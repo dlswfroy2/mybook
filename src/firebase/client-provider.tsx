@@ -34,19 +34,22 @@ function getFirebaseInstances() {
   if (!window.__FIREBASE_FIRESTORE__) {
     /**
      * Modern Firestore Initialization (SDK v11+)
-     * Using persistentSingleTabManager with a robust retry strategy 
-     * to prevent INTERNAL ASSERTION FAILED errors often caused by 
-     * race conditions during background sync in multi-tab or dev environments.
+     * Using persistentLocalCache with specialized settings 
+     * to prevent INTERNAL ASSERTION FAILED errors (Unexpected state)
+     * which are common in v11.9.x during background sync or hot-reloading.
      */
     try {
       window.__FIREBASE_FIRESTORE__ = initializeFirestore(app, {
         localCache: persistentLocalCache({
           tabManager: persistentSingleTabManager({}),
         }),
+        // Force long polling to stabilize the internal watch stream 
+        // and prevent assertion failures in managed environments.
+        experimentalForceLongPolling: true,
       });
     } catch (e) {
       console.warn("Firestore re-initialization or persistent cache conflict detected.");
-      // Fallback to existing instance if available
+      // Standard fallback to prevent the app from crashing
       window.__FIREBASE_FIRESTORE__ = window.__FIREBASE_FIRESTORE__ || initializeFirestore(app, {});
     }
 
