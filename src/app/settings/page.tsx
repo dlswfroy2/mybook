@@ -25,8 +25,21 @@ import {
   ShieldCheck, 
   FileUp, 
   FileType,
-  BookOpen
+  BookOpen,
+  School,
+  Calendar,
+  HardDriveDownload,
+  Monitor,
+  ImageIcon
 } from 'lucide-react';
+import { 
+  SchoolInfoSettings, 
+  HolidaySettings, 
+  UserManagementSettings, 
+  BackupAndExportSettings, 
+  GalleryManagementSettings, 
+  SystemUsageInfo 
+} from '@/components/settings/BpsSettingsComponents';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from '@/hooks/use-toast';
@@ -464,23 +477,31 @@ function SettingsContent() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
       <header className="flex items-center gap-4 border-b pb-4">
         <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
           <SettingsIcon className="w-6 h-6" />
         </div>
-        <h2 className="text-xl font-bold">সেটিং</h2>
+        <h2 className="text-xl font-bold">সেটিংস ও নিয়ন্ত্রণ কেন্দ্র</h2>
       </header>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full mb-6 bg-secondary/50 p-1 ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'}`}>
+        <TabsList className="flex flex-wrap gap-1.5 w-full mb-6 bg-secondary/50 p-2 rounded-2xl h-auto">
           <TabsTrigger value="profile" className="gap-2 font-bold text-xs"><User className="w-3.5 h-3.5" /> প্রোফাইল</TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="school" className="gap-2 font-bold text-xs"><School className="w-3.5 h-3.5" /> প্রতিষ্ঠানের তথ্য</TabsTrigger>
+          )}
           <TabsTrigger value="books" className="gap-2 font-bold text-xs"><BookCopy className="w-3.5 h-3.5" /> বই ব্যবস্থাপনা</TabsTrigger>
           {isAdmin && (
             <>
               <TabsTrigger value="sheets" className="gap-2 font-bold text-xs"><FileUp className="w-3.5 h-3.5" /> ফাইল আপলোড</TabsTrigger>
-              <TabsTrigger value="requests" className="gap-2 font-bold text-xs"><Users className="w-3.5 h-3.5" /> আবেদন</TabsTrigger>
-              <TabsTrigger value="software" className="gap-2 font-bold text-xs"><Globe className="w-3.5 h-3.5" /> ব্র্যান্ডিং</TabsTrigger>
+              <TabsTrigger value="requests" className="gap-2 font-bold text-xs"><Users className="w-3.5 h-3.5" /> অনুমোদন আবেদন</TabsTrigger>
+              <TabsTrigger value="software" className="gap-2 font-bold text-xs"><Globe className="w-3.5 h-3.5" /> সফটওয়্যার ব্র্যান্ডিং</TabsTrigger>
+              <TabsTrigger value="holidays" className="gap-2 font-bold text-xs"><Calendar className="w-3.5 h-3.5" /> ছুটির ক্যালেন্ডার</TabsTrigger>
+              <TabsTrigger value="users" className="gap-2 font-bold text-xs"><Users className="w-3.5 h-3.5" /> ইউজার ও পারমিশন</TabsTrigger>
+              <TabsTrigger value="backup" className="gap-2 font-bold text-xs"><HardDriveDownload className="w-3.5 h-3.5" /> ব্যাকআপ ও এক্সপোর্ট</TabsTrigger>
+              <TabsTrigger value="gallery" className="gap-2 font-bold text-xs"><ImageIcon className="w-3.5 h-3.5" /> গ্যালারি</TabsTrigger>
+              <TabsTrigger value="system" className="gap-2 font-bold text-xs"><Monitor className="w-3.5 h-3.5" /> সিস্টেম ওভারভিউ</TabsTrigger>
             </>
           )}
         </TabsList>
@@ -841,6 +862,30 @@ function SettingsContent() {
                   </Button>
                 </CardFooter>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="school" className="space-y-4">
+              <SchoolInfoSettings />
+            </TabsContent>
+
+            <TabsContent value="holidays" className="space-y-4">
+              <HolidaySettings />
+            </TabsContent>
+
+            <TabsContent value="users" className="space-y-4">
+              <UserManagementSettings />
+            </TabsContent>
+
+            <TabsContent value="backup" className="space-y-4">
+              <BackupAndExportSettings />
+            </TabsContent>
+
+            <TabsContent value="gallery" className="space-y-4">
+              <GalleryManagementSettings />
+            </TabsContent>
+
+            <TabsContent value="system" className="space-y-4">
+              <SystemUsageInfo />
             </TabsContent>
           </>
         )}

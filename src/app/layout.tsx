@@ -5,6 +5,9 @@ import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { AuthProvider } from '@/context/AuthContext';
+import { SchoolInfoProvider } from '@/context/SchoolInfoContext';
+import { AcademicYearProvider } from '@/context/AcademicYearContext';
 
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
@@ -26,16 +29,22 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col bg-background">
         <FirebaseClientProvider>
-          <Navbar />
-          <main className="flex-1 pt-20 pb-12 container mx-auto px-4">
-            {children}
-          </main>
-          <footer className="py-6 text-center text-[10px] text-muted-foreground border-t bg-muted/5 mb-20 no-print font-bold">
-            <p className="tracking-widest uppercase">© ২০২৪-২৬ টপ গ্রেড টিউটোরিয়ালস।</p>
-            <p className="mt-1 text-primary/60">সর্বস্বত্ব সংরক্ষিত।</p>
-          </footer>
-          <BottomNav />
-          <Toaster />
+          <AuthProvider>
+            <SchoolInfoProvider>
+              <AcademicYearProvider>
+                <Navbar />
+                <main className="flex-1 pt-20 pb-12 container mx-auto px-4">
+                  {children}
+                </main>
+                <footer className="py-6 text-center text-[10px] text-muted-foreground border-t bg-muted/5 mb-20 no-print font-bold">
+                  <p className="tracking-widest uppercase">© ২০২৪-২৬ টপ গ্রেড টিউটোরিয়ালস।</p>
+                  <p className="mt-1 text-primary/60">সর্বস্বত্ব সংরক্ষিত।</p>
+                </footer>
+                <BottomNav />
+                <Toaster />
+              </AcademicYearProvider>
+            </SchoolInfoProvider>
+          </AuthProvider>
         </FirebaseClientProvider>
       </body>
     </html>

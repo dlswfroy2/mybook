@@ -17,11 +17,25 @@ import {
   NotebookPen, 
   FileUp, 
   LayoutGrid,
-  FileText
+  FileText,
+  Bell,
+  Megaphone,
+  UserPlus,
+  Search,
+  CalendarCheck,
+  Award,
+  Banknote,
+  MessageSquare,
+  UserCog,
+  FolderOpen,
+  Clock
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
-import { collection } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp, FirestoreError } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
+import { Notice } from '@/lib/notice-data';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { 
   Select, 
   SelectContent, 
@@ -105,6 +119,88 @@ function normalizeForSort(name: string): number {
   return isNaN(num) ? 998 : num;
 }
 
+// Scrolling Notice Ticker Component
+const NoticeTicker = () => {
+    const db = useFirestore();
+    const { user } = useUser();
+    const [scrollingNotices, setScrollingNotices] = useState<Notice[]>([]);
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    useEffect(() => {
+        if (!db || !user || !isClient) return;
+        
+        const q = query(collection(db, 'notices'), orderBy('date', 'desc'), limit(15));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => {
+                const docData = doc.data();
+                return {
+                    id: doc.id,
+                    ...docData,
+                    date: docData.date instanceof Timestamp ? docData.date.toDate() : (docData.date ? new Date(docData.date) : new Date()),
+                } as Notice;
+            });
+            const scrolling = data.filter(n => !!n.isScrolling);
+            setScrollingNotices(scrolling);
+        }, async (error: FirestoreError) => {
+            if (error.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'notices',
+                    operation: 'list',
+                }));
+            }
+        });
+
+        return () => unsubscribe();
+    }, [db, user, isClient]);
+
+    if (!isClient) return null;
+
+    if (scrollingNotices.length > 0) {
+        return (
+            <div className="w-full bg-yellow-100 text-red-700 h-8 flex items-center overflow-hidden border-y-2 border-red-500 shadow-md sticky top-16 md:top-20 z-40 font-kalpurush group cursor-default rounded-lg">
+                <div className="bg-red-600 text-white px-3 h-full flex items-center gap-1.5 shrink-0 z-10 shadow-lg">
+                    <Megaphone className="h-3.5 w-3.5 animate-bounce" />
+                    <span className="font-black text-xs whitespace-nowrap leading-none">জরুরি নোটিশ:</span>
+                </div>
+                <div className="flex-1 relative overflow-hidden h-full flex items-center">
+                    <div className="absolute whitespace-nowrap animate-marquee flex items-center gap-10 group-hover:pause-animation">
+                        {scrollingNotices.map((notice, idx) => (
+                            <span key={`notice-${idx}`} className="font-black text-xs tracking-tight">
+                                <span className="text-blue-800">[{notice.title}]</span> - {notice.content.replace(/\n/g, ' ')}
+                            </span>
+                        ))}
+                        {scrollingNotices.map((notice, idx) => (
+                            <span key={`notice-loop-${idx}`} className="font-black text-xs tracking-tight">
+                                <span className="text-blue-800">[{notice.title}]</span> - {notice.content.replace(/\n/g, ' ')}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+                <style jsx>{`
+                    @keyframes marquee {
+                        0% { transform: translateX(0); }
+                        100% { transform: translateX(-50%); }
+                    }
+                    .animate-marquee {
+                        animation: marquee 45s linear infinite;
+                        display: inline-flex;
+                        width: max-content;
+                    }
+                    .pause-animation {
+                        animation-play-state: paused;
+                    }
+                `}</style>
+            </div>
+        );
+    }
+
+    return null;
+};
+
 export default function Home() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -113,9 +209,9 @@ export default function Home() {
   const [selectedSubjects, setSelectedSubjects] = useState<Record<string, string>>({});
   const [selectedDashboardClass, setSelectedDashboardClass] = useState<string>('6');
 
-  const qQuery = useMemo(() => db ? collection(db, 'questions') : null, [db]);
-  const pQuery = useMemo(() => db ? collection(db, 'pdf-sheets') : null, [db]);
-  const lQuery = useMemo(() => db ? collection(db, 'lecture-sheets') : null, [db]);
+  const qQuery = useMemo(() => (db && user) ? collection(db, 'questions') : null, [db, user]);
+  const pQuery = useMemo(() => (db && user) ? collection(db, 'pdf-sheets') : null, [db, user]);
+  const lQuery = useMemo(() => (db && user) ? collection(db, 'lecture-sheets') : null, [db, user]);
 
   const { data: allQuestions } = useCollection(qQuery);
   const { data: allPdfSheets } = useCollection(pQuery);
@@ -170,7 +266,8 @@ export default function Home() {
   const glassClass = "backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]";
 
   return (
-    <div className="space-y-12 animate-fade-in font-kalpurush">
+    <div className="space-y-8 animate-fade-in font-kalpurush">
+      <NoticeTicker />
       <section className="grid grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
         <Link href="/create-question">
           <Card className={cn(glassClass, "bg-blue-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-blue-600 h-full")}>
@@ -182,6 +279,20 @@ export default function Home() {
             </CardHeader>
             <CardContent className="p-1 pt-0">
               <p className="text-[9px] md:text-[10px] font-black text-blue-900/60 leading-tight line-clamp-2">বোর্ড স্ট্যান্ডার্ড সৃজনশীল ও এমসিকিউ।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/notices-management">
+          <Card className={cn(glassClass, "bg-yellow-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-yellow-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-yellow-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Bell className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-yellow-900 font-black text-[10px] md:text-[12px] leading-tight">নোটিশ বোর্ড</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-yellow-900/60 leading-tight line-clamp-2">নোটিশ ও ঘোষণা পরিচালনা।</p>
             </CardContent>
           </Card>
         </Link>
@@ -214,16 +325,156 @@ export default function Home() {
           </Card>
         </Link>
 
-        <Link href="/students">
+        <Link href="/student-profile">
+          <Card className={cn(glassClass, "bg-sky-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-sky-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-sky-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Search className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-sky-900 font-black text-[10px] md:text-[12px] leading-tight">শিক্ষার্থী প্রোফাইল</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-sky-900/60 leading-tight line-clamp-2">ব্যক্তিগত তথ্য ও ফলাফল অনুসন্ধান।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/add-student">
+          <Card className={cn(glassClass, "bg-emerald-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-emerald-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-emerald-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-emerald-900 font-black text-[10px] md:text-[12px] leading-tight">নতুন শিক্ষার্থী ভর্তি</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-emerald-900/60 leading-tight line-clamp-2">একক ও এক্সেল বাল্ক ভর্তি।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/student-list">
           <Card className={cn(glassClass, "bg-green-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-green-600 h-full")}>
             <CardHeader className="p-1">
               <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-green-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
                 <Users className="w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <CardTitle className="text-green-900 font-black text-[10px] md:text-[12px] leading-tight">শিক্ষার্থী</CardTitle>
+              <CardTitle className="text-green-900 font-black text-[10px] md:text-[12px] leading-tight">শিক্ষার্থী তালিকা</CardTitle>
             </CardHeader>
             <CardContent className="p-1 pt-0">
-              <p className="text-[9px] md:text-[10px] font-black text-green-900/60 leading-tight line-clamp-2">শিক্ষার্থীদের তথ্য ও হাজিরা পরিচালনা।</p>
+              <p className="text-[9px] md:text-[10px] font-black text-green-900/60 leading-tight line-clamp-2">শ্রেণিভিত্তিক তালিকা ও প্রিন্ট।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/attendance">
+          <Card className={cn(glassClass, "bg-teal-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-teal-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-teal-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <CalendarCheck className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-teal-900 font-black text-[10px] md:text-[12px] leading-tight">হাজিরা শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-teal-900/60 leading-tight line-clamp-2">দৈনিক হাজিরা ও রিপোর্ট।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/results">
+          <Card className={cn(glassClass, "bg-purple-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-purple-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-purple-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Award className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-purple-900 font-black text-[10px] md:text-[12px] leading-tight">ফলাফল শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-purple-900/60 leading-tight line-clamp-2">মার্ক এন্ট্রি ও রেজাল্ট শিট।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/accounts">
+          <Card className={cn(glassClass, "bg-emerald-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-emerald-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-emerald-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Banknote className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-emerald-900 font-black text-[10px] md:text-[12px] leading-tight">হিসাব শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-emerald-900/60 leading-tight line-clamp-2">ফি আদায় ও ক্যাশবুক।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/messaging">
+          <Card className={cn(glassClass, "bg-blue-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-blue-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-blue-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-blue-900 font-black text-[10px] md:text-[12px] leading-tight">মেসেজ শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-blue-900/60 leading-tight line-clamp-2">এসএমএস ও নোটিফিকেশন।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/staff">
+          <Card className={cn(glassClass, "bg-indigo-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-indigo-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-indigo-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <UserCog className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-indigo-900 font-black text-[10px] md:text-[12px] leading-tight">স্টাফ পোর্টাল</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-indigo-900/60 leading-tight line-clamp-2">শিক্ষক ও স্টাফ তালিকা।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/documents">
+          <Card className={cn(glassClass, "bg-amber-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-amber-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-amber-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <FolderOpen className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-amber-900 font-black text-[10px] md:text-[12px] leading-tight">ডকুমেন্ট পোর্টাল</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-amber-900/60 leading-tight line-clamp-2">প্রত্যয়ন ও এডমিট কার্ড।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/routines">
+          <Card className={cn(glassClass, "bg-violet-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-violet-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-violet-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Clock className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-violet-900 font-black text-[10px] md:text-[12px] leading-tight">রুটিন শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-violet-900/60 leading-tight line-clamp-2">ক্লাস ও পরীক্ষা রুটিন।</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/public-exam-records">
+          <Card className={cn(glassClass, "bg-cyan-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-cyan-600 h-full")}>
+            <CardHeader className="p-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-cyan-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+                <Award className="w-4 h-4 md:w-5 md:h-5" />
+              </div>
+              <CardTitle className="text-cyan-900 font-black text-[10px] md:text-[12px] leading-tight">রেকর্ড শাখা</CardTitle>
+            </CardHeader>
+            <CardContent className="p-1 pt-0">
+              <p className="text-[9px] md:text-[10px] font-black text-cyan-900/60 leading-tight line-clamp-2">বোর্ড পরীক্ষার অতীত ফলাফল।</p>
             </CardContent>
           </Card>
         </Link>
