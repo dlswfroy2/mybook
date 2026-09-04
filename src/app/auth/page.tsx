@@ -22,6 +22,7 @@ import {
   where,
   getDocs
 } from 'firebase/firestore';
+import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,84 @@ export default function AuthPage() {
   const appLogoUrl = schoolInfo?.logoUrl || '';
 
   const [scrollingNotices, setScrollingNotices] = useState<any[]>([]);
+
+  // Dynamic Stats States for Public Board
+  const [stats, setStats] = useState({ 
+    students: 0, 
+    teachers: 0,
+    attendanceRate: 0,
+    passRate: 0,
+    sscYear: new Date().getFullYear().toString()
+  });
+
+  // Fetch live stats for the public dashboard/login board
+  useEffect(() => {
+    if (!db) return;
+    const fetchStats = async () => {
+      try {
+        const currentYear = new Date().getFullYear().toString();
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        
+        const sPromise = getDocs(query(collection(db, 'students'), where('academicYear', '==', currentYear)));
+        const tPromise = getDocs(query(collection(db, 'staff'), where('isActive', '==', true), where('staffType', '==', 'teacher')));
+        const attPromise = getDocs(query(collection(db, 'attendance'), where('academicYear', '==', currentYear), where('date', '==', todayStr)));
+        const sscRecordsPromise = getDocs(query(collection(db, 'publicExamRecords'), where('examType', '==', 'SSC')));
+
+        const [sSnap, tSnap, attSnap, allSscSnap] = await Promise.all([
+          sPromise.catch(() => ({ size: 0, docs: [] })),
+          tPromise.catch(() => ({ size: 0, docs: [] })),
+          attPromise.catch(() => ({ size: 0, docs: [] })),
+          sscRecordsPromise.catch(() => ({ size: 0, docs: [] }))
+        ]);
+
+        const totalStudentsCount = (sSnap as any).size;
+        const activeTeachersCount = (tSnap as any).size;
+
+        let presentCount = 0;
+        (attSnap as any).docs.forEach((doc: any) => {
+          const data = doc.data();
+          if (data.attendance) {
+            presentCount += data.attendance.filter((a: any) => a.status === 'present').length;
+          }
+        });
+
+        let sscYear = currentYear;
+        let sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === currentYear);
+        
+        if (sscDocs.length === 0 && (allSscSnap as any).docs.length > 0) {
+          const yearsWithRecords = Array.from(new Set((allSscSnap as any).docs.map((d: any) => d.data().academicYear).filter(Boolean))).sort().reverse();
+          if (yearsWithRecords.length > 0) {
+            sscYear = yearsWithRecords[0] as string;
+            sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === sscYear);
+          }
+        }
+
+        let passRatePercent = 0;
+        if (sscDocs.length > 0) {
+          const passedCount = sscDocs.filter((doc: any) => {
+            const data = doc.data();
+            const grade = (data.grade || '').toString().trim().toUpperCase();
+            const gpa = Number(data.gpa) || 0;
+            return grade !== '' && grade !== 'F' && gpa > 0;
+          }).length;
+          passRatePercent = (passedCount / sscDocs.length) * 100;
+        } else if ((schoolInfo as any)?.passingRate) {
+          passRatePercent = parseFloat((schoolInfo as any).passingRate) || 0;
+        }
+
+        setStats({ 
+          students: totalStudentsCount, 
+          teachers: activeTeachersCount,
+          attendanceRate: totalStudentsCount > 0 ? (presentCount / totalStudentsCount) * 100 : 0,
+          passRate: passRatePercent,
+          sscYear: sscYear
+        });
+      } catch (e) {
+        console.warn('Stats fetch error:', e);
+      }
+    };
+    fetchStats();
+  }, [db, schoolInfo]);
 
   // Load notices for marquee ticker safely
   useEffect(() => {
@@ -628,7 +707,7 @@ export default function AuthPage() {
                      <Users className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-4xl font-black text-slate-800">১৬৭</p>
+                    <p className="text-2xl md:text-4xl font-black text-slate-800">{toBengaliNumber(stats.students)}</p>
                     <p className="text-[10px] md:text-xs font-black text-blue-600 uppercase tracking-wider">শিক্ষার্থী</p>
                   </div>
                </CardContent>
@@ -639,7 +718,7 @@ export default function AuthPage() {
                      <GraduationCap className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-4xl font-black text-slate-800">১০</p>
+                    <p className="text-2xl md:text-4xl font-black text-slate-800">{toBengaliNumber(stats.teachers)}</p>
                     <p className="text-[10px] md:text-xs font-black text-emerald-600 uppercase tracking-wider">শিক্ষক</p>
                   </div>
                </CardContent>
@@ -650,7 +729,7 @@ export default function AuthPage() {
                      <Calendar className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-4xl font-black text-slate-800">০.০%</p>
+                    <p className="text-2xl md:text-4xl font-black text-slate-800">{toBengaliNumber(stats.attendanceRate.toFixed(1))}%</p>
                     <p className="text-[10px] md:text-xs font-black text-indigo-600 uppercase tracking-wider">উপস্থিতি</p>
                   </div>
                </CardContent>
@@ -661,8 +740,8 @@ export default function AuthPage() {
                      <Trophy className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-4xl font-black text-slate-800">০.০%</p>
-                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider">এস এস সি পরীক্ষা-২০২৭</p>
+                    <p className="text-2xl md:text-4xl font-black text-slate-800">{toBengaliNumber(stats.passRate.toFixed(1))}%</p>
+                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
                   </div>
                </CardContent>
             </Card>

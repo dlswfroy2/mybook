@@ -1,10 +1,11 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { 
   GraduationCap, 
@@ -21,7 +22,7 @@ import {
   Bell,
   Megaphone,
   UserPlus,
-  Search,
+  Search, 
   CalendarCheck,
   Award,
   Calendar,
@@ -29,11 +30,21 @@ import {
   Banknote,
   UserCog,
   FolderOpen,
-  Clock
+  Clock,
+  UserCheck,
+  CheckCircle2,
+  XCircle,
+  Image as ImageIcon,
+  AlertCircle
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp, FirestoreError } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp, FirestoreError, where, getDocs, doc, QueryDocumentSnapshot } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Notice } from '@/lib/notice-data';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -45,6 +56,97 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { useAcademicYear } from '@/context/AcademicYearContext';
+import { Student, studentFromDoc } from '@/lib/student-data';
+import { getAttendanceForDate, saveDailyAttendance, StudentAttendance, DailyAttendance, getAttendanceForClassAndDate } from '@/lib/attendance-data';
+import { isHoliday } from '@/lib/holiday-data';
+import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
+import { StudentFeeDialog } from '@/components/StudentFeeDialog';
+import { useToast } from '@/hooks/use-toast';
+
+const classNamesMap: Record<string, string> = {
+  '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
+};
+
+const GalleryCard = () => {
+    const db = useFirestore();
+    const { user } = useUser();
+    const [config, setConfig] = useState<GalleryConfig>(defaultGalleryConfig);
+    const [currentIdx, setCurrentIdx] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!db || !user) return;
+        const unsub = onSnapshot(doc(db, 'school', 'gallery'), (snap) => {
+            if (snap.exists()) {
+                setConfig(snap.data() as GalleryConfig);
+            }
+            setIsLoading(false);
+        }, async (error: FirestoreError) => {
+            if (error.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'school/gallery',
+                    operation: 'get',
+                }));
+            }
+        });
+        return () => unsub();
+    }, [db, user]);
+
+    const activeImages = useMemo(() => config.images.filter(img => img.isActive), [config.images]);
+
+    useEffect(() => {
+        if (activeImages.length <= 1) return;
+        const interval = setInterval(() => {
+            setCurrentIdx(prev => (prev + 1) % activeImages.length);
+        }, config.duration * 1000);
+        return () => clearInterval(interval);
+    }, [activeImages, config.duration]);
+
+    if (isLoading) return <Skeleton className="h-full w-full rounded-xl min-h-[140px]" />;
+
+    return (
+        <Card className="relative overflow-hidden bg-white border-2 border-black shadow-sm group hover:shadow-lg transition-all duration-500 rounded-xl">
+            <CardHeader className="p-3 bg-primary/5 border-b border-black/10 relative z-20">
+                <CardTitle className="text-xs font-black text-primary flex items-center gap-1.5 uppercase">
+                    <ImageIcon className="h-3.5 w-3.5" /> বিদ্যালয় গ্যালারি
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 relative h-28 sm:h-32 overflow-hidden">
+                {activeImages.length > 0 ? (
+                    <div className="relative w-full h-full">
+                        {activeImages.map((img, idx) => (
+                            <div 
+                                key={img.id}
+                                className={cn(
+                                    "absolute inset-0 transition-opacity duration-1000",
+                                    idx === currentIdx ? "opacity-100 z-10" : "opacity-0 z-0"
+                                )}
+                            >
+                                <Image 
+                                    src={img.url} 
+                                    alt={img.title} 
+                                    fill 
+                                    className="object-cover"
+                                    data-ai-hint="school landscape"
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-[2px] p-1 text-center">
+                                    <p className="text-[10px] text-white font-black truncate">{img.title}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-muted-foreground italic">
+                        <ImageIcon className="h-8 w-8 mb-1 opacity-20" />
+                        <p className="text-[10px]">ছবি নেই</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
@@ -210,6 +312,230 @@ export default function Home() {
   const [selectedSubjects, setSelectedSubjects] = useState<Record<string, string>>({});
   const [selectedDashboardClass, setSelectedDashboardClass] = useState<string>('6');
 
+  const { toast } = useToast();
+  const { selectedYear } = useAcademicYear();
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+  const [totalPresent, setTotalPresent] = useState(0);
+  const [totalAbsent, setTotalAbsent] = useState(0);
+
+  // Quick Payment States
+  const [isQuickPaymentOpen, setIsQuickPaymentOpen] = useState(false);
+  const [quickSearchInput, setQuickSearchInput] = useState('');
+  const [quickSearchClass, setQuickSearchClass] = useState<string>('');
+  const [studentsForYear, setStudentsForYear] = useState<Student[]>([]);
+  const [quickFeeStudent, setQuickFeeStudent] = useState<Student | null>(null);
+
+  // Quick Attendance States
+  const [isQuickAttendanceOpen, setIsQuickAttendanceOpen] = useState(false);
+  const [quickAttendanceClass, setQuickAttendanceClass] = useState<string>('6');
+  const [quickAttendanceInput, setQuickAttendanceInput] = useState('');
+  const [isSavingQuickAttendance, setIsSavingQuickAttendance] = useState(false);
+  const [isConfirmingQuickAttendance, setIsConfirmingQuickAttendance] = useState(false);
+
+  const refreshDashboardAttendance = useCallback(async (currentStudents?: Student[]) => {
+      if (!db) return;
+      const list = currentStudents && currentStudents.length > 0 ? currentStudents : studentsForYear;
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      try {
+          const todaysAttendance = await getAttendanceForDate(db, todayStr, selectedYear);
+          if (todaysAttendance.length > 0) {
+              let totalPresentCount = 0;
+              let totalAbsentCount = 0;
+              todaysAttendance.forEach(classAttendanceRecord => {
+                  const className = classAttendanceRecord.className;
+                  classAttendanceRecord.attendance.forEach(studentAttendance => {
+                      const studentExistsInYear = list.some(s => s.id === studentAttendance.studentId && s.className === className);
+                      if (studentExistsInYear) {
+                          if (studentAttendance.status === 'present') {
+                              totalPresentCount++;
+                          } else {
+                              totalAbsentCount++;
+                          }
+                      }
+                  });
+              });
+              setTotalPresent(totalPresentCount);
+              setTotalAbsent(totalAbsentCount);
+          } else {
+              setTotalPresent(0);
+              setTotalAbsent(0);
+          }
+      } catch (e) {}
+  }, [db, selectedYear, studentsForYear]);
+
+  useEffect(() => {
+      if (!db || !user) return;
+
+      const studentsQuery = query(collection(db, 'students'), where('academicYear', '==', selectedYear));
+      
+      const unsubscribeStudents = onSnapshot(studentsQuery, async (studentsSnapshot) => {
+        const list = studentsSnapshot.docs.map(studentFromDoc);
+        setStudentsForYear(list);
+        setTotalStudents(list.length);
+        refreshDashboardAttendance(list);
+      },
+      (error: FirestoreError) => {
+        if (error.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'students',
+                operation: 'list',
+            }));
+        }
+      });
+
+      const staffQuery = query(collection(db, 'staff'), where('isActive', '==', true), where('staffType', '==', 'teacher'));
+      const unsubscribeStaff = onSnapshot(staffQuery, (querySnapshot) => {
+        setTotalTeachers(querySnapshot.size);
+      },
+      (error: FirestoreError) => {
+        if (error.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'staff',
+                operation: 'list',
+            }));
+        }
+      });
+
+      return () => {
+        unsubscribeStudents();
+        unsubscribeStaff();
+      };
+  }, [selectedYear, db, user, refreshDashboardAttendance]);
+
+  const handleQuickSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const queryStr = quickSearchInput.trim().toLowerCase();
+    if (!queryStr) {
+        toast({ variant: "destructive", title: "তথ্য দিন", description: "রোল বা আইডি লিখুন।" });
+        return;
+    }
+
+    const bnToEn = (str: string) => str.toString().replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
+    const queryEn = bnToEn(queryStr);
+    const rollEn = parseInt(queryEn, 10);
+
+    const found = studentsForYear.find(s => {
+        if (s.generatedId && s.generatedId.toLowerCase() === queryEn) {
+            return true;
+        }
+        if (quickSearchClass && !isNaN(rollEn)) {
+            return s.className === quickSearchClass && s.roll === rollEn;
+        }
+        return false;
+    });
+
+    if (found) {
+        setQuickFeeStudent(found);
+        setQuickSearchInput('');
+        setIsQuickPaymentOpen(false);
+    } else {
+        toast({
+            variant: "destructive",
+            title: "শিক্ষার্থী পাওয়া যায়নি",
+            description: "সঠিক আইডি লিখুন অথবা রোল এবং শ্রেণি উভয়ই চেক করুন।"
+        });
+    }
+  };
+
+  const handleQuickAttendanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!db) return;
+    if (!quickAttendanceClass) {
+        toast({ variant: 'destructive', title: 'শ্রেণি নির্বাচন করুন' });
+        return;
+    }
+
+    setIsSavingQuickAttendance(true);
+    try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const activeHoliday = await isHoliday(db, todayStr);
+        const dayOfWeek = new Date().getDay();
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+
+        if (activeHoliday || isWeekend) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'আজ ছুটির দিন!', 
+                description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে স্কুল বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
+            });
+            setIsSavingQuickAttendance(false);
+            return;
+        }
+
+        if (!isConfirmingQuickAttendance) {
+            const existing = await getAttendanceForClassAndDate(db, todayStr, quickAttendanceClass, selectedYear);
+            if (existing) {
+                setIsConfirmingQuickAttendance(true);
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'হাজিরা ইতিমধ্যে নেওয়া হয়েছে!', 
+                    description: 'আপনি কি পূর্বের হাজিরা মুছে নতুনভাবে সেভ করতে চান? চাইলে আবার এন্টার দিন।' 
+                });
+                setIsSavingQuickAttendance(false);
+                return;
+            }
+        }
+
+        const bnToEn = (str: string) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
+        const inputRolls = quickAttendanceInput
+            .split(/[\s,]+/)
+            .map(r => parseInt(bnToEn(r.trim()), 10))
+            .filter(r => !isNaN(r));
+
+        let classStudents = (studentsForYear || []).filter(
+            (s: Student) => String(s.className) === String(quickAttendanceClass)
+        );
+
+        if (classStudents.length === 0) {
+            const qSnap = await getDocs(query(
+                collection(db, 'students'),
+                where('className', '==', quickAttendanceClass),
+                where('academicYear', '==', selectedYear)
+            ));
+            classStudents = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+        }
+
+        if (classStudents.length === 0) {
+            toast({ variant: 'destructive', title: 'এই শ্রেণিতে কোনো শিক্ষার্থী পাওয়া যায়নি' });
+            setIsSavingQuickAttendance(false);
+            return;
+        }
+
+        const attendanceData: StudentAttendance[] = classStudents.map((student: Student) => ({
+            studentId: student.id,
+            status: (student.roll !== undefined && inputRolls.includes(student.roll)) ? 'present' : 'absent'
+        }));
+
+        const dailyAttendance: DailyAttendance = {
+            date: todayStr,
+            academicYear: selectedYear,
+            className: quickAttendanceClass,
+            attendance: attendanceData,
+        };
+
+        await saveDailyAttendance(db, dailyAttendance);
+
+        toast({
+            title: `আজকের কুইক হাজিরা সংরক্ষিত হয়েছে (${classNamesMap[quickAttendanceClass] || quickAttendanceClass} শ্রেণি)`,
+            description: `${inputRolls.length} জন উপস্থিত হিসেবে সেভ হয়েছে।`
+        });
+        setQuickAttendanceInput('');
+        setIsConfirmingQuickAttendance(false);
+        setIsQuickAttendanceOpen(false);
+
+        refreshDashboardAttendance(studentsForYear);
+    } catch (err: any) {
+        console.error("Error saving quick attendance:", err);
+        toast({ variant: 'destructive', title: 'হাজিরা সেভ করতে সমস্যা হয়েছে' });
+    } finally {
+        setIsSavingQuickAttendance(false);
+    }
+  };
+
+  const presentPercentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : "০";
+  const absentPercentage = totalStudents > 0 ? ((totalAbsent / totalStudents) * 100).toFixed(1) : "০";
+
   const qQuery = useMemo(() => (db && user) ? collection(db, 'questions') : null, [db, user]);
   const pQuery = useMemo(() => (db && user) ? collection(db, 'pdf-sheets') : null, [db, user]);
   const lQuery = useMemo(() => (db && user) ? collection(db, 'lecture-sheets') : null, [db, user]);
@@ -269,6 +595,177 @@ export default function Home() {
   return (
     <div className="space-y-8 animate-fade-in font-kalpurush">
       <NoticeTicker />
+
+      {/* Quick Actions Bar */}
+      <div className="flex flex-wrap gap-4 items-center justify-center sm:justify-start">
+          <Link href="/add-student">
+              <Button className="h-12 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+                  <UserPlus className="h-5 w-5" /> কুইক ভর্তি
+              </Button>
+          </Link>
+
+          <Dialog open={isQuickPaymentOpen} onOpenChange={setIsQuickPaymentOpen}>
+              <DialogTrigger asChild>
+                  <Button className="h-12 px-6 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+                      <Banknote className="h-5 w-5" /> কুইক পেমেন্ট
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className="font-kalpurush sm:max-w-md">
+                  <DialogHeader>
+                      <DialogTitle className="text-xl font-black text-teal-700 flex items-center gap-2">
+                          <Banknote /> কুইক পেমেন্ট সার্চ
+                      </DialogTitle>
+                      <DialogDescription className="font-bold">রোল এবং শ্রেণি নির্বাচন করে শিক্ষার্থী খুঁজুন</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleQuickSearch} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                          <Label className="font-bold">শ্রেণি নির্বাচন</Label>
+                          <Select value={quickSearchClass} onValueChange={setQuickSearchClass}>
+                              <SelectTrigger className="h-11 border-2"><SelectValue placeholder="সিলেক্ট শ্রেণি" /></SelectTrigger>
+                              <SelectContent>
+                                  {Object.entries(classNamesMap).map(([id, label]) => (
+                                      <SelectItem key={id} value={id}>{label} শ্রেণি</SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="font-bold">রোল অথবা আইডি (ID)</Label>
+                          <Input 
+                              value={quickSearchInput} 
+                              onChange={e => setQuickSearchInput(e.target.value)} 
+                              placeholder="এখানে লিখুন..." 
+                              className="h-11 border-2 font-black text-lg"
+                          />
+                      </div>
+                      <Button type="submit" className="w-full h-11 bg-teal-600 hover:bg-teal-700 text-white font-black">সার্চ করুন</Button>
+                  </form>
+              </DialogContent>
+          </Dialog>
+
+          <Dialog open={isQuickAttendanceOpen} onOpenChange={(o) => { setIsQuickAttendanceOpen(o); if(!o) setIsConfirmingQuickAttendance(false); }}>
+              <DialogTrigger asChild>
+                  <Button className="h-12 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+                      <UserCheck className="h-5 w-5" /> কুইক হাজিরা
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className={cn("font-kalpurush sm:max-w-md transition-all duration-300", isConfirmingQuickAttendance && "border-rose-500 ring-4 ring-rose-100")}>
+                  <DialogHeader>
+                      <DialogTitle className={cn("text-xl font-black flex items-center gap-2", isConfirmingQuickAttendance ? "text-rose-700" : "text-emerald-700")}>
+                          {isConfirmingQuickAttendance ? <AlertCircle /> : <UserCheck />}
+                          {isConfirmingQuickAttendance ? "পুনরায় সেভ নিশ্চিত করুন" : "আজকের কুইক হাজিরা"}
+                      </DialogTitle>
+                      <DialogDescription className={cn("font-bold", isConfirmingQuickAttendance && "text-rose-600")}>
+                          {isConfirmingQuickAttendance ? "এই শ্রেণির হাজিরা আজ একবার নেওয়া হয়েছে। আপডেট করতে চান?" : "রোল নম্বরগুলো কমা বা স্পেস দিয়ে লিখুন।"}
+                      </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleQuickAttendanceSubmit} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                          <Label className="font-bold">শ্রেণি</Label>
+                          <Select value={quickAttendanceClass} onValueChange={(v) => { setQuickAttendanceClass(v); setIsConfirmingQuickAttendance(false); }}>
+                              <SelectTrigger className="h-11 border-2"><SelectValue placeholder="সিলেক্ট শ্রেণি" /></SelectTrigger>
+                              <SelectContent>
+                                  {Object.entries(classNamesMap).map(([id, label]) => (
+                                      <SelectItem key={id} value={id}>{label} শ্রেণি</SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="font-bold">উপস্থিত রোল নম্বরসমূহ</Label>
+                          <Input 
+                              value={quickAttendanceInput} 
+                              onChange={e => { setQuickAttendanceInput(e.target.value); setIsConfirmingQuickAttendance(false); }} 
+                              placeholder="উদা: ১, ২, ৫, ১০" 
+                              className={cn("h-11 border-2 font-black text-lg", isConfirmingQuickAttendance && "bg-rose-50")}
+                          />
+                      </div>
+                      <div className="flex gap-2">
+                          {isConfirmingQuickAttendance && (
+                              <Button type="button" variant="outline" onClick={() => setIsConfirmingQuickAttendance(false)} className="flex-1 font-bold">বাতিল</Button>
+                          )}
+                          <Button type="submit" disabled={isSavingQuickAttendance} className={cn("flex-1 h-11 font-black text-white", isConfirmingQuickAttendance ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700")}>
+                              {isSavingQuickAttendance ? <Loader2 className="animate-spin" /> : (isConfirmingQuickAttendance ? 'হ্যাঁ, আপডেট করুন' : 'হাজিরা সম্পন্ন করুন')}
+                          </Button>
+                      </div>
+                  </form>
+              </DialogContent>
+          </Dialog>
+      </div>
+
+      {/* 5 Stat Cards matching user screenshot */}
+      <div className="grid gap-4 md:grid-cols-2 md:gap-4 lg:grid-cols-5">
+        <GalleryCard />
+        
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-black shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group rounded-xl">
+          <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+             <Users className="h-28 w-28 text-indigo-900" />
+          </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <CardTitle className="text-sm font-bold text-indigo-900">মোট শিক্ষার্থী</CardTitle>
+            <div className="p-2 bg-white/60 rounded-full backdrop-blur-sm shadow-sm">
+              <Users className="h-4 w-4 text-indigo-700" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-3xl font-black text-indigo-950 mb-1">{toBengaliNumber(totalStudents)}</div>
+            <p className="text-xs text-indigo-700 font-medium">শিক্ষাবর্ষ {toBengaliNumber(selectedYear)}</p>
+          </CardContent>
+        </Card>
+        
+         <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-100 border-2 border-black shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group rounded-xl">
+          <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+             <CheckCircle2 className="h-28 w-28 text-teal-900" />
+          </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <CardTitle className="text-sm font-bold text-teal-900">মোট উপস্থিত</CardTitle>
+            <div className="p-2 bg-white/60 rounded-full backdrop-blur-sm shadow-sm">
+              <Users className="h-4 w-4 text-teal-700" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-black text-teal-950 mb-1">{toBengaliNumber(totalPresent)}</div>
+              <div className="text-sm font-bold text-emerald-700 bg-white/80 px-2 py-0.5 rounded-full border border-emerald-100">{toBengaliNumber(presentPercentage)}%</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden bg-gradient-to-br from-rose-50 to-red-100 border-2 border-black shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group rounded-xl">
+          <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+             <XCircle className="h-28 w-28 text-red-900" />
+          </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <CardTitle className="text-sm font-bold text-red-900">মোট অনুপস্থিত</CardTitle>
+            <div className="p-2 bg-white/60 rounded-full backdrop-blur-sm shadow-sm">
+              <Users className="h-4 w-4 text-red-700" />
+            </div>
+          </CardHeader>            
+          <CardContent className="relative z-10">
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-black text-red-950 mb-1">{toBengaliNumber(totalAbsent)}</div>
+              <div className="text-sm font-bold text-rose-700 bg-white/80 px-2 py-0.5 rounded-full border border-rose-100">{toBengaliNumber(absentPercentage)}%</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-orange-100 border-2 border-black shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group rounded-xl">
+           <div className="absolute -right-4 -top-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+             <GraduationCap className="h-28 w-28 text-orange-900" />
+          </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <CardTitle className="text-sm font-bold text-orange-900">মোট শিক্ষক</CardTitle>
+            <div className="p-2 bg-white/60 rounded-full backdrop-blur-sm shadow-sm">
+              <GraduationCap className="h-4 w-4 text-orange-700" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10">
+            <div className="text-3xl font-black text-orange-950 mb-1">{toBengaliNumber(totalTeachers)}</div>
+            <p className="text-xs text-orange-700 font-medium">নিবন্ধিত সক্রিয় শিক্ষক</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <section className="grid grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
         <Link href="/create-question">
           <Card className={cn(glassClass, "bg-red-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-red-600 h-full")}>
@@ -699,6 +1196,16 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      {/* Direct Fee Dialog for Quick Search */}
+      {quickFeeStudent && (
+          <StudentFeeDialog 
+            student={quickFeeStudent} 
+            open={!!quickFeeStudent} 
+            onOpenChange={(o) => !o && setQuickFeeStudent(null)} 
+            onFeeCollected={() => {}} 
+          />
+      )}
       
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { height: 8px; }
