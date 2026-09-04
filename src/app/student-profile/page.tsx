@@ -417,6 +417,9 @@ function StudentProfileSearchContent() {
         return { tuitionDue: tuitionDueAmount, tuitionDueMonths, examDues, otherDues };
     }, [studentData, paidMonths, feeHistory]);
 
+    const glassCardClass = "bg-white/10 backdrop-blur-2xl border-2 border-black shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_12px_40px_rgba(0,0,0,0.15)]";
+    const metallicIconClass = "p-4 rounded-full shrink-0 shadow-[0_6px_10px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.5),inset_0_-2px_4px_rgba(0,0,0,0.3)] border-2 border-white/40 bg-[radial-gradient(circle_at_center,_#60a5fa_0%,_#1e3a8a_100%)] text-white";
+
     if (!isMounted || authLoading) {
         return (
             <div className="flex min-h-[50vh] w-full items-center justify-center">
@@ -429,31 +432,38 @@ function StudentProfileSearchContent() {
         <div className="flex min-h-screen w-full flex-col font-kalpurush">
             <div className="no-print w-full flex flex-col">
                 <main className="flex flex-1 flex-col items-center justify-center p-4 min-h-[calc(100vh-140px)] pb-80">
-                    <Card className="w-full max-w-lg shadow-xl border-2 border-primary/10">
-                        <CardHeader className="text-center bg-primary/5 rounded-t-lg">
-                            <CardTitle className="text-2xl text-primary font-black">
-                                {isEn ? 'Student Profile Search' : 'শিক্ষার্থী প্রোফাইল অনুসন্ধান'}
-                            </CardTitle>
-                            <CardDescription>
-                                {isEn ? 'View student details with roll and class' : 'রোল এবং শ্রেণি দিয়ে শিক্ষার্থীর বিস্তারিত তথ্য দেখুন'}
-                            </CardDescription>
+                    <Card className={cn("w-full max-w-lg overflow-hidden", glassCardClass)}>
+                        <CardHeader className="text-center bg-primary/5 rounded-t-lg border-b-2 border-black p-6">
+                            <div className="flex flex-col items-center gap-4">
+                                <div className={metallicIconClass}>
+                                    <Search className="h-8 w-8 drop-shadow-md" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-2xl text-primary font-black drop-shadow-sm">
+                                        {isEn ? 'Student Profile Search' : 'শিক্ষার্থী প্রোফাইল অনুসন্ধান'}
+                                    </CardTitle>
+                                    <CardDescription className="font-bold">
+                                        {isEn ? 'View student details with roll and class' : 'রোল এবং শ্রেণি দিয়ে শিক্ষার্থীর বিস্তারিত তথ্য দেখুন'}
+                                    </CardDescription>
+                                </div>
+                            </div>
                         </CardHeader>
-                        <CardContent className="pt-6">
+                        <CardContent className="pt-8">
                             <form onSubmit={(e) => handleSearch(e)} className="space-y-6">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="roll" className="font-bold">{isEn ? 'Roll Number' : 'রোল নম্বর'}</Label>
-                                        <Input id="roll" value={roll} onChange={e => setRoll(e.target.value)} required placeholder={isEn ? "Ex: 1" : "উদা: ১"} />
+                                        <Label htmlFor="roll" className="font-black text-slate-700">{isEn ? 'Roll Number' : 'রোল নম্বর'}</Label>
+                                        <Input id="roll" value={roll} onChange={e => setRoll(e.target.value)} required placeholder={isEn ? "Ex: 1" : "উদা: ১"} className="h-11 border-2 border-black/10 focus:border-primary font-black" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="class" className="font-bold">{isEn ? 'Class' : 'শ্রেণি'}</Label>
+                                        <Label htmlFor="class" className="font-black text-slate-700">{isEn ? 'Class' : 'শ্রেণি'}</Label>
                                         <Select value={className} onValueChange={setClassName} required>
-                                            <SelectTrigger id="class" className="bg-white">
+                                            <SelectTrigger id="class" className="bg-white h-11 border-2 border-black/10 font-bold">
                                                 <SelectValue placeholder={isEn ? "Select Class" : "শ্রেণি নির্বাচন"} />
                                             </SelectTrigger>
-                                            <SelectContent position="item-aligned">
+                                            <SelectContent position="item-aligned" className="font-kalpurush border-2 border-black">
                                                 {Object.entries(classNamesMap).map(([id, label]) => (
-                                                    <SelectItem key={id} value={id}>
+                                                    <SelectItem key={id} value={id} className="font-bold">
                                                         {isEn ? `Class ${id}` : `${label} শ্রেণি`}
                                                     </SelectItem>
                                                 ))}
@@ -462,8 +472,15 @@ function StudentProfileSearchContent() {
                                     </div>
                                 </div>
 
-                                <Button type="submit" className="w-full h-12 text-lg shadow-md font-black" disabled={isLoading}>
-                                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Search className="mr-2 h-5 w-5" /> <span>{isEn ? 'View Information' : 'তথ্য দেখুন'}</span></>}
+                                <Button 
+                                    type="submit" 
+                                    className={cn(
+                                        "w-full h-14 text-lg font-black transition-all active:scale-95 shadow-[0_8px_15px_rgba(0,0,0,0.2)] border-2 border-white/30 hover:border-white/60",
+                                        "bg-primary text-white"
+                                    )} 
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Search className="mr-2 h-6 w-6" /> <span>{isEn ? 'View Information' : 'তথ্য দেখুন'}</span></>}
                                 </Button>
                             </form>
                         </CardContent>
