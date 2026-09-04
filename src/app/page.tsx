@@ -24,8 +24,9 @@ import {
   Search,
   CalendarCheck,
   Award,
-  Banknote,
+  Calendar,
   MessageSquare,
+  Banknote,
   UserCog,
   FolderOpen,
   Clock
@@ -270,9 +271,9 @@ export default function Home() {
       <NoticeTicker />
       <section className="grid grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
         <Link href="/create-question">
-          <Card className={cn(glassClass, "bg-blue-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-blue-600 h-full")}>
+          <Card className={cn(glassClass, "bg-red-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-red-600 h-full")}>
             <CardHeader className="p-1">
-              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-blue-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-red-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
                 <BrainCircuit className="w-4 h-4 md:w-5 md:h-5" />
               </div>
               <CardTitle className="text-blue-900 font-black text-[10px] md:text-[12px] leading-tight">প্রশ্ন ব্যাংক</CardTitle>
@@ -284,29 +285,29 @@ export default function Home() {
         </Link>
 
         <Link href="/notices-management">
-          <Card className={cn(glassClass, "bg-yellow-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-yellow-600 h-full")}>
+          <Card className={cn(glassClass, "bg-blue-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-blue-600 h-full")}>
             <CardHeader className="p-1">
-              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-yellow-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-blue-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
                 <Bell className="w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <CardTitle className="text-yellow-900 font-black text-[10px] md:text-[12px] leading-tight">নোটিশ বোর্ড</CardTitle>
+              <CardTitle className="text-red-900 font-black text-[10px] md:text-[12px] leading-tight">নোটিশ বোর্ড</CardTitle>
             </CardHeader>
             <CardContent className="p-1 pt-0">
-              <p className="text-[9px] md:text-[10px] font-black text-yellow-900/60 leading-tight line-clamp-2">নোটিশ ও ঘোষণা পরিচালনা।</p>
+              <p className="text-[9px] md:text-[10px] font-black text-red-900/60 leading-tight line-clamp-2">নোটিশ ও ঘোষণা পরিচালনা।</p>
             </CardContent>
           </Card>
         </Link>
 
         <Link href="/create-lecture-sheet">
-          <Card className={cn(glassClass, "bg-orange-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-orange-600 h-full")}>
+          <Card className={cn(glassClass, "bg-green-500/10 overflow-hidden group hover:scale-105 transition-all border-l-4 border-l-green-600 h-full")}>
             <CardHeader className="p-1">
-              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-orange-500 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-lg bg-green-600 flex items-center justify-center text-white mb-1 shadow-md group-hover:rotate-12 transition-transform border border-white/20">
                 <BookOpen className="w-4 h-4 md:w-5 md:h-5" />
               </div>
-              <CardTitle className="text-orange-900 font-black text-[10px] md:text-[12px] leading-tight">লেকচার শিট</CardTitle>
+              <CardTitle className="text-green-900 font-black text-[10px] md:text-[12px] leading-tight">লেকচার শিট</CardTitle>
             </CardHeader>
             <CardContent className="p-1 pt-0">
-              <p className="text-[9px] md:text-[10px] font-black text-orange-900/60 leading-tight line-clamp-2">অধ্যায় ভিত্তিক লেকচার নোট তৈরি করুন।</p>
+              <p className="text-[9px] md:text-[10px] font-black text-green-900/60 leading-tight line-clamp-2">অধ্যায় ভিত্তিক লেকচার নোট তৈরি করুন।</p>
             </CardContent>
           </Card>
         </Link>
