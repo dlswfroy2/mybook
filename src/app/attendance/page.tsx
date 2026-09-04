@@ -98,17 +98,19 @@ function useOnlineStatus() {
 // --- Helper Components ---
 
 const SchoolPrintHeader = ({ title, schoolInfo, startDate, endDate }: { title: string, schoolInfo: any, startDate?: Date, endDate?: Date }) => (
-    <div className="hidden print:block text-black mb-8 border-b-4 border-emerald-800 pb-4 font-kalpurush">
-        <div className="flex items-center gap-6 justify-center">
-            {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={70} height={70} className="object-contain" />}
+    <div className="hidden print:block text-black mb-2 border-b-2 border-emerald-800 pb-1.5 font-kalpurush w-full">
+        <div className="flex items-center gap-4 justify-center">
+            {schoolInfo?.logoUrl && (
+                <img src={schoolInfo.logoUrl} alt="Logo" className="w-10 h-10 object-contain print:block" />
+            )}
             <div className="text-center">
-                <h1 className="text-3xl font-black uppercase text-emerald-950">{schoolInfo.name}</h1>
-                <p className="text-sm font-bold text-slate-700">{schoolInfo.address}</p>
-                <div className="mt-2 inline-block bg-emerald-50 px-6 py-0.5 rounded-full border-2 border-emerald-800">
-                    <h2 className="text-lg font-black uppercase">
+                <h1 className="text-xl font-black uppercase text-emerald-950 leading-tight">{schoolInfo?.nameEn || schoolInfo?.name || 'বিদ্যালয়ের নাম'}</h1>
+                <p className="text-[11px] font-bold text-slate-700 leading-tight">{schoolInfo?.address || ''}</p>
+                <div className="mt-0.5 inline-block bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-800">
+                    <h2 className="text-[12px] font-black uppercase text-emerald-900 leading-tight">
                         {title}
                         {startDate && endDate && (
-                            <span className="ml-2">
+                            <span className="ml-1 font-bold">
                                 ({format(startDate, 'dd/MM/yyyy', { locale: bn })} হতে {format(endDate, 'dd/MM/yyyy', { locale: bn })} পর্যন্ত)
                             </span>
                         )}
@@ -143,10 +145,12 @@ const MonthlyAttendanceGrid = ({
     const isAdmin = user?.role === 'admin';
     const canManageAttendance = hasPermission('manage:attendance');
     
-    // Scroll Sync Refs
+    // Scroll Sync Refs & Dynamic Width
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const isFirstLoad = useRef(true);
+    const isSyncing = useRef(false);
+    const [tableScrollWidth, setTableScrollWidth] = useState(3000);
 
     // Default reference date for calendar calculation
     const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate]);
@@ -222,16 +226,52 @@ const MonthlyAttendanceGrid = ({
         fetchData(); 
     }, [fetchData]);
 
-    // Handle Scroll Sync
+    // Keep top scrollbar dummy inner width 100% synchronized with the actual table scrollWidth
+    useEffect(() => {
+        const updateWidth = () => {
+            if (tableContainerRef.current) {
+                const sw = tableContainerRef.current.scrollWidth;
+                if (sw > 0) {
+                    setTableScrollWidth(sw);
+                }
+            }
+        };
+
+        updateWidth();
+        const t1 = setTimeout(updateWidth, 100);
+        const t2 = setTimeout(updateWidth, 500);
+
+        let ro: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined' && tableContainerRef.current) {
+            ro = new ResizeObserver(() => updateWidth());
+            ro.observe(tableContainerRef.current);
+            const tbl = tableContainerRef.current.querySelector('table');
+            if (tbl) ro.observe(tbl);
+        }
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            if (ro) ro.disconnect();
+        };
+    }, [daysInMonth, students, monthRecords, selectedDate]);
+
+    // Handle Bidirectional Scroll Sync
     const handleScrollSync = (source: 'top' | 'table') => {
+        if (isSyncing.current) return;
+        isSyncing.current = true;
         const top = topScrollRef.current;
         const table = tableContainerRef.current;
-        if (!top || !table) return;
-        if (source === 'top') {
-            table.scrollLeft = top.scrollLeft;
-        } else {
-            top.scrollLeft = table.scrollLeft;
+        if (top && table) {
+            if (source === 'top') {
+                table.scrollLeft = top.scrollLeft;
+            } else {
+                top.scrollLeft = table.scrollLeft;
+            }
         }
+        requestAnimationFrame(() => {
+            isSyncing.current = false;
+        });
     };
 
     const handleSave = async () => {
@@ -378,16 +418,25 @@ const MonthlyAttendanceGrid = ({
                 .attendance-table th, .attendance-table td {
                     border: 1px solid black !important;
                 }
-                .permanent-scroll::-webkit-scrollbar {
-                    height: 12px;
+                .permanent-scroll::-webkit-scrollbar,
+                .top-scrollbar-track::-webkit-scrollbar {
+                    height: 14px;
                     display: block;
                 }
-                .permanent-scroll::-webkit-scrollbar-track {
-                    background: #f1f1f1;
+                .permanent-scroll::-webkit-scrollbar-track,
+                .top-scrollbar-track::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                    border-radius: 8px;
                 }
-                .permanent-scroll::-webkit-scrollbar-thumb {
-                    background: #2418ff;
-                    border-radius: 10px;
+                .permanent-scroll::-webkit-scrollbar-thumb,
+                .top-scrollbar-track::-webkit-scrollbar-thumb {
+                    background: #2563eb;
+                    border-radius: 8px;
+                    border: 2px solid #f1f5f9;
+                }
+                .permanent-scroll::-webkit-scrollbar-thumb:hover,
+                .top-scrollbar-track::-webkit-scrollbar-thumb:hover {
+                    background: #1d4ed8;
                 }
             `}</style>
 
@@ -447,10 +496,11 @@ const MonthlyAttendanceGrid = ({
                 <div 
                     ref={topScrollRef}
                     onScroll={() => handleScrollSync('top')}
-                    className="overflow-x-auto permanent-scroll no-print mb-1 h-3"
-                    style={{ width: '100%' }}
+                    className="overflow-x-auto top-scrollbar-track no-print mb-2 rounded-lg border border-slate-300 bg-slate-100 shadow-inner cursor-pointer"
+                    style={{ width: '100%', height: '18px' }}
+                    title="টেবিল ডানে-বামে সরাতে স্ক্রোল করুন"
                 >
-                    <div style={{ width: `${(daysInMonth.length * 96) + 390}px`, height: '1px' }} />
+                    <div style={{ width: `${tableScrollWidth || ((daysInMonth.length * 96) + 390)}px`, height: '1px' }} />
                 </div>
 
                 <div 
@@ -1063,14 +1113,85 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                 </Button>
             </div>
 
-            <Card className="border-2 border-primary/20 shadow-xl overflow-hidden printable-area bg-white text-black p-0 sm:p-10">
+            <Card className="border-2 border-primary/20 shadow-xl overflow-hidden printable-area bg-white text-black p-0 sm:p-10 print:p-0 print:border-none print:shadow-none print:overflow-visible">
                 <style jsx global>{`
                     @media print {
-                        @page { size: A4 landscape; margin: 0.4in !important; }
-                        .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; }
-                        .printable-area table tr { height: 28px !important; }
-                        .printable-area table td, .printable-area table th { padding: 2px 4px !important; font-size: 14px !important; border: 1px solid black !important; }
-                        .no-print { display: none !important; }
+                        @page {
+                            size: A4 portrait;
+                            margin: 5mm 8mm !important;
+                        }
+                        html, body {
+                            width: 100% !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            background: white !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        body * {
+                            visibility: hidden;
+                        }
+                        .printable-area, .printable-area * {
+                            visibility: visible !important;
+                        }
+                        .printable-area {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            background: white !important;
+                            overflow: visible !important;
+                        }
+                        .printable-area .table-container {
+                            max-height: none !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                            border: none !important;
+                            width: 100% !important;
+                        }
+                        .printable-area table {
+                            width: 100% !important;
+                            min-width: 100% !important;
+                            max-width: 100% !important;
+                            border-collapse: collapse !important;
+                            table-layout: fixed !important;
+                            margin: 0 !important;
+                        }
+                        .printable-area thead tr {
+                            height: 26px !important;
+                        }
+                        .printable-area thead th {
+                            font-size: 11px !important;
+                            font-weight: 900 !important;
+                            padding: 2px 2px !important;
+                            border: 1px solid #000 !important;
+                            background-color: #f8fafc !important;
+                            color: #000 !important;
+                            text-align: center !important;
+                        }
+                        .printable-area tbody tr {
+                            height: 23px !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                        }
+                        .printable-area tbody td {
+                            font-size: 10.5px !important;
+                            font-weight: 700 !important;
+                            padding: 1px 2px !important;
+                            border: 1px solid #000 !important;
+                            color: #000 !important;
+                            line-height: 1.15 !important;
+                            text-align: center !important;
+                        }
+                        .no-print {
+                            display: none !important;
+                        }
                     }
                 `}</style>
                 <SchoolPrintHeader 
@@ -1079,17 +1200,17 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                 />
                 
                 <CardContent className="p-0">
-                    <div className="table-container max-h-[600px] overflow-auto print:max-h-none print:overflow-visible">
-                        <Table className="min-w-[1000px] border-separate border-spacing-0 border-collapse print:min-w-full">
+                    <div className="table-container max-h-[600px] overflow-auto print:max-h-none print:overflow-visible print:w-full">
+                        <Table className="min-w-[1000px] border-separate border-spacing-0 border-collapse print:min-w-full print:w-full">
                             <TableHeader className="sticky top-0 z-30 print:bg-white print:static">
-                                <TableRow className="h-16 print:h-8">
-                                    <TableHead className="text-center font-black border-r border-b w-48 bg-muted z-40 sticky left-0 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:bg-white print:shadow-none print:border-black text-[14px]">তারিখ ও বার</TableHead>
+                                <TableRow className="h-16 print:h-7">
+                                    <TableHead className="text-center font-black border-r border-b w-48 bg-muted z-40 sticky left-0 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:bg-slate-100 print:shadow-none print:border-black text-[14px] print:text-[11px] print:w-[22%]">তারিখ ও বার</TableHead>
                                     {classes.map(cls => (
-                                        <TableHead key={cls} className="text-center font-black border-r border-b text-[14px] leading-tight print:border-black">{classNamesMap[cls]}</TableHead>
+                                        <TableHead key={cls} className="text-center font-black border-r border-b text-[14px] leading-tight print:border-black print:text-[11px] print:w-[9%] print:bg-slate-100">{classNamesMap[cls]}</TableHead>
                                     ))}
-                                    <TableHead className="text-center font-black border-r border-b bg-indigo-50 text-indigo-900 print:bg-white print:text-black print:border-black text-[14px]">মোট</TableHead>
-                                    <TableHead className="text-center font-black border-r border-b bg-emerald-50 text-emerald-900 print:bg-white print:text-black print:border-black text-[14px]">শতকরা উপস্থিত</TableHead>
-                                    <TableHead className="text-center font-black border-b bg-rose-50 text-rose-900 print:bg-white print:text-black print:border-black text-[14px]">শতকরা অনুপস্থিত</TableHead>
+                                    <TableHead className="text-center font-black border-r border-b bg-indigo-50 text-indigo-900 print:bg-slate-100 print:text-black print:border-black text-[14px] print:text-[11px] print:w-[9%]">মোট</TableHead>
+                                    <TableHead className="text-center font-black border-r border-b bg-emerald-50 text-emerald-900 print:bg-slate-100 print:text-black print:border-black text-[14px] print:text-[11px] print:w-[12%]">শতকরা উপস্থিত</TableHead>
+                                    <TableHead className="text-center font-black border-b bg-rose-50 text-rose-900 print:bg-slate-100 print:text-black print:border-black text-[14px] print:text-[11px] print:w-[12%]">শতকরা অনুপস্থিত</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1103,14 +1224,14 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                     
                                     return (
                                         <TableRow key={i} className={cn(
-                                            "h-12 transition-colors print:border-black",
-                                            isOff ? "bg-red-100 hover:bg-red-200 print:bg-gray-100" : "hover:bg-slate-50"
+                                            "h-12 print:h-[23px] transition-colors print:border-black",
+                                            isOff ? "bg-red-100 hover:bg-red-200 print:bg-slate-100" : "hover:bg-slate-50"
                                         )}>
                                             <TableCell className={cn(
-                                                "text-center font-black border-r whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:shadow-none print:border-black text-[14px] group/row",
-                                                isOff ? "text-red-700 bg-red-200 print:bg-gray-100" : "text-slate-600 bg-white"
+                                                "text-center font-black border-r whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:shadow-none print:border-black text-[14px] print:text-[10.5px] print:p-0.5 group/row",
+                                                isOff ? "text-red-700 bg-red-200 print:bg-slate-100 print:text-rose-700" : "text-slate-600 bg-white"
                                             )}>
-                                                <div className="flex items-center justify-between gap-2 px-2">
+                                                <div className="flex items-center justify-between gap-2 px-2 print:px-1">
                                                     <span>{toBengaliNumber(fullDateStr)} {dayName}</span>
                                                     {isAdmin && (
                                                         <AlertDialog>
@@ -1138,9 +1259,9 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                             {classes.map(cls => {
                                                 const hasData = row[cls] !== null;
                                                 return (
-                                                    <TableCell key={cls} className="text-center font-black border-r border-b print:border-black text-base group relative">
+                                                    <TableCell key={cls} className="text-center font-black border-r border-b print:border-black text-base print:text-[11px] print:p-0.5 group relative">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span>{hasData ? toBengaliNumber(row[cls]) : '-'}</span>
+                                                             <span>{hasData ? toBengaliNumber(row[cls]) : '-'}</span>
                                                             {hasData && isAdmin && (
                                                                 <AlertDialog>
                                                                     <AlertDialogTrigger asChild>
@@ -1166,13 +1287,13 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                                     </TableCell>
                                                 )
                                             })}
-                                            <TableCell className="text-center font-black border-r border-b bg-indigo-50/30 text-indigo-700 print:bg-white print:text-black print:border-black text-base">
+                                            <TableCell className="text-center font-black border-r border-b bg-indigo-50/30 text-indigo-700 print:bg-white print:text-black print:border-black text-base print:text-[11px] print:p-0.5">
                                                 {row.totalPresent > 0 ? toBengaliNumber(row.totalPresent) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-black border-r border-b bg-emerald-50/30 text-emerald-700 print:bg-white print:text-black print:border-black text-base">
+                                            <TableCell className="text-center font-black border-r border-b bg-emerald-50/30 text-emerald-700 print:bg-white print:text-black print:border-black text-base print:text-[11px] print:p-0.5">
                                                 {row.totalPresent > 0 ? toBengaliNumber(row.presentPercent.toFixed(1)) + '%' : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-black border-b bg-rose-50/30 text-rose-700 print:bg-white print:text-black print:border-black text-base">
+                                            <TableCell className="text-center font-black border-b bg-rose-50/30 text-rose-700 print:bg-white print:text-black print:border-black text-base print:text-[11px] print:p-0.5">
                                                 {row.totalPresent > 0 ? toBengaliNumber(row.absentPercent.toFixed(1)) + '%' : '-'}
                                             </TableCell>
                                         </TableRow>
@@ -1633,13 +1754,82 @@ const ReportSheet = ({ classId, students, startDate, endDate }: { classId: strin
     if (students.length === 0) return <p className="text-center text-muted-foreground p-8">এই শ্রেণিতে কোনো শিক্ষার্থী নেই।</p>;
 
     return (
-        <div className="p-0 sm:p-10 bg-white text-black font-kalpurush printable-area min-h-screen">
+        <div className="p-0 sm:p-10 bg-white text-black font-kalpurush printable-area min-h-screen print:min-h-0 print:p-0">
             <style jsx global>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 0.4in !important; }
-                    .printable-area { padding: 0 !important; margin: 0 !important; }
-                    .printable-area table tr { height: 32px !important; }
-                    .printable-area table td, .printable-area table th { padding: 4px 8px !important; border: 1px solid black !important; font-size: 14px !important; }
+                    @page {
+                        size: A4 portrait;
+                        margin: 8mm 10mm !important;
+                    }
+                    html, body {
+                        width: 100% !important;
+                        height: auto !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    body * {
+                        visibility: hidden;
+                    }
+                    .printable-area, .printable-area * {
+                        visibility: visible !important;
+                    }
+                    .printable-area {
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        background: white !important;
+                    }
+                    .printable-area .table-container {
+                        max-height: none !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                        border: none !important;
+                        width: 100% !important;
+                    }
+                    .printable-area table {
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
+                        border-collapse: collapse !important;
+                        table-layout: auto !important;
+                        margin: 0 !important;
+                    }
+                    .printable-area thead {
+                        display: table-header-group !important;
+                    }
+                    .printable-area thead tr {
+                        height: 28px !important;
+                    }
+                    .printable-area thead th {
+                        font-size: 13px !important;
+                        font-weight: 900 !important;
+                        padding: 3px 6px !important;
+                        border: 1px solid #000 !important;
+                        background-color: #f1f5f9 !important;
+                        color: #000 !important;
+                    }
+                    .printable-area tbody tr {
+                        height: 26px !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    .printable-area tbody td {
+                        font-size: 12px !important;
+                        font-weight: 700 !important;
+                        padding: 3px 6px !important;
+                        border: 1px solid #000 !important;
+                        color: #000 !important;
+                        line-height: 1.2 !important;
+                    }
                     .no-print { display: none !important; }
                 }
             `}</style>
@@ -1650,10 +1840,10 @@ const ReportSheet = ({ classId, students, startDate, endDate }: { classId: strin
                 endDate={endDate}
             />
             
-            <div className="table-container !max-h-none !overflow-visible border-black">
-                <Table className="border-collapse border-black print:border-black print:border">
+            <div className="table-container !max-h-none !overflow-visible border-black print:w-full">
+                <Table className="border-collapse border-black print:border-black print:border print:w-full w-full">
                     <TableHeader className="bg-muted/50 sticky top-0 z-10 print:static print:bg-white">
-                        <TableRow className="print:border-black h-12">
+                        <TableRow className="print:border-black h-12 print:h-7">
                             <TableHead className="w-20 text-center font-black print:border-black print:border text-base">রোল</TableHead>
                             <TableHead className="font-black print:border-black print:border text-base">শিক্ষার্থীর নাম ও মোবাইল</TableHead>
                             <TableHead className="text-center font-black print:border-black print:border text-base">মোট কার্যদিবস</TableHead>
@@ -1664,16 +1854,16 @@ const ReportSheet = ({ classId, students, startDate, endDate }: { classId: strin
                     </TableHeader>
                     <TableBody>
                         {reportData.map(report => (
-                            <TableRow key={report.student.id} className="hover:bg-accent/5 transition-colors print:border-black h-12">
-                                <TableCell className="text-center font-black print:border-black print:border text-base">{toBengaliNumber(report.student.roll)}</TableCell>
-                                <TableCell className="print:border-black print:border text-base">
-                                    <p className="font-bold text-slate-700">{report.student.studentNameBn}</p>
-                                    <p className="text-[12px] text-muted-foreground font-bold">{report.student.guardianMobile || '-'}</p>
+                            <TableRow key={report.student.id} className="hover:bg-accent/5 transition-colors print:border-black h-12 print:h-[26px]">
+                                <TableCell className="text-center font-black print:border-black print:border text-base print:text-[12px] print:py-0.5">{toBengaliNumber(report.student.roll)}</TableCell>
+                                <TableCell className="print:border-black print:border text-base print:text-[12px] print:py-0.5">
+                                    <p className="font-bold text-slate-700 leading-tight">{report.student.studentNameBn}</p>
+                                    <p className="text-[12px] print:text-[10px] text-muted-foreground font-bold leading-tight">{report.student.guardianMobile || '-'}</p>
                                 </TableCell>
-                                <TableCell className="text-center font-medium print:border-black print:border text-base">{toBengaliNumber(report.totalDays)}</TableCell>
-                                <TableCell className="text-center text-emerald-600 font-black print:border-black print:border text-base">{toBengaliNumber(report.presentDays)}</TableCell>
-                                <TableCell className="text-center text-rose-600 font-black print:border-black print:border text-base">{toBengaliNumber(report.absentDays)}</TableCell>
-                                <TableCell className="text-right font-black text-emerald-700 print:border-black print:border text-base">
+                                <TableCell className="text-center font-medium print:border-black print:border text-base print:text-[12px] print:py-0.5">{toBengaliNumber(report.totalDays)}</TableCell>
+                                <TableCell className="text-center text-emerald-600 font-black print:border-black print:border text-base print:text-[12px] print:py-0.5">{toBengaliNumber(report.presentDays)}</TableCell>
+                                <TableCell className="text-center text-rose-600 font-black print:border-black print:border text-base print:text-[12px] print:py-0.5">{toBengaliNumber(report.absentDays)}</TableCell>
+                                <TableCell className="text-right font-black text-emerald-700 print:border-black print:border text-base print:text-[12px] print:py-0.5">
                                     {report.totalDays > 0 ? 
                                         toBengaliNumber(((report.presentDays / report.totalDays) * 100).toFixed(1)) + '%' 
                                         : 'N/A'
@@ -1825,10 +2015,10 @@ export default function AttendancePage() {
     if (!isClient) return null;
 
     return (
-        <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
+        <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush print:bg-white print:min-h-0 print:p-0 print:m-0">
             
-            <main className="flex-1 p-4 md:p-10 pb-40">
-                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
+            <main className="flex-1 p-4 md:p-10 pb-40 print:p-0 print:m-0 print:pb-0">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8 print:block print:max-w-none print:p-0 print:m-0">
                     {/* Sidebar Navigation */}
                     <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
                         <div className="mb-6 px-4 hidden md:block">
@@ -1863,8 +2053,8 @@ export default function AttendancePage() {
                     </aside>
 
                     {/* Content Area */}
-                    <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                    <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4 print:block print:min-h-0 print:border-none print:shadow-none print:rounded-none print:overflow-visible print:p-0 print:m-0">
+                        <div className="p-4 sm:p-6 lg:p-8 flex-1 print:p-0 print:m-0">
                             {!isOnline && (
                                 <div className="mb-6 p-4 bg-rose-50 border-2 border-dashed border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700 animate-pulse no-print">
                                     <WifiOff className="h-6 w-6" />
