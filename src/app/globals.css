@@ -93,3 +93,37 @@
 .math-sup { font-size: 0.7em; vertical-align: super; }
 .math-sub { font-size: 0.7em; vertical-align: sub; }
 .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
+
+/* Custom Visible Scrollbars */
+.permanent-scroll,
+.top-scrollbar-track {
+  scrollbar-width: auto;
+  scrollbar-color: #2563eb #e2e8f0;
+}
+
+.permanent-scroll::-webkit-scrollbar,
+.top-scrollbar-track::-webkit-scrollbar {
+  height: 16px !important;
+  width: 16px !important;
+  display: block !important;
+}
+
+.permanent-scroll::-webkit-scrollbar-track,
+.top-scrollbar-track::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 8px !important;
+}
+
+.permanent-scroll::-webkit-scrollbar-thumb,
+.top-scrollbar-track::-webkit-scrollbar-thumb {
+  background: #2563eb !important;
+  border-radius: 8px !important;
+  border: 3px solid #f1f5f9 !important;
+  min-width: 50px !important;
+}
+
+.permanent-scroll::-webkit-scrollbar-thumb:hover,
+.top-scrollbar-track::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8 !important;
+}
+

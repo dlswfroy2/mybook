@@ -33,7 +33,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { 
     Edit2, CalendarX, Check, 
     CalendarDays, CalendarCheck, Plus, Save, Loader2, 
-    ListChecks, ChevronRight, UserX, Printer, Wifi, WifiOff, Trash2,
+    ListChecks, ChevronRight, ChevronLeft, UserX, Printer, Wifi, WifiOff, Trash2,
     Info
 } from 'lucide-react';
 import { 
@@ -274,6 +274,13 @@ const MonthlyAttendanceGrid = ({
         });
     };
 
+    // Quick scroll by offset
+    const handleScrollBy = (amount: number) => {
+        if (tableContainerRef.current) {
+            tableContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    };
+
     const handleSave = async () => {
         if (!db || !user || isSaving || !selectedDate) return;
         
@@ -493,15 +500,40 @@ const MonthlyAttendanceGrid = ({
             </div>
 
             <div className="relative group">
+            {/* টেবিল ডানে-বামে সরানোর কন্ট্রোলার ও উপরের স্পষ্ট স্ক্রোলবার */}
+            <div className="bg-slate-100/90 border-2 border-slate-300 rounded-xl p-2 mb-2 no-print shadow-sm flex items-center gap-2">
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleScrollBy(-350)}
+                    className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                    title="টেবিল বামে সরান"
+                >
+                    <ChevronLeft className="w-4 h-4 text-blue-600" /> বামে
+                </Button>
+
                 <div 
                     ref={topScrollRef}
                     onScroll={() => handleScrollSync('top')}
-                    className="overflow-x-auto top-scrollbar-track no-print mb-2 rounded-lg border border-slate-300 bg-slate-100 shadow-inner cursor-pointer"
-                    style={{ width: '100%', height: '18px' }}
-                    title="টেবিল ডানে-বামে সরাতে স্ক্রোল করুন"
+                    className="flex-1 overflow-x-scroll permanent-scroll top-scrollbar-track rounded-lg border border-slate-300 bg-white cursor-pointer"
+                    style={{ height: '24px' }}
+                    title="স্ক্রোলবারটি ডানে-বামে টেনে পুরো টেবিল সরান"
                 >
-                    <div style={{ width: `${tableScrollWidth || ((daysInMonth.length * 96) + 390)}px`, height: '1px' }} />
+                    <div style={{ width: `${Math.max(tableScrollWidth, 3400)}px`, height: '2px' }} />
                 </div>
+
+                <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleScrollBy(350)}
+                    className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                    title="টেবিল ডানে সরান"
+                >
+                    ডানে <ChevronRight className="w-4 h-4 text-blue-600" />
+                </Button>
+            </div>
 
                 <div 
                     ref={tableContainerRef}
