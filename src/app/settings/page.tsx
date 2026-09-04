@@ -55,6 +55,12 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
+function toBengaliNumber(n: number | string | undefined | null): string {
+  if (n === undefined || n === null || n === '') return '';
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
+}
+
 async function processImage(file: File): Promise<string> {
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('ফাইল সাইজ ৫ মেগাবাইটের বেশি হতে পারবে না।');
@@ -221,7 +227,7 @@ function SettingsContent() {
     try {
       const q = query(collection(db, 'users'), where('status', '==', 'pending'));
       const snap = await getDocs(q);
-      setPendingUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      pendingUsers && setPendingUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {} finally {
       setLoadingRequests(false);
     }
@@ -507,7 +513,7 @@ function SettingsContent() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
-      <header className="flex items-center gap-4 border-b pb-6 no-print">
+      <header className="flex items-center gap-4 border-b pb-4 no-print">
         <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg">
           <SettingsIcon className="w-7 h-7" />
         </div>
@@ -519,7 +525,7 @@ function SettingsContent() {
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
         {/* Sidebar Navigation */}
-        <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+        <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-28 self-start">
             <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none max-h-[calc(100vh-140px)] md:overflow-y-auto pr-2 custom-scrollbar">
                 {sidebarItems.map(item => (
                     <button
