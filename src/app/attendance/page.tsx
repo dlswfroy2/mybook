@@ -540,7 +540,7 @@ const MonthlyAttendanceGrid = ({
                     onScroll={() => handleScrollSync('table')}
                     className="table-container attendance-table !max-h-[600px] border rounded-lg overflow-auto relative permanent-scroll"
                 >
-                    <Table className="border-separate border-spacing-0 min-w-max">
+                    <table className="w-full caption-bottom text-sm border-separate border-spacing-0 min-w-max">
                         <TableHeader className="sticky top-0 z-40">
                             <TableRow className="border-t-2 border-b-2 border-black bg-slate-100 h-20">
                                 <TableHead className="w-14 text-center font-black border-r-2 border-black bg-slate-200 sticky left-0 z-[60] text-black">রোল</TableHead>
@@ -684,7 +684,7 @@ const MonthlyAttendanceGrid = ({
                                 <TableCell className="sticky right-0 z-50 border-l-2 border-black bg-slate-200 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"></TableCell>
                             </TableRow>
                         </TableFooter>
-                    </Table>
+                    </table>
                 </div>
             </div>
             
