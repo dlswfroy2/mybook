@@ -33,7 +33,7 @@ export interface StudentProcessedResult {
 }
 
 export const getGradePoint = (percentage: number): GradeInfo => {
-    if (percentage < 33) return { grade: 'F', point: 0.0 };
+    if (isNaN(percentage) || percentage < 33) return { grade: 'F', point: 0.0 };
     if (percentage < 40) return { grade: 'D', point: 1.0 };
     if (percentage < 50) return { grade: 'C', point: 2.0 };
     if (percentage < 60) return { grade: 'B', point: 3.0 };
@@ -81,8 +81,12 @@ export function processStudentResults(
 
         const groupAllowedSubjects = getSubjects(student.className, studentGroupNormalized);
         
-        // Final subject list for this student
+        // Final subject list for this student (exclude non-exam subjects like continuous assessment with fullMarks 0)
         const subjectsForStudent = groupAllowedSubjects.filter(subInfo => {
+            if (subInfo.isExamSubject === false || subInfo.fullMarks === 0) {
+                return false;
+            }
+
             const currentSubNameNormalized = normalize(subInfo.name);
             
             // For 9-10 Science: Exclusive check between HM and Agri
