@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, Suspense } from 'react';
@@ -160,13 +161,13 @@ function NavbarContent() {
                     href={item.href}
                     className={cn(
                       "flex items-center justify-between px-4 py-3 transition-all group rounded-2xl border border-white/5 shadow-lg",
-                      "backdrop-blur-xl bg-white/5 hover:bg-white/15",
+                      "backdrop-blur-xl bg-white/10 hover:bg-white/15",
                       "shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]",
                       isActive ? cn(item.activeBg, "border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05),inset_0_1px_1px_rgba(255,255,255,0.2)] scale-[1.02]") : "text-white/70"
                     )}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Metallic 3D Badge */}
+                      {/* 3D Metallic Gradient Circular Badge */}
                       <div className={cn(
                         "p-2.5 rounded-full shrink-0 shadow-[0_4px_10px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2)] border-2 border-white/40 bg-gradient-to-br transition-transform group-hover:scale-110",
                         item.color
