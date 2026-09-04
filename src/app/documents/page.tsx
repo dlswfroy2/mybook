@@ -61,7 +61,7 @@ const DOCUMENT_TOOLS = [
   },
   { 
     id: 'testimonial', 
-    label: 'प्रत्यয়ন পত্র', 
+    label: 'প্রত্যয়ন পত্র', 
     icon: FileBadge, 
     href: '/documents/testimonial', 
     color: 'text-emerald-600 bg-emerald-50', 
@@ -128,7 +128,7 @@ export default function DocumentsPage() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
       
-      <main className="flex-1 flex flex-col md:flex-row h-full max-w-[1600px] mx-auto w-full md:p-6 lg:p-10 gap-8 pb-[500px]">
+      <main className="flex-1 flex flex-col md:flex-row h-full max-w-[1600px] mx-auto w-full md:p-6 lg:p-10 gap-8 pb-[250px]">
         
         {/* Sidebar Navigation - Sticky */}
         <aside className="w-full md:w-72 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">

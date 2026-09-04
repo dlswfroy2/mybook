@@ -506,7 +506,7 @@ function SettingsContent() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-20 font-kalpurush">
+    <div className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
       <header className="flex items-center gap-4 border-b pb-6 no-print">
         <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg">
           <SettingsIcon className="w-7 h-7" />

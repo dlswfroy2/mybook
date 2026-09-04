@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
@@ -84,7 +85,7 @@ const STAFF_ORDER = [
 
 const dayMap = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"];
 const periodLabels = ["১ম", "২য়", "৩য়", "৪র্থ", "৫ম", "৬ষ্ঠ"];
-const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম' };
+const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': 'দশম' };
 
 function toBengaliNumber(str: string | number) {
   if (!str && str !== 0) return '';
@@ -235,7 +236,7 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
     }, [selectedStaffId, attendanceData, holidays, startDate, endDate]);
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end p-6 border-2 border-primary/10 rounded-2xl bg-white shadow-sm">
                 <div className="space-y-2 md:col-span-1">
                     <Label className="font-black text-primary flex items-center gap-2"><User className="h-4 w-4" /> শিক্ষক বা কর্মচারী নির্বাচন করুন</Label>
@@ -916,7 +917,7 @@ export default function StaffListPage() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
       
-      <main className="flex-1 flex flex-col md:flex-row h-full max-w-[1600px] mx-auto w-full md:p-6 lg:p-10 gap-8 pb-[500px]">
+      <main className="flex-1 flex flex-col md:flex-row h-full max-w-[1600px] mx-auto w-full md:p-6 lg:p-10 gap-8 pb-[250px]">
         
         <aside className="w-full md:w-60 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
             <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">স্টাফ পোর্টাল</h2>
@@ -1159,7 +1160,7 @@ export default function StaffListPage() {
                                     )}
                                 </CardContent>
                                 {existingInToday?.status !== 'leave' && (
-                                    <CardFooter className="bg-slate-50 p-6 border-t flex justify-between gap-4">
+                                    <CardFooter className="p-6 bg-slate-50 border-t flex justify-between gap-4">
                                         <Button variant="ghost" onClick={() => { setSelectedStaffId(''); setTempEntry(null); }} className="font-bold h-12 px-8">বাতিল</Button>
                                         <Button 
                                             onClick={handleSaveIndividualAttendance} 

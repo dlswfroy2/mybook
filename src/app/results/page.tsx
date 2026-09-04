@@ -1898,7 +1898,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+        <div className="space-y-6 animate-in fade-in duration-500 pb-12">
             <div className="flex flex-wrap gap-2 no-print">
                 <Button variant={specialMode === 'input' ? 'default' : 'outline'} onClick={() => setSpecialMode('input')} className="font-black h-10 px-6 rounded-xl shadow-sm"><FilePen className="h-4 w-4 mr-2" /> নম্বর ইনপুট</Button>
                 <Button variant={specialMode === 'sheet' ? 'default' : 'outline'} onClick={() => setSpecialMode('sheet')} className="font-black h-10 px-6 rounded-xl shadow-sm"><LayoutGrid className="h-4 w-4 mr-2" /> ফলাফল শিট</Button>
@@ -1992,7 +1992,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                                                                 const match = allSpecialResults.find(r => {
                                                                     const normalizedSearch = normalize(sub.name);
                                                                     const normalizedRecord = normalize(r.subject);
-                                                                    if (sub.isCombined) return sub.subList.some((innerSub: string) => normalize(innerSub) === normalizedRecord) && r.examType === type;
+                                                                    if (sub.isCombined) return sub.subList.some((innerSub: string) => normalizedRecord === normalizedRecord) && r.examType === type;
                                                                     return normalizedRecord === normalizedSearch && r.examType === type;
                                                                 });
                                                                 const marks = match?.results.find(res => res.studentId === student.id)?.marks;
@@ -2016,7 +2016,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
             {specialMode === 'fullmarks' && (
                 <div className="animate-in fade-in duration-500">
                     <Card className="max-w-md mx-auto border-2 shadow-lg rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b"><CardTitle className="text-lg font-black flex items-center gap-2"><Settings className="h-5 w-5" /> বিশেষ পরীক্ষার পূর্ণমান নির্ধারণ</CardTitle></CardHeader>
+                        <CardHeader className="bg-muted/30 border-b"><CardTitle className="text-lg font-black flex items-center gap-2"><Settings className="h-5 w-5" /> বিশেষ পরীক্ষার পূর্ণমান নির্ধারণ</CardTitle></AccordionHeader>
                         <CardContent className="p-8 space-y-6">
                              <div className="space-y-4">
                                 <p className="text-sm font-bold text-muted-foreground leading-relaxed text-center">বিশেষ পরীক্ষার ফলাফল ইনপুট দেওয়ার সময় সরাসরি ওই সেকশন থেকেই পূর্ণমান এডিট করতে পারবেন। ডিফল্ট পূর্ণমান ২০ হিসেবে সেট করা থাকে।</p>
@@ -2105,7 +2105,7 @@ export default function ResultsPage() {
 
     return (
         <div className="flex min-h-screen w-full flex-col font-kalpurush">
-            <main className="flex-1 p-4 md:p-8 no-print pb-40">
+            <main className="flex-1 p-4 md:p-8 no-print pb-20">
                 <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                     <aside className="w-full md:w-64 shrink-0 space-y-1 bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">ফলাফল ব্যবস্থাপনা</h2>

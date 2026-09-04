@@ -432,7 +432,7 @@ function MyLibraryContent() {
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               {[
-                { id: 'all', label: 'সবগুলো', icon: LayoutGrid },
+                { id: 'all', label: 'সকলগুলো', icon: LayoutGrid },
                 { id: 'sheet', label: 'লেকচার শিট', icon: BookOpen },
                 { id: 'creative', label: 'সৃজনশীল প্রশ্ন', icon: FileText },
                 { id: 'mcq', label: 'বহুনির্বাচনী প্রশ্ন', icon: BrainCircuit },
@@ -612,7 +612,7 @@ function MyLibraryContent() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-32 font-kalpurush">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-16 font-kalpurush">
       <header className="flex flex-col gap-4 border-b-2 border-black pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

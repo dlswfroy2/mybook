@@ -38,7 +38,7 @@ import { collection, query, where, onSnapshot, writeBatch, doc, getDocs } from '
 import { TeacherAllocationRecord, SubjectAllocation, saveTeacherAllocation, getTeacherAllocations } from '@/lib/teacher-allocation-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': 'দশম' };
+const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম' };
 
 const dayMap = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"];
 const periodLabels = ["১ম", "২য়", "৩য়", "৪র্থ", "৫ম", "৬ষ্ঠ"];
@@ -1483,7 +1483,7 @@ export default function RoutinesPage() {
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
             
-            <main className="flex-1 p-4 md:p-10 pb-40">
+            <main className="flex-1 p-4 md:p-10 pb-20">
                 <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                     <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">রুটিন শাখা</h2>

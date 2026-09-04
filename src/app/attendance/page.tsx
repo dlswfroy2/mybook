@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -33,7 +34,8 @@ import {
     Edit2, CalendarX, Check, 
     CalendarDays, CalendarCheck, Plus, Save, Loader2, 
     ListChecks, ChevronRight, UserX, Printer, Wifi, WifiOff, Trash2,
-    Info
+    Info,
+    AlertTriangle
 } from 'lucide-react';
 import { 
     AlertDialog, 
@@ -118,6 +120,12 @@ const SchoolPrintHeader = ({ title, schoolInfo, startDate, endDate }: { title: s
     </div>
 );
 
+const isOffDay = (date: Date, holidays: string[]) => {
+    const d = date.getDay();
+    const ds = format(date, 'yyyy-MM-dd');
+    return d === 5 || d === 6 || holidays.includes(ds);
+};
+
 // --- Monthly Grid Register Component ---
 
 const MonthlyAttendanceGrid = ({ 
@@ -142,17 +150,14 @@ const MonthlyAttendanceGrid = ({
     const isAdmin = user?.role === 'admin';
     const canManageAttendance = hasPermission('manage:attendance');
     
-    // Scroll Sync Refs
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const isFirstLoad = useRef(true);
 
-    // Default reference date for calendar calculation
     const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate]);
     const monthEnd = useMemo(() => endOfMonth(viewDate), [viewDate]);
     const daysInMonth = useMemo(() => eachDayOfInterval({ start: monthStart, end: monthEnd }), [monthStart, monthEnd]);
 
-    // Highlight only the specific selected day in the current month view
     const activeDay = useMemo(() => {
         if (selectedDate && isSameMonth(selectedDate, viewDate) && isSameYear(selectedDate, viewDate)) {
             return getDate(selectedDate);
@@ -221,7 +226,6 @@ const MonthlyAttendanceGrid = ({
         fetchData(); 
     }, [fetchData]);
 
-    // Handle Scroll Sync
     const handleScrollSync = (source: 'top' | 'table') => {
         const top = topScrollRef.current;
         const table = tableContainerRef.current;
@@ -338,7 +342,6 @@ const MonthlyAttendanceGrid = ({
         }
     };
 
-    // Presence calculations
     const getStudentTotalPresent = useCallback((studentId: string) => {
         let count = 0;
         daysInMonth.forEach(day => {
@@ -452,7 +455,7 @@ const MonthlyAttendanceGrid = ({
                     className="overflow-x-auto permanent-scroll no-print mb-1 h-3"
                     style={{ width: '100%' }}
                 >
-                    <div style={{ width: `${(daysInMonth.length * 96) + 390}px`, height: '1px' }} />
+                    <div style={{ width: `${(daysInMonth.length * 96) + 316}px`, height: '1px' }} />
                 </div>
 
                 <div 
@@ -620,46 +623,12 @@ const MonthlyAttendanceGrid = ({
     );
 };
 
-const isOffDay = (date: Date, holidays: string[]) => {
-    const d = date.getDay();
-    const ds = format(date, 'yyyy-MM-dd');
-    return d === 5 || d === 6 || holidays.includes(ds);
-};
-
 // --- Sub Tabs Components ---
-
-const AttendanceSheet = ({ 
-    classId, 
-    students, 
-    date,
-    viewDate,
-    onRefresh,
-    onDateChange
-}: { 
-    classId: string, 
-    students: Student[], 
-    date: Date | undefined,
-    viewDate: Date,
-    onRefresh: () => void,
-    onDateChange: (d: Date) => void
-}) => {
-    return (
-        <MonthlyAttendanceGrid 
-            classId={classId} 
-            students={students} 
-            selectedDate={date} 
-            viewDate={viewDate}
-            onRefresh={onRefresh} 
-            onDateChange={onDateChange}
-        />
-    );
-};
 
 const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents: Student[], date: Date | undefined, onDateChange: (d: Date) => void }) => {
     const { selectedYear } = useAcademicYear();
     const [viewDate, setViewDate] = useState<Date>(new Date());
     
-    // Sync view context if an external date selection is made (e.g. from missed attendance list)
     useEffect(() => {
         if (date) setViewDate(date);
     }, [date]);
@@ -723,10 +692,10 @@ const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents
                                         এই শ্রেণিতে কোনো শিক্ষার্থী নেই।
                                     </div>
                                 ) : (
-                                    <AttendanceSheet 
+                                    <MonthlyAttendanceGrid 
                                         classId={className} 
                                         students={getStudentsByClass(className)} 
-                                        date={date}
+                                        selectedDate={date} 
                                         viewDate={viewDate}
                                         onRefresh={() => {}}
                                         onDateChange={onDateChange}
@@ -940,7 +909,6 @@ const QuickRollAttendanceTab = ({ allStudents, date, onDateChange }: { allStuden
 };
 
 const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
-    const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const db = useFirestore();
     const { schoolInfo } = useSchoolInfo();
     const { selectedYear } = useAcademicYear();
@@ -1068,23 +1036,37 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
             <Card className="border-2 border-primary/20 shadow-xl overflow-hidden printable-area bg-white text-black p-0 sm:p-10">
                 <style jsx global>{`
                     @media print {
-                        @page { size: A4 landscape; margin: 0.4in !important; }
-                        .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; }
-                        .printable-area table tr { height: 28px !important; }
-                        .printable-area table td, .printable-area table th { padding: 2px 4px !important; font-size: 14px !important; border: 1px solid black !important; }
+                        @page { size: A4 portrait; margin: 0.5in !important; }
+                        .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
+                        .printable-area table { width: 100% !important; border-collapse: collapse !important; border: 1px solid black !important; }
+                        .printable-area table td, .printable-area table th { padding: 4px 6px !important; font-size: 12px !important; border: 1px solid black !important; }
+                        .printable-area table th { background-color: #f8fafc !important; font-weight: 900 !important; }
                         .no-print { display: none !important; }
+                        .pill-title { border: 2px solid black !important; border-radius: 9999px !important; padding: 4px 24px !important; display: inline-block !important; }
+                        .thick-green-line { border-bottom: 4px solid #065f46 !important; width: 100% !important; margin-bottom: 16px !important; }
+                        .text-red-print { color: #dc2626 !important; font-weight: 900 !important; }
                     }
                 `}</style>
-                <SchoolPrintHeader 
-                    title={`মাসিক হাজিরা সারাংশ - ${BENGALI_MONTHS[parseInt(selectedMonth)]} ${toBengaliNumber(selectedYear)}`} 
-                    schoolInfo={schoolInfo} 
-                />
+                
+                <header className="hidden print:flex flex-col items-center mb-4 font-kalpurush">
+                    <div className="flex items-center gap-4 mb-2">
+                        {schoolInfo.logoUrl && <img src={schoolInfo.logoUrl} alt="Logo" width={60} height={60} className="object-contain" />}
+                        <div className="text-center">
+                            <h1 className="text-2xl font-black uppercase text-emerald-950 leading-none">{schoolInfo.name}</h1>
+                            <p className="text-xs font-bold text-slate-700">{schoolInfo.address}</p>
+                        </div>
+                    </div>
+                    <div className="pill-title mt-2">
+                        <h2 className="text-sm font-black uppercase">মাসিক হাজিরা সারাংশ - {BENGALI_MONTHS[parseInt(selectedMonth)]} {toBengaliNumber(selectedYear)}</h2>
+                    </div>
+                    <div className="thick-green-line mt-4"></div>
+                </header>
                 
                 <CardContent className="p-0">
                     <div className="table-container max-h-[600px] overflow-auto print:max-h-none print:overflow-visible">
                         <Table className="min-w-[1000px] border-separate border-spacing-0 border-collapse print:min-w-full">
                             <TableHeader className="sticky top-0 z-30 print:bg-white print:static">
-                                <TableRow className="h-16 print:h-8">
+                                <TableRow className="h-16 print:h-10">
                                     <TableHead className="text-center font-black border-r border-b w-48 bg-muted z-40 sticky left-0 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:bg-white print:shadow-none print:border-black text-[14px]">তারিখ ও বার</TableHead>
                                     {classes.map(cls => (
                                         <TableHead key={cls} className="text-center font-black border-r border-b text-[14px] leading-tight print:border-black">{classNamesMap[cls]}</TableHead>
@@ -1102,15 +1084,17 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                     const fullDateStr = format(dObj, 'dd-MM-yyyy');
                                     const dayName = format(dObj, 'EEEE', { locale: bn });
                                     const isOff = row.isWeekend || row.isHolidayDay;
+                                    const isWeekendDay = dObj.getDay() === 5 || dObj.getDay() === 6;
                                     
                                     return (
                                         <TableRow key={i} className={cn(
-                                            "h-12 transition-colors print:border-black",
+                                            "h-12 transition-colors print:border-black print:h-8",
                                             isOff ? "bg-red-100 hover:bg-red-200 print:bg-gray-100" : "hover:bg-slate-50"
                                         )}>
                                             <TableCell className={cn(
                                                 "text-center font-black border-r whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:shadow-none print:border-black text-[14px] group/row",
-                                                isOff ? "text-red-700 bg-red-200 print:bg-gray-100" : "text-slate-600 bg-white"
+                                                isOff ? "text-red-700 bg-red-200 print:bg-gray-100" : "text-slate-600 bg-white",
+                                                isWeekendDay && "print:text-red-print"
                                             )}>
                                                 <div className="flex items-center justify-between gap-2 px-2">
                                                     <span>{toBengaliNumber(fullDateStr)} {dayName}</span>
@@ -1189,8 +1173,128 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
     );
 };
 
+const AbsentStudentListTab = ({ allStudents }: { allStudents: Student[] }) => {
+    const db = useFirestore();
+    const { selectedYear } = useAcademicYear();
+    const [selectedMonth, setSelectedMonth] = useState<string>(BENGALI_MONTHS[new Date().getMonth()]);
+    const [selectedClass, setSelectedClass] = useState<string>('6');
+    const [absentData, setAbsentData] = useState<{student: Student, count: number}[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const fetchAbsentees = useCallback(async () => {
+        if (!db || !selectedClass) return;
+        setIsLoading(true);
+        try {
+            const monthIndex = BENGALI_MONTHS.indexOf(selectedMonth);
+            const year = parseInt(selectedYear);
+            const start = format(new Date(year, monthIndex, 1), 'yyyy-MM-dd');
+            const end = format(new Date(year, monthIndex + 1, 0), 'yyyy-MM-dd');
+
+            const q = query(
+                collection(db, 'attendance'),
+                where('academicYear', '==', selectedYear),
+                where('className', '==', selectedClass)
+            );
+            const snap = await getDocs(q);
+            const records = snap.docs
+                .map(doc => doc.data() as DailyAttendance)
+                .filter(r => r.date >= start && r.date <= end);
+
+            const studentsInClass = allStudents.filter(s => s.academicYear === selectedYear && s.className === selectedClass);
+            
+            const results = studentsInClass.map(student => {
+                let count = 0;
+                records.forEach(r => {
+                    const att = r.attendance.find(a => a.studentId === student.id);
+                    if (att?.status === 'absent') count++;
+                });
+                return { student, count };
+            }).filter(res => res.count > 0).sort((a, b) => (Number(a.student.roll) || 0) - (Number(b.student.roll) || 0));
+
+            setAbsentData(results);
+        } catch (e) {
+            console.error(e);
+        }
+        setIsLoading(false);
+    }, [db, selectedClass, selectedMonth, selectedYear, allStudents]);
+
+    useEffect(() => { fetchAbsentees(); }, [fetchAbsentees]);
+
+    return (
+        <div className="mt-4 space-y-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-white/50 items-end no-print">
+                <div className="space-y-2">
+                    <Label className="font-bold text-primary">শ্রেণি নির্বাচন</Label>
+                    <Select value={selectedClass} onValueChange={setSelectedClass}>
+                        <SelectTrigger className="bg-white h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            {['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c}>{classNamesMap[c]}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label className="font-bold text-primary">মাস নির্বাচন</Label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger className="bg-white h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            {BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <Button onClick={fetchAbsentees} disabled={isLoading} className="h-9 font-black text-xs">তথ্য রিফ্রেশ করুন</Button>
+            </div>
+
+            <Card className="border-2 border-rose-100 shadow-md">
+                <CardHeader className="bg-rose-50/30 border-b">
+                    <CardTitle className="text-rose-700 flex items-center gap-2">
+                        <UserX className="h-5 w-5" /> অনুপস্থিত শিক্ষার্থীর তালিকা ({selectedMonth})
+                    </CardTitle>
+                    <CardDescription>মাসে অন্তত ১ দিন অনুপস্থিত শিক্ষার্থীদের তালিকা</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {isLoading ? (
+                        <div className="p-20 text-center italic text-muted-foreground flex flex-col items-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <span>বিশ্লেষণ করা হচ্ছে...</span>
+                        </div>
+                    ) : absentData.length === 0 ? (
+                        <div className="p-20 text-center text-emerald-600 font-black text-lg italic">
+                            এই মাসে কোনো শিক্ষার্থী অনুপস্থিত ছিল না।
+                        </div>
+                    ) : (
+                        <div className="table-container">
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="w-16 text-center font-black">রোল</TableHead>
+                                        <TableHead className="font-black">নাম ও মোবাইল</TableHead>
+                                        <TableHead className="text-center font-black">অনুপস্থিত দিন</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {absentData.map(({ student, count }) => (
+                                        <TableRow key={student.id} className="hover:bg-rose-50 transition-colors h-14">
+                                            <TableCell className="text-center font-black text-lg">{toBengaliNumber(student.roll)}</TableCell>
+                                            <TableCell>
+                                                <p className="font-black text-slate-800">{student.studentNameBn}</p>
+                                                <p className="text-[10px] font-bold text-muted-foreground">{student.guardianMobile || '-'}</p>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="destructive" className="font-black px-4 h-7 text-sm">{toBengaliNumber(count)} দিন</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
 const MissedAttendanceTab = ({ onTakeAttendance }: { onTakeAttendance: (date: Date) => void }) => {
-    const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const db = useFirestore();
     const { selectedYear } = useAcademicYear();
     const { toast } = useToast();
@@ -1349,133 +1453,9 @@ const MissedAttendanceTab = ({ onTakeAttendance }: { onTakeAttendance: (date: Da
     );
 };
 
-const AbsentStudentListTab = ({ allStudents }: { allStudents: Student[] }) => {
-    const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
-    const db = useFirestore();
-    const { selectedYear } = useAcademicYear();
-    const { toast } = useToast();
-    const [selectedMonth, setSelectedMonth] = useState<string>(BENGALI_MONTHS[new Date().getMonth()]);
-    const [selectedClass, setSelectedClass] = useState<string>('6');
-    const [absentData, setAbsentData] = useState<{student: Student, count: number}[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-
-    const fetchAbsentees = useCallback(async () => {
-        if (!db || !selectedClass) return;
-        setIsLoading(true);
-        try {
-            const monthIndex = BENGALI_MONTHS.indexOf(selectedMonth);
-            const year = parseInt(selectedYear);
-            const start = format(new Date(year, monthIndex, 1), 'yyyy-MM-dd');
-            const end = format(new Date(year, monthIndex + 1, 0), 'yyyy-MM-dd');
-
-            const q = query(
-                collection(db, 'attendance'),
-                where('academicYear', '==', selectedYear),
-                where('className', '==', selectedClass)
-            );
-            const snap = await getDocs(q);
-            const records = snap.docs
-                .map(doc => doc.data() as DailyAttendance)
-                .filter(r => r.date >= start && r.date <= end);
-
-            const studentsInClass = allStudents.filter(s => s.academicYear === selectedYear && s.className === selectedClass);
-            
-            const results = studentsInClass.map(student => {
-                let count = 0;
-                records.forEach(r => {
-                    const att = r.attendance.find(a => a.studentId === student.id);
-                    if (att?.status === 'absent') count++;
-                });
-                return { student, count };
-            }).filter(res => res.count > 0).sort((a, b) => (Number(a.student.roll) || 0) - (Number(b.student.roll) || 0));
-
-            setAbsentData(results);
-        } catch (e) {
-            console.error(e);
-        }
-        setIsLoading(false);
-    }, [db, selectedClass, selectedMonth, selectedYear, allStudents]);
-
-    useEffect(() => { fetchAbsentees(); }, [fetchAbsentees]);
-
-    return (
-        <div className="mt-4 space-y-6 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-white/50 items-end no-print">
-                <div className="space-y-2">
-                    <Label className="font-bold text-primary">শ্রেণি নির্বাচন</Label>
-                    <Select value={selectedClass} onValueChange={setSelectedClass}>
-                        <SelectTrigger className="bg-white h-9 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c}>{classNamesMap[c]}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label className="font-bold text-primary">মাস নির্বাচন</Label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                        <SelectTrigger className="bg-white h-9 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <Button onClick={fetchAbsentees} disabled={isLoading} className="h-9 font-black text-xs">তথ্য রিফ্রেশ করুন</Button>
-            </div>
-
-            <Card className="border-2 border-rose-100 shadow-md">
-                <CardHeader className="bg-rose-50/30 border-b">
-                    <CardTitle className="text-rose-700 flex items-center gap-2">
-                        <UserX className="h-5 w-5" /> অনুপস্থিত শিক্ষার্থীর তালিকা ({selectedMonth})
-                    </CardTitle>
-                    <CardDescription>মাসে অন্তত ১ দিন অনুপস্থিত শিক্ষার্থীদের তালিকা</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {isLoading ? (
-                        <div className="p-20 text-center italic text-muted-foreground flex flex-col items-center gap-2">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                            <span>বিশ্লেষণ করা হচ্ছে...</span>
-                        </div>
-                    ) : absentData.length === 0 ? (
-                        <div className="p-20 text-center text-emerald-600 font-black text-lg italic">
-                            এই মাসে কোনো শিক্ষার্থী অনুপস্থিত ছিল না।
-                        </div>
-                    ) : (
-                        <div className="table-container">
-                            <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead className="w-16 text-center font-black">রোল</TableHead>
-                                        <TableHead className="font-black">নাম ও মোবাইল</TableHead>
-                                        <TableHead className="text-center font-black">অনুপস্থিত দিন</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {absentData.map(({ student, count }) => (
-                                        <TableRow key={student.id} className="hover:bg-rose-50 transition-colors h-14">
-                                            <TableCell className="text-center font-black text-lg">{toBengaliNumber(student.roll)}</TableCell>
-                                            <TableCell>
-                                                <p className="font-black text-slate-800">{student.studentNameBn}</p>
-                                                <p className="text-[10px] font-bold text-muted-foreground">{student.guardianMobile || '-'}</p>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="destructive" className="font-black px-4 h-7 text-sm">{toBengaliNumber(count)} দিন</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-};
-
 const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
     const db = useFirestore();
     const { selectedYear } = useAcademicYear();
-    const { toast } = useToast();
     const [selectedClass, setSelectedClass] = useState('6');
     const [alerts, setAlerts] = useState<StudentConsecutiveAbsence[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -1638,7 +1618,7 @@ const ReportSheet = ({ classId, students, startDate, endDate }: { classId: strin
         <div className="p-0 sm:p-10 bg-white text-black font-kalpurush printable-area min-h-screen">
             <style jsx global>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 0.4in !important; }
+                    @page { size: A4 portrait; margin: 0.5in !important; }
                     .printable-area { padding: 0 !important; margin: 0 !important; }
                     .printable-area table tr { height: 32px !important; }
                     .printable-area table td, .printable-area table th { padding: 4px 8px !important; border: 1px solid black !important; font-size: 14px !important; }
@@ -1793,10 +1773,6 @@ export default function AttendancePage() {
         return () => unsubscribe();
     }, [db, user]);
 
-    const canInputQuickRoll = hasPermission('input:quick-roll-attendance');
-    const canViewMissedAttendance = hasPermission('view:missed-attendance');
-    const canViewAbsentList = hasPermission('view:absent-student-list');
-
     const handleTakeMissedAttendance = (date: Date) => {
         setAttendanceDate(date);
         setActiveSection('digital-attendance');
@@ -1818,7 +1794,7 @@ export default function AttendancePage() {
 
     return (
         <div className="flex min-h-screen w-full flex-col font-kalpurush">
-            <main className="flex-1 p-4 md:p-6 pb-40">
+            <main className="flex-1 p-4 md:p-6 pb-20">
                 <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                     {/* Sidebar Navigation */}
                     <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">

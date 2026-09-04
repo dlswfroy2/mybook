@@ -183,7 +183,7 @@ export default function TeacherDiaryPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-20 font-kalpurush">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
       <header className="flex items-center justify-between border-b pb-6 no-print">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg">

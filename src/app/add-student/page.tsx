@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -256,7 +257,7 @@ export default function AddStudentPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col font-kalpurush">
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-80">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-40">
         <Card className="max-w-4xl mx-auto w-full shadow-xl rounded-3xl overflow-hidden border-none">
           <CardHeader className="bg-white/80 border-b pb-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
@@ -428,7 +429,7 @@ export default function AddStudentPage() {
                                   {photoPreview ? <img src={photoPreview} alt="Student" className="object-cover w-full h-full" /> : <Upload className="h-6 w-6 text-muted-foreground" />}
                               </div>
                               <div className="space-y-2">
-                                <Input type="file" className="hidden" id="photo" onChange={handlePhotoChange} accept="image/*" />
+                                <input type="file" className="hidden" id="photo" onChange={handlePhotoChange} accept="image/*" />
                                 <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('photo')?.click()} className="font-bold bg-white">ছবি আপলোড</Button>
                               </div>
                           </div>

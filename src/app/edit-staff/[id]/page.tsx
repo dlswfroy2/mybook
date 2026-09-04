@@ -1,4 +1,5 @@
-﻿'use client';
+
+'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -176,7 +177,7 @@ export default function EditStaffPage() {
     return (
         <div className="flex min-h-screen w-full flex-col bg-orange-100">
             
-             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-80">
+             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-40">
                 <Card>
                     <CardHeader>
                         <Skeleton className="h-8 w-64" />
@@ -205,7 +206,7 @@ export default function EditStaffPage() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-orange-100">
       
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-80">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-40">
         <Card>
           <CardHeader>
             <CardTitle>শিক্ষক/কর্মচারীর তথ্য এডিট করুন</CardTitle>

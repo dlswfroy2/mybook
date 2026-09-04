@@ -510,7 +510,7 @@ function CreateLectureSheetContent() {
   if (loading || userLoading) return <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]"><Loader2 className="w-12 h-12 animate-spin text-primary mb-4" /><p className="font-bold">অ্যাক্সেস চেক করা হচ্ছে...</p></div>;
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-32 font-kalpurush">
+    <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
       <div ref={measurementRef} className="fixed invisible pointer-none whitespace-pre-wrap text-[10.5pt] font-kalpurush" style={{ width: '7.27in', lineHeight: '1.2' }} />
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         <header className="flex items-center justify-between border-b pb-4">
@@ -675,7 +675,7 @@ function CreateLectureSheetContent() {
              </div>
           </header>
           <div className="flex-1 flex overflow-hidden">
-            <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-32 custom-scrollbar">
+            <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
                {activeEditIdx !== null && pageStyles[activeEditIdx] ? (
                  <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
                     <div className="flex items-center justify-between"><h4 className="text-xs font-black text-blue-600 uppercase flex items-center gap-2"><Edit3 className="w-3.5 h-3.5" /> পাতা {toBengaliNumber(activeEditIdx + 1)} টুলস</h4><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActiveEditIdx(null)}><X className="w-3 h-3" /></Button></div>
@@ -746,7 +746,7 @@ function CreateLectureSheetContent() {
                  </div>
                </div>
             </aside>
-            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-16 pb-24 flex flex-col items-center gap-10 relative">
+            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-16 pb-12 flex flex-col items-center gap-10 relative">
                {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5 };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
@@ -767,7 +767,7 @@ function CreateLectureSheetContent() {
                     </div>
                  </div>
                )})}
-               <div className="no-print pt-4 pb-20"><Button onClick={() => setPaginatedPages(prev => [...prev, ""])} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
+               <div className="no-print pt-4 pb-10"><Button onClick={() => setPaginatedPages(prev => [...prev, ""])} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
             </main>
           </div>
         </div>

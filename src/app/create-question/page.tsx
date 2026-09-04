@@ -81,7 +81,7 @@ function formatMath(text: string) {
     '\\\\degree': '°', '\\\\cdot': '·', '\\\\infty': '∞', '\\\\approx': '≈',
     '\\\\sum': '∑', '\\\\prod': '∏', '\\\\alpha': 'α', '\\\\beta': 'β',
     '\\\\gamma': 'γ', '\\\\delta': 'δ', '\\\\sigma': 'σ', '\\\\phi': 'φ', '\\\\omega': 'ω',
-    '\\\\eta': 'η', '\\\\rho': 'ρ', '\\\\lambda': 'λ', '\\\\mu': 'μ',
+    '\\\\eta': 'η', '\\\\rho': 'র', '\\\\lambda': 'λ', '\\\\mu': 'μ',
     '\\\\div': '÷', '\\\\rightarrow': '→', '\\\\to': '→', '\\\\arrow': '→',
     '\\\\in': '∈', '\\\\mathbb\\{N\\}': 'ℕ', '\\\\mathbb\\{R\\}': 'ℝ', '\\\\mathbb\\{Z\\}': 'ℤ',
     '\\\\mathbb\\{Q\\}': 'ℚ', '\\\\subset': '⊂', '\\\\subseteq': '⊆', '\\\\cup': '∪',
@@ -213,7 +213,7 @@ function CreateQuestionContent() {
   const isEnglish = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-32 font-kalpurush">
+    <div className="max-w-5xl mx-auto space-y-8 pb-16 font-kalpurush">
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         <header className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm"><FileText className="w-7 h-7" /></div><h2 className="text-2xl font-bold text-primary">প্রশ্নপত্র নির্মাতা</h2></div>
