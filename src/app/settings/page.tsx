@@ -30,7 +30,8 @@ import {
   Calendar,
   HardDriveDownload,
   Monitor,
-  ImageIcon
+  ImageIcon,
+  ChevronRight
 } from 'lucide-react';
 import { 
   SchoolInfoSettings, 
@@ -51,6 +52,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 async function processImage(file: File): Promise<string> {
   if (file.size > 5 * 1024 * 1024) {
@@ -472,424 +474,392 @@ function SettingsContent() {
       });
   };
 
+  const sidebarItems = useMemo(() => {
+    const items = [
+      { id: 'profile', label: 'প্রোফাইল', icon: User, color: 'text-indigo-600 bg-indigo-50' },
+    ];
+    
+    if (isAdmin) {
+      items.push({ id: 'school', label: 'প্রতিষ্ঠানের তথ্য', icon: School, color: 'text-emerald-600 bg-emerald-50' });
+    }
+    
+    items.push({ id: 'books', label: 'বই ব্যবস্থাপনা', icon: BookCopy, color: 'text-amber-600 bg-amber-50' });
+    
+    if (isAdmin) {
+      items.push(
+        { id: 'sheets', label: 'ফাইল আপলোড', icon: FileUp, color: 'text-blue-600 bg-blue-50' },
+        { id: 'requests', label: 'অনুমোদন আবেদন', icon: Users, color: 'text-orange-600 bg-orange-50' },
+        { id: 'software', label: 'সফটওয়্যার ব্র্যান্ডিং', icon: Globe, color: 'text-indigo-600 bg-indigo-50' },
+        { id: 'holidays', label: 'ছুটির ক্যালেন্ডার', icon: Calendar, color: 'text-rose-600 bg-rose-50' },
+        { id: 'users', label: 'ইউজার ও পারমিশন', icon: Users, color: 'text-primary bg-primary/10' },
+        { id: 'backup', label: 'ব্যাকআপ ও এক্সপোর্ট', icon: HardDriveDownload, color: 'text-emerald-600 bg-emerald-50' },
+        { id: 'gallery', label: 'গ্যালারি', icon: ImageIcon, color: 'text-blue-600 bg-blue-50' },
+        { id: 'system', label: 'সিস্টেম ওভারভিউ', icon: Monitor, color: 'text-slate-600 bg-slate-50' }
+      );
+    }
+    return items;
+  }, [isAdmin]);
+
   if (userLoading || adminCheckLoading) {
     return <div className="flex flex-col items-center justify-center min-h-[50vh]"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10 font-kalpurush">
-      <header className="flex items-center gap-4 border-b pb-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-          <SettingsIcon className="w-6 h-6" />
+    <div className="max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-20 font-kalpurush">
+      <header className="flex items-center gap-4 border-b pb-6 no-print">
+        <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg">
+          <SettingsIcon className="w-7 h-7" />
         </div>
-        <h2 className="text-xl font-bold">সেটিংস ও নিয়ন্ত্রণ কেন্দ্র</h2>
+        <div>
+          <h2 className="text-2xl font-black text-foreground">সেটিংস ও নিয়ন্ত্রণ কেন্দ্র</h2>
+          <p className="text-xs text-muted-foreground font-bold">সিস্টেম কনফিগারেশন এবং প্রোফাইল ব্যবস্থাপনা</p>
+        </div>
       </header>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex flex-wrap gap-1.5 w-full mb-6 bg-secondary/50 p-2 rounded-2xl h-auto">
-          <TabsTrigger value="profile" className="gap-2 font-bold text-xs"><User className="w-3.5 h-3.5" /> প্রোফাইল</TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="school" className="gap-2 font-bold text-xs"><School className="w-3.5 h-3.5" /> প্রতিষ্ঠানের তথ্য</TabsTrigger>
-          )}
-          <TabsTrigger value="books" className="gap-2 font-bold text-xs"><BookCopy className="w-3.5 h-3.5" /> বই ব্যবস্থাপনা</TabsTrigger>
-          {isAdmin && (
-            <>
-              <TabsTrigger value="sheets" className="gap-2 font-bold text-xs"><FileUp className="w-3.5 h-3.5" /> ফাইল আপলোড</TabsTrigger>
-              <TabsTrigger value="requests" className="gap-2 font-bold text-xs"><Users className="w-3.5 h-3.5" /> অনুমোদন আবেদন</TabsTrigger>
-              <TabsTrigger value="software" className="gap-2 font-bold text-xs"><Globe className="w-3.5 h-3.5" /> সফটওয়্যার ব্র্যান্ডিং</TabsTrigger>
-              <TabsTrigger value="holidays" className="gap-2 font-bold text-xs"><Calendar className="w-3.5 h-3.5" /> ছুটির ক্যালেন্ডার</TabsTrigger>
-              <TabsTrigger value="users" className="gap-2 font-bold text-xs"><Users className="w-3.5 h-3.5" /> ইউজার ও পারমিশন</TabsTrigger>
-              <TabsTrigger value="backup" className="gap-2 font-bold text-xs"><HardDriveDownload className="w-3.5 h-3.5" /> ব্যাকআপ ও এক্সপোর্ট</TabsTrigger>
-              <TabsTrigger value="gallery" className="gap-2 font-bold text-xs"><ImageIcon className="w-3.5 h-3.5" /> গ্যালারি</TabsTrigger>
-              <TabsTrigger value="system" className="gap-2 font-bold text-xs"><Monitor className="w-3.5 h-3.5" /> সিস্টেম ওভারভিউ</TabsTrigger>
-            </>
-          )}
-        </TabsList>
-
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader className="p-4"><CardTitle className="text-lg">ব্যক্তিগত প্রোফাইল</CardTitle></CardHeader>
-            <CardContent className="p-4 space-y-6">
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="relative group shrink-0">
-                  <Avatar className="h-24 w-24 border-4 border-primary/20 shadow-xl">
-                    <AvatarImage src={photoURL || ''} />
-                    <AvatarFallback className="text-3xl font-black bg-secondary text-primary">{displayName?.charAt(0) || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <button onClick={() => profileInputRef.current?.click()} className="absolute -bottom-1 -right-1 bg-primary text-white p-2 rounded-full shadow-lg">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                  <input type="file" ref={profileInputRef} className="hidden" accept="image/*" onChange={handleProfilePhotoChange} />
-                </div>
-                <div className="flex-1 w-full space-y-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold">আপনার নাম</Label>
-                    <Input value={displayName || ''} onChange={e => setDisplayName(e.target.value)} placeholder="নাম লিখুন" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-bold">প্রোফাইল ছবির লিঙ্ক (ঐচ্ছিক)</Label>
-                    <Input value={photoURL || ''} onChange={e => setPhotoURL(e.target.value)} placeholder="https://..." />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end border-t bg-muted/20 py-3">
-              <Button onClick={handleUpdateProfile} disabled={savingProfile} className="gap-2 font-bold h-9 shadow-md">
-                {savingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ করুন
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="books" className="space-y-6">
-          {isAdmin && (
-            <Card className="border-2 border-primary/10">
-              <CardHeader className="p-4 border-b">
-                <div className="flex items-center gap-2 font-bold text-primary"><LinkIcon className="w-4 h-4" /> নতুন বই যোগ করুন</div>
-              </CardHeader>
-              <CardContent className="p-4 space-y-6">
-                <div className="space-y-3">
-                  <Label className="font-bold text-primary">বইয়ের ধরন</Label>
-                  <RadioGroup value={bookType || 'nctb'} onValueChange={(v) => setBookType(v as 'nctb' | 'guide')} className="flex gap-6">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="nctb" id="nctb" /><Label htmlFor="nctb" className="cursor-pointer font-bold">পাঠ্যবই</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="guide" id="guide" /><Label htmlFor="guide" className="cursor-pointer font-bold">গাইড বই</Label></div>
-                  </RadioGroup>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><label className="text-sm font-bold">শ্রেণি</label><Select onValueChange={setClassId} value={classId || ''}><SelectTrigger><SelectValue placeholder="নির্বাচন করুন" /></SelectTrigger><SelectContent>{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><label className="text-sm font-bold">বিষয়</label><Select onValueChange={setSubject} value={subject || ''} disabled={!classId}><SelectTrigger><SelectValue placeholder="নির্বাচন করুন" /></SelectTrigger><SelectContent>{subjectsList.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
-                </div>
-                {bookType === 'guide' && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">অধ্যায়ের নাম</label>
-                    {chaptersList.length > 0 ? (
-                      <Select onValueChange={setChapterName} value={chapterName || ''}><SelectTrigger><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger><SelectContent>{chaptersList.map(ch => <SelectItem key={ch} value={ch}>{ch}</SelectItem>)}</SelectContent></Select>
-                    ) : (
-                      <Input placeholder="অধ্যায়ের নাম লিখুন" value={chapterName || ''} onChange={e => setChapterName(e.target.value)} />
-                    )}
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><label className="text-sm font-bold">পিডিএফ লিঙ্ক</label><Input placeholder="https://..." value={pdfUrl || ''} onChange={e => setPdfUrl(e.target.value)} disabled={uploading} /></div>
-                  <div className="space-y-2"><label className="text-sm font-bold">কভার ইমেজ লিঙ্ক (ঐচ্ছিক)</label><Input placeholder="https://..." value={coverImageUrl || ''} onChange={e => setCoverImageUrl(e.target.value)} disabled={uploading} /></div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end border-t bg-muted/20 py-3">
-                <Button onClick={handleSaveBook} disabled={uploading || !pdfUrl || !classId || !subject} className="bg-accent text-white h-9 gap-2 px-8 font-bold shadow-lg">
-                  {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />} সেভ করুন
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
-
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h3 className="font-bold">বর্তমানে থাকা বইসমূহ</h3>
-              <div className="flex items-center gap-2 bg-secondary/30 p-1.5 rounded-lg border">
-                <Select value={viewClassId || 'all'} onValueChange={setViewClassId}>
-                  <SelectTrigger className="w-[110px] h-8 text-[10px] bg-white font-bold"><SelectValue placeholder="সব শ্রেণি" /></SelectTrigger>
-                  <SelectContent><SelectItem value="all">সব শ্রেণি</SelectItem>{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={viewBookType || 'all'} onValueChange={setViewBookType}>
-                  <SelectTrigger className="w-[110px] h-8 text-[10px] bg-white font-bold"><SelectValue placeholder="বইয়ের ধরন" /></SelectTrigger>
-                  <SelectContent><SelectItem value="all">সব বই</SelectItem><SelectItem value="nctb">পাঠ্যবই</SelectItem><SelectItem value="guide">গাইড বই</SelectItem></SelectContent>
-                </Select>
-              </div>
-            </div>
-            {loadingBooks ? (
-              <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" /></div>
-            ) : filteredBooks.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredBooks.map(book => (
-                  <div key={book.id} className="p-3 flex items-center justify-between border rounded-lg hover:border-primary transition-all group bg-white shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-14 rounded border bg-primary/5 flex items-center justify-center overflow-hidden shrink-0 relative">
-                        {book.coverImageUrl ? <img src={book.coverImageUrl} className="max-full h-full object-cover" /> : <FileText className="w-5 h-5 text-primary" />}
-                        {book.isGuide && <div className="absolute top-0 right-0 bg-accent text-[6px] px-1 text-white font-bold uppercase">Guide</div>}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-sm truncate text-primary">{book.subject}</h4>
-                        <p className="text-[10px] text-muted-foreground font-bold">{CLASSES.find(c => c.id === book.classId)?.label || 'অজানা'} শ্রেণি | {book.isGuide ? 'গাইড' : 'বোর্ড'}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPdf(book.pdfUrl)}><BookOpen className="w-4 h-4" /></Button>
-                       {isAdmin && <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => removeBook(book.id)}><Trash2 className="w-4 h-4" /></Button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-10 text-center border-dashed border-2 bg-muted/5 rounded-xl"><p className="text-muted-foreground text-sm">কোনো বই পাওয়া যায়নি।</p></div>
-            )}
-          </div>
-        </TabsContent>
-
-        {isAdmin && (
-          <>
-            <TabsContent value="sheets" className="space-y-6">
-              <Card className="border-2 border-indigo-100">
-                <CardHeader className="bg-indigo-50/50 p-4 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2 font-bold text-indigo-700">
-                    <FileType className="w-5 h-5" /> ফাইল আপলোড (PDF/Word)
-                  </CardTitle>
-                  <CardDescription className="font-bold">লেকচার শিট, সৃজনশীল প্রশ্ন, এমসিকিউ বা মডেল টেস্ট ফাইল আপলোড করুন। ওয়ার্ড ফাইল আপলোড করলে ফরমেট ১০০% ঠিক থাকবে।</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 space-y-6">
-                  <div className="space-y-4 border-b pb-4">
-                    <Label className="font-bold text-indigo-700">আপলোড পদ্ধতি</Label>
-                    <RadioGroup value={sheetUploadType} onValueChange={(v) => setSheetUploadType(v as 'file' | 'link')} className="flex gap-6">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="file" id="sheet-file" />
-                        <Label htmlFor="sheet-file" className="cursor-pointer font-bold text-xs">ফাইল আপলোড</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="link" id="sheet-link" />
-                        <Label htmlFor="sheet-link" className="cursor-pointer font-bold text-xs">লিঙ্ক আপলোড (URL)</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">ক্যাটাগরি</label>
-                      <Select onValueChange={setSheetCategory} value={sheetCategory || ''}>
-                        <SelectTrigger><SelectValue placeholder="নির্বাচন করুন" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="lecture_sheet">লেকচার শিট</SelectItem>
-                          <SelectItem value="creative">সৃজনশীল প্রশ্ন</SelectItem>
-                          <SelectItem value="mcq">বহুনির্বাচনী প্রশ্ন</SelectItem>
-                          <SelectItem value="model_test">মডেল টেস্ট</SelectItem>
-                          <SelectItem value="answer_key">উত্তরমালা</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">শ্রেণি</label>
-                      <Select onValueChange={setSheetClassId} value={sheetClassId || ''}>
-                        <SelectTrigger><SelectValue placeholder="নির্বাচন করুন" /></SelectTrigger>
-                        <SelectContent>{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">বিষয়</label>
-                      <Select onValueChange={setSheetSubject} value={sheetSubject || ''} disabled={!sheetClassId}>
-                        <SelectTrigger><SelectValue placeholder="নির্বাচন করুন" /></SelectTrigger>
-                        <SelectContent>{sheetSubjectsList.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold">অধ্যায় (Chapter)</label>
-                      {sheetChaptersList.length > 0 ? (
-                        <Select onValueChange={setSheetChapter} value={sheetChapter || ''}>
-                          <SelectTrigger><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger>
-                          <SelectContent>{sheetChaptersList.map(ch => <SelectItem key={ch} value={ch}>{ch}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Input placeholder="অধ্যায়ের নাম লিখুন" value={sheetChapter || ''} onChange={e => setSheetChapter(e.target.value)} />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {sheetUploadType === 'file' ? (
-                      <>
-                        <label className="text-sm font-bold">ফাইল নির্বাচন করুন (PDF/Word)</label>
-                        <div className="flex items-center gap-4">
-                          <Input 
-                            type="file" 
-                            ref={sheetInputRef}
-                            accept=".pdf,.doc,.docx" 
-                            onChange={e => setSheetFile(e.target.files?.[0] || null)} 
-                            className="flex-1 font-bold"
-                            disabled={sheetUploading}
-                          />
-                          {sheetFile && (
-                            <Button variant="ghost" onClick={() => { setSheetFile(null); if(sheetInputRef.current) sheetInputRef.current.value = ''; }} className="text-destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                        {sheetUploading && (
-                          <div className="space-y-2 mt-2">
-                            <div className="flex justify-between text-[10px] font-bold">
-                              <span>প্রসেসিং ও আপলোড হচ্ছে...</span>
-                              <span>{sheetUploadProgress}%</span>
-                            </div>
-                            <Progress value={sheetUploadProgress} className="h-2" />
-                          </div>
+      <div className="flex flex-col md:flex-row gap-8 items-start">
+        {/* Sidebar Navigation */}
+        <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+            <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
+                {sidebarItems.map(item => (
+                    <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit",
+                            activeTab === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
                         )}
-                      </>
-                    ) : (
-                      <>
-                        <label className="text-sm font-bold">ফাইল লিঙ্ক (URL) দিন</label>
-                        <Input 
-                          placeholder="https://example.com/file.pdf" 
-                          value={sheetManualUrl} 
-                          onChange={e => setSheetManualUrl(e.target.value)} 
-                          className="font-bold"
-                          disabled={sheetUploading}
-                        />
-                      </>
-                    )}
+                    >
+                        <div className={cn("p-1.5 rounded-lg shrink-0", activeTab === item.id ? item.color : "bg-muted")}>
+                            <item.icon className="h-4 w-4" />
+                        </div>
+                        <span className="text-sm font-black">{item.label}</span>
+                        {activeTab === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}
+                    </button>
+                ))}
+            </div>
+        </aside>
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsContent value="profile" className="mt-0">
+              <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)] bg-white">
+                <CardHeader className="bg-primary/5 p-6 border-b-[3px] border-black">
+                  <CardTitle className="text-xl font-black">ব্যক্তিগত প্রোফাইল</CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 space-y-6">
+                  <div className="flex flex-col md:flex-row items-center gap-8">
+                    <div className="relative group shrink-0">
+                      <Avatar className="h-32 w-32 border-[4px] border-black shadow-xl">
+                        <AvatarImage src={photoURL || ''} />
+                        <AvatarFallback className="text-4xl font-black bg-secondary text-primary">{displayName?.charAt(0) || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <button onClick={() => profileInputRef.current?.click()} className="absolute -bottom-2 -right-2 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary/90 transition-all border-2 border-white">
+                        <Camera className="w-5 h-5" />
+                      </button>
+                      <input type="file" ref={profileInputRef} className="hidden" accept="image/*" onChange={handleProfilePhotoChange} />
+                    </div>
+                    <div className="flex-1 w-full space-y-6">
+                      <div className="space-y-2">
+                        <Label className="font-black text-sm text-slate-700">আপনার নাম</Label>
+                        <Input value={displayName || ''} onChange={e => setDisplayName(e.target.value)} placeholder="নাম লিখুন" className="h-12 text-lg font-bold border-2" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-black text-sm text-slate-700">প্রোফাইল ছবির লিঙ্ক (ঐচ্ছিক)</Label>
+                        <Input value={photoURL || ''} onChange={e => setPhotoURL(e.target.value)} placeholder="https://..." className="h-10 border-2" />
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-end border-t bg-muted/20 py-3">
-                  <Button onClick={handleUploadSheet} disabled={sheetUploading || (sheetUploadType === 'file' && !sheetFile) || (sheetUploadType === 'link' && !sheetManualUrl)} className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 gap-2 px-10 font-bold shadow-lg">
-                    {sheetUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />} {sheetUploadType === 'file' ? 'ফাইল আপলোড করুন' : 'লিঙ্ক সেভ করুন'}
+                <CardFooter className="flex justify-end p-6 border-t-[3px] border-black bg-slate-50">
+                  <Button onClick={handleUpdateProfile} disabled={savingProfile} className="gap-2 font-black h-12 px-10 shadow-lg text-base">
+                    {savingProfile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} প্রোফাইল সেভ করুন
                   </Button>
                 </CardFooter>
               </Card>
+            </TabsContent>
 
-              <div className="space-y-4 pt-6">
-                <h3 className="font-bold flex items-center gap-2 text-indigo-700"><CheckCircle className="w-4 h-4" /> আপলোড করা ফাইলসমূহ</h3>
-                {loadingSheets ? (
-                  <div className="p-10 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
-                ) : sortedSheets.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3">
-                    {sortedSheets.map(sheet => (
-                      <div key={sheet.id} className="p-4 border rounded-xl flex items-center justify-between bg-white hover:bg-indigo-50/30 transition-all shadow-sm group">
+            <TabsContent value="school" className="mt-0">
+              <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                <div className="p-8">
+                  <SchoolInfoSettings />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="books" className="mt-0 space-y-6">
+              {isAdmin && (
+                <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)] bg-white">
+                  <CardHeader className="bg-amber-50 p-6 border-b-[3px] border-black">
+                    <CardTitle className="text-xl font-black flex items-center gap-2 text-amber-900"><LinkIcon className="w-6 h-6" /> নতুন বই যোগ করুন</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-8 space-y-8">
+                    <div className="space-y-3">
+                      <Label className="font-black text-primary text-lg">বইয়ের ধরন</Label>
+                      <RadioGroup value={bookType || 'nctb'} onValueChange={(v) => setBookType(v as 'nctb' | 'guide')} className="flex gap-10">
+                        <div className="flex items-center space-x-3"><RadioGroupItem value="nctb" id="nctb" className="h-5 w-5" /><Label htmlFor="nctb" className="cursor-pointer font-black text-base">পাঠ্যবই (NCTB)</Label></div>
+                        <div className="flex items-center space-x-3"><RadioGroupItem value="guide" id="guide" className="h-5 w-5" /><Label htmlFor="guide" className="cursor-pointer font-black text-base">গাইড বই (Guide)</Label></div>
+                      </RadioGroup>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2"><label className="text-sm font-black text-slate-700">শ্রেণি</label><Select onValueChange={setClassId} value={classId || ''}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="শ্রেণি নির্বাচন" /></SelectTrigger><SelectContent className="font-kalpurush">{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
+                      <div className="space-y-2"><label className="text-sm font-black text-slate-700">বিষয়</label><Select onValueChange={setSubject} value={subject || ''} disabled={!classId}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger><SelectContent className="font-kalpurush">{subjectsList.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                    </div>
+                    {bookType === 'guide' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-black text-slate-700">অধ্যায়ের নাম</label>
+                        {chaptersList.length > 0 ? (
+                          <Select onValueChange={setChapterName} value={chapterName || ''}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger><SelectContent className="font-kalpurush">{chaptersList.map(ch => <SelectItem key={ch} value={ch}>{ch}</SelectItem>)}</SelectContent></Select>
+                        ) : (
+                          <Input placeholder="অধ্যায়ের নাম লিখুন" value={chapterName || ''} onChange={e => setChapterName(e.target.value)} className="h-11 border-2 font-bold" />
+                        )}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2"><label className="text-sm font-black text-slate-700">পিডিএফ লিঙ্ক (URL)</label><Input placeholder="https://..." value={pdfUrl || ''} onChange={e => setPdfUrl(e.target.value)} disabled={uploading} className="h-11 border-2" /></div>
+                      <div className="space-y-2"><label className="text-sm font-black text-slate-700">কভার ইমেজ লিঙ্ক (ঐচ্ছিক)</label><Input placeholder="https://..." value={coverImageUrl || ''} onChange={e => setCoverImageUrl(e.target.value)} disabled={uploading} className="h-11 border-2" /></div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-end p-6 border-t-[3px] border-black bg-slate-50">
+                    <Button onClick={handleSaveBook} disabled={uploading || !pdfUrl || !classId || !subject} className="bg-emerald-600 hover:bg-emerald-700 text-white h-14 gap-2 px-12 font-black shadow-xl text-lg">
+                      {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <CheckCircle className="w-6 h-6" />} বই সেভ করুন
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )}
+
+              <div className="space-y-6 pt-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
+                  <h3 className="font-black text-xl flex items-center gap-2 text-slate-800"><BookOpen className="w-6 h-6 text-primary" /> বর্তমানে থাকা বইসমূহ</h3>
+                  <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border-2 border-black shadow-sm">
+                    <Select value={viewClassId || 'all'} onValueChange={setViewClassId}>
+                      <SelectTrigger className="w-[120px] h-9 text-xs bg-slate-50 font-black border-none focus:ring-0"><SelectValue placeholder="সব শ্রেণি" /></SelectTrigger>
+                      <SelectContent className="font-kalpurush"><SelectItem value="all">সব শ্রেণি</SelectItem>{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Separator orientation="vertical" className="h-6 bg-slate-200" />
+                    <Select value={viewBookType || 'all'} onValueChange={setViewBookType}>
+                      <SelectTrigger className="w-[120px] h-9 text-xs bg-slate-50 font-black border-none focus:ring-0"><SelectValue placeholder="বইয়ের ধরন" /></SelectTrigger>
+                      <SelectContent className="font-kalpurush"><SelectItem value="all">সব বই</SelectItem><SelectItem value="nctb">পাঠ্যবই</SelectItem><SelectItem value="guide">গাইড বই</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {loadingBooks ? (
+                  <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" /></div>
+                ) : filteredBooks.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredBooks.map(book => (
+                      <div key={book.id} className="p-4 flex items-center justify-between border-2 border-black/5 rounded-2xl hover:border-primary/30 transition-all group bg-white shadow-sm">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                            <FileText className="w-6 h-6" />
+                          <div className="w-14 h-20 rounded-lg border-2 border-slate-100 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 relative shadow-inner">
+                            {book.coverImageUrl ? <img src={book.coverImageUrl} className="w-full h-full object-cover" alt="cover" /> : <FileText className="w-8 h-8 text-slate-300" />}
+                            {book.isGuide && <div className="absolute top-0 right-0 bg-amber-600 text-[7px] px-1.5 py-0.5 text-white font-black uppercase tracking-widest shadow-sm">Guide</div>}
                           </div>
-                          <div>
-                            <h4 className="font-bold text-sm text-indigo-900">{sheet.chapterName} - {sheet.subject}</h4>
-                            <div className="flex gap-2 items-center mt-0.5">
-                              <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
-                                {sheet.category === 'lecture_sheet' ? 'লেকচার শিট' : sheet.category === 'creative' ? 'সৃজনশীল' : sheet.category === 'mcq' ? 'এমসিকিউ' : sheet.category === 'model_test' ? 'মডেল টেস্ট' : 'উত্তরমালা'}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-bold">
-                                {CLASSES.find(c => c.id === sheet.classId)?.label} শ্রেণি
-                              </span>
-                            </div>
+                          <div className="min-w-0">
+                            <h4 className="font-black text-base truncate text-slate-900">{book.subject}</h4>
+                            <p className="text-xs font-bold text-muted-foreground mt-1">{CLASSES.find(c => c.id === book.classId)?.label || 'অজানা'} শ্রেণি | {book.isGuide ? 'গাইড বই' : 'পাঠ্যবই (বোর্ড)'}</p>
+                            <p className="text-[10px] font-bold text-primary mt-1 line-clamp-1">{book.chapterName || 'সম্পূর্ণ বই'}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-8 font-bold gap-1 text-[10px] border-indigo-200"
-                            onClick={() => handleOpenPdf(sheet.pdfUrl)}
-                          >
-                            <LinkIcon className="w-3 h-3" /> ফাইল দেখুন
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeSheet(sheet.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                        <div className="flex gap-2 shrink-0">
+                           <Button variant="outline" size="icon" className="h-10 w-10 border-2 rounded-xl text-primary" onClick={() => handleOpenPdf(book.pdfUrl)}><BookOpen className="w-5 h-5" /></Button>
+                           {isAdmin && <Button variant="ghost" size="icon" className="h-10 w-10 text-rose-500 hover:bg-rose-50 hover:text-rose-600" onClick={() => removeBook(book.id)}><Trash2 className="w-5 h-5" /></Button>}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="p-10 text-center border-dashed border-2 bg-muted/5 rounded-xl"><p className="text-muted-foreground text-sm font-bold">কোনো ফাইল পাওয়া যায়নি।</p></div>
+                  <div className="p-20 text-center border-4 border-dashed border-slate-200 bg-slate-50 rounded-[32px] opacity-40"><p className="text-slate-400 font-black text-xl">কোনো বই পাওয়া যায়নি।</p></div>
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="requests" className="space-y-6">
-              <Card className="border-2 border-orange-100">
-                <CardHeader className="bg-orange-50/50 p-4 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2 font-bold text-orange-700">
-                    <Users className="w-5 h-5" /> একাউন্ট খোলার আবেদনসমূহ
-                  </CardTitle>
-                  <CardDescription className="font-bold">যেসকল ইউজার রেজিস্ট্রেশন করেছেন তাদের তালিকা এখানে পাবেন।</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4">
-                  {loadingRequests ? (
-                    <div className="p-10 text-center"><Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto" /></div>
-                  ) : pendingUsers.length > 0 ? (
-                    <div className="space-y-3">
-                      {pendingUsers.map(userReq => (
-                        <div key={userReq.id} className="p-4 border rounded-xl flex items-center justify-between bg-white hover:bg-slate-50 transition-all shadow-sm">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black">
-                              {userReq.displayName?.charAt(0) || userReq.email?.charAt(0)}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm">{userReq.displayName || 'নামহীন'}</h4>
-                              <p className="text-xs text-muted-foreground font-bold">{userReq.email}</p>
-                            </div>
-                          </div>
-                          <Button 
-                            onClick={() => handleConfirmUser(userReq.id)} 
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 gap-2 font-bold"
-                          >
-                            <ShieldCheck className="w-4 h-4" /> কনফার্ম করুন
-                          </Button>
+            {isAdmin && (
+              <>
+                <TabsContent value="sheets" className="mt-0 space-y-6">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <div className="flex items-center gap-4 mb-8">
+                        <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200">
+                          <FileType className="w-8 h-8" />
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-20 text-center border-dashed border-2 bg-muted/5 rounded-2xl">
-                      <p className="text-muted-foreground font-bold">বর্তমানে কোনো পেন্ডিং আবেদন নেই।</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                        <div>
+                          <h3 className="text-2xl font-black text-slate-900">সরাসরি ফাইল আপলোড (PDF/Word)</h3>
+                          <p className="font-bold text-muted-foreground">লেকচার শিট, প্রশ্নপত্র বা উত্তরমালা ডাটাবেসে সেভ করুন</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-8">
+                        <div className="p-6 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 space-y-4">
+                          <Label className="font-black text-indigo-900 uppercase tracking-widest text-[10px]">১. আপলোড পদ্ধতি</Label>
+                          <RadioGroup value={sheetUploadType} onValueChange={(v) => setSheetUploadType(v as 'file' | 'link')} className="flex gap-12">
+                            <div className="flex items-center space-x-3"><RadioGroupItem value="file" id="sheet-file" className="h-5 w-5" /><Label htmlFor="sheet-file" className="cursor-pointer font-black text-base text-indigo-900">ফাইল আপলোড</Label></div>
+                            <div className="flex items-center space-x-3"><RadioGroupItem value="link" id="sheet-link" className="h-5 w-5" /><Label htmlFor="sheet-link" className="cursor-pointer font-black text-base text-indigo-900">লিঙ্ক আপলোড (URL)</Label></div>
+                          </RadioGroup>
+                        </div>
 
-            <TabsContent value="software" className="space-y-6">
-              <Card className="border-2 border-primary/20">
-                <CardHeader className="p-4"><CardTitle className="text-lg font-black text-primary">সফটওয়্যার ব্র্যান্ডিং</CardTitle></CardHeader>
-                <CardContent className="p-4 space-y-8">
-                  <div className="flex flex-col md:flex-row items-center gap-8">
-                    <div className="relative group shrink-0">
-                      <div className="w-24 h-24 rounded-2xl bg-white flex items-center justify-center p-2 border-4 border-primary/10 overflow-hidden shadow-xl">
-                        {appLogoUrl ? <img src={appLogoUrl} className="max-w-full max-h-full object-contain" /> : <Globe className="w-10 h-10 text-primary" />}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2"><Label className="font-black text-slate-700">ক্যাটাগরি</Label><Select onValueChange={setSheetCategory} value={sheetCategory || ''}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="ধরণ নির্বাচন করুন" /></SelectTrigger><SelectContent className="font-kalpurush"><SelectItem value="lecture_sheet">লেকচার শিট</SelectItem><SelectItem value="creative">সৃজনশীল প্রশ্ন</SelectItem><SelectItem value="mcq">বহুনির্বাচনী প্রশ্ন</SelectItem><SelectItem value="model_test">মডেল টেস্ট</SelectItem><SelectItem value="answer_key">উত্তরমালা</SelectItem></SelectContent></Select></div>
+                          <div className="space-y-2"><Label className="font-black text-slate-700">শ্রেণি</Label><Select onValueChange={setSheetClassId} value={sheetClassId || ''}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="শ্রেণি নির্বাচন" /></SelectTrigger><SelectContent className="font-kalpurush">{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
+                          <div className="space-y-2"><Label className="font-black text-slate-700">বিষয়</Label><Select onValueChange={setSheetSubject} value={sheetSubject || ''} disabled={!sheetClassId}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger><SelectContent className="font-kalpurush">{sheetSubjectsList.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                          <div className="space-y-2"><Label className="font-black text-slate-700">অধ্যায় (Chapter)</Label>{sheetChaptersList.length > 0 ? (<Select onValueChange={setSheetChapter} value={sheetChapter || ''}><SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger><SelectContent className="font-kalpurush">{sheetChaptersList.map(ch => <SelectItem key={ch} value={ch}>{ch}</SelectItem>)}</SelectContent></Select>) : (<Input placeholder="অধ্যায়ের নাম লিখুন" value={sheetChapter || ''} onChange={e => setSheetChapter(e.target.value)} className="h-11 border-2 font-bold" />)}</div>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-dashed">
+                          {sheetUploadType === 'file' ? (
+                            <div className="space-y-4">
+                              <Label className="font-black text-slate-700">ফাইল নির্বাচন করুন (PDF/Word)</Label>
+                              <div className="flex items-center gap-4">
+                                <div onClick={() => !sheetUploading && sheetInputRef.current?.click()} className="flex-1 h-32 border-4 border-dashed border-indigo-200 rounded-[24px] bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 hover:border-indigo-400 transition-all group overflow-hidden">
+                                  {sheetFile ? (<div className="flex items-center gap-3 p-4"><div className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg"><FileText className="w-8 h-8" /></div><div><p className="font-black text-indigo-900">{sheetFile.name}</p><p className="text-[10px] font-bold text-muted-foreground">{(sheetFile.size / 1024).toFixed(1)} KB</p></div></div>) : (<><FileUp className="w-10 h-10 text-slate-300 group-hover:text-indigo-500 transition-colors mb-2" /><p className="text-sm font-black text-slate-400 group-hover:text-indigo-600 transition-colors">ফাইল এখানে ড্রপ করুন অথবা ক্লিক করুন</p></>)}
+                                </div>
+                                <input type="file" ref={sheetInputRef} className="hidden" accept=".pdf,.doc,.docx" onChange={e => setSheetFile(e.target.files?.[0] || null)} />
+                              </div>
+                              {sheetUploading && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                  <div className="flex justify-between text-[10px] font-black text-indigo-600 uppercase tracking-widest"><span>প্রসেসিং ও আপলোড হচ্ছে...</span><span>{toBengaliNumber(sheetUploadProgress)}%</span></div>
+                                  <Progress value={sheetUploadProgress} className="h-2 bg-indigo-100" />
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Label className="font-black text-slate-700">ফাইল লিঙ্ক (URL) দিন</Label>
+                              <Input placeholder="https://example.com/file.pdf" value={sheetManualUrl} onChange={e => setSheetManualUrl(e.target.value)} className="h-12 border-2 font-bold" disabled={sheetUploading} />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <button onClick={() => logoInputRef.current?.click()} className="absolute -bottom-2 -right-2 bg-accent text-white p-2 rounded-full shadow-lg">
-                        <Camera className="w-4 h-4" />
-                      </button>
-                      <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
-                    </div>
-                    <div className="flex-1 w-full space-y-4">
-                      <div className="space-y-2">
-                        <Label className="font-bold">সফটওয়্যারের নাম</Label>
-                        <Input value={appName || ''} onChange={e => setAppName(e.target.value)} placeholder="প্রতিষ্ঠানের নাম লিখুন" className="font-bold text-primary text-[25px]" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="font-bold">লোগো ছবি লিঙ্ক (ঐচ্ছিক)</Label>
-                        <Input value={appLogoUrl || ''} onChange={e => setAppLogoUrl(e.target.value)} placeholder="https://..." />
+                      
+                      <div className="mt-10 flex justify-end">
+                        <Button onClick={handleUploadSheet} disabled={sheetUploading || (sheetUploadType === 'file' && !sheetFile) || (sheetUploadType === 'link' && !sheetManualUrl)} className="h-16 px-16 text-xl font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl shadow-indigo-200">
+                          {sheetUploading ? <Loader2 className="w-6 h-6 animate-spin mr-2" /> : <Save className="w-6 h-6 mr-2" />} 
+                          {sheetUploadType === 'file' ? 'ফাইল সেভ করুন' : 'লিঙ্ক সেভ করুন'}
+                        </Button>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-                <CardFooter className="flex justify-end border-t bg-muted/20 py-3">
-                  <Button onClick={handleUpdateSoftware} disabled={savingSoftware} className="gap-2 font-bold h-9 shadow-lg bg-primary">
-                    {savingSoftware ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ করুন
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
+                </TabsContent>
 
-            <TabsContent value="school" className="space-y-4">
-              <SchoolInfoSettings />
-            </TabsContent>
+                <TabsContent value="requests" className="mt-0">
+                  <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)] bg-white">
+                    <CardHeader className="bg-orange-50 p-6 border-b-[3px] border-black">
+                      <CardTitle className="text-xl font-black flex items-center gap-2 text-orange-700"><Users className="w-6 h-6" /> একাউন্ট খোলার আবেদনসমূহ</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                      {loadingRequests ? (
+                        <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin text-orange-600 mx-auto" /></div>
+                      ) : pendingUsers.length > 0 ? (
+                        <div className="space-y-4">
+                          {pendingUsers.map(userReq => (
+                            <div key={userReq.id} className="p-5 border-2 border-black/5 rounded-2xl flex items-center justify-between bg-white hover:border-orange-200 transition-all shadow-sm">
+                              <div className="flex items-center gap-4">
+                                <Avatar className="h-12 w-12 border-2 border-orange-100">
+                                  <AvatarFallback className="bg-orange-50 text-orange-600 font-black text-lg">{userReq.displayName?.charAt(0) || userReq.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h4 className="font-black text-slate-900">{userReq.displayName || 'নামহীন'}</h4>
+                                  <p className="text-xs font-bold text-muted-foreground">{userReq.email}</p>
+                                </div>
+                              </div>
+                              <Button onClick={() => handleConfirmUser(userReq.id)} size="lg" className="bg-emerald-600 hover:bg-emerald-700 h-11 px-8 gap-2 font-black shadow-lg shadow-emerald-100">
+                                <ShieldCheck className="w-5 h-5" /> কনফার্ম করুন
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-20 text-center border-4 border-dashed border-slate-200 rounded-[32px] opacity-40">
+                          <Users className="h-16 w-16 mx-auto mb-4 text-slate-300" />
+                          <p className="text-slate-400 font-black text-xl italic">বর্তমানে কোনো পেন্ডিং আবেদন নেই।</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-            <TabsContent value="holidays" className="space-y-4">
-              <HolidaySettings />
-            </TabsContent>
+                <TabsContent value="software" className="mt-0">
+                  <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)] bg-white">
+                    <CardHeader className="bg-indigo-600 text-white p-6 border-b-[3px] border-black">
+                      <CardTitle className="text-xl font-black">সফটওয়্যার ব্র্যান্ডিং</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-10">
+                      <div className="flex flex-col md:flex-row items-center gap-10">
+                        <div className="relative group shrink-0">
+                          <div className="w-32 h-32 rounded-3xl bg-white flex items-center justify-center p-3 border-[4px] border-black shadow-2xl relative overflow-hidden">
+                            {appLogoUrl ? <img src={appLogoUrl} className="max-w-full max-h-full object-contain" alt="logo" /> : <Globe className="w-12 h-12 text-primary" />}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Camera className="text-white w-8 h-8" />
+                            </div>
+                          </div>
+                          <button onClick={() => logoInputRef.current?.click()} className="absolute -bottom-3 -right-3 bg-primary text-white p-3 rounded-full shadow-lg border-2 border-white hover:scale-110 transition-transform">
+                            <Camera className="w-5 h-5" />
+                          </button>
+                          <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
+                        </div>
+                        <div className="flex-1 w-full space-y-6">
+                          <div className="space-y-2">
+                            <Label className="font-black text-slate-700 text-sm uppercase tracking-wider">প্রতিষ্ঠানের নাম (সফটওয়্যারে প্রদর্শিত)</Label>
+                            <Input value={appName || ''} onChange={e => setAppName(e.target.value)} placeholder="প্রতিষ্ঠানের নাম লিখুন" className="font-black text-primary text-3xl h-16 border-2 border-black/10 focus:border-primary shadow-inner" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-black text-slate-700 text-sm uppercase tracking-wider">সফটওয়্যার লোগো লিঙ্ক (URL)</Label>
+                            <Input value={appLogoUrl || ''} onChange={e => setAppLogoUrl(e.target.value)} placeholder="https://..." className="h-12 border-2 font-bold" />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end p-6 border-t-[3px] border-black bg-slate-50">
+                      <Button onClick={handleUpdateSoftware} disabled={savingSoftware} className="gap-2 font-black h-14 px-12 text-lg shadow-xl">
+                        {savingSoftware ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} ব্র্যান্ডিং সেভ করুন
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </TabsContent>
 
-            <TabsContent value="users" className="space-y-4">
-              <UserManagementSettings />
-            </TabsContent>
+                <TabsContent value="holidays" className="mt-0">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <HolidaySettings />
+                    </div>
+                  </div>
+                </TabsContent>
 
-            <TabsContent value="backup" className="space-y-4">
-              <BackupAndExportSettings />
-            </TabsContent>
+                <TabsContent value="users" className="mt-0">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <UserManagementSettings />
+                    </div>
+                  </div>
+                </TabsContent>
 
-            <TabsContent value="gallery" className="space-y-4">
-              <GalleryManagementSettings />
-            </TabsContent>
+                <TabsContent value="backup" className="mt-0">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <BackupAndExportSettings />
+                    </div>
+                  </div>
+                </TabsContent>
 
-            <TabsContent value="system" className="space-y-4">
-              <SystemUsageInfo />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
+                <TabsContent value="gallery" className="mt-0">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <GalleryManagementSettings />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="system" className="mt-0">
+                  <div className="bg-white border-[4px] border-black rounded-[32px] overflow-hidden shadow-[12px_12px_0px_rgba(0,0,0,0.1)]">
+                    <div className="p-8">
+                      <SystemUsageInfo />
+                    </div>
+                  </div>
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
