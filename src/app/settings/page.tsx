@@ -53,6 +53,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 async function processImage(file: File): Promise<string> {
   if (file.size > 5 * 1024 * 1024) {
@@ -247,20 +248,6 @@ function SettingsContent() {
       }
     } else {
       window.open(url, '_blank');
-    }
-  };
-
-  const handleConfirmUser = async (uid: string) => {
-    if (!db) return;
-    try {
-      await updateDoc(doc(db, 'users', uid), { 
-        status: 'active', 
-        updatedAt: serverTimestamp() 
-      });
-      setPendingUsers(prev => prev.filter(u => u.id !== uid));
-      toast({ title: "সফল", description: "ইউজার অ্যাকাউন্ট সক্রিয় করা হয়েছে।" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "ত্রুটি", description: "অনুমোদন ব্যর্থ হয়েছে।" });
     }
   };
 
@@ -472,6 +459,20 @@ function SettingsContent() {
           path: `pdf-sheets/${sheetId}`, operation: 'delete'
         }));
       });
+  };
+
+  const handleConfirmUser = async (uid: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'users', uid), { 
+        status: 'active', 
+        updatedAt: serverTimestamp() 
+      });
+      setPendingUsers(prev => prev.filter(u => u.id !== uid));
+      toast({ title: "সফল", description: "ইউজার অ্যাকাউন্ট সক্রিয় করা হয়েছে।" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "ত্রুটি", description: "অনুমোদন ব্যর্থ হয়েছে।" });
+    }
   };
 
   const sidebarItems = useMemo(() => {
