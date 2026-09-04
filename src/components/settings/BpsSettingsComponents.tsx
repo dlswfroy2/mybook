@@ -1,7 +1,7 @@
-﻿
+
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { 
     Trash2, Upload, Info, Database, Calculator, Clock, Loader2, ChevronRight, User, School, 
     Calendar, Users, HardDriveDownload, Monitor, ShieldAlert,
-    FileSpreadsheet, FileJson, Download, ImageIcon, Plus, CheckCircle2, Save, Eye, EyeOff, Bell, FilePen, Sparkles, Printer, FileText, ExternalLink
+    FileSpreadsheet, FileJson, Download, ImageIcon, Plus, CheckCircle2, Save, Eye, EyeOff, Bell, FilePen, Sparkles, Printer, FileText, ExternalLink, Camera
 } from 'lucide-react';
 import { format } from "date-fns";
 import { bn } from 'date-fns/locale';
@@ -57,6 +57,48 @@ const classNamesMap: Record<string, string> = {
     '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
 };
 
+async function processGalleryImage(file: File): Promise<string> {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('ফাইল সাইজ ৫ মেগাবাইটের বেশি হতে পারবে না।');
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 1200;
+        const maxHeight = 800;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => reject(new Error('ছবি লোড করা সম্ভব হয়নি।'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('ফাইল পড়া সম্ভব হয়নি।'));
+    reader.readAsDataURL(file);
+  });
+}
+
 // --- Sub Components ---
 
 export function GalleryManagementSettings() {
@@ -68,6 +110,9 @@ export function GalleryManagementSettings() {
     
     const [newImgUrl, setNewImgUrl] = useState('');
     const [newImgTitle, setNewImgTitle] = useState('');
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (!db) return;
@@ -92,7 +137,7 @@ export function GalleryManagementSettings() {
 
     const handleAddImage = () => {
         if (!newImgUrl.trim()) {
-            toast({ variant: 'destructive', title: 'ছবির লিংক দিন' });
+            toast({ variant: 'destructive', title: 'ছবির লিংক বা ফাইল দিন' });
             return;
         }
         const newImg: GalleryImage = {
@@ -104,6 +149,23 @@ export function GalleryManagementSettings() {
         setConfig(prev => ({ ...prev, images: [...prev.images, newImg] }));
         setNewImgUrl('');
         setNewImgTitle('');
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsProcessing(true);
+        try {
+            const base64 = await processGalleryImage(file);
+            setNewImgUrl(base64);
+            toast({ title: 'ছবি প্রসেস করা হয়েছে', description: 'এখন শিরোনাম দিয়ে যুক্ত করুন।' });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message });
+        } finally {
+            setIsProcessing(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     const handleRemoveImage = (id: string) => {
@@ -151,15 +213,32 @@ export function GalleryManagementSettings() {
                     <h3 className="font-black text-lg text-slate-800">নতুন ছবি যোগ করুন</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="space-y-2">
-                            <Label className="text-xs font-black uppercase">ছবির লিংক (URL)</Label>
-                            <Input value={newImgUrl} onChange={e => setNewImgUrl(e.target.value)} placeholder="https://..." />
+                            <Label className="text-xs font-black uppercase">ছবির লিংক বা আপলোড</Label>
+                            <div className="flex gap-2">
+                                <Input 
+                                    value={newImgUrl.startsWith('data:') ? 'ছবির ফাইল সিলেক্ট করা হয়েছে' : newImgUrl} 
+                                    onChange={e => setNewImgUrl(e.target.value)} 
+                                    placeholder="https://..." 
+                                    className="flex-1 font-bold"
+                                />
+                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                                <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    className="h-10 w-10 shrink-0 border-primary text-primary hover:bg-primary/5"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isProcessing}
+                                >
+                                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                                </Button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-black uppercase">ছবির শিরোনাম</Label>
-                            <Input value={newImgTitle} onChange={e => setNewImgTitle(e.target.value)} placeholder="উদা: আমাদের মাঠ" />
+                            <Input value={newImgTitle} onChange={e => setNewImgTitle(e.target.value)} placeholder="উদা: আমাদের মাঠ" className="font-bold" />
                         </div>
                         <Button onClick={handleAddImage} variant="outline" className="h-10 border-primary text-primary font-black hover:bg-primary/5">
-                            <Plus className="h-4 w-4 mr-2" /> ছবি যুক্ত করুন
+                            <Plus className="h-4 w-4 mr-2" /> তালিকায় যুক্ত করুন
                         </Button>
                     </div>
                 </div>
@@ -1052,4 +1131,3 @@ export function BackupAndExportSettings() {
 }
 
 // --- Main Page Component ---
-
