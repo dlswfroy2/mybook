@@ -1750,7 +1750,7 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
                 </CardContent>
             </Card>
             {searchResult && (
-                <Card className="max-w-2xl mx-auto border-2 shadow-xl animate-in zoom-in-95 duration-300">
+                <Card className="max-w-2xl mx-auto border-2 shadow-xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-300">
                     <CardHeader className="bg-muted/30 border-b flex flex-row items-center gap-4 p-6">
                         <Avatar className="h-16 w-16 border-2 border-white shadow-md">
                             <AvatarImage src={sanitizePhotoUrl(searchResult.student.photoUrl, searchResult.student.gender) || getStudentPlaceholderImage(searchResult.student.gender)} className="object-cover" />
@@ -1765,7 +1765,29 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
                             <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">গ্রেড</p><p className={cn("text-xl font-black", searchResult.isPass ? "text-emerald-600" : "text-rose-600")}>{searchResult.isPass ? searchResult.finalGrade : 'F'}</p></div>
                             <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মেধাস্থান</p><p className="text-xl font-black text-amber-600">{searchResult.isPass ? toBengaliNumber(searchResult.meritPosition || '-') : '-'}</p></div>
                         </div>
-                        <div className="table-container max-h-[300px] border-2"><Table><TableHeader className="bg-muted/50 sticky top-0 z-10"><TableRow><TableHead className="font-black">বিষয়</TableHead><TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead><TableHead className="text-center font-black">গ্রেড</TableHead><TableHead className="text-right font-black">পয়েন্ট</TableHead></TableRow></TableHeader><TableBody>{Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (<TableRow key={name} className="h-10"><TableCell className="font-bold text-xs">{name}</TableCell><TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell><TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell><TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell></TableRow>))}</TableBody></Table></div></CardContent>
+                        <div className="rounded-xl border border-slate-200 overflow-x-auto overflow-y-auto max-h-[420px] shadow-sm">
+                            <Table>
+                                <TableHeader className="bg-muted/50 sticky top-0 z-10 backdrop-blur">
+                                    <TableRow>
+                                        <TableHead className="font-black">বিষয়</TableHead>
+                                        <TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead>
+                                        <TableHead className="text-center font-black">গ্রেড</TableHead>
+                                        <TableHead className="text-right font-black">পয়েন্ট</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (
+                                        <TableRow key={name} className="h-10 hover:bg-slate-50">
+                                            <TableCell className="font-bold text-xs">{name}</TableCell>
+                                            <TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell>
+                                            <TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell>
+                                            <TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
                     <CardFooter className="bg-slate-50 p-4 border-t flex justify-end gap-3">
                         <Button variant="outline" className="font-black" onClick={() => setSearchResult(null)}>অন্য ফলাফল খুঁজুন</Button>
                         <Link href={`/marksheet/${searchResult.student.id}?academicYear=${selectedYear}&examName=${encodeURIComponent(searchExam)}`} target="_blank">
