@@ -387,21 +387,20 @@ export default function AuthPage() {
       );
       const allStudents = allClassStudentsSnap.docs.map(studentFromDoc);
 
-      const [subjects, results] = await Promise.all([
-        getSubjects(db, searchClass),
-        getAllResults(db, searchYear, searchClass, searchExam)
-      ]);
+      const subjects = getSubjects(searchClass, matchedStudent.group);
+      const allExamResults = await getAllResults(db, searchYear, searchExam);
+      const classExamResults = allExamResults.filter(r => r.className === searchClass);
 
-      const studentResults = results.filter(r => r.studentId === matchedStudent.id);
-
-      if (studentResults.length === 0) {
+      const hasStudentResult = classExamResults.some(r => r.results?.some(sr => sr.studentId === matchedStudent.id));
+      if (!hasStudentResult) {
         toast({ variant: 'destructive', title: 'ফলাফল পাওয়া যায়নি', description: 'এই পরীক্ষার ফলাফল এখনো আপলোড করা হয়নি।' });
         setIsSearching(false);
         return;
       }
 
-      const processed = processStudentResults(matchedStudent, studentResults, subjects, allStudents, results);
-      setSearchResult(processed);
+      const processedList = processStudentResults(allStudents, classExamResults, subjects);
+      const myResult = processedList.find(p => p.student.id === matchedStudent.id) || null;
+      setSearchResult(myResult);
     } catch (err: any) {
       console.error(err);
       toast({ variant: 'destructive', title: 'অনুসন্ধান ত্রুটি', description: err.message || 'ফলাফল অনুসন্ধানে সমস্যা হয়েছে।' });
