@@ -105,25 +105,25 @@ function NavbarContent() {
   }
 
   const navItems = [
-    { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'from-cyan-400 to-cyan-700 shadow-cyan-500/20 text-white', activeBg: 'bg-cyan-500/20' },
-    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'from-lime-400 to-lime-700 shadow-lime-500/20 text-white', activeBg: 'bg-lime-500/20' },
-    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', color: 'from-orange-400 to-orange-700 shadow-orange-500/20 text-white', activeBg: 'bg-orange-500/20' },
-    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', color: 'from-purple-400 to-purple-700 shadow-purple-500/20 text-white', activeBg: 'bg-purple-500/20' },
-    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', color: 'from-pink-400 to-pink-700 shadow-pink-500/20 text-white', activeBg: 'bg-pink-500/20' },
-    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', color: 'from-teal-400 to-teal-700 shadow-teal-500/20 text-white', activeBg: 'bg-teal-500/20' },
-    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', color: 'from-indigo-400 to-indigo-700 shadow-indigo-500/20 text-white', activeBg: 'bg-indigo-500/20' },
-    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', color: 'from-emerald-400 to-emerald-700 shadow-emerald-500/20 text-white', activeBg: 'bg-emerald-500/20' },
-    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', color: 'from-blue-400 to-blue-700 shadow-blue-500/20 text-white', activeBg: 'bg-blue-500/20' },
-    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', color: 'from-amber-400 to-amber-700 shadow-amber-500/20 text-white', activeBg: 'bg-amber-500/20' },
-    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', color: 'from-fuchsia-400 to-fuchsia-700 shadow-fuchsia-500/20 text-white', activeBg: 'bg-fuchsia-500/20' },
-    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', color: 'from-rose-400 to-rose-700 shadow-rose-500/20 text-white', activeBg: 'bg-rose-500/20' },
-    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', color: 'from-violet-400 to-violet-700 shadow-violet-500/20 text-white', activeBg: 'bg-violet-500/20' },
-    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', color: 'from-cyan-400 to-cyan-700 shadow-cyan-500/20 text-white', activeBg: 'bg-cyan-500/20' },
-    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', color: 'from-indigo-400 to-indigo-700 shadow-indigo-500/20 text-white', activeBg: 'bg-indigo-500/20' },
-    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', color: 'from-orange-400 to-orange-700 shadow-orange-500/20 text-white', activeBg: 'bg-orange-500/20' },
-    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', color: 'from-lime-400 to-lime-700 shadow-lime-500/20 text-white', activeBg: 'bg-lime-500/20' },
-    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', color: 'from-blue-400 to-blue-700 shadow-blue-500/20 text-white', activeBg: 'bg-blue-500/20' },
-    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', color: 'from-slate-400 to-slate-700 shadow-slate-500/20 text-white', activeBg: 'bg-slate-500/20' },
+    { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'from-cyan-400 via-cyan-500 to-cyan-800 shadow-cyan-500/40 text-white', activeBg: 'bg-cyan-500/20 border-cyan-400/30' },
+    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'from-lime-400 via-lime-500 to-lime-800 shadow-lime-500/40 text-white', activeBg: 'bg-lime-500/20 border-lime-400/30' },
+    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', color: 'from-orange-400 via-orange-500 to-orange-800 shadow-orange-500/40 text-white', activeBg: 'bg-orange-500/20 border-orange-400/30' },
+    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', color: 'from-purple-400 via-purple-500 to-purple-800 shadow-purple-500/40 text-white', activeBg: 'bg-purple-500/20 border-purple-400/30' },
+    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', color: 'from-pink-400 via-pink-500 to-pink-800 shadow-pink-500/40 text-white', activeBg: 'bg-pink-500/20 border-pink-400/30' },
+    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', color: 'from-teal-400 via-teal-500 to-teal-800 shadow-teal-500/40 text-white', activeBg: 'bg-teal-500/20 border-teal-400/30' },
+    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', color: 'from-indigo-400 via-indigo-500 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
+    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', color: 'from-emerald-400 via-emerald-500 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
+    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
+    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
+    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', color: 'from-fuchsia-400 via-fuchsia-500 to-fuchsia-800 shadow-fuchsia-500/40 text-white', activeBg: 'bg-fuchsia-500/20 border-fuchsia-400/30' },
+    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', color: 'from-rose-400 via-rose-500 to-rose-800 shadow-rose-500/40 text-white', activeBg: 'bg-rose-500/20 border-rose-400/30' },
+    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', color: 'from-violet-400 via-violet-500 to-violet-800 shadow-violet-500/40 text-white', activeBg: 'bg-violet-500/20 border-violet-400/30' },
+    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', color: 'from-cyan-400 via-cyan-500 to-cyan-800 shadow-cyan-500/40 text-white', activeBg: 'bg-cyan-500/20 border-cyan-400/30' },
+    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', color: 'from-indigo-400 via-indigo-500 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
+    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', color: 'from-orange-400 via-orange-500 to-orange-800 shadow-orange-500/40 text-white', activeBg: 'bg-orange-500/20 border-orange-400/30' },
+    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', color: 'from-lime-400 via-lime-500 to-lime-800 shadow-lime-500/40 text-white', activeBg: 'bg-lime-500/20 border-lime-400/30' },
+    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
+    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', color: 'from-slate-400 via-slate-500 to-slate-800 shadow-slate-500/40 text-white', activeBg: 'bg-slate-500/20 border-slate-400/30' },
   ];
 
   return (
@@ -135,7 +135,7 @@ function NavbarContent() {
             <Menu className="w-6 h-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-[300px] p-0 border-r-white/20 font-kalpurush flex flex-col h-full max-h-screen bg-slate-900 overflow-hidden">
+        <SheetContent side="left" className="w-[300px] p-0 border-r-white/20 font-kalpurush flex flex-col h-full max-h-screen bg-[#0f172a] overflow-hidden">
           <SheetHeader className="p-6 bg-gradient-to-b from-primary to-primary/80 text-white border-b border-white/10 shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] pointer-events-none" />
             <div className="flex items-center gap-3 relative z-10">
@@ -160,25 +160,25 @@ function NavbarContent() {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center justify-between px-4 py-3 transition-all group rounded-2xl border border-white/5 shadow-lg",
+                      "flex items-center justify-between px-3 py-2.5 transition-all group rounded-2xl border border-white/5",
                       "backdrop-blur-xl bg-white/10 hover:bg-white/15",
-                      "shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]",
-                      isActive ? cn(item.activeBg, "border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05),inset_0_1px_1px_rgba(255,255,255,0.2)] scale-[1.02]") : "text-white/70"
+                      "shadow-[0_4px_10px_rgba(0,0,0,0.1),inset_0_1px_2px_rgba(255,255,255,0.15)]",
+                      isActive ? cn(item.activeBg, "border-white/25 shadow-[0_0_15px_rgba(255,255,255,0.05),inset_0_1px_1px_rgba(255,255,255,0.25)] scale-[1.01]") : "text-white/70"
                     )}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       {/* 3D Metallic Gradient Circular Badge */}
                       <div className={cn(
-                        "p-2.5 rounded-full shrink-0 shadow-[0_4px_10px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2)] border-2 border-white/40 bg-gradient-to-br transition-transform group-hover:scale-110",
+                        "p-2.5 rounded-full shrink-0 shadow-[0_6px_10px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.5),inset_0_-2px_4px_rgba(0,0,0,0.3)] border-2 border-white/40 bg-gradient-to-br transition-transform group-hover:scale-110",
                         item.color
                       )}>
-                        <item.icon className="w-4 h-4 drop-shadow-md" />
+                        <item.icon className="w-3.5 h-3.5 drop-shadow-md" />
                       </div>
-                      <span className={cn("font-black text-xs md:text-sm tracking-tight transition-colors", isActive ? "text-white" : "group-hover:text-white")}>
+                      <span className={cn("font-black text-xs md:text-sm tracking-tight transition-colors drop-shadow-sm", isActive ? "text-white" : "group-hover:text-white")}>
                         {item.label}
                       </span>
                     </div>
-                    <ChevronRight className={cn("w-3.5 h-3.5 transition-all", isActive ? "text-white scale-125 opacity-100" : "text-white/20 opacity-0 group-hover:opacity-100 group-hover:translate-x-1")} />
+                    <ChevronRight className={cn("w-3 h-3 transition-all", isActive ? "text-white scale-110 opacity-100" : "text-white/20 opacity-0 group-hover:opacity-100 group-hover:translate-x-1")} />
                   </Link>
                 </SheetClose>
               );
