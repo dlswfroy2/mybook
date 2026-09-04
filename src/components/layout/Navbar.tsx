@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, Suspense } from 'react';
@@ -105,25 +104,25 @@ function NavbarContent() {
   }
 
   const navItems = [
-    { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'text-cyan-600 bg-cyan-50', hoverBg: 'hover:bg-cyan-50/50', activeBg: 'bg-cyan-100' },
-    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'text-lime-600 bg-lime-50', hoverBg: 'hover:bg-lime-50/50', activeBg: 'bg-lime-100' },
-    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', color: 'text-orange-600 bg-orange-50', hoverBg: 'hover:bg-orange-50/50', activeBg: 'bg-orange-100' },
-    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', color: 'text-purple-600 bg-purple-50', hoverBg: 'hover:bg-purple-50/50', activeBg: 'bg-purple-100' },
-    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', color: 'text-pink-600 bg-pink-50', hoverBg: 'hover:bg-pink-50/50', activeBg: 'bg-pink-100' },
-    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', color: 'text-teal-600 bg-teal-50', hoverBg: 'hover:bg-teal-50/50', activeBg: 'bg-teal-100' },
-    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', color: 'text-indigo-600 bg-indigo-50', hoverBg: 'hover:bg-indigo-50/50', activeBg: 'bg-indigo-100' },
-    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', color: 'text-emerald-600 bg-emerald-50', hoverBg: 'hover:bg-emerald-50/50', activeBg: 'bg-emerald-100' },
-    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', color: 'text-blue-600 bg-blue-50', hoverBg: 'hover:bg-blue-50/50', activeBg: 'bg-blue-100' },
-    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', color: 'text-amber-600 bg-amber-50', hoverBg: 'hover:bg-amber-50/50', activeBg: 'bg-amber-100' },
-    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', color: 'text-fuchsia-600 bg-fuchsia-50', hoverBg: 'hover:bg-fuchsia-50/50', activeBg: 'bg-fuchsia-100' },
-    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', color: 'text-rose-600 bg-rose-50', hoverBg: 'hover:bg-rose-50/50', activeBg: 'bg-rose-100' },
-    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', color: 'text-violet-600 bg-violet-50', hoverBg: 'hover:bg-violet-50/50', activeBg: 'bg-violet-100' },
-    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', color: 'text-cyan-600 bg-cyan-50', hoverBg: 'hover:bg-cyan-50/50', activeBg: 'bg-cyan-100' },
-    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', color: 'text-indigo-600 bg-indigo-50', hoverBg: 'hover:bg-indigo-50/50', activeBg: 'bg-indigo-100' },
-    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', color: 'text-orange-600 bg-orange-50', hoverBg: 'hover:bg-orange-50/50', activeBg: 'bg-orange-100' },
-    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', color: 'text-lime-600 bg-lime-50', hoverBg: 'hover:bg-lime-50/50', activeBg: 'bg-lime-100' },
-    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', color: 'text-blue-600 bg-blue-50', hoverBg: 'hover:bg-blue-50/50', activeBg: 'bg-blue-100' },
-    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', color: 'text-slate-600 bg-slate-50', hoverBg: 'hover:bg-slate-50/50', activeBg: 'bg-slate-100' },
+    { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'from-cyan-400 to-cyan-700 shadow-cyan-500/20 text-white', activeBg: 'bg-cyan-500/20' },
+    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'from-lime-400 to-lime-700 shadow-lime-500/20 text-white', activeBg: 'bg-lime-500/20' },
+    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', color: 'from-orange-400 to-orange-700 shadow-orange-500/20 text-white', activeBg: 'bg-orange-500/20' },
+    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', color: 'from-purple-400 to-purple-700 shadow-purple-500/20 text-white', activeBg: 'bg-purple-500/20' },
+    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', color: 'from-pink-400 to-pink-700 shadow-pink-500/20 text-white', activeBg: 'bg-pink-500/20' },
+    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', color: 'from-teal-400 to-teal-700 shadow-teal-500/20 text-white', activeBg: 'bg-teal-500/20' },
+    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', color: 'from-indigo-400 to-indigo-700 shadow-indigo-500/20 text-white', activeBg: 'bg-indigo-500/20' },
+    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', color: 'from-emerald-400 to-emerald-700 shadow-emerald-500/20 text-white', activeBg: 'bg-emerald-500/20' },
+    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', color: 'from-blue-400 to-blue-700 shadow-blue-500/20 text-white', activeBg: 'bg-blue-500/20' },
+    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', color: 'from-amber-400 to-amber-700 shadow-amber-500/20 text-white', activeBg: 'bg-amber-500/20' },
+    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', color: 'from-fuchsia-400 to-fuchsia-700 shadow-fuchsia-500/20 text-white', activeBg: 'bg-fuchsia-500/20' },
+    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', color: 'from-rose-400 to-rose-700 shadow-rose-500/20 text-white', activeBg: 'bg-rose-500/20' },
+    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', color: 'from-violet-400 to-violet-700 shadow-violet-500/20 text-white', activeBg: 'bg-violet-500/20' },
+    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', color: 'from-cyan-400 to-cyan-700 shadow-cyan-500/20 text-white', activeBg: 'bg-cyan-500/20' },
+    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', color: 'from-indigo-400 to-indigo-700 shadow-indigo-500/20 text-white', activeBg: 'bg-indigo-500/20' },
+    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', color: 'from-orange-400 to-orange-700 shadow-orange-500/20 text-white', activeBg: 'bg-orange-500/20' },
+    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', color: 'from-lime-400 to-lime-700 shadow-lime-500/20 text-white', activeBg: 'bg-lime-500/20' },
+    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', color: 'from-blue-400 to-blue-700 shadow-blue-500/20 text-white', activeBg: 'bg-blue-500/20' },
+    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', color: 'from-slate-400 to-slate-700 shadow-slate-500/20 text-white', activeBg: 'bg-slate-500/20' },
   ];
 
   return (
@@ -135,23 +134,24 @@ function NavbarContent() {
             <Menu className="w-6 h-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-[280px] p-0 border-r-primary/20 font-kalpurush flex flex-col h-full max-h-screen">
-          <SheetHeader className="p-6 bg-primary text-white border-b border-white/10 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-white p-1.5 rounded-xl text-primary shadow-lg shrink-0">
+        <SheetContent side="left" className="w-[300px] p-0 border-r-white/20 font-kalpurush flex flex-col h-full max-h-screen bg-slate-900 overflow-hidden">
+          <SheetHeader className="p-6 bg-gradient-to-b from-primary to-primary/80 text-white border-b border-white/10 shrink-0 relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] pointer-events-none" />
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="bg-white p-2 rounded-2xl text-primary shadow-[0_4px_15px_rgba(255,255,255,0.3)] shrink-0 border-2 border-white/50">
                 {appLogoUrl ? (
                   <img src={appLogoUrl} alt="Logo" className="w-8 h-8 object-contain" />
                 ) : (
                   <BookOpenText className="w-8 h-8" />
                 )}
               </div>
-              <SheetTitle className="text-white text-[14px] font-black leading-tight text-left">
+              <SheetTitle className="text-white text-[14px] font-black leading-tight text-left drop-shadow-md">
                 {appName}
               </SheetTitle>
             </div>
           </SheetHeader>
           
-          <div className="flex-1 overflow-y-auto py-2">
+          <div className="flex-1 overflow-y-auto py-4 px-3 space-y-2 bg-[#0f172a] scrollbar-thin scrollbar-thumb-white/10">
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               return (
@@ -159,26 +159,33 @@ function NavbarContent() {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center justify-between px-5 py-2.5 transition-all group",
-                      item.hoverBg,
-                      isActive ? cn(item.activeBg, "border-r-4 border-primary shadow-sm") : "text-foreground/70"
+                      "flex items-center justify-between px-4 py-3 transition-all group rounded-2xl border border-white/5 shadow-lg",
+                      "backdrop-blur-xl bg-white/5 hover:bg-white/15",
+                      "shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]",
+                      isActive ? cn(item.activeBg, "border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05),inset_0_1px_1px_rgba(255,255,255,0.2)] scale-[1.02]") : "text-white/70"
                     )}
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div className={cn("p-2 rounded-full shrink-0 shadow-sm border border-white/50", item.color)}>
-                        <item.icon className="w-4 h-4" />
+                    <div className="flex items-center gap-4">
+                      {/* Metallic 3D Badge */}
+                      <div className={cn(
+                        "p-2.5 rounded-full shrink-0 shadow-[0_4px_10px_rgba(0,0,0,0.3),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2)] border-2 border-white/40 bg-gradient-to-br transition-transform group-hover:scale-110",
+                        item.color
+                      )}>
+                        <item.icon className="w-4 h-4 drop-shadow-md" />
                       </div>
-                      <span className={cn("font-bold text-xs md:text-sm", isActive && "text-primary")}>{item.label}</span>
+                      <span className={cn("font-black text-xs md:text-sm tracking-tight transition-colors", isActive ? "text-white" : "group-hover:text-white")}>
+                        {item.label}
+                      </span>
                     </div>
-                    <ChevronRight className={cn("w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity", isActive ? "opacity-100 text-primary" : "text-muted-foreground")} />
+                    <ChevronRight className={cn("w-3.5 h-3.5 transition-all", isActive ? "text-white scale-125 opacity-100" : "text-white/20 opacity-0 group-hover:opacity-100 group-hover:translate-x-1")} />
                   </Link>
                 </SheetClose>
               );
             })}
           </div>
           
-          <div className="shrink-0 p-4 border-t bg-slate-50">
-             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">© ২০২৪-২৬ {appName}</p>
+          <div className="shrink-0 p-4 border-t border-white/10 bg-black/40 backdrop-blur-md">
+             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest text-center">© ২০২৪-২৬ {appName}</p>
           </div>
         </SheetContent>
       </Sheet>
