@@ -738,8 +738,8 @@ function StudentProfileSearchContent() {
                                                 const isFuture = idx > new Date().getMonth();
                                                 return (
                                                     <div key={month} className={cn(
-                                                        "flex flex-col items-center justify-center p-3 rounded-2xl border-[3px] font-black transition-all",
-                                                        isPaid ? "border-emerald-600 bg-emerald-50 text-emerald-800 shadow-[4px_4px_0px_rgba(16,185,129,0.2)]" : 
+                                                        "flex flex-col items-center justify-center w-full p-3 rounded-2xl border-2 transition-all duration-300",
+                                                        isPaid ? "bg-emerald-50 border-emerald-500/30 text-emerald-800 shadow-[4px_4px_0px_rgba(16,185,129,0.2)]" : 
                                                         isFuture ? "border-slate-200 bg-slate-50 text-slate-400 opacity-60" :
                                                         "border-rose-500 bg-rose-50 text-rose-800 shadow-[4px_4px_0px_rgba(244,63,94,0.2)] animate-pulse"
                                                     )}>
@@ -825,28 +825,42 @@ function StudentProfileSearchContent() {
                 </DialogContent>
             </Dialog>
 
-            {/* Printable Area - Redesigned to match the provided layout */}
+            {/* Printable Area */}
             {studentData && (
                 <div className="hidden print:block printable-area bg-white text-black p-4 font-kalpurush w-full box-border border-[6px] border-double border-black/30">
-                    <style jsx global>{`
+                    <style type="text/css" dangerouslySetInnerHTML={{ __html: `
                         @media print {
                             @page {
-                                size: A4;
-                                margin: 0.4in !important;
+                                size: A4 portrait;
+                                margin: 0;
+                            }
+                            html, body {
+                                visibility: hidden !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                height: auto !important;
+                                overflow: visible !important;
+                            }
+                            .no-print {
+                                display: none !important;
                             }
                             .printable-area {
+                                visibility: visible !important;
                                 position: absolute !important;
                                 top: 0 !important;
                                 left: 0 !important;
                                 width: 100% !important;
-                                min-height: 100% !important;
-                                padding: 8mm !important;
-                                box-sizing: border-box !important;
-                                border: 6px double rgba(0, 0, 0, 0.3) !important;
                                 display: block !important;
+                                padding: 10mm !important;
+                                box-sizing: border-box !important;
+                                background: white !important;
+                                border: 6px double rgba(0, 0, 0, 0.3) !important;
+                            }
+                            .printable-area * {
+                                visibility: visible !important;
                             }
                         }
-                    `}</style>
+                    `}} />
                     {/* Header */}
                     <div className="flex items-center justify-between border-b-4 border-[#2d572c] pb-2 mb-6">
                         <div className="relative w-16 h-16">
@@ -975,7 +989,7 @@ function StudentProfileSearchContent() {
                         </div>
                     </div>
 
-                    {/* Signatures Footer - Reduced mt to fit on one page */}
+                    {/* Signatures Footer */}
                     <div className="mt-12 flex justify-between px-16">
                         <div className="text-center w-40 border-t-[1.5px] border-black pt-1 font-black text-sm">{isEn ? "Class Teacher's Signature" : "শ্রেণি শিক্ষকের স্বাক্ষর"}</div>
                         <div className="text-center w-40 border-t-[1.5px] border-black pt-1 font-black text-sm">{isEn ? "Headmaster's Signature" : "প্রধান শিক্ষকের স্বাক্ষর"}</div>
