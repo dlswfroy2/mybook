@@ -1080,9 +1080,3 @@ export default function StudentListPage() {
     </Suspense>
   );
 }
-
-function toBengaliNumber(n: number | string | undefined | null): string {
-  if (n === undefined || n === null || n === '') return '';
-  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
-}
