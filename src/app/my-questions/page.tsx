@@ -141,9 +141,9 @@ function MyLibraryContent() {
     }
   }, [searchParams]);
 
-  const questionsQuery = useMemo(() => db && user ? query(collection(db, 'questions'), where('userId', '==', user.uid)) : null, [db, user]);
-  const sheetsQuery = useMemo(() => db && user ? query(collection(db, 'lecture-sheets'), where('userId', '==', user.uid)) : null, [db, user]);
-  const pdfSheetsQuery = useMemo(() => db && user ? query(collection(db, 'pdf-sheets')) : null, [db, user]);
+  const questionsQuery = useMemo(() => db && user?.uid ? query(collection(db, 'questions'), where('userId', '==', user.uid)) : null, [db, user?.uid]);
+  const sheetsQuery = useMemo(() => db && user?.uid ? query(collection(db, 'lecture-sheets'), where('userId', '==', user.uid)) : null, [db, user?.uid]);
+  const pdfSheetsQuery = useMemo(() => db && user?.uid ? query(collection(db, 'pdf-sheets')) : null, [db, user?.uid]);
 
   const { data: rawQuestions, loading: questionsLoading, error: qError } = useCollection(questionsQuery);
   const { data: rawSheets, loading: sheetsLoading, error: sError } = useCollection(sheetsQuery);
@@ -301,11 +301,11 @@ function MyLibraryContent() {
   const toggleSelection = (id: string) => { if (!isSelecting) return; setSelectedDocIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); };
 
   const handleMergeAndCreate = async () => {
-    if (selectedDocIds.length < 1) return;
+    if (selectedDocIds.length < 1 || !user?.uid) return;
     setMerging(true);
     try {
       const mergedQuestions: any[] = [];
-      const promises = selectedDocIds.map(id => getDocs(query(collection(db!, 'questions'), where('userId', '==', user!.uid))));
+      const promises = selectedDocIds.map(id => getDocs(query(collection(db!, 'questions'), where('userId', '==', user.uid))));
       const results = await Promise.all(promises);
       results.forEach(snap => snap.docs.forEach(doc => { if (selectedDocIds.includes(doc.id)) { const data = doc.data(); if (data.questions) mergedQuestions.push(...data.questions); } }));
       if (mergedQuestions.length === 0) { toast({ variant: "destructive", title: "ত্রুটি", description: "কোনো প্রশ্ন পাওয়া যায়নি।" }); return; }

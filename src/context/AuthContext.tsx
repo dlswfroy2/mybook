@@ -103,11 +103,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               userData.role = 'admin';
               userData.permissions = availablePermissions.map(p => p.id);
             }
-            setUser(userData);
+            
+            setUser(prev => {
+                // Prevent unnecessary global re-renders if core permission data hasn't changed
+                // This stops the "flicker/reload" caused by heartbeat timestamp updates
+                if (prev && 
+                    prev.role === userData.role && 
+                    prev.uid === userData.uid &&
+                    JSON.stringify(prev.permissions) === JSON.stringify(userData.permissions) &&
+                    JSON.stringify(prev.marksPermissions) === JSON.stringify(userData.marksPermissions)
+                ) {
+                    return prev;
+                }
+                return userData;
+            });
             setLoading(false);
           } else {
             // Document missing fallback: Mandatory signup enforcement
-            // If auth exists but no doc, the user didn't sign up via portal
             await signOut(auth);
             setUser(null);
             setLoading(false);

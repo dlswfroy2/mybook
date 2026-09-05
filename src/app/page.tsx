@@ -77,7 +77,7 @@ const GalleryCard = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         const unsub = onSnapshot(doc(db, 'school', 'gallery'), (snap) => {
             if (snap.exists()) {
                 setConfig(snap.data() as GalleryConfig);
@@ -92,7 +92,7 @@ const GalleryCard = () => {
             }
         });
         return () => unsub();
-    }, [db, user]);
+    }, [db, user?.uid]);
 
     const activeImages = useMemo(() => config.images.filter(img => img.isActive), [config.images]);
 
@@ -234,7 +234,7 @@ const NoticeTicker = () => {
     }, []);
 
     useEffect(() => {
-        if (!db || !user || !isClient) return;
+        if (!db || !user?.uid || !isClient) return;
         
         const q = query(collection(db, 'notices'), orderBy('date', 'desc'), limit(15));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -258,7 +258,7 @@ const NoticeTicker = () => {
         });
 
         return () => unsubscribe();
-    }, [db, user, isClient]);
+    }, [db, user?.uid, isClient]);
 
     if (!isClient) return null;
 
@@ -365,7 +365,7 @@ export default function Home() {
   }, [db, selectedYear, studentsForYear]);
 
   useEffect(() => {
-      if (!db || !user) return;
+      if (!db || !user?.uid) return;
 
       const studentsQuery = query(collection(db, 'students'), where('academicYear', '==', selectedYear));
       
@@ -401,7 +401,7 @@ export default function Home() {
         unsubscribeStudents();
         unsubscribeStaff();
       };
-  }, [selectedYear, db, user, refreshDashboardAttendance]);
+  }, [selectedYear, db, user?.uid, refreshDashboardAttendance]);
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -536,9 +536,9 @@ export default function Home() {
   const presentPercentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : "০";
   const absentPercentage = totalStudents > 0 ? ((totalAbsent / totalStudents) * 100).toFixed(1) : "০";
 
-  const qQuery = useMemo(() => (db && user) ? collection(db, 'questions') : null, [db, user]);
-  const pQuery = useMemo(() => (db && user) ? collection(db, 'pdf-sheets') : null, [db, user]);
-  const lQuery = useMemo(() => (db && user) ? collection(db, 'lecture-sheets') : null, [db, user]);
+  const qQuery = useMemo(() => (db && user?.uid) ? collection(db, 'questions') : null, [db, user?.uid]);
+  const pQuery = useMemo(() => (db && user?.uid) ? collection(db, 'pdf-sheets') : null, [db, user?.uid]);
+  const lQuery = useMemo(() => (db && user?.uid) ? collection(db, 'lecture-sheets') : null, [db, user?.uid]);
 
   const { data: allQuestions } = useCollection(qQuery);
   const { data: allPdfSheets } = useCollection(pQuery);
@@ -579,9 +579,9 @@ export default function Home() {
     return { classData };
   }, [allQuestions, allPdfSheets, allLectureSheets]);
 
-  useEffect(() => { if (!loading && !user) router.push('/auth'); }, [user, loading, router]);
+  useEffect(() => { if (!loading && !user?.uid) router.push('/auth'); }, [user?.uid, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !user?.uid) {
     return (
       <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]">
         <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
@@ -590,7 +590,7 @@ export default function Home() {
     );
   }
 
-  const glassClass = "backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]";
+  const glassCardClass = "backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]";
 
   return (
     <div className="space-y-8 animate-fade-in font-kalpurush">
@@ -976,7 +976,7 @@ export default function Home() {
             const chapterChunks = chunkArray(sortedChapterList, 20); 
 
             return (
-              <div key={cls.id} className={cn(glassClass, "rounded-xl overflow-hidden bg-white/40 p-1")}>
+              <div key={cls.id} className={cn("backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]", "rounded-xl overflow-hidden bg-white/40 p-1")}>
                 <div className="overflow-x-auto custom-scrollbar pb-2">
                   {chapterChunks.length > 0 ? (
                     chapterChunks.map((chunk, chunkIdx) => (

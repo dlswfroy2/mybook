@@ -107,9 +107,9 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
     const canUploadMarks = hasPermission('upload:marks');
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         getExams(db, selectedYear).then(setExams);
-    }, [db, selectedYear, user]);
+    }, [db, selectedYear, user?.uid]);
 
     const showGroupSelector = useMemo(() => parseInt(className) >= 9, [className]);
 
@@ -123,7 +123,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
             setSubject('');
             setSelectedSubjectInfo(null);
         }
-    }, [className, group, subject, user, hasPermission, isSubjectPermitted]);
+    }, [className, group, subject, user?.role, hasPermission, isSubjectPermitted]);
 
     useEffect(() => {
         if (subject) {
@@ -133,7 +133,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
     }, [subject, availableSubjects]);
     
     const handleLoadStudents = async () => {
-        if (!examName || !className || !subject || !db || !user) {
+        if (!examName || !className || !subject || !db || !user?.uid) {
             toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'অনুগ্রহ করে পরীক্ষা, শ্রেণি ও বিষয় নির্বাচন করুন।' });
             return;
         }
@@ -193,7 +193,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
     };
 
     const handleSaveResults = async () => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         if (!isSubjectPermitted(className, subject)) { toast({ variant: 'destructive', title: 'পারমিশন নেই' }); return; }
         if (studentsForClass.length === 0) { toast({ variant: 'destructive', title: 'কোনো শিক্ষার্থী নেই' }); return; }
         
@@ -219,7 +219,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
     };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (!db || !user || !className || !subject || !examName) { toast({ variant: "destructive", title: "তথ্য অসম্পূর্ণ" }); return; }
+        if (!db || !user?.uid || !className || !subject || !examName) { toast({ variant: "destructive", title: "তথ্য অসম্পূর্ণ" }); return; }
         if (!isSubjectPermitted(className, subject)) { toast({ variant: 'destructive', title: 'পারমিশন নেই' }); return; }
         if (!canUploadMarks) { toast({ variant: 'destructive', title: 'পারমিশন নেই', description: 'এক্সেল ফাইল আপলোড করার অনুমতি নেই।' }); return; }
 
@@ -370,12 +370,12 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
         if (user?.role === 'admin') return true;
         if (hasPermission('manage:results')) return true;
         return (user as any)?.marksPermissions?.[cls]?.includes(sub) ?? false;
-    }, [user, hasPermission]);
+    }, [user?.role, hasPermission]);
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         getExams(db, selectedYear).then(setExams);
-    }, [db, selectedYear, user]);
+    }, [db, selectedYear, user?.uid]);
 
     useEffect(() => {
         let newSubjects = getSubjects(className, group).filter(s => s.isExamSubject !== false);
@@ -383,7 +383,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
             newSubjects = newSubjects.filter(s => isSubjectPermitted(className, s.name));
         }
         setAvailableSubjects(newSubjects);
-    }, [className, group, user, hasPermission, isSubjectPermitted]);
+    }, [className, group, user?.role, hasPermission, isSubjectPermitted]);
 
     const handleLoadReport = async () => {
         if (!examName || !className || !subject || !db) {
@@ -619,11 +619,11 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
     };
 
     useEffect(() => { 
-        if (db && user) getExams(db, selectedYear).then(setExams); 
-    }, [db, selectedYear, user]);
+        if (db && user?.uid) getExams(db, selectedYear).then(setExams); 
+    }, [db, selectedYear, user?.uid]);
 
     const handleViewResults = async () => {
-        if (!examName || !className || !db || !user) { toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ' }); return; }
+        if (!examName || !className || !db || !user?.uid) { toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ' }); return; }
         setIsLoading(true);
         try {
             const students = allStudents.filter(s => {
@@ -1085,15 +1085,15 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
     const [isSaving, setIsSaving] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         getExams(db, selectedYear).then(setExams);
-    }, [db, selectedYear, user]);
+    }, [db, selectedYear, user?.uid]);
 
     const updateSavedResults = useCallback(async () => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         const allResults = await getAllResults(db, selectedYear, examName || undefined).catch(() => []);
         setSavedResults(allResults);
-    }, [db, selectedYear, user, examName]);
+    }, [db, selectedYear, user?.uid, examName]);
     
     useEffect(() => {
         updateSavedResults();
@@ -1103,11 +1103,11 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
         if (user?.role === 'admin') return true;
         if (hasPermission('manage:results') || hasPermission('manage:full-marks')) return true;
         return (user as any)?.marksPermissions?.[cls]?.includes(sub) ?? false;
-    }, [user, hasPermission]);
+    }, [user?.role, hasPermission]);
 
     const handleUpdateFullMarks = (cls: string, sub: string, exam: string, currentRecord: ClassResult | null, newVal: string) => {
         const val = parseInt(newVal, 10);
-        if (isNaN(val) || !db || !user) return;
+        if (isNaN(val) || !db || !user?.uid) return;
         if (!isSubjectPermitted(cls, sub)) {
             toast({ variant: 'destructive', title: 'পারমিশন নেই' });
             return;
@@ -1129,7 +1129,7 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
     };
 
     const handleDeleteResult = (id: string) => {
-        if (!db || !id || !user) return;
+        if (!db || !id || !user?.uid) return;
         deleteClassResult(db, id);
         toast({ title: 'ফলাফল মোছা হয়েছে' });
         setTimeout(updateSavedResults, 500);
@@ -1325,11 +1325,11 @@ const MeritListTab = ({ allStudents }: { allStudents: Student[] }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => { 
-        if (db && user) getExams(db, selectedYear).then(setExams); 
-    }, [db, selectedYear, user]);
+        if (db && user?.uid) getExams(db, selectedYear).then(setExams); 
+    }, [db, selectedYear, user?.uid]);
 
     const handleViewMerit = async () => {
-        if (!examName || !className || !db || !user) return;
+        if (!examName || !className || !db || !user?.uid) return;
         setIsLoading(true);
         try {
             const students = allStudents.filter(s => {
@@ -1650,7 +1650,7 @@ const PromotionTab = ({ allStudents }: { allStudents: Student[] }) => {
             <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
                 <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col font-kalpurush p-0 border-none shadow-2xl rounded-2xl overflow-hidden">
                     <DialogHeader className="p-6 bg-primary text-white shrink-0">
-                        <DialogTitle className="text-2xl font-black flex items-center gap-2"><Sparkles className="h-6 w-6" /> প্রমোশন কনফার্মেশন ও প্রিভিউ</DialogTitle>
+                        <DialogTitle className="text-2xl font-black flex items-center gap-2"><Sparkles className="h-6 v-6" /> প্রমোশন কনফার্মেশন ও প্রিভিউ</DialogTitle>
                         <DialogDescription className="text-white/80 font-bold">{classNamesMap[sourceClass]} থেকে {classNamesMap[targetClass]} শ্রেণিতে উন্নীতকরণের তালিকা</DialogDescription>
                     </DialogHeader>
                     <div className="flex-1 overflow-y-auto p-6 bg-slate-50"><Card className="border-2 border-black/5 bg-white shadow-inner rounded-xl"><div className="grid grid-cols-4 p-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest text-center"><span>শিক্ষার্থীর নাম (আইডি)</span><span>বর্তমান রোল</span><span>স্ট্যাটাস</span><span className="text-primary">নতুন রোল</span></div><div className="divide-y-2 divide-slate-50">{projectedPromotions.map((item) => (<div key={item.id} className="grid grid-cols-4 p-4 items-center text-center hover:bg-primary/5 transition-colors"><div className="flex flex-col items-center"><span className="font-black text-slate-800 text-sm truncate px-1">{item.name}</span><span className="text-[10px] font-bold text-muted-foreground">ID: {toBengaliNumber(item.generatedId || '')}</span></div><span className="font-bold text-slate-500">{toBengaliNumber(item.currentRoll)}</span><span><Badge className={item.isPass ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}>{item.isPass ? 'কৃতকার্য' : 'বিশেষ পাশ'}</Badge></span><div className="flex justify-center"><Input type="number" value={item.projectedRoll} onChange={(e) => updateProjectedRoll(item.id, e.target.value)} className="w-20 h-9 text-center font-black border-2 border-primary/20 bg-white" /></div></div>))}</div></Card></div>
@@ -2086,14 +2086,15 @@ export default function ResultsPage() {
     const canViewRes = hasPermission('manage:results') || hasPermission('input:results');
     const canManageFullMarks = hasPermission('manage:full-marks') || hasPermission('manage:results');
 
-    const [activeSection, setActiveSection] = useState('management');
+    const [activeSection, setActiveSection] = useState<string>('management');
+    const [hasInitialSection, setHasInitialSection] = useState(false);
     const [printingReport, setPrintingReport] = useState<any>(null);
     const [fullSheetPrintData, setFullSheetPrintData] = useState<any>(null);
     const [specialPrintData, setSpecialPrintData] = useState<any>(null);
 
     useEffect(() => {
         setIsClient(true); 
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         const unsubscribe = onSnapshot(query(collection(db, "students")), (snap) => { 
             setAllStudents(snap.docs.map(studentFromDoc)); 
             setIsLoading(false); 
@@ -2102,15 +2103,21 @@ export default function ResultsPage() {
             setIsLoading(false); 
         });
         return () => unsubscribe();
-    }, [db, user]);
+    }, [db, user?.uid]);
 
     useEffect(() => {
-        if (canViewRes) setActiveSection('management');
-        else if (canManageFullMarks) setActiveSection('full-marks');
-        else if (hasPermission('view:merit-list')) setActiveSection('merit');
-        else if (hasPermission('promote:students')) setActiveSection('promotion');
-        else if (hasPermission('manage:special-results')) setActiveSection('special-exam');
-    }, [canViewRes, canManageFullMarks, hasPermission]);
+        if (hasInitialSection || !user?.uid) return;
+        
+        let section = 'management';
+        if (canViewRes) section = 'management';
+        else if (canManageFullMarks) section = 'full-marks';
+        else if (hasPermission('view:merit-list')) section = 'merit';
+        else if (hasPermission('promote:students')) section = 'promotion';
+        else if (hasPermission('manage:special-results')) section = 'special-exam';
+        
+        setActiveSection(section);
+        setHasInitialSection(true);
+    }, [canViewRes, canManageFullMarks, hasPermission, user?.uid, hasInitialSection]);
 
     const handleSubjectPrint = (data: any) => {
         setPrintingReport(data);
@@ -2129,7 +2136,7 @@ export default function ResultsPage() {
 
     const sidebarItems = useMemo(() => {
         return [
-            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'from-indigo-400 via-indigo-500 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
+            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'from-indigo-400 via-indigo-50 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
             { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'from-emerald-400 via-emerald-500 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
             { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
             { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },

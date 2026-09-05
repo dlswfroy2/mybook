@@ -74,7 +74,7 @@ async function processImage(file: File): Promise<string> {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const maxSide = 512;
+        const maxSide = 400;
 
         if (width > height) {
           if (width > maxSide) {
@@ -92,7 +92,7 @@ async function processImage(file: File): Promise<string> {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
       };
       img.onerror = () => reject(new Error('ছবি লোড করা সম্ভব হয়নি।'));
       img.src = e.target?.result as string;
@@ -162,18 +162,18 @@ function SettingsContent() {
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
 
-  const softwareDocRef = useMemo(() => doc(db, 'config', 'software'), [db]);
+  const softwareDocRef = useMemo(() => db ? doc(db, 'config', 'software') : null, [db]);
   const { data: softwareConfig } = useDoc(softwareDocRef);
   const [appName, setAppName] = useState('');
   const [appLogoUrl, setAppLogoUrl] = useState('');
   const [savingSoftware, setSavingSoftware] = useState(false);
 
-  const userProfileRef = useMemo(() => user ? doc(db, 'users', user.uid) : null, [db, user]);
+  const userProfileRef = useMemo(() => user?.uid ? doc(db, 'users', user.uid) : null, [db, user?.uid]);
   const { data: userProfile } = useDoc(userProfileRef);
 
   useEffect(() => {
-    if (!userLoading && !user) router.push('/auth');
-  }, [user, userLoading, router]);
+    if (!userLoading && !user?.uid) router.push('/auth');
+  }, [user?.uid, userLoading, router]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -186,11 +186,11 @@ function SettingsContent() {
     if (userProfile) {
       setDisplayName(userProfile.displayName || user?.displayName || '');
       setPhotoURL(userProfile.photoURL || user?.photoURL || '');
-    } else if (user) {
+    } else if (user?.uid) {
       setDisplayName(user.displayName || '');
       setPhotoURL(user.photoURL || '');
     }
-  }, [userProfile, user]);
+  }, [userProfile, user?.uid, user?.displayName, user?.photoURL]);
 
   useEffect(() => {
     if (softwareConfig) {
@@ -203,7 +203,7 @@ function SettingsContent() {
 
   useEffect(() => {
     async function checkAdmin() {
-      if (!db || !user) return;
+      if (!db || !user?.uid) return;
       if (user.email === 'dlswf.roy@gmail.com') {
         setIsAdmin(true);
         setAdminCheckLoading(false);
@@ -218,8 +218,8 @@ function SettingsContent() {
         setAdminCheckLoading(false);
       }
     }
-    if (user && db) checkAdmin();
-  }, [user, db]);
+    if (user?.uid && db) checkAdmin();
+  }, [user?.uid, user?.email, db]);
 
   const fetchRequests = async () => {
     if (!isAdmin || !db) return;
@@ -227,7 +227,7 @@ function SettingsContent() {
     try {
       const q = query(collection(db, 'users'), where('status', '==', 'pending'));
       const snap = await getDocs(q);
-      pendingUsers && setPendingUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPendingUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) {} finally {
       setLoadingRequests(false);
     }
@@ -312,7 +312,7 @@ function SettingsContent() {
   };
 
   const handleUpdateProfile = async () => {
-    if (!user || !userProfileRef) return;
+    if (!user?.uid || !userProfileRef) return;
     setSavingProfile(true);
     const profileData = { 
       displayName: displayName || '', 

@@ -791,7 +791,7 @@ function CollectionReportTab({ allStudents, onDeleteSuccess }: { allStudents: St
     const canDelete = hasPermission('special:delete-transaction') || user?.role === 'admin';
 
     useEffect(() => {
-        if (!db || !user) return;
+        if (!db || !user?.uid) return;
         setIsLoading(true);
         const q = query(collection(db, 'feeCollections'), where('academicYear', '==', selectedYear));
         const unsubscribe = onSnapshot(q, (snapshot) => { const data = snapshot.docs.map(doc => feeCollectionFromDoc(doc)).filter((c): c is FeeCollection => c !== null).sort((a, b) => b.collectionDate.getTime() - a.collectionDate.getTime()); setCollections(data); setIsLoading(false); }, (error) => { 
@@ -801,7 +801,7 @@ function CollectionReportTab({ allStudents, onDeleteSuccess }: { allStudents: St
             setIsLoading(false); 
         });
         return () => unsubscribe();
-    }, [db, user, selectedYear]);
+    }, [db, user?.uid, selectedYear]);
 
     const studentMap = useMemo(() => { const map = new Map<string, Student>(); allStudents.forEach(s => map.set(s.id, s)); return map; }, [allStudents]);
     const uniqueCollectors = useMemo(() => { const collectors = new Set<string>(); collections.forEach(c => { if (c.collectorName) collectors.add(c.collectorName); }); return Array.from(collectors).sort(); }, [collections]);
@@ -950,7 +950,7 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                 <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-[8px_8px_0px_rgba(0,0,0,0.1)] bg-white"><CardHeader className="bg-rose-50 p-4 border-b-[3px] border-black"><CardTitle className="text-[10px] font-black uppercase text-rose-700 tracking-widest">মোট বকেয়া / অনাদায়ী</CardTitle></CardHeader><CardContent className="p-6"><div className="text-3xl font-black text-rose-950">{toBengaliNumber(stats.due)} ৳</div><p className="text-[10px] font-bold text-rose-600 mt-1 uppercase tracking-tighter">প্রাক্কলিত অবশিষ্ট পাওনা</p></CardContent></Card>
             </div>
             
-            <Card className="border-[4px] border-black rounded-[32px] shadow-2xl bg-white overflow-hidden"><CardHeader className="bg-primary/5 border-b-[3px] border-black"><div><CardTitle className="text-xl font-black flex items-center gap-2 text-primary uppercase tracking-tight"><BarChart3 className="h-6 w-6" /> সম্ভাব্য আয় বনাম প্রকৃত আদায় (তুলনামূলক চিত্র)</CardTitle><CardDescription className="font-bold text-[10px] uppercase">প্রতি মাসের সম্ভাব্য পাওনা এবং আদায়ের গ্রাফিকাল বিশ্লেষণ</CardDescription></div></CardHeader><CardContent className="pt-8 h-[400px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 'bold', fill: '#64748b' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 'bold', fill: '#64748b' }} /><Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '16px', border: '3px solid black', fontWeight: 'bold', fontSize: '12px', boxShadow: '8px 8px 0px rgba(0,0,0,0.1)' }} formatter={(value: number) => [`${toBengaliNumber(value)} ৳`, '']} /><Legend verticalAlign="top" align="right" iconType="circle" /><Bar dataKey="potential" name="সম্ভাব্য পাওনা" fill="#6366f1" radius={[4, 4, 0, 0]} /><Bar dataKey="actual" name="প্রকৃত আদায়" fill="#10b981" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card>
+            <Card className="border-[4px] border-black rounded-[32px] shadow-2xl bg-white overflow-hidden"><CardHeader className="bg-primary/5 border-b-[3px] border-black"><div><CardTitle className="text-xl font-black flex items-center gap-2 text-primary uppercase tracking-tight"><BarChart3 className="h-6 w-6" /> সম্ভাব্য আয় বনাম প্রকৃত আদায় (তুলনামূলক চিত্র)</CardTitle><CardDescription className="font-bold text-[10px] uppercase">প্রতি মাসের সম্ভাব্য পাওনা এবং আদায়ের গ্রাফিকাল বিশ্লেষণ</CardDescription></div></CardHeader><CardContent className="pt-8 h-[400px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeights: 'bold', fill: '#64748b' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeights: 'bold', fill: '#64748b' }} /><Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '16px', border: '3px solid black', fontWeights: 'bold', fontSize: '12px', boxShadow: '8px 8px 0px rgba(0,0,0,0.1)' }} formatter={(value: number) => [`${toBengaliNumber(value)} ৳`, '']} /><Legend verticalAlign="top" align="right" iconType="circle" /><Bar dataKey="potential" name="সম্ভাব্য পাওনা" fill="#6366f1" radius={[4, 4, 0, 0]} /><Bar dataKey="actual" name="প্রকৃত আদায়" fill="#10b981" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></CardContent></Card>
             
             <Card className="border-[4px] border-black rounded-[32px] bg-white shadow-2xl overflow-hidden">
                 <CardHeader className="bg-emerald-50/50 border-b-[3px] border-black flex flex-row items-center justify-between p-6">
@@ -1335,7 +1335,7 @@ function NewTransactionTab({ onTransactionAdded, initialType = 'income' }: { onT
     const { toast } = useToast(); const db = useFirestore(); const { user } = useAuth(); const { selectedYear } = useAcademicYear(); const [date, setDate] = useState<Date | undefined>(new Date()); const [type, setType] = useState<TransactionType>(initialType); const [method, setMethod] = useState<PaymentMethod>('cash'); const [accountHead, setAccountHead] = useState(''); const [description, setDescription] = useState(''); const [amount, setAmount] = useState<number | ''>(''); const [voucherNo, setVoucherNo] = useState(''); const [checkNo, setCheckNo] = useState(''); const incomeHeads = ['Tuition Fee', 'Exam Fee', 'Admission Fee', 'Session Fee', 'Donation', 'Bank to Cash', 'Other']; const expenseHeads = ['Staff Salary', 'Electricity & Utility', 'Stationery', 'Repair & Maintenance', 'Entertainment', 'Cash to Bank', 'Other'];
     useEffect(() => { setType(initialType); setAccountHead(''); }, [initialType]);
     
-    const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (!db || !user || !date || !type || !accountHead || !amount || amount <= 0) { toast({ variant: 'destructive', title: 'অনুগ্রহ করে সকল তথ্য পূরণ করুন।' }); return; } const newTransaction: NewTransactionData = { date, type, method, accountHead, description, amount: Number(amount), academicYear: selectedYear, voucherNo: type === 'expense' ? voucherNo : undefined, checkNo: method === 'bank' ? checkNo : undefined }; 
+    const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (!db || !user?.uid || !date || !type || !accountHead || !amount || amount <= 0) { toast({ variant: 'destructive', title: 'অনুগ্রহ করে সকল তথ্য পূরণ করুন।' }); return; } const newTransaction: NewTransactionData = { date, type, method, accountHead, description, amount: Number(amount), academicYear: selectedYear, voucherNo: type === 'expense' ? voucherNo : undefined, checkNo: method === 'bank' ? checkNo : undefined }; 
         addTransaction(db, newTransaction).then(() => {
             toast({ title: 'লেনদেন সফলভাবে যোগ হয়েছে।' }); setAccountHead(''); setDescription(''); setAmount(''); setVoucherNo(''); setCheckNo(''); onTransactionAdded();
         }).catch((error) => { errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'transactions', operation: 'create' })); });
@@ -1381,13 +1381,13 @@ export default function AccountsPage() {
   const [potentialPrintParams, setPotentialPrintParams] = useState<{ cls: string } | null>(null);
   const [annualReportPrintData, setAnnualReportPrintData] = useState<any[]>([]);
   
-  const fetchTransactions = useCallback(async () => { if (!db || !user) return; setIsLoading(true); const fetched = await getTransactions(db, selectedYear); setTransactions(fetched); setIsLoading(false); }, [db, user, selectedYear]);
-  const fetchStudents = useCallback(() => { if (!db || !user) return; setIsLoadingStudents(true); const q = query(collection(db, 'students'), where('academicYear', '==', selectedYear)); const unsubscribe = onSnapshot(q, (snap) => { setAllStudents(snap.docs.map(studentFromDoc)); setIsLoadingStudents(false); }, (error) => { 
+  const fetchTransactions = useCallback(async () => { if (!db || !user?.uid) return; setIsLoading(true); const fetched = await getTransactions(db, selectedYear); setTransactions(fetched); setIsLoading(false); }, [db, user?.uid, selectedYear]);
+  const fetchStudents = useCallback(() => { if (!db || !user?.uid) return; setIsLoadingStudents(true); const q = query(collection(db, 'students'), where('academicYear', '==', selectedYear)); const unsubscribe = onSnapshot(q, (snap) => { setAllStudents(snap.docs.map(studentFromDoc)); setIsLoadingStudents(false); }, (error) => { 
     if (error.code === 'permission-denied') {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'students', operation: 'list' })); 
     }
     setIsLoadingStudents(false); 
-  }); return unsubscribe; }, [db, user, selectedYear]);
+  }); return unsubscribe; }, [db, user?.uid, selectedYear]);
   useEffect(() => { setIsClient(true); fetchTransactions(); const unsub = fetchStudents(); return () => unsub?.(); }, [fetchTransactions, fetchStudents]);
   
   const sidebarItems = useMemo(() => { 
@@ -1690,4 +1690,5 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
 }
 
 type AccountsPrintType = 'fee-setup' | 'annual-potential' | 'annual-collection' | null;
+
 
