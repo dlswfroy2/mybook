@@ -768,157 +768,166 @@ export default function Home() {
 
       <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5 md:gap-2">
         <Link href="/create-question" className="block w-full">
-          <div className="bg-[#dc2626] hover:bg-[#b91c1c] border-b-4 border-[#7f1d1d] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#dc2626] hover:bg-[#b91c1c] border-b-4 border-[#7f1d1d] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <BrainCircuit className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">প্রশ্ন ব্যাংক</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">প্রশ্ন ব্যাংক</span>
           </div>
         </Link>
 
         <Link href="/notices-management" className="block w-full">
-          <div className="bg-[#2563eb] hover:bg-[#1d4ed8] border-b-4 border-[#1e3a8a] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#2563eb] hover:bg-[#1d4ed8] border-b-4 border-[#1e3a8a] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Bell className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">নোটিশ বোর্ড</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">নোটিশ বোর্ড</span>
           </div>
         </Link>
 
         <Link href="/create-lecture-sheet" className="block w-full">
-          <div className="bg-[#059669] hover:bg-[#047857] border-b-4 border-[#064e3b] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#059669] hover:bg-[#047857] border-b-4 border-[#064e3b] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">লেকচার শিট</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">লেকচার শিট</span>
           </div>
         </Link>
 
         <Link href="/diary" className="block w-full">
-          <div className="bg-[#4f46e5] hover:bg-[#4338ca] border-b-4 border-[#312e81] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#4f46e5] hover:bg-[#4338ca] border-b-4 border-[#312e81] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <NotebookPen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">টিচার্স ডায়েরি</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">টিচার্স ডায়েরি</span>
           </div>
         </Link>
 
         <Link href="/student-profile" className="block w-full">
-          <div className="bg-[#1e293b] hover:bg-[#0f172a] border-b-4 border-black text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#1e293b] hover:bg-[#0f172a] border-b-4 border-black text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Search className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">শিক্ষার্থী প্রোফাইল</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">শিক্ষার্থী প্রোফাইল</span>
           </div>
         </Link>
 
         <Link href="/add-student" className="block w-full">
-          <div className="bg-[#0d9488] hover:bg-[#0f766e] border-b-4 border-[#134e4a] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#0d9488] hover:bg-[#0f766e] border-b-4 border-[#134e4a] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <UserPlus className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">নতুন শিক্ষার্থী ভর্তি</span>
+            <span className="font-black text-[8.5px] sm:text-[9.5px] md:text-[10px] xl:text-[10.5px] tracking-tight leading-normal text-center whitespace-nowrap drop-shadow-sm">নতুন শিক্ষার্থী ভর্তি</span>
           </div>
         </Link>
 
         <Link href="/student-list" className="block w-full">
-          <div className="bg-[#16a34a] hover:bg-[#15803d] border-b-4 border-[#14532d] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#16a34a] hover:bg-[#15803d] border-b-4 border-[#14532d] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">শিক্ষার্থী তালিকা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">শিক্ষার্থী তালিকা</span>
           </div>
         </Link>
 
         <Link href="/attendance" className="block w-full">
-          <div className="bg-[#0284c7] hover:bg-[#0369a1] border-b-4 border-[#075985] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#0284c7] hover:bg-[#0369a1] border-b-4 border-[#075985] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <CalendarCheck className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">হাজিরা শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">হাজিরা শাখা</span>
           </div>
         </Link>
 
         <Link href="/results" className="block w-full">
-          <div className="bg-[#7c3aed] hover:bg-[#6d28d9] border-b-4 border-[#4c1d95] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#7c3aed] hover:bg-[#6d28d9] border-b-4 border-[#4c1d95] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">ফলাফল শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">ফলাফল শাখা</span>
           </div>
         </Link>
 
         <Link href="/accounts" className="block w-full">
-          <div className="bg-[#057a55] hover:bg-[#046c4e] border-b-4 border-[#03543f] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#057a55] hover:bg-[#046c4e] border-b-4 border-[#03543f] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Banknote className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">হিসাব শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">হিসাব শাখা</span>
           </div>
         </Link>
 
         <Link href="/messaging" className="block w-full">
-          <div className="bg-[#3b82f6] hover:bg-[#2563eb] border-b-4 border-[#1d4ed8] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#3b82f6] hover:bg-[#2563eb] border-b-4 border-[#1d4ed8] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <MessageSquare className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">মেসেজ শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">মেসেজ শাখা</span>
           </div>
         </Link>
 
         <Link href="/staff" className="block w-full">
-          <div className="bg-[#9333ea] hover:bg-[#7e22ce] border-b-4 border-[#581c87] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#9333ea] hover:bg-[#7e22ce] border-b-4 border-[#581c87] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <UserCog className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">স্টাফ পোর্টাল</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">স্টাফ পোর্টাল</span>
           </div>
         </Link>
 
         <Link href="/documents" className="block w-full">
-          <div className="bg-[#d97706] hover:bg-[#b45309] border-b-4 border-[#78350f] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#d97706] hover:bg-[#b45309] border-b-4 border-[#78350f] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <FolderOpen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">ডকুমেন্ট পোর্টাল</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">ডকুমেন্ট পোর্টাল</span>
           </div>
         </Link>
 
         <Link href="/routines" className="block w-full">
-          <div className="bg-[#6366f1] hover:bg-[#4f46e5] border-b-4 border-[#3730a3] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#6366f1] hover:bg-[#4f46e5] border-b-4 border-[#3730a3] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">রুটিন শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">রুটিন শাখা</span>
           </div>
         </Link>
 
         <Link href="/public-exam-records" className="block w-full">
-          <div className="bg-[#0891b2] hover:bg-[#0e7490] border-b-4 border-[#164e63] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#0891b2] hover:bg-[#0e7490] border-b-4 border-[#164e63] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">রেকর্ড শাখা</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">রেকর্ড শাখা</span>
           </div>
         </Link>
 
         <Link href="/settings?tab=sheets" className="block w-full">
-          <div className="bg-[#ea580c] hover:bg-[#c2410c] border-b-4 border-[#9a3412] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#ea580c] hover:bg-[#c2410c] border-b-4 border-[#9a3412] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">কুইক আপলোড</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">কুইক আপলোড</span>
           </div>
         </Link>
 
         <Link href="/my-questions" className="block w-full">
-          <div className="bg-[#be185d] hover:bg-[#9d174d] border-b-4 border-[#700c35] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#be185d] hover:bg-[#9d174d] border-b-4 border-[#700c35] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <Library className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">আমার লাইব্রেরি</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">আমার লাইব্রেরি</span>
           </div>
         </Link>
 
         <Link href="/admissions-management" className="block w-full">
-          <div className="bg-[#4338ca] hover:bg-[#3730a3] border-b-4 border-[#1e1b4b] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+          <div className="bg-[#4338ca] hover:bg-[#3730a3] border-b-4 border-[#1e1b4b] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
             <UserCheck className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm truncate">ভর্তি আবেদন</span>
+            <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">ভর্তি আবেদন</span>
           </div>
         </Link>
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-6 border-b-2 border-black pb-2">
+        <div className="flex items-center justify-between mb-4 border-b-2 border-black pb-2">
           <h3 className="text-lg font-black text-foreground flex items-center gap-2">
             <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-primary" />
             বোর্ড বই দেখুন (শ্রেণি নির্বাচন করুন)
           </h3>
         </div>
-        <div className="grid grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
-          {CLASSES.map((cls) => (
-            <Link key={cls.id} href={`/class/${cls.id}`}>
-              <Card className={cn(glassClass, "hover:bg-primary/10 hover:scale-105 transition-all group overflow-hidden bg-white/60")}>
-                <CardContent className="p-1 flex flex-col items-center text-center space-y-1">
-                  <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-primary flex items-center justify-center text-white group-hover:bg-white group-hover:text-primary transition-all shadow-md border-2 border-white">
-                    <GraduationCap className="w-4 h-4 md:w-5 md:h-5" />
-                  </div>
-                  <div>
-                    <p className="font-black text-[10px] md:text-[12px] group-hover:text-primary transition-colors">{cls.label} শ্রেণি</p>
-                  </div>
-                  <div className="flex items-center gap-0.5 text-[7px] font-black text-primary opacity-80 group-hover:opacity-100 transition-all uppercase tracking-tighter">
-                    প্রবেশ <ArrowRight className="w-1.5 h-1.5 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
+          {CLASSES.map((cls) => {
+            const classColors: Record<string, { bg: string; hover: string; border: string }> = {
+              '6': { bg: 'bg-[#2563eb]', hover: 'hover:bg-[#1d4ed8]', border: 'border-[#1e3a8a]' },
+              '7': { bg: 'bg-[#059669]', hover: 'hover:bg-[#047857]', border: 'border-[#064e3b]' },
+              '8': { bg: 'bg-[#7c3aed]', hover: 'hover:bg-[#6d28d9]', border: 'border-[#4c1d95]' },
+              '9': { bg: 'bg-[#ea580c]', hover: 'hover:bg-[#c2410c]', border: 'border-[#9a3412]' },
+              '10': { bg: 'bg-[#dc2626]', hover: 'hover:bg-[#b91c1c]', border: 'border-[#7f1d1d]' },
+            };
+            const col = classColors[cls.id] || { bg: 'bg-[#4f46e5]', hover: 'hover:bg-[#4338ca]', border: 'border-[#312e81]' };
+            return (
+              <Link key={cls.id} href={`/class/${cls.id}`} className="block w-full">
+                <div className={cn(
+                  col.bg,
+                  col.hover,
+                  "border-b-4",
+                  col.border,
+                  "text-white h-10 md:h-11 px-2 md:px-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full cursor-pointer"
+                )}>
+                  <BookOpen className="w-4 h-4 md:w-4.5 md:h-4.5 text-white shrink-0 group-hover:scale-110 transition-transform" />
+                  <span className="font-black text-xs md:text-sm leading-normal text-center whitespace-nowrap drop-shadow-sm">
+                    {cls.label} শ্রেণি
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
