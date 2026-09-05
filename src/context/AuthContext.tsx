@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { 
   doc, 
   onSnapshot, 
@@ -106,30 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(userData);
             setLoading(false);
           } else {
-            // Document missing fallback: Only Super Admin gets admin rights automatically
-            const isSuperAdm = fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com';
-            const initialRole = isSuperAdm ? 'admin' : 'teacher';
-            const initialPermissions = isSuperAdm ? availablePermissions.map(p => p.id) : (defaultPermissions['teacher'] || []);
-            
-            const fallbackUser: User = {
-              uid: fbUser.uid,
-              displayName: fbUser.displayName || 'ব্যবহারকারী',
-              email: fbUser.email || '',
-              role: initialRole,
-              permissions: initialPermissions,
-            };
-
-            await setDoc(userDocRef, {
-              uid: fbUser.uid,
-              displayName: fbUser.displayName || 'ব্যবহারকারী',
-              email: fbUser.email || '',
-              role: initialRole,
-              status: 'active',
-              permissions: initialPermissions,
-              createdAt: serverTimestamp()
-            }, { merge: true });
-
-            setUser(fallbackUser);
+            // Document missing fallback: Mandatory signup enforcement
+            // If auth exists but no doc, the user didn't sign up via portal
+            await signOut(auth);
+            setUser(null);
             setLoading(false);
           }
         }, async (error) => {

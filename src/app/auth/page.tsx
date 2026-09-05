@@ -321,115 +321,102 @@ export default function AuthPage() {
         const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await updateProfile(userCredential.user, { displayName: name });
 
-        const isAdm = isSuperAdmin;
         const teacherData = isTeacherInStaff ? staffSnap.docs[0].data() : null;
 
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           uid: userCredential.user.uid,
           email: cleanEmail,
-          displayName: name || teacherData?.name || (isAdm ? 'প্রধান অ্যাডমিন' : 'শিক্ষক'),
-          role: isAdm ? 'admin' : 'teacher',
+          displayName: name || teacherData?.nameBn || (isSuperAdmin ? 'প্রধান অ্যাডমিন' : 'শিক্ষক'),
+          role: isSuperAdmin ? 'admin' : 'teacher',
           status: 'active',
           staffId: isTeacherInStaff ? staffSnap.docs[0].id : null,
-          permissions: isAdm ? availablePermissions.map(p => p.id) : (defaultPermissions['teacher'] || []),
+          permissions: isSuperAdmin ? availablePermissions.map(p => p.id) : (defaultPermissions['teacher'] || []),
           createdAt: serverTimestamp()
         });
 
         toast({ 
           title: "সফল রেজিস্ট্রেশন", 
-          description: isAdm 
+          description: isSuperAdmin 
             ? "অভিনন্দন! আপনি সুপার অ্যাডমিন হিসেবে যুক্ত হয়েছেন।" 
             : "আপনার শিক্ষক আইডি সফলভাবে তৈরি হয়েছে। এখন লগইন করুন।" 
         });
 
-        setIsDialogOpen(false);
-        router.push('/');
+        setActiveAuthTab('teacher');
+        setLoading(false);
         return;
-      } else if (activeAuthTab === 'admin') {
-        // --- ADMIN LOGIN (Strictly from registered accounts) ---
+      } else {
+        // --- LOGIN (Teacher or Admin) ---
         const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        const user = userCredential.user;
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        let isAdm = cleanEmail === 'dlswf.roy@gmail.com';
-        if (!isAdm && userDoc.exists()) {
-          isAdm = userDoc.data()?.role === 'admin';
-        }
-
-        if (isAdm) {
-          await setDoc(userDocRef, {
-            isOnline: true,
-            lastLoginAt: serverTimestamp(),
-            lastActiveAt: serverTimestamp(),
-          }, { merge: true });
-
-          toast({ title: "সফল এডমিন লগইন" });
-          setIsDialogOpen(false);
-          router.push('/');
-        } else {
+        const fbUser = userCredential.user;
+        
+        // Mandatory signup check: Fetch user doc to check role existence
+        const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+        
+        if (!userDoc.exists()) {
           await signOut(auth);
-          toast({ 
-            variant: "destructive", 
-            title: "প্রবেশাধিকার নেই", 
-            description: "আপনার রোল অ্যাডমিন নয়। দয়া করে শিক্ষক পোর্টালে লগইন করুন।" 
+          toast({
+            variant: "destructive",
+            title: "অ্যাকাউন্ট পাওয়া যায়নি",
+            description: "দয়া করে আগে 'নিবন্ধন' ট্যাব থেকে অ্যাকাউন্ট তৈরি করুন।"
           });
           setLoading(false);
-        }
-      } else {
-        // --- TEACHER LOGIN (Strictly from registered accounts) ---
-        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        const user = userCredential.user;
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-             await signOut(auth);
-             toast({
-                variant: "destructive",
-                title: "অ্যাকাউন্ট পাওয়া যায়নি",
-                description: "দয়া করে আগে 'নিবন্ধন' ট্যাব থেকে অ্যাকাউন্ট তৈরি করুন।"
-             });
-             setLoading(false);
-             return;
+          return;
         }
 
-        const data = userDoc.data();
-        if (data.status === 'inactive' || data.status === 'blocked') {
+        const userData = userDoc.data();
+        const userRole = userData.role;
+
+        // Role Enforcement: Must use the correct portal
+        if (activeAuthTab === 'admin') {
+          if (userRole !== 'admin' && !isSuperAdmin) {
+            await signOut(auth);
+            toast({ 
+              variant: "destructive", 
+              title: "প্রবেশাধিকার নেই", 
+              description: "আপনার অ্যাকাউন্টটি অ্যাডমিন নয়। দয়া করে শিক্ষক পোর্টালে লগইন করুন।" 
+            });
+            setLoading(false);
+            return;
+          }
+        } else if (activeAuthTab === 'teacher') {
+          if (userRole !== 'teacher' && !isSuperAdmin) {
+            await signOut(auth);
+            toast({
+              variant: "destructive",
+              title: "প্রবেশাধিকার নেই",
+              description: "আপনার অ্যাকাউন্টের রোল 'শিক্ষক' নয়। দয়া করে এডমিন পোর্টালে লগইন করুন।"
+            });
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Check if blocked
+        if (userData.status === 'inactive' || userData.status === 'blocked') {
             await signOut(auth);
             toast({ variant: "destructive", title: "অ্যাকাউন্ট নিষ্ক্রিয়", description: "আপনার অ্যাকাউন্টটি বর্তমানে নিষ্ক্রিয় রয়েছে।" });
             setLoading(false);
             return;
         }
 
-        if (data.role !== 'teacher' && cleanEmail !== 'dlswf.roy@gmail.com') {
-             await signOut(auth);
-             toast({
-                variant: "destructive",
-                title: "প্রবেশাধিকার নেই",
-                description: "আপনার অ্যাকাউন্টের রোল 'শিক্ষক' নয়। দয়া করে এডমিন পোর্টালে লগইন করুন।"
-             });
-             setLoading(false);
-             return;
-        }
-
-        await setDoc(userDocRef, {
+        await setDoc(doc(db, 'users', fbUser.uid), {
           isOnline: true,
           lastLoginAt: serverTimestamp(),
           lastActiveAt: serverTimestamp(),
         }, { merge: true }).catch(() => {});
 
-        toast({ title: "সফল শিক্ষক লগইন" });
+        toast({ title: "সফল লগইন হয়েছে" });
         setIsDialogOpen(false);
         router.push('/');
       }
     } catch (error: any) {
-      console.error(error);
       let msg = "ইমেইল বা পাসওয়ার্ড সঠিক নয়।";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        msg = "ভুল ইমেইল বা পাসওয়ার্ড প্রদান করেছেন অথবা অ্যাকাউন্টটি নিবন্ধিত নয়।";
-      } else if (error.code === 'auth/email-already-in-use') {
-        msg = "এই ইমেইলে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে।";
+      if (error.code === 'auth/email-already-in-use') {
+        msg = "এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট তৈরি করা আছে। দয়া করে লগইন করুন।";
+      } else if (error.code === 'auth/weak-password') {
+        msg = "পাসওয়ার্ডটি অন্তত ৬ অক্ষরের হতে হবে।";
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        msg = "ভুল ইমেইল বা পাসওয়ার্ড অথবা অ্যাকাউন্টটি নিবন্ধিত নয়।";
       }
       toast({ variant: "destructive", title: "ত্রুটি", description: msg });
     } finally {
@@ -750,7 +737,7 @@ export default function AuthPage() {
                   </div>
                   <div>
                     <p className="text-2xl md:text-3xl font-black text-slate-800">{toBengaliNumber(stats.attendanceRate.toFixed(1))}%</p>
-                    <p className="text-[10px] md:text-xs font-black text-blue-600 uppercase tracking-wider mt-0.5">উপস্থিতি</p>
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider mt-0.5">উপস্থিতি</p>
                   </div>
                </CardContent>
             </Card>
