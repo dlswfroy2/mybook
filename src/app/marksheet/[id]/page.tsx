@@ -99,9 +99,7 @@ function MarksheetContent() {
                         if (parseInt(studentData.className) >= 9 && (studentData.group?.toLowerCase() === 'science' || studentData.group === 'বিজ্ঞান')) {
                              const hmNorm = normalize('উচ্চতর গণিত');
                              const agriNorm = normalize('কৃষি শিক্ষা');
-                             if (subNameNorm === hmNorm || subNameNorm === agriNorm) {
-                                 if (optSubNorm && subNameNorm !== optSubNorm) return false;
-                             }
+                             if (optSubNorm && subNameNorm !== optSubNorm) return false;
                         }
                         return true;
                     });
@@ -118,16 +116,6 @@ function MarksheetContent() {
 
         fetchAllData();
     }, [db, studentId, academicYear, currentExamName]);
-
-    const gradingScale = [
-        { interval: '80-100', point: '5.00', grade: 'A+' },
-        { interval: '70-79', point: '4.00', grade: 'A' },
-        { interval: '60-69', point: '3.50', grade: 'A-' },
-        { interval: '50-59', point: '3.00', grade: 'B' },
-        { interval: '40-49', point: '2.00', grade: 'C' },
-        { interval: '33-39', point: '1.00', grade: 'D' },
-        { interval: '0-32', point: '0.00', grade: 'F' },
-    ];
 
     if (isLoading) {
         return (
@@ -146,12 +134,8 @@ function MarksheetContent() {
         );
     }
 
-    const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
-    const displayExamName = examNameEnglishMap[currentExamName] || currentExamName;
-    const hasPractical = sortedSubjects.some(s => s.practical);
-
     return (
-        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center overflow-x-hidden">
+        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center">
             <style jsx global>{`
                 @media print {
                     @page {
@@ -159,32 +143,29 @@ function MarksheetContent() {
                         margin: 0.5in !important;
                     }
                     html, body {
-                        height: auto !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        height: auto !important;
                         overflow: visible !important;
+                        width: 100% !important;
                     }
                     .no-print {
                         display: none !important;
                     }
+                    .printable-area {
+                        display: block !important;
+                        width: 100% !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                    }
                     .marksheet-container {
                         width: 100% !important;
                         height: auto !important;
-                        margin: 0 !important;
                         padding: 0 !important;
-                        page-break-after: always !important;
-                        overflow: hidden !important;
-                        position: relative !important;
-                        display: flex !important;
-                        flex-direction: column !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                        box-shadow: none !important;
+                        margin: 0 !important;
                         border: none !important;
-                    }
-                    .watermark-layer img {
-                        visibility: visible !important;
-                        display: block !important;
+                        box-shadow: none !important;
+                        page-break-after: always;
                     }
                 }
             `}</style>
@@ -234,165 +215,218 @@ function MarksheetContent() {
                 </div>
             </div>
             
-            <div className="printable-area marksheet-container w-[210mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:m-0 print:p-0">
-                {schoolInfo.logoUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer" style={{ opacity: watermarkOpacity }}>
-                        <img src={schoolInfo.logoUrl} alt="Watermark" className="w-[300px] h-[300px] object-contain" />
-                    </div>
-                )}
-                
-                <div className="relative z-10 border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent">
-                    <div className="printable-header mb-4 flex justify-between items-start">
-                        <div className="flex items-center gap-4">
-                            {schoolInfo.logoUrl && (
-                                <div className="w-20 h-20 relative">
-                                    <Image src={schoolInfo.logoUrl} alt="School Logo" fill className="object-contain" priority />
-                                </div>
-                            )}
-                            <div className="text-left">
-                                <h1 className="text-3xl font-black uppercase text-[#003366] tracking-tight leading-none mb-1">
-                                    {schoolInfo.nameEn || schoolInfo.name || "SCHOOL NAME"}
-                                </h1>
-                                <p className="text-sm font-bold text-gray-700">{schoolInfo.address || ""}</p>
-                                <div className="mt-2 inline-block bg-[#eef6ff] px-3 py-1 rounded border border-[#b3d7ff]">
-                                    <p className="text-sm text-[#0056b3] font-bold">Academic Session: {academicYear}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="text-[9px]">
-                            <table className="border-collapse border border-black text-center w-full">
-                                <thead className="bg-gray-100">
-                                    <tr className="border-b border-black">
-                                        <th className="p-1 px-2 border-r border-black font-bold">Range</th>
-                                        <th className="p-1 px-2 border-r border-black font-bold">GP</th>
-                                        <th className="p-1 px-2 font-bold">Grade</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {gradingScale.map(g => (
-                                        <tr key={g.grade} className="border-b border-black last:border-b-0">
-                                            <td className="p-0.5 border-r border-black">{g.interval}</td>
-                                            <td className="p-0.5 border-r border-black">{g.point}</td>
-                                            <td className="p-0.5 font-bold">{g.grade}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div className="text-center mb-4">
-                        <h2 className="text-xl font-black underline underline-offset-8 uppercase tracking-widest text-black">
-                            {displayExamName} Progress Report
-                        </h2>
-                    </div>
-
-                    <section className="mb-4 text-[12px] leading-relaxed bg-slate-50/50 p-2 border border-dashed border-gray-300 rounded">
-                        <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 border-b border-black/10 pb-1">
-                            <div className="font-bold text-gray-600 uppercase">Student's Name</div><div className="font-bold uppercase text-blue-900">: {student.studentNameEn || student.studentNameBn}</div>
-                            <div className="font-bold text-gray-600 text-right uppercase">Class</div><div className="font-bold">: {classMap[student.className] || student.className}</div>
-                        </div>
-                        <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b border-black/10 pb-1">
-                            <div className="font-bold text-gray-600 uppercase">Father's Name</div><div>: {student.fatherNameEn || student.fatherNameBn}</div>
-                            <div className="font-bold text-gray-600 text-right uppercase">Roll No.</div><div className="font-bold">: {student.roll}</div>
-                        </div>
-                        <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b border-black/10 pb-1">
-                            <div className="font-bold text-gray-600 uppercase">Mother's Name</div><div>: {student.motherNameEn || student.motherNameBn}</div>
-                            <div className="font-bold text-gray-600 text-right uppercase">Group</div><div>: {student.group ? groupMap[student.group.toLowerCase()] || student.group : 'General'}</div>
-                        </div>
-                        <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1">
-                            <div className="font-bold text-gray-600 uppercase">Student ID</div><div className="font-black">: {student.generatedId || '-'}</div>
-                            <div></div><div></div>
-                        </div>
-                    </section>
-
-                    <section className="mb-4">
-                        <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[12px] bg-blue-900 text-white rounded-sm">
-                            <div className="py-1.5">Status: <span className={cn("font-black", processedResult.isPass ? "text-green-400" : "text-red-400")}>{processedResult.isPass ? 'PASSED' : 'FAILED'}</span></div>
-                            <div className="py-1.5">GPA: <span className="font-black text-amber-300">{processedResult.gpa.toFixed(2)}</span></div>
-                            <div className="py-1.5">Final Grade: <span className="font-black text-amber-300">{processedResult.finalGrade}</span></div>
-                            <div className="py-1.5">Merit Rank: <span className="font-black">{processedResult.isPass ? renderMeritPosition(processedResult.meritPosition) : 'N/A'}</span></div>
-                        </div>
-                    </section>
-
-                    <section className="flex-grow overflow-visible">
-                        <table className="w-full border-collapse border-[1.5px] border-black text-[11px]">
-                            <thead>
-                                <tr className="border-b-[1.5px] border-black bg-gray-100 font-bold">
-                                    <th className="border-r border-black p-1 w-8 text-center">SL</th>
-                                    <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
-                                    <th className="border-r border-black p-1 w-14 text-center">Full Marks</th>
-                                    <th className="border-r border-black p-1 w-14 text-center">Written</th>
-                                    <th className="border-r border-black p-1 w-14 text-center">MCQ</th>
-                                    {hasPractical && <th className="border-r border-black p-1 w-14 text-center">Practical</th>}
-                                    <th className="border-r border-black p-1 w-16 text-center">Obtained</th>
-                                    <th className="border-r border-black p-1 w-14 text-center">Grade</th>
-                                    <th className="p-1 w-14 text-center">Point</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedSubjects.map((subject, index) => {
-                                    const subResult = processedResult.subjectResults.get(subject.name);
-                                    const isFail = subResult?.isPass === false;
-                                    return (
-                                        <tr key={subject.code} className={cn("border-b border-black last:border-0", isFail ? "bg-red-50/30" : "")}>
-                                            <td className="border-r border-black p-1 text-center font-medium text-gray-500">{index + 1}</td>
-                                            <td className="border-r border-black p-1 px-4 font-semibold">
-                                                {subject.englishName}
-                                                {student.optionalSubject === subject.name && <span className="text-[8px] text-blue-600 font-bold italic ml-2">(Optional)</span>}
-                                            </td>
-                                            <td className="border-r border-black p-1 text-center font-medium">{subResult?.fullMarks ?? subject.fullMarks}</td>
-                                            <td className="border-r border-black p-1 text-center font-medium">{subResult?.written ?? '-'}</td>
-                                            <td className="border-r border-black p-1 text-center font-medium">{subResult?.mcq ?? '-'}</td>
-                                            {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{subResult?.practical ?? '-'}</td>}
-                                            <td className={cn("border-r border-black p-1 text-center font-bold text-[14px]", isFail ? "text-red-600" : "text-blue-900")}>{subResult?.marks ?? '-'}</td>
-                                            <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "")}>{subResult?.grade ?? '-'}</td>
-                                            <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{subResult?.point !== undefined ? subResult.point.toFixed(2) : '-'}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                            <tfoot>
-                                <tr className="border-t-[1.5px] border-black font-black bg-blue-50 text-[12px]">
-                                    <td colSpan={hasPractical ? 6 : 5} className="p-2 pr-8 text-right border-r border-black uppercase text-blue-900">Total Marks & Final Results</td>
-                                    <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{processedResult.totalMarks}</td>
-                                    <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{processedResult.finalGrade}</td>
-                                    <td className="p-2 text-center text-blue-950 text-sm">{processedResult.gpa.toFixed(2)}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </section>
-
-                    <section className="mt-4 mb-2 p-2 border border-black rounded bg-gray-50/30">
-                        <p className="text-[10px] font-bold uppercase text-gray-500 mb-1">Remarks:</p>
-                        <p className="text-[12px] font-black italic text-blue-900 leading-tight">
-                            "{processedResult.isPass ? (processedResult.gpa >= 5 ? "Excellent results. Keep it up!" : "Satisfactory performance. Aim higher!") : "Work hard to do well in the next exam"}"
-                        </p>
-                    </section>
-
-                    <footer className="mt-auto pt-6 pb-2 text-[11px]">
-                        <div className="flex justify-between px-16">
-                            <div className="text-center w-32 border-t border-black pt-1 font-bold text-gray-700 uppercase">Class Teacher</div>
-                            <div className="text-center w-32 border-t border-black pt-1 font-bold text-gray-700 uppercase">Headmaster</div>
-                        </div>
-                        <div className="mt-4 flex justify-between items-center text-[9px] text-muted-foreground italic border-t pt-2">
-                            <span>Report Date: {new Date().toLocaleDateString('en-GB')}</span>
-                            <span>Powered by: {schoolInfo.nameEn || ""} Management System</span>
-                        </div>
-                    </footer>
-                </div>
+            <div className="printable-area marksheet-container w-[210mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:p-0">
+                <MarksheetTemplate 
+                    result={processedResult} 
+                    schoolInfo={schoolInfo} 
+                    examName={currentExamName} 
+                    academicYear={academicYear}
+                    watermarkOpacity={watermarkOpacity}
+                />
             </div>
         </div>
     );
 }
 
-function renderMeritPosition(position?: number) {
-    if (!position) return '-';
-    if (position % 10 === 1 && position % 100 !== 11) return `${position}st`;
-    if (position % 10 === 2 && position % 100 !== 12) return `${position}nd`;
-    if (position % 10 === 3 && position % 100 !== 13) return `${position}rd`;
-    return `${position}th`;
-}
+const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, watermarkOpacity }: any) => {
+    const student = result.student;
+    const gradingScale = [
+        { interval: '80-100', point: '5.00', grade: 'A+' },
+        { interval: '70-79', point: '4.00', grade: 'A' },
+        { interval: '60-69', point: '3.50', grade: 'A-' },
+        { interval: '50-59', point: '3.00', grade: 'B' },
+        { interval: '40-49', point: '2.00', grade: 'C' },
+        { interval: '33-39', point: '1.00', grade: 'D' },
+        { interval: '0-32', point: '0.00', grade: 'F' },
+    ];
+
+    const allSubjectsForGroup = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
+    const subjects = allSubjectsForGroup.filter(subInfo => {
+        const subNameNorm = normalize(subInfo.name);
+        const optSubNorm = normalize(student.optionalSubject || '');
+        const classNum = parseInt(student.className);
+        if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
+            const hmNorm = normalize('উচ্চতর গণিত');
+            const agriNorm = normalize('কৃষি শিক্ষা');
+            if (subNameNorm === hmNorm || subNameNorm === agriNorm) {
+                if (optSubNorm && subNameNorm !== optSubNorm) return false;
+            }
+        }
+        return true;
+    });
+
+    const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
+    const displayExamName = examNameEnglishMap[examName] || examName;
+    const hasPractical = sortedSubjects.some(s => s.practical);
+
+    const renderMeritPosition = (position?: number) => {
+        if (!position) return '-';
+        if (position % 10 === 1 && position % 100 !== 11) return `${position}st`;
+        if (position % 10 === 2 && position % 100 !== 12) return `${position}nd`;
+        if (position % 10 === 3 && position % 100 !== 13) return `${position}rd`;
+        return `${position}th`;
+    }
+
+    const getRemarks = (gpa: number, isPass: boolean) => {
+        if (!isPass) return "Work hard to do well in the next exam";
+        if (gpa >= 5.0) return "Excellent results. Keep it up!";
+        if (gpa >= 4.0) return "Satisfactory performance. Aim higher!";
+        if (gpa >= 3.5) return "Good result. Needs more focus.";
+        if (gpa >= 3.0) return "Average result. Improvement needed.";
+        if (gpa >= 2.0) return "Below average. Study hard.";
+        if (gpa >= 1.0) return "Poor performance. Needs regular study.";
+        return "Work hard to do well in the next exam";
+    };
+
+    return (
+        <div className="marksheet-inner-content border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent relative">
+            <style jsx>{`
+                .watermark-layer img { visibility: visible !important; display: block !important; }
+            `}</style>
+
+            {schoolInfo.logoUrl && (
+                <div 
+                    className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer"
+                    style={{ opacity: watermarkOpacity }}
+                >
+                    <img src={schoolInfo.logoUrl} alt="Watermark" className="w-[300px] h-[300px] object-contain" />
+                </div>
+            )}
+            
+            <div className="relative z-10 flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                        {schoolInfo.logoUrl && (
+                            <div className="w-20 h-20 relative">
+                                <img src={schoolInfo.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                            </div>
+                        )}
+                        <div className="text-left">
+                            <h1 className="text-2xl font-black uppercase text-[#003366] leading-none mb-1">
+                                {schoolInfo.nameEn || schoolInfo.name || ""}
+                            </h1>
+                            <p className="text-sm font-bold text-gray-700">{schoolInfo.address}</p>
+                            <div className="mt-2 inline-block bg-[#eef6ff] px-3 py-1 rounded border border-[#b3d7ff]">
+                                <p className="text-xs text-[#0056b3] font-bold">Academic Session: {academicYear}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-[8px]">
+                        <table className="border-collapse border border-black text-center w-full">
+                            <thead className="bg-gray-100">
+                                <tr className="border-b border-black">
+                                    <th className="p-1 px-2 border-r border-black font-bold">Range</th>
+                                    <th className="p-1 px-2 border-r border-black font-bold">GP</th>
+                                    <th className="p-1 px-2 font-bold">Grade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {gradingScale.map(g => (
+                                    <tr key={g.grade} className="border-b border-black last:border-b-0">
+                                        <td className="p-0.5 border-r border-black">{g.interval}</td>
+                                        <td className="p-0.5 border-r border-black">{g.point}</td>
+                                        <td className="p-0.5 font-bold">{g.grade}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="text-center mb-4">
+                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">Progress Report</h2>
+                </div>
+
+                <section className="mb-4 text-[11px] leading-relaxed bg-slate-50/50 p-2 border border-dashed border-gray-300 rounded">
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 border-b pb-1">
+                        <div className="font-bold text-gray-600 uppercase">Student's Name</div><div className="font-bold uppercase text-blue-900">: {student.studentNameEn || student.studentNameBn}</div>
+                        <div className="font-bold text-gray-600 text-right uppercase">Class</div><div className="font-bold">: {classMap[student.className] || student.className}</div>
+                    </div>
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b pb-1">
+                        <div className="font-bold text-gray-600 uppercase">Father's Name</div><div>: {student.fatherNameEn || student.fatherNameBn}</div>
+                        <div className="font-bold text-gray-600 text-right uppercase">Roll No.</div><div className="font-bold">: {student.roll}</div>
+                    </div>
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b pb-1">
+                        <div className="font-bold text-gray-600 uppercase">Mother's Name</div><div>: {student.motherNameEn || student.motherNameBn}</div>
+                        <div className="font-bold text-gray-600 text-right uppercase">Group</div><div>: {student.group ? groupMap[student.group.toLowerCase()] || student.group : 'General'}</div>
+                    </div>
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1">
+                        <div className="font-bold text-gray-600 uppercase">Student ID</div><div className="font-black">: {student.generatedId || '-'}</div>
+                        <div className="font-bold text-gray-600 text-right uppercase">Exam</div><div className="font-bold">: {displayExamName}</div>
+                    </div>
+                </section>
+
+                <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[11px] bg-blue-900 text-white mb-4 rounded-sm">
+                    <div className="py-1.5 font-bold">Status: <span className={result.isPass ? "text-green-400" : "text-red-400"}>{result.isPass ? 'PASSED' : 'FAILED'}</span></div>
+                    <div className="py-1.5 font-bold">GPA: <span className="text-amber-300 font-black">{result.gpa.toFixed(2)}</span></div>
+                    <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300 font-black">{result.isPass ? result.finalGrade : 'F'}</span></div>
+                    <div className="py-1.5 font-bold">Merit Rank: <span>{result.isPass ? renderMeritPosition(result.meritPosition) : 'N/A'}</span></div>
+                </div>
+
+                <div className="flex-grow">
+                    <table className="w-full border-collapse border-[1.5px] border-black text-[10px]">
+                        <thead className="bg-gray-100 font-bold">
+                            <tr className="border-b-[1.5px] border-black">
+                                <th className="border-r border-black p-1 w-8 text-center">SL</th>
+                                <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
+                                <th className="border-r border-black p-1 w-12">Full Marks</th>
+                                <th className="border-r border-black p-1 w-14">Written</th>
+                                <th className="border-r border-black p-1 w-14">MCQ</th>
+                                {hasPractical && <th className="border-r border-black p-1 w-14">Practical</th>}
+                                <th className="border-r border-black p-1 w-16">Obtained</th>
+                                <th className="border-r border-black p-1 w-12">Grade</th>
+                                <th className="p-1 w-12">Point</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedSubjects.map((sub, sIdx) => {
+                                const sr = result.subjectResults.get(sub.name);
+                                const isFail = sr?.isPass === false;
+                                return (
+                                    <tr key={sIdx} className={cn("border-b border-black", isFail && "bg-red-50/50")}>
+                                        <td className="border-r border-black p-1 text-center font-medium text-gray-500">{sIdx + 1}</td>
+                                        <td className="border-r border-black p-1 text-left pl-4 font-semibold uppercase">{sub.englishName}</td>
+                                        <td className="border-r border-black p-1 text-center font-bold">{sr?.fullMarks ?? sub.fullMarks}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium">{sr?.written ?? '-'}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium">{sr?.mcq ?? '-'}</td>
+                                        {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</td>}
+                                        <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
+                                        <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
+                                        <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="border-t-[1.5px] border-black font-black bg-blue-50">
+                                <td colSpan={hasPractical ? 6 : 5} className="p-1.5 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
+                                <td className="p-1.5 text-center border-r border-black text-blue-950 text-sm">{result.totalMarks}</td>
+                                <td className="p-1.5 text-center border-r border-black text-blue-950 text-sm">{result.isPass ? result.finalGrade : 'F'}</td>
+                                <td className="p-1.5 text-center text-blue-950 text-sm">{result.gpa.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div className="mt-4 p-2 border border-black rounded bg-gray-50/30">
+                    <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">Remarks:</p>
+                    <p className="text-[11px] font-black italic text-blue-900">"{getRemarks(result.gpa, result.isPass)}"</p>
+                </div>
+
+                <footer className="mt-auto pt-6 flex flex-col pb-2">
+                    <div className="flex justify-between px-12 mb-4">
+                        <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Class Teacher</div>
+                        <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Headmaster</div>
+                    </div>
+                    <div className="pt-1 border-t border-dashed flex justify-between items-center text-[8px] text-gray-400 italic">
+                        <span>Report Date: {new Date().toLocaleDateString('en-GB')}</span>
+                        <span>{schoolInfo.nameEn || schoolInfo.name} Digital Portal</span>
+                    </div>
+                </footer>
+            </div>
+        </div>
+    );
+};
 
 export default function MarksheetPage() {
     return (

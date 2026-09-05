@@ -91,8 +91,16 @@ const classNamesMap: Record<string, string> = {
   '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
 };
 
+const classMap: { [key: string]: string } = { '6': 'Six', '7': 'Seven', '8': 'Eight', '9': 'Nine', '10': 'Ten' };
 const groupMapEn: Record<string, string> = {
   'science': 'Science', 'arts': 'Humanities', 'commerce': 'Business Studies', 'general': 'General'
+};
+
+const examNameEnglishMap: { [key: string]: string } = {
+    'অর্ধ-বার্ষিক পরীক্ষা': 'Half-Yearly Examination',
+    'বার্ষিক পরীক্ষা': 'Annual Examination',
+    'প্রাক-নির্বাচনী পরীক্ষা': 'Pre-Test Examination',
+    'নির্বাচনী পরীক্ষা': 'Test Examination'
 };
 
 const BackgroundGallery = () => {
@@ -504,6 +512,14 @@ export default function AuthPage() {
                 overflow: hidden !important;
                 display: block !important;
             }
+            .marksheet-container {
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
             .no-print { display: none !important; }
         }
       `}</style>
@@ -813,7 +829,7 @@ export default function AuthPage() {
       {/* Professional English Marksheet for Printing */}
       {searchResult && (
         <div className="hidden print:block printable-area bg-white text-black p-0 w-full min-h-0 mx-auto font-sans">
-          <div className="border-[1.5px] border-black p-4 flex flex-col h-full bg-white">
+          <div className="marksheet-container marksheet-content border-[1.5px] border-black p-4 flex flex-col h-full bg-white">
             <header className="text-center border-b-2 border-black pb-4 mb-4 flex flex-col items-center">
                 {appLogoUrl && <img src={appLogoUrl} alt="Logo" className="w-16 h-16 object-contain mb-2" />}
                 <h1 className="text-2xl font-black uppercase text-[#003366] leading-none mb-1">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
@@ -875,7 +891,7 @@ export default function AuthPage() {
                     <tr>
                         <td colSpan={searchSubjects.some(s => s.practical) ? 6 : 5} className="border-r border-black text-right pr-6 uppercase text-[10px]">Total Marks & Final Results</td>
                         <td className="border-r border-black text-sm text-blue-900">{searchResult.totalMarks}</td>
-                        <td className="border-r border-black text-sm">{searchResult.finalGrade}</td>
+                        <td className="border-r border-black text-sm">{searchResult.isPass ? searchResult.finalGrade : 'F'}</td>
                         <td className="text-sm">{searchResult.gpa.toFixed(2)}</td>
                     </tr>
                     </tfoot>
@@ -896,7 +912,7 @@ export default function AuthPage() {
             
             <div className="mt-2 text-[7px] text-slate-400 italic flex justify-between border-t border-dashed pt-2">
                 <span>Generated Date: {new Date().toLocaleDateString('en-GB')}</span>
-                <span>Digital Management Portal | {schoolInfo.nameEn || institutionName}</span>
+                <span>Digital Management Portal | {schoolInfo.nameEn || schoolInfo.name}</span>
             </div>
           </div>
         </div>

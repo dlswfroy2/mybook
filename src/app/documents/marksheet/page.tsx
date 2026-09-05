@@ -13,7 +13,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Student, studentFromDoc } from '@/lib/student-data';
 import { Exam, getExams } from '@/lib/exam-data';
 import { getAllResults, ClassResult } from '@/lib/results-data';
-import { getSubjects } from '@/lib/subjects';
+import { getSubjects, subjectNameNormalization } from '@/lib/subjects';
 import { processStudentResults, StudentProcessedResult } from '@/lib/results-calculation';
 import { Printer, ArrowLeft, User, Users, Info, FileBadge, Loader2, Minus, Plus } from 'lucide-react';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
@@ -33,20 +33,10 @@ const examNameEnglishMap: { [key: string]: string } = {
     'নির্বাচনী পরীক্ষা': 'Test Examination'
 };
 
-const gradingScale = [
-    { interval: '80-100', point: '5.00', grade: 'A+' },
-    { interval: '70-79', point: '4.00', grade: 'A' },
-    { interval: '60-69', point: '3.50', grade: 'A-' },
-    { interval: '50-59', point: '3.00', grade: 'B' },
-    { interval: '40-49', point: '2.00', grade: 'C' },
-    { interval: '33-39', point: '1.00', grade: 'D' },
-    { interval: '0-32', point: '0.00', grade: 'F' },
-];
-
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
-    return (trimmed).toLowerCase();
+    return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
 };
 
 const MarksheetGeneratorPage = () => {
@@ -262,7 +252,14 @@ const MarksheetGeneratorPage = () => {
                 <style jsx global>{`
                     @media print {
                         @page { size: A4 portrait; margin: 0.5in !important; }
-                        .print-page-wrapper { 
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                            width: 100% !important;
+                        }
+                        .marksheet-page-wrapper { 
                             width: 100% !important; 
                             height: auto !important; 
                             margin: 0 !important; 
@@ -271,10 +268,18 @@ const MarksheetGeneratorPage = () => {
                             overflow: hidden !important;
                             display: block !important;
                         }
+                        .marksheet-container {
+                            width: 100% !important;
+                            height: auto !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                        }
                     }
                 `}</style>
                 {resultsToPrint.map((res) => (
-                    <div key={res.student.id} className="print-page-wrapper w-[210mm] mx-auto overflow-hidden relative bg-white">
+                    <div key={res.student.id} className="marksheet-page-wrapper">
                         <MarksheetTemplate 
                             result={res} 
                             schoolInfo={schoolInfo} 
@@ -291,6 +296,16 @@ const MarksheetGeneratorPage = () => {
 
 const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, watermarkOpacity }: any) => {
     const student = result.student;
+    const gradingScale = [
+        { interval: '80-100', point: '5.00', grade: 'A+' },
+        { interval: '70-79', point: '4.00', grade: 'A' },
+        { interval: '60-69', point: '3.50', grade: 'A-' },
+        { interval: '50-59', point: '3.00', grade: 'B' },
+        { interval: '40-49', point: '2.00', grade: 'C' },
+        { interval: '33-39', point: '1.00', grade: 'D' },
+        { interval: '0-32', point: '0.00', grade: 'F' },
+    ];
+
     const allSubjectsForGroup = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
     const subjects = allSubjectsForGroup.filter(subInfo => {
         const subNameNorm = normalize(subInfo.name);
@@ -330,20 +345,10 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
     };
 
     return (
-        <div className="marksheet-container w-[210mm] bg-white relative flex flex-col box-border font-sans text-black">
+        <div className="marksheet-container bg-white p-8 relative flex flex-col box-border font-sans text-black">
             <style jsx>{`
                 .watermark-layer img { visibility: visible !important; display: block !important; }
-                .marksheet-content { border: 1.5px solid black; padding: 16px; height: 100%; display: flex; flex-direction: column; background: transparent; position: relative; z-index: 10; }
-                @media print {
-                  .marksheet-container { 
-                    width: 100% !important; 
-                    height: auto !important; 
-                    margin: 0 !important; 
-                    padding: 0 !important; 
-                    print-color-adjust: exact; 
-                    -webkit-print-color-adjust: exact; 
-                  }
-                }
+                .marksheet-content { border: 1.5px solid black; padding: 16px; flex-grow: 1; display: flex; flex-direction: column; background: transparent; position: relative; z-index: 10; }
             `}</style>
 
             {schoolInfo.logoUrl && (
@@ -414,18 +419,18 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                     </div>
                     <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1">
                         <div className="font-bold text-gray-600 uppercase">Student ID</div><div className="font-black">: {student.generatedId || '-'}</div>
-                        <div className=""></div><div></div>
+                        <div className="font-bold text-gray-600 text-right uppercase">Exam</div><div className="font-bold">: {displayExamName}</div>
                     </div>
                 </section>
 
                 <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[11px] bg-blue-900 text-white mb-4 rounded-sm">
                     <div className="py-1.5 font-bold">Status: <span className={result.isPass ? "text-green-400" : "text-red-400"}>{result.isPass ? 'PASSED' : 'FAILED'}</span></div>
-                    <div className="py-1.5 font-bold">GPA: <span className="text-amber-300">{result.gpa.toFixed(2)}</span></div>
-                    <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300">{result.finalGrade}</span></div>
+                    <div className="py-1.5 font-bold">GPA: <span className="text-amber-300 font-black">{result.gpa.toFixed(2)}</span></div>
+                    <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300 font-black">{result.isPass ? result.finalGrade : 'F'}</span></div>
                     <div className="py-1.5 font-bold">Merit Rank: <span>{result.isPass ? renderMeritPosition(result.meritPosition) : 'N/A'}</span></div>
                 </div>
 
-                <div className="flex-grow overflow-visible">
+                <div className="flex-grow">
                     <table className="w-full border-collapse border-[1.5px] border-black text-[10px]">
                         <thead className="bg-gray-100 font-bold">
                             <tr className="border-b-[1.5px] border-black">
@@ -446,13 +451,13 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                 const isFail = sr?.isPass === false;
                                 return (
                                     <tr key={sIdx} className={cn("border-b border-black", isFail && "bg-red-50/50")}>
-                                        <td className="border-r border-black p-1 text-center">{sIdx + 1}</td>
-                                        <td className="border-r border-black p-1 pl-4 font-semibold">{sub.englishName}</td>
-                                        <td className="border-r border-black p-1 text-center">{sr?.fullMarks ?? sub.fullMarks}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium text-gray-500">{sIdx + 1}</td>
+                                        <td className="border-r border-black p-1 text-left pl-4 font-semibold uppercase">{sub.englishName}</td>
+                                        <td className="border-r border-black p-1 text-center font-bold">{sr?.fullMarks ?? sub.fullMarks}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.written ?? '-'}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.mcq ?? '-'}</td>
                                         {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</td>}
-                                        <td className={cn("border-r border-black p-1 text-center font-bold", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
+                                        <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
                                         <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
                                         <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
                                     </tr>
@@ -461,10 +466,10 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                         </tbody>
                         <tfoot>
                             <tr className="border-t-[1.5px] border-black font-black bg-blue-50">
-                                <td colSpan={hasPractical ? 6 : 5} className="p-2 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
-                                <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.totalMarks}</td>
-                                <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.finalGrade}</td>
-                                <td className="p-2 text-center text-blue-950 text-sm">{result.gpa.toFixed(2)}</td>
+                                <td colSpan={hasPractical ? 6 : 5} className="p-1.5 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
+                                <td className="p-1.5 text-center border-r border-black text-blue-950 text-sm">{result.totalMarks}</td>
+                                <td className="p-1.5 text-center border-r border-black text-blue-950 text-sm">{result.isPass ? result.finalGrade : 'F'}</td>
+                                <td className="p-1.5 text-center text-blue-950 text-sm">{result.gpa.toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -480,9 +485,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                         <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Class Teacher</div>
                         <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Headmaster</div>
                     </div>
-                    <div className="pt-2 border-t border-dashed flex justify-between items-center text-[8px] text-gray-400 italic">
+                    <div className="pt-1 border-t border-dashed flex justify-between items-center text-[8px] text-gray-400 italic">
                         <span>Report Date: {new Date().toLocaleDateString('en-GB')}</span>
-                        <span>Powered by: {schoolInfo.nameEn || "BPHS"} Management System</span>
+                        <span>{schoolInfo.nameEn || schoolInfo.name} Digital Portal</span>
                     </div>
                 </footer>
             </div>
