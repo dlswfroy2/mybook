@@ -23,6 +23,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -60,7 +61,8 @@ import {
   Globe,
   BookOpen,
   Printer,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -305,21 +307,7 @@ export default function AuthPage() {
         const staffSnap = await getDocs(staffQuery);
         const isTeacherInStaff = !staffSnap.empty;
 
-        // Create Firebase user credential first
-        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        await updateProfile(userCredential.user, { displayName: name });
-
-        // Now that user is authenticated, safely check existing users count
-        let isFirstUser = false;
-        try {
-          const usersSnap = await getDocs(query(collection(db, 'users'), limit(2)));
-          isFirstUser = usersSnap.empty || (usersSnap.size === 1 && usersSnap.docs[0].id === userCredential.user.uid);
-        } catch {
-          // If security rules prevent list, fallback
-        }
-
-        if (!isFirstUser && !isTeacherInStaff && !isSuperAdmin) {
-          await userCredential.user.delete().catch(() => signOut(auth));
+        if (!isTeacherInStaff && !isSuperAdmin) {
           toast({
             variant: "destructive",
             title: "নিবন্ধন করা সম্ভব নয়",
@@ -329,7 +317,11 @@ export default function AuthPage() {
           return;
         }
 
-        const isAdm = isFirstUser || isSuperAdmin;
+        // Create Firebase user credential
+        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        await updateProfile(userCredential.user, { displayName: name });
+
+        const isAdm = isSuperAdmin;
         const teacherData = isTeacherInStaff ? staffSnap.docs[0].data() : null;
 
         await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -346,34 +338,16 @@ export default function AuthPage() {
         toast({ 
           title: "সফল রেজিস্ট্রেশন", 
           description: isAdm 
-            ? "অভিনন্দন! আপনি সিস্টেমের প্রথম ব্যবহারকারী হিসেবে প্রধান অ্যাডমিন হিসেবে যুক্ত হয়েছেন।" 
-            : "আপনার শিক্ষক আইডি সফলভাবে তৈরি হয়েছে।" 
+            ? "অভিনন্দন! আপনি সুপার অ্যাডমিন হিসেবে যুক্ত হয়েছেন।" 
+            : "আপনার শিক্ষক আইডি সফলভাবে তৈরি হয়েছে। এখন লগইন করুন।" 
         });
 
         setIsDialogOpen(false);
         router.push('/');
         return;
       } else if (activeAuthTab === 'admin') {
-        // --- ADMIN LOGIN (Seamless first-time onboarding) ---
-        let userCredential;
-        let isNewUserCreated = false;
-
-        try {
-          userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        } catch (signInErr: any) {
-          // If the account doesn't exist in Firebase Auth yet, automatically onboard on first attempt!
-          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
-            try {
-              userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-              isNewUserCreated = true;
-            } catch (createErr) {
-              throw signInErr;
-            }
-          } else {
-            throw signInErr;
-          }
-        }
-
+        // --- ADMIN LOGIN (Strictly from registered accounts) ---
+        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
         const user = userCredential.user;
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
@@ -381,104 +355,62 @@ export default function AuthPage() {
         let isAdm = cleanEmail === 'dlswf.roy@gmail.com';
         if (!isAdm && userDoc.exists()) {
           isAdm = userDoc.data()?.role === 'admin';
-        } else if (!userDoc.exists() || isNewUserCreated) {
-          try {
-            const adminQuery = query(collection(db, 'users'), where('role', '==', 'admin'), limit(1));
-            const adminSnap = await getDocs(adminQuery);
-            if (adminSnap.empty || (adminSnap.size === 1 && adminSnap.docs[0].id === user.uid)) {
-              isAdm = true;
-            }
-          } catch {
-            isAdm = true; // First user fallback
-          }
         }
 
         if (isAdm) {
           await setDoc(userDocRef, {
-            uid: user.uid,
-            email: cleanEmail,
-            displayName: user.displayName || 'প্রধান অ্যাডমিন',
-            role: 'admin',
-            status: 'active',
-            permissions: availablePermissions.map(p => p.id),
             isOnline: true,
             lastLoginAt: serverTimestamp(),
             lastActiveAt: serverTimestamp(),
-            createdAt: serverTimestamp()
           }, { merge: true });
 
-          toast({ 
-            title: isNewUserCreated ? "প্রথম অ্যাডমিন সফলভাবে তৈরি ও লগইন হয়েছে" : "সফল এডমিন লগইন",
-            description: "আপনি প্রধান অ্যাডমিন হিসেবে সিস্টেমে প্রবেশ করেছেন।" 
-          });
+          toast({ title: "সফল এডমিন লগইন" });
           setIsDialogOpen(false);
           router.push('/');
-          return;
         } else {
           await signOut(auth);
           toast({ 
             variant: "destructive", 
             title: "প্রবেশাধিকার নেই", 
-            description: "সিস্টেমে ইতিমধ্যে অন্য অ্যাডমিন বিদ্যমান অথবা পাসওয়ার্ড সঠিক নয়।" 
+            description: "আপনার রোল অ্যাডমিন নয়। দয়া করে শিক্ষক পোর্টালে লগইন করুন।" 
           });
           setLoading(false);
-          return;
         }
       } else {
-        // --- TEACHER LOGIN (Seamless verified onboarding) ---
-        let userCredential;
-        let isNewTeacherCreated = false;
-
-        try {
-          userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        } catch (signInErr: any) {
-          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
-            // Check if email is in teacher list (staff collection)
-            const staffQuery = query(collection(db, 'staff'), where('email', '==', cleanEmail));
-            const staffSnap = await getDocs(staffQuery);
-
-            if (!staffSnap.empty) {
-              // Automatically register verified teacher!
-              userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-              isNewTeacherCreated = true;
-              const teacherData = staffSnap.docs[0].data();
-              await setDoc(doc(db, 'users', userCredential.user.uid), {
-                uid: userCredential.user.uid,
-                email: cleanEmail,
-                displayName: teacherData.name || 'শিক্ষক',
-                role: 'teacher',
-                status: 'active',
-                staffId: staffSnap.docs[0].id,
-                permissions: defaultPermissions['teacher'] || [],
-                isOnline: true,
-                lastLoginAt: serverTimestamp(),
-                lastActiveAt: serverTimestamp(),
-                createdAt: serverTimestamp()
-              });
-            } else {
-              throw signInErr;
-            }
-          } else {
-            throw signInErr;
-          }
-        }
-
+        // --- TEACHER LOGIN (Strictly from registered accounts) ---
+        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
         const user = userCredential.user;
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
 
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (data.status === 'inactive' || data.status === 'blocked') {
+        if (!userDoc.exists()) {
+             await signOut(auth);
+             toast({
+                variant: "destructive",
+                title: "অ্যাকাউন্ট পাওয়া যায়নি",
+                description: "দয়া করে আগে 'নিবন্ধন' ট্যাব থেকে অ্যাকাউন্ট তৈরি করুন।"
+             });
+             setLoading(false);
+             return;
+        }
+
+        const data = userDoc.data();
+        if (data.status === 'inactive' || data.status === 'blocked') {
             await signOut(auth);
-            toast({
-              variant: "destructive",
-              title: "অ্যাকাউন্ট নিষ্ক্রিয়",
-              description: "আপনার শিক্ষক আইডি বর্তমানে নিষ্ক্রিয় রয়েছে। অ্যাডমিনের সাথে যোগাযোগ করুন।"
-            });
+            toast({ variant: "destructive", title: "অ্যাকাউন্ট নিষ্ক্রিয়", description: "আপনার অ্যাকাউন্টটি বর্তমানে নিষ্ক্রিয় রয়েছে।" });
             setLoading(false);
             return;
-          }
+        }
+
+        if (data.role !== 'teacher' && cleanEmail !== 'dlswf.roy@gmail.com') {
+             await signOut(auth);
+             toast({
+                variant: "destructive",
+                title: "প্রবেশাধিকার নেই",
+                description: "আপনার অ্যাকাউন্টের রোল 'শিক্ষক' নয়। দয়া করে এডমিন পোর্টালে লগইন করুন।"
+             });
+             setLoading(false);
+             return;
         }
 
         await setDoc(userDocRef, {
@@ -487,9 +419,7 @@ export default function AuthPage() {
           lastActiveAt: serverTimestamp(),
         }, { merge: true }).catch(() => {});
 
-        toast({ 
-          title: isNewTeacherCreated ? "শিক্ষক অ্যাকাউন্ট তৈরি ও লগইন সফল" : "সফল শিক্ষক লগইন" 
-        });
+        toast({ title: "সফল শিক্ষক লগইন" });
         setIsDialogOpen(false);
         router.push('/');
       }
@@ -497,11 +427,9 @@ export default function AuthPage() {
       console.error(error);
       let msg = "ইমেইল বা পাসওয়ার্ড সঠিক নয়।";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        msg = "ভুল ইমেইল বা পাসওয়ার্ড প্রদান করেছেন।";
+        msg = "ভুল ইমেইল বা পাসওয়ার্ড প্রদান করেছেন অথবা অ্যাকাউন্টটি নিবন্ধিত নয়।";
       } else if (error.code === 'auth/email-already-in-use') {
-        msg = "এই ইমেইলে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে। লগইন করার চেষ্টা করুন।";
-      } else if (error.message) {
-        msg = error.message;
+        msg = "এই ইমেইলে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে।";
       }
       toast({ variant: "destructive", title: "ত্রুটি", description: msg });
     } finally {
@@ -678,7 +606,7 @@ export default function AuthPage() {
                          {appLogoUrl ? <img src={appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" /> : <GraduationCap className="w-10 h-10 text-[#1e293b]" />}
                       </div>
                       <DialogTitle className="text-xl font-black">প্রশাসনিক লগইন পোর্টাল</DialogTitle>
-                      <DialogDescription className="text-xs text-slate-400 font-bold">আপনার নির্ধারিত রোল অনুযায়ী প্রবেশ করুন</DialogDescription>
+                      <DialogDescription className="text-xs text-slate-400 font-bold">আপনার নির্ধারিত রোল অনুযায়ী পোর্টালে প্রবেশ করুন</DialogDescription>
                    </div>
 
                    <div className="p-6 md:p-8 bg-white">
@@ -767,7 +695,7 @@ export default function AuthPage() {
                         <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2">
                           <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                           <p className="text-[10px] font-bold text-amber-800 leading-tight">
-                            সিস্টেম সিকিউরিটি নিশ্চিত করতে শুধুমাত্র শিক্ষক তালিকায় থাকা ইমেইল দিয়ে আইডি তৈরি সম্ভব। এডমিন কর্তৃক নির্ধারিত পারমিশন অনুযায়ী কাজ করতে পারবেন।
+                            সিস্টেম সিকিউরিটি নিশ্চিত করতে শুধুমাত্র শিক্ষক তালিকায় থাকা ইমেইল দিয়ে আইডি তৈরি সম্ভব।
                           </p>
                         </div>
                       )}
@@ -1117,4 +1045,3 @@ export default function AuthPage() {
     </div>
   );
 }
-

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -97,61 +98,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const docUnsub = onSnapshot(userDocRef, async (docSnap) => {
           if (docSnap.exists()) {
             const userData = userFromDoc(docSnap);
-            if (userData.role === 'admin' || fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com') {
+            // Super Admin Bypass
+            if (fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com') {
               userData.role = 'admin';
               userData.permissions = availablePermissions.map(p => p.id);
             }
             setUser(userData);
             setLoading(false);
           } else {
-            try {
-              const usersCountSnap = await getDocs(query(collection(db, 'users'), limit(2)));
-              const isFirst = usersCountSnap.empty || (usersCountSnap.size === 1 && usersCountSnap.docs[0].id === fbUser.uid);
-              const isAdm = isFirst || fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com';
-              const initialPermissions = isAdm ? availablePermissions.map(p => p.id) : (defaultPermissions['teacher'] || []);
-              
-              const fallbackUser: User = {
-                uid: fbUser.uid,
-                displayName: fbUser.displayName || 'ব্যবহারকারী',
-                email: fbUser.email || '',
-                role: isAdm ? 'admin' : 'teacher',
-                permissions: initialPermissions,
-              };
-
-              await setDoc(userDocRef, {
-                uid: fbUser.uid,
-                displayName: fbUser.displayName || 'ব্যবহারকারী',
-                email: fbUser.email || '',
-                role: isAdm ? 'admin' : 'teacher',
-                status: 'active',
-                permissions: initialPermissions,
-                createdAt: serverTimestamp()
-              }, { merge: true });
-
-              setUser(fallbackUser);
-            } catch (err) {
-              const isAdm = fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com';
-              const fallbackUser: User = {
-                uid: fbUser.uid,
-                displayName: fbUser.displayName || 'ব্যবহারকারী',
-                email: fbUser.email || '',
-                role: isAdm ? 'admin' : 'teacher',
-                permissions: isAdm ? availablePermissions.map(p => p.id) : [],
-              };
-              setUser(fallbackUser);
-            }
-            setLoading(false);
-          }
-        }, async (error) => {
-            const isAdm = fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com';
+            // Document missing fallback: Only Super Admin gets admin rights automatically
+            const isSuperAdm = fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com';
+            const initialRole = isSuperAdm ? 'admin' : 'teacher';
+            const initialPermissions = isSuperAdm ? availablePermissions.map(p => p.id) : (defaultPermissions['teacher'] || []);
+            
             const fallbackUser: User = {
               uid: fbUser.uid,
               displayName: fbUser.displayName || 'ব্যবহারকারী',
               email: fbUser.email || '',
-              role: isAdm ? 'admin' : 'teacher',
-              permissions: isAdm ? availablePermissions.map(p => p.id) : [],
+              role: initialRole,
+              permissions: initialPermissions,
             };
+
+            await setDoc(userDocRef, {
+              uid: fbUser.uid,
+              displayName: fbUser.displayName || 'ব্যবহারকারী',
+              email: fbUser.email || '',
+              role: initialRole,
+              status: 'active',
+              permissions: initialPermissions,
+              createdAt: serverTimestamp()
+            }, { merge: true });
+
             setUser(fallbackUser);
+            setLoading(false);
+          }
+        }, async (error) => {
+            console.error("Auth Snapshot Error:", error);
             setLoading(false);
         });
 
