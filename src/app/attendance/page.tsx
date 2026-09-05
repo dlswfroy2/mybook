@@ -1,3 +1,4 @@
+
 'use client';
 
 
@@ -417,6 +418,12 @@ const MonthlyAttendanceGrid = ({
         }
     }, [activeDay, currentStatusMap, monthRecords]);
 
+    const isOffDay = (date: Date, holidays: string[]) => {
+      const d = date.getDay();
+      const ds = format(date, 'yyyy-MM-dd');
+      return d === 5 || d === 6 || holidays.includes(ds);
+    };
+
     if (isLoading && isFirstLoad.current) return <div className="p-20 text-center italic"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" /> ডাটা লোড হচ্ছে...</div>;
 
     return (
@@ -699,14 +706,6 @@ const MonthlyAttendanceGrid = ({
         </div>
     );
 };
-
-const isOffDay = (date: Date, holidays: string[]) => {
-    const d = date.getDay();
-    const ds = format(date, 'yyyy-MM-dd');
-    return d === 5 || d === 6 || holidays.includes(ds);
-};
-
-// --- Sub Tabs Components ---
 
 const AttendanceSheet = ({ 
     classId, 
@@ -2129,3 +2128,4 @@ interface StudentReport {
     absentDays: number;
     totalDays: number;
 }
+

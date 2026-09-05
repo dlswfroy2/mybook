@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -395,7 +396,7 @@ function MarksheetContent() {
                         </div>
                         <div className="mt-8 flex justify-between items-center text-[9px] text-muted-foreground italic border-t pt-2">
                             <span>Report Date: {new Date().toLocaleDateString('en-GB')}</span>
-                            <span>Powered by: {schoolInfo.nameEn || "BPHS"} Management System</span>
+                            <span>Powered by: {schoolInfo.nameEn || ""} Management System</span>
                         </div>
                     </footer>
                 </div>
@@ -415,7 +416,7 @@ function renderMeritPosition(position?: number) {
 export default function MarksheetPage() {
     return (
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-50">Loading...</div>}>
-            <MarksheetContent />
+            <MarkasheetContent />
         </Suspense>
     );
 }

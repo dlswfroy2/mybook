@@ -1,4 +1,5 @@
-﻿'use client';
+
+'use client';
 
 import Image from 'next/image';
 import { FeeCollection } from '@/lib/fees-data';
@@ -276,7 +277,7 @@ ${isEn ? 'Date:' : 'তারিখ:'} ${format(collection.collectionDate, 'dd/M
                         {isEn ? `Generated: ${format(new Date(), 'PPpp')}` : `জেনারেশন সময়: ${toBengaliNumber(format(new Date(), 'pp', { locale: bn }))}`}
                     </div>
                     <div className="text-right text-[8.5px] text-slate-500 font-black uppercase tracking-[0.15em]">
-                        DIGITAL MANAGEMENT PORTAL | BPHS
+                        DIGITAL MANAGEMENT PORTAL
                     </div>
                 </div>
             </footer>

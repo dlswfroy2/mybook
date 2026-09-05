@@ -833,7 +833,7 @@ export default function AuthPage() {
                   </div>
                   <div>
                     <p className="text-2xl md:text-3xl font-black text-slate-800">{toBengaliNumber(stats.passRate.toFixed(1))}%</p>
-                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
                   </div>
                </CardContent>
             </Card>
@@ -1117,3 +1117,4 @@ export default function AuthPage() {
     </div>
   );
 }
+
