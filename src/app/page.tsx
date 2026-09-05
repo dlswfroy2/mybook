@@ -766,123 +766,123 @@ export default function Home() {
         </Card>
       </div>
 
-      <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-2.5">
-        <Link href="/create-question" className="block w-full">
-          <div className="bg-[#dc2626] hover:bg-[#b91c1c] border-b-4 border-[#7f1d1d] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <BrainCircuit className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">প্রশ্ন ব্যাংক</span>
+      <section className="flex flex-wrap justify-center gap-1.5 md:gap-2">
+        <Link href="/create-question" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#dc2626] hover:bg-[#b91c1c] border-b-4 border-[#7f1d1d] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <BrainCircuit className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">প্রশ্ন ব্যাংক</span>
           </div>
         </Link>
 
-        <Link href="/notices-management" className="block w-full">
-          <div className="bg-[#2563eb] hover:bg-[#1d4ed8] border-b-4 border-[#1e3a8a] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Bell className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">নোটিশ বোর্ড</span>
+        <Link href="/notices-management" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#2563eb] hover:bg-[#1d4ed8] border-b-4 border-[#1e3a8a] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Bell className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">নোটিশ বোর্ড</span>
           </div>
         </Link>
 
-        <Link href="/create-lecture-sheet" className="block w-full">
-          <div className="bg-[#059669] hover:bg-[#047857] border-b-4 border-[#064e3b] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">লেকচার শিট</span>
+        <Link href="/create-lecture-sheet" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#059669] hover:bg-[#047857] border-b-4 border-[#064e3b] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">লেকচার শিট</span>
           </div>
         </Link>
 
-        <Link href="/diary" className="block w-full">
-          <div className="bg-[#4f46e5] hover:bg-[#4338ca] border-b-4 border-[#312e81] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <NotebookPen className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">টিচার্স ডায়েরি</span>
+        <Link href="/diary" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#4f46e5] hover:bg-[#4338ca] border-b-4 border-[#312e81] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <NotebookPen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">টিচার্স ডায়েরি</span>
           </div>
         </Link>
 
-        <Link href="/student-profile" className="block w-full">
-          <div className="bg-[#1e293b] hover:bg-[#0f172a] border-b-4 border-black text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Search className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">শিক্ষার্থী প্রোফাইল</span>
+        <Link href="/student-profile" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#1e293b] hover:bg-[#0f172a] border-b-4 border-black text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Search className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">শিক্ষার্থী প্রোফাইল</span>
           </div>
         </Link>
 
-        <Link href="/add-student" className="block w-full">
-          <div className="bg-[#0d9488] hover:bg-[#0f766e] border-b-4 border-[#134e4a] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <UserPlus className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">নতুন শিক্ষার্থী ভর্তি</span>
+        <Link href="/add-student" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#0d9488] hover:bg-[#0f766e] border-b-4 border-[#134e4a] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <UserPlus className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">নতুন শিক্ষার্থী ভর্তি</span>
           </div>
         </Link>
 
-        <Link href="/student-list" className="block w-full">
-          <div className="bg-[#16a34a] hover:bg-[#15803d] border-b-4 border-[#14532d] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Users className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">শিক্ষার্থী তালিকা</span>
+        <Link href="/student-list" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#16a34a] hover:bg-[#15803d] border-b-4 border-[#14532d] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">শিক্ষার্থী তালিকা</span>
           </div>
         </Link>
 
-        <Link href="/attendance" className="block w-full">
-          <div className="bg-[#0284c7] hover:bg-[#0369a1] border-b-4 border-[#075985] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <CalendarCheck className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">হাজিরা শাখা</span>
+        <Link href="/attendance" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#0284c7] hover:bg-[#0369a1] border-b-4 border-[#075985] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <CalendarCheck className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">হাজিরা শাখা</span>
           </div>
         </Link>
 
-        <Link href="/results" className="block w-full">
-          <div className="bg-[#7c3aed] hover:bg-[#6d28d9] border-b-4 border-[#4c1d95] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Award className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">ফলাফল শাখা</span>
+        <Link href="/results" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#7c3aed] hover:bg-[#6d28d9] border-b-4 border-[#4c1d95] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">ফলাফল শাখা</span>
           </div>
         </Link>
 
-        <Link href="/accounts" className="block w-full">
-          <div className="bg-[#057a55] hover:bg-[#046c4e] border-b-4 border-[#03543f] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Banknote className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">হিসাব শাখা</span>
+        <Link href="/accounts" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#057a55] hover:bg-[#046c4e] border-b-4 border-[#03543f] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Banknote className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">হিসাব শাখা</span>
           </div>
         </Link>
 
-        <Link href="/messaging" className="block w-full">
-          <div className="bg-[#3b82f6] hover:bg-[#2563eb] border-b-4 border-[#1d4ed8] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <MessageSquare className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">মেসেজ শাখা</span>
+        <Link href="/messaging" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#3b82f6] hover:bg-[#2563eb] border-b-4 border-[#1d4ed8] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <MessageSquare className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">মেসেজ শাখা</span>
           </div>
         </Link>
 
-        <Link href="/staff" className="block w-full">
-          <div className="bg-[#9333ea] hover:bg-[#7e22ce] border-b-4 border-[#581c87] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <UserCog className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">স্টাফ পোর্টাল</span>
+        <Link href="/staff" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#9333ea] hover:bg-[#7e22ce] border-b-4 border-[#581c87] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <UserCog className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">স্টাফ পোর্টাল</span>
           </div>
         </Link>
 
-        <Link href="/documents" className="block w-full">
-          <div className="bg-[#d97706] hover:bg-[#b45309] border-b-4 border-[#78350f] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <FolderOpen className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">ডকুমেন্ট পোর্টাল</span>
+        <Link href="/documents" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#d97706] hover:bg-[#b45309] border-b-4 border-[#78350f] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <FolderOpen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">ডকুমেন্ট পোর্টাল</span>
           </div>
         </Link>
 
-        <Link href="/routines" className="block w-full">
-          <div className="bg-[#6366f1] hover:bg-[#4f46e5] border-b-4 border-[#3730a3] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Clock className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">রুটিন শাখা</span>
+        <Link href="/routines" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#6366f1] hover:bg-[#4f46e5] border-b-4 border-[#3730a3] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Clock className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">রুটিন শাখা</span>
           </div>
         </Link>
 
-        <Link href="/public-exam-records" className="block w-full">
-          <div className="bg-[#0891b2] hover:bg-[#0e7490] border-b-4 border-[#164e63] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Award className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">রেকর্ড শাখা</span>
+        <Link href="/public-exam-records" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#0891b2] hover:bg-[#0e7490] border-b-4 border-[#164e63] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Award className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">রেকর্ড শাখা</span>
           </div>
         </Link>
 
-        <Link href="/settings?tab=sheets" className="block w-full">
-          <div className="bg-[#ea580c] hover:bg-[#c2410c] border-b-4 border-[#9a3412] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <FileUp className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">কুইক আপলোড</span>
+        <Link href="/settings?tab=sheets" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#ea580c] hover:bg-[#c2410c] border-b-4 border-[#9a3412] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">কুইক আপলোড</span>
           </div>
         </Link>
 
-        <Link href="/my-questions" className="block w-full">
-          <div className="bg-[#be185d] hover:bg-[#9d174d] border-b-4 border-[#700c35] text-white h-11 md:h-12 px-2.5 sm:px-3.5 rounded-xl shadow-md hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-0.5 w-full">
-            <Library className="w-4 h-4 md:w-5 md:h-5 text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-[11px] sm:text-xs md:text-[13px] whitespace-nowrap drop-shadow-sm truncate">আমার লাইব্রেরি</span>
+        <Link href="/my-questions" className="w-[calc(50%-0.375rem)] sm:w-[calc(33.333%-0.5rem)] md:w-[calc(16.666%-0.5rem)] lg:w-[calc(11.111%-0.5rem)] block">
+          <div className="bg-[#be185d] hover:bg-[#9d174d] border-b-4 border-[#700c35] text-white h-10 md:h-11 px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-0.5 w-full">
+            <Library className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-[10px] sm:text-[10.5px] lg:text-[11px] xl:text-[11.5px] leading-[1.15] text-center whitespace-nowrap drop-shadow-sm">আমার লাইব্রেরি</span>
           </div>
         </Link>
       </section>
