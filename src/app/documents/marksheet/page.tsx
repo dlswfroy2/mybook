@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -260,9 +259,21 @@ const MarksheetGeneratorPage = () => {
             </main>
 
             <div className="hidden print:block printable-area bg-white">
+                <style jsx global>{`
+                    @media print {
+                        @page { size: A4 portrait; margin: 0.5in !important; }
+                        .print-page-wrapper { 
+                            width: 100% !important; 
+                            height: auto !important; 
+                            margin: 0 !important; 
+                            padding: 0 !important; 
+                            page-break-after: always !important; 
+                        }
+                    }
+                `}</style>
                 {resultsToPrint.map((res) => (
-                    <div key={res.student.id} className="w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white" style={{ pageBreakAfter: 'always' }}>
-                        <div className="p-8 h-full w-full box-border">
+                    <div key={res.student.id} className="print-page-wrapper w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white">
+                        <div className="p-0 h-full w-full box-border print:p-0">
                             <MarksheetTemplate 
                                 result={res} 
                                 schoolInfo={schoolInfo} 
@@ -324,7 +335,14 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 .watermark-layer img { visibility: visible !important; display: block !important; }
                 .marksheet-content { border: 1.5px solid black; padding: 16px; height: 100%; display: flex; flex-direction: column; background: transparent; position: relative; z-index: 10; }
                 @media print {
-                  .marksheet-container { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+                  .marksheet-container { 
+                    width: 100% !important; 
+                    height: auto !important; 
+                    margin: 0 !important; 
+                    padding: 0 !important; 
+                    print-color-adjust: exact; 
+                    -webkit-print-color-adjust: exact; 
+                  }
                 }
             `}</style>
 

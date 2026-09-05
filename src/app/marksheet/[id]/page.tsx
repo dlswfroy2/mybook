@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -11,12 +10,11 @@ import { getExams, Exam } from '@/lib/exam-data';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Printer, Loader2, ArrowLeft, Plus, Lowercase, Minus } from 'lucide-react';
+import { Printer, Loader2, ArrowLeft, Plus, Minus } from 'lucide-react';
 import Image from 'next/image';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import { useFirestore } from '@/firebase';
 import { collection, query, getDocs, where, doc, getDoc } from 'firebase/firestore';
-import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const classMap: { [key: string]: string } = { '6': 'Six', '7': 'Seven', '8': 'Eight', '9': 'Nine', '10': 'Ten' };
@@ -58,7 +56,6 @@ function MarksheetContent() {
     const academicYear = searchParams.get('academicYear') || new Date().getFullYear().toString();
     const initialExam = searchParams.get('examName') || 'Annual Examination';
     const [currentExamName, setCurrentExamName] = useState<string>(initialExam);
-    const displayExamName = examNameEnglishMap[currentExamName] || currentExamName;
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -150,6 +147,7 @@ function MarksheetContent() {
     }
 
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
+    const displayExamName = examNameEnglishMap[currentExamName] || currentExamName;
     const hasPractical = sortedSubjects.some(s => s.practical);
 
     return (
@@ -157,8 +155,8 @@ function MarksheetContent() {
             <style jsx global>{`
                 @media print {
                     @page {
-                        size: A4;
-                        margin: 0 !important;
+                        size: A4 portrait;
+                        margin: 0.5in !important;
                     }
                     html, body {
                         height: auto !important;
@@ -170,12 +168,10 @@ function MarksheetContent() {
                         display: none !important;
                     }
                     .marksheet-container {
-                        width: 210mm !important;
-                        height: 297mm !important;
+                        width: 100% !important;
+                        height: auto !important;
                         margin: 0 !important;
-                        padding: 8mm !important;
-                        border: none !important;
-                        box-shadow: none !important;
+                        padding: 0 !important;
                         page-break-after: always !important;
                         overflow: hidden !important;
                         position: relative !important;
@@ -183,6 +179,8 @@ function MarksheetContent() {
                         flex-direction: column !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                        box-shadow: none !important;
+                        border: none !important;
                     }
                     .watermark-layer img {
                         visibility: visible !important;
@@ -236,7 +234,7 @@ function MarksheetContent() {
                 </div>
             </div>
             
-            <div className="printable-area marksheet-container w-[210mm] h-[297mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:m-0">
+            <div className="printable-area marksheet-container w-[210mm] min-h-[297mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:m-0">
                 {schoolInfo.logoUrl && (
                     <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer" style={{ opacity: watermarkOpacity }}>
                         <img src={schoolInfo.logoUrl} alt="Watermark" className="w-[300px] h-[300px] object-contain" />
