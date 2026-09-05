@@ -11,7 +11,7 @@ import { getExams, Exam } from '@/lib/exam-data';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Printer, Loader2, ArrowLeft, Plus, Minus } from 'lucide-react';
+import { Printer, Loader2, ArrowLeft, Plus, Lowercase, Minus } from 'lucide-react';
 import Image from 'next/image';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import { useFirestore } from '@/firebase';
@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 
 const classMap: { [key: string]: string } = { '6': 'Six', '7': 'Seven', '8': 'Eight', '9': 'Nine', '10': 'Ten' };
 const groupMap: { [key: string]: string } = { 'science': 'Science', 'arts': 'Arts', 'commerce': 'Commerce', 'general': 'General' };
-const religionMap: { [key: string]: string } = { 'islam': 'Islam', 'hinduism': 'Hinduism', 'buddhism': 'Buddhism', 'christianity': 'Christianity', 'other': 'Other' };
 
 const examNameEnglishMap: { [key: string]: string } = {
     'অর্ধ-বার্ষিক পরীক্ষা': 'Half-Yearly Examination',
@@ -151,6 +150,7 @@ function MarksheetContent() {
     }
 
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
+    const hasPractical = sortedSubjects.some(s => s.practical);
 
     return (
         <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center overflow-x-hidden">
@@ -324,9 +324,9 @@ function MarksheetContent() {
                                     <th className="border-r border-black p-1 w-8 text-center">SL</th>
                                     <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
                                     <th className="border-r border-black p-1 w-14 text-center">Full Marks</th>
-                                    <th className="border-r border-black p-1 w-10 text-center">W</th>
-                                    <th className="border-r border-black p-1 w-10 text-center">M</th>
-                                    <th className="border-r border-black p-1 w-10 text-center">P</th>
+                                    <th className="border-r border-black p-1 w-14 text-center">Written</th>
+                                    <th className="border-r border-black p-1 w-14 text-center">MCQ</th>
+                                    {hasPractical && <th className="border-r border-black p-1 w-14 text-center">Practical</th>}
                                     <th className="border-r border-black p-1 w-16 text-center">Obtained</th>
                                     <th className="border-r border-black p-1 w-14 text-center">Grade</th>
                                     <th className="p-1 w-14 text-center">Point</th>
@@ -346,7 +346,7 @@ function MarksheetContent() {
                                             <td className="border-r border-black p-1 text-center font-medium">{subResult?.fullMarks ?? subject.fullMarks}</td>
                                             <td className="border-r border-black p-1 text-center font-medium">{subResult?.written ?? '-'}</td>
                                             <td className="border-r border-black p-1 text-center font-medium">{subResult?.mcq ?? '-'}</td>
-                                            <td className="border-r border-black p-1 text-center font-medium">{subResult?.practical ?? '-'}</td>
+                                            {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{subResult?.practical ?? '-'}</td>}
                                             <td className={cn("border-r border-black p-1 text-center font-bold text-[14px]", isFail ? "text-red-600" : "text-blue-900")}>{subResult?.marks ?? '-'}</td>
                                             <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "")}>{subResult?.grade ?? '-'}</td>
                                             <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{subResult?.point !== undefined ? subResult.point.toFixed(2) : '-'}</td>
@@ -356,7 +356,7 @@ function MarksheetContent() {
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-[1.5px] border-black font-black bg-blue-50 text-[12px]">
-                                    <td colSpan={6} className="p-2 pr-8 text-right border-r border-black uppercase text-blue-900">Total Marks & Final Results</td>
+                                    <td colSpan={hasPractical ? 6 : 5} className="p-2 pr-8 text-right border-r border-black uppercase text-blue-900">Total Marks & Final Results</td>
                                     <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{processedResult.totalMarks}</td>
                                     <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{processedResult.finalGrade}</td>
                                     <td className="p-2 text-center text-blue-950 text-sm">{processedResult.gpa.toFixed(2)}</td>

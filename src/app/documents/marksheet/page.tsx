@@ -297,6 +297,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
 
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
     const displayExamName = examNameEnglishMap[examName] || examName;
+    const hasPractical = sortedSubjects.some(s => s.practical);
 
     const renderMeritPosition = (position?: number) => {
         if (!position) return '-';
@@ -413,9 +414,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                 <th className="border-r border-black p-1 w-8">SL</th>
                                 <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
                                 <th className="border-r border-black p-1 w-12">Full Marks</th>
-                                <th className="border-r border-black p-1 w-10">W</th>
-                                <th className="border-r border-black p-1 w-10">M</th>
-                                <th className="border-r border-black p-1 w-10">P</th>
+                                <th className="border-r border-black p-1 w-14">Written</th>
+                                <th className="border-r border-black p-1 w-14">MCQ</th>
+                                {hasPractical && <th className="border-r border-black p-1 w-14">Practical</th>}
                                 <th className="border-r border-black p-1 w-16">Obtained</th>
                                 <th className="border-r border-black p-1 w-12">Grade</th>
                                 <th className="p-1 w-12">Point</th>
@@ -432,7 +433,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                         <td className="border-r border-black p-1 text-center">{sr?.fullMarks ?? sub.fullMarks}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.written ?? '-'}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.mcq ?? '-'}</td>
-                                        <td className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</td>
+                                        {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</td>}
                                         <td className={cn("border-r border-black p-1 text-center font-bold", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
                                         <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
                                         <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
@@ -442,7 +443,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                         </tbody>
                         <tfoot>
                             <tr className="border-t-[1.5px] border-black font-black bg-blue-50">
-                                <td colSpan={6} className="p-2 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
+                                <td colSpan={hasPractical ? 6 : 5} className="p-2 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
                                 <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.totalMarks}</td>
                                 <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.finalGrade}</td>
                                 <td className="p-2 text-center text-blue-950 text-sm">{result.gpa.toFixed(2)}</td>
