@@ -850,11 +850,27 @@ function StudentListContent() {
                                                 size: A4 landscape;
                                                 margin: 0.5in !important;
                                             }
+                                            .esif-container {
+                                                width: 100% !important;
+                                                max-width: none !important;
+                                                margin: 0 !important;
+                                                padding: 0 !important;
+                                                display: block !important;
+                                            }
+                                            .esif-container > div {
+                                                width: 100% !important;
+                                                padding: 0 !important;
+                                                margin: 0 !important;
+                                            }
+                                            table {
+                                                width: 100% !important;
+                                                min-width: 100% !important;
+                                            }
                                         }
                                     `}</style>
                                     {['6', '8', '9'].includes(activeTab) ? (
-                                        <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full">
-                                            <div className="w-full mx-auto bg-white p-4">
+                                        <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full print:w-full">
+                                            <div className="w-full mx-auto bg-white p-4 print:p-0 print:m-0">
                                                 <header className="text-center mb-6">
                                                     <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
                                                     <p className="text-sm font-bold border-b-2 border-black inline-block px-4 pb-0.5 uppercase tracking-widest">ESIF STUDENT REGISTRATION FORM</p>
