@@ -850,21 +850,33 @@ function StudentListContent() {
                                                 size: A4 landscape;
                                                 margin: 0.5in !important;
                                             }
+                                            body * {
+                                                visibility: hidden;
+                                            }
+                                            .esif-container, .esif-container * {
+                                                visibility: visible;
+                                            }
                                             .esif-container {
+                                                position: absolute !important;
+                                                left: 0 !important;
+                                                top: 0 !important;
                                                 width: 100% !important;
-                                                max-width: none !important;
                                                 margin: 0 !important;
                                                 padding: 0 !important;
                                                 display: block !important;
+                                                border: none !important;
+                                                box-shadow: none !important;
                                             }
                                             .esif-container > div {
                                                 width: 100% !important;
+                                                max-width: none !important;
                                                 padding: 0 !important;
                                                 margin: 0 !important;
                                             }
                                             table {
                                                 width: 100% !important;
                                                 min-width: 100% !important;
+                                                border-collapse: collapse !important;
                                             }
                                         }
                                     `}</style>
@@ -1067,4 +1079,10 @@ export default function StudentListPage() {
       <StudentListContent />
     </Suspense>
   );
+}
+
+function toBengaliNumber(n: number | string | undefined | null): string {
+  if (n === undefined || n === null || n === '') return '';
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
 }
