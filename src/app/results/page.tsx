@@ -251,6 +251,19 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     const numberInputClass = "h-9 font-bold border-2 border-black focus:ring-primary shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
+    const limits = useMemo(() => {
+        if (fullMarks === 100) {
+            if (selectedSubjectInfo?.practical) return { written: 50, mcq: 25, practical: 25 };
+            return { written: 70, mcq: 30, practical: 0 };
+        }
+        if (fullMarks === 50) {
+            if (subject.includes('ইংরেজি') || subject.includes('English')) return { written: 50, mcq: 0, practical: 0 };
+            return { written: 40, mcq: 10, practical: 0 };
+        }
+        if (fullMarks === 25) return { written: 0, mcq: 25, practical: 0 };
+        return { written: fullMarks, mcq: fullMarks, practical: fullMarks };
+    }, [fullMarks, selectedSubjectInfo, subject]);
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
@@ -315,15 +328,18 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {studentsForClass.map(student => (
-                                        <TableRow key={student.id} className="hover:bg-accent/5">
-                                            <TableCell className="font-black text-center">{toBengaliNumber(student.roll)}</TableCell>
-                                            <TableCell className="font-bold text-slate-700">{student.studentNameBn}</TableCell>
-                                            <TableCell><Input type="number" value={marks.get(student.id)?.written ?? ''} onChange={(e) => handleMarkChange(student.id, 'written', e.target.value)} onKeyDown={handleKeyDown} className={numberInputClass} /></TableCell>
-                                            <TableCell><Input type="number" value={marks.get(student.id)?.mcq ?? ''} onChange={(e) => handleMarkChange(student.id, 'mcq', e.target.value)} onKeyDown={handleKeyDown} className={numberInputClass} /></TableCell>
-                                            {selectedSubjectInfo?.practical && <TableCell><Input type="number" value={marks.get(student.id)?.practical ?? ''} onChange={(e) => handleMarkChange(student.id, 'practical', e.target.value)} onKeyDown={handleKeyDown} className={numberInputClass} /></TableCell>}
-                                        </TableRow>
-                                    ))}
+                                    {studentsForClass.map(student => {
+                                        const sMarks = marks.get(student.id);
+                                        return (
+                                            <TableRow key={student.id} className="hover:bg-accent/5">
+                                                <TableCell className="font-black text-center">{toBengaliNumber(student.roll)}</TableCell>
+                                                <TableCell className="font-bold text-slate-700">{student.studentNameBn}</TableCell>
+                                                <TableCell><Input type="number" value={sMarks?.written ?? ''} onChange={(e) => handleMarkChange(student.id, 'written', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.written || 0) > limits.written && "border-red-600 bg-red-50 text-red-700")} /></TableCell>
+                                                <TableCell><Input type="number" value={sMarks?.mcq ?? ''} onChange={(e) => handleMarkChange(student.id, 'mcq', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.mcq || 0) > limits.mcq && "border-red-600 bg-red-50 text-red-700")} /></TableCell>
+                                                {selectedSubjectInfo?.practical && <TableCell><Input type="number" value={sMarks?.practical ?? ''} onChange={(e) => handleMarkChange(student.id, 'practical', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.practical || 0) > limits.practical && "border-red-600 bg-red-50 text-red-700")} /></TableCell>}
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>
@@ -933,9 +949,9 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                         if (parseInt(className) >= 9) {
                             const rGroupRaw = (r.group || 'none').toLowerCase().trim();
                             const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
-                            const gkNorm = groupMap[gk.toLowerCase().trim()] || gk.toLowerCase().trim();
+                            const groupKeyNorm = groupMap[gk.toLowerCase().trim()] || groupKey.toLowerCase().trim();
                             
-                            return rGroupNorm === 'none' || rGroupNorm === gkNorm || gk === 'all';
+                            return rGroupNorm === 'none' || rGroupNorm === groupKeyNorm || gk === 'all';
                         }
                         return true;
                     });
@@ -999,7 +1015,7 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                                                         <>
                                                             <th className={cn("text-[11px] text-center border-r-2 border-b-2 border-black font-bold p-0.5 sticky top-[32px] z-30 w-12 h-[32px] box-border", bgColor)}>লিখিত</th>
                                                             <th className={cn("text-[11px] text-center border-r-2 border-b-2 border-black font-bold p-0.5 sticky top-[32px] z-30 w-12 h-[32px] box-border", bgColor)}>MCQ</th>
-                                                            {s.practical && <th className={cn("text-[11px] text-center border-r-2 border-black font-bold p-0.5 sticky top-[32px] z-30 w-12 h-[32px] box-border", bgColor)}>ব্যবহারিক</th>}
+                                                            {s.practical && <th className={cn("text-[11px] text-center border-r-2 border-b-2 border-black font-bold p-0.5 sticky top-[32px] z-30 w-12 h-[32px] box-border", bgColor)}>ব্যবহারিক</th>}
                                                         </>
                                                     )}
                                                     <th className={cn("text-[11px] text-center border-r-2 border-b-2 border-black font-black bg-blue-200 text-blue-950 p-0.5 sticky top-[32px] z-30 w-14 h-[32px] box-border", bgColor)}>প্রাপ্ত</th>
