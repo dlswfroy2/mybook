@@ -64,7 +64,7 @@ const normalize = (name: string) => {
 const groupMap: Record<string, string> = { 
     'science': 'science', 'বিজ্ঞান': 'science',
     'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts',
-    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
+    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
 };
 
 export function processStudentResults(
@@ -125,8 +125,11 @@ export function processStudentResults(
                 return true;
             });
 
-            const studentResult = classResult?.results.find(r => r.studentId === student.id);
-            const fullMarks = classResult?.fullMarks || subjectInfo.fullMarks;
+            // If no data entered for this subject at all, skip it from the calculation
+            if (!classResult) return;
+
+            const studentResult = classResult.results.find(r => r.studentId === student.id);
+            const fullMarks = classResult.fullMarks || subjectInfo.fullMarks;
 
             const written = studentResult?.written;
             const mcq = studentResult?.mcq;
@@ -136,7 +139,6 @@ export function processStudentResults(
             let isPassSubject = true;
             const overallPassMark = Math.ceil(fullMarks * 0.33);
 
-            // Separate Pass Logic for NCTB curriculum
             if (obtainedMarks < overallPassMark) {
                 isPassSubject = false;
             } else {
@@ -145,22 +147,18 @@ export function processStudentResults(
 
                 if (!isEnglish) {
                     if (isIct25) {
-                        // ICT 25 Marks (MCQ 25) -> Pass: 8
                         if (mcq !== undefined && mcq < 8) isPassSubject = false;
                     } else if (fullMarks === 100) {
                         if (subjectInfo.practical) {
-                            // Subject with Practical: Written 50 (Pass 17), MCQ 25 (Pass 8), Practical 25 (Pass 8)
                             if (written !== undefined && written < 17) isPassSubject = false;
                             if (mcq !== undefined && mcq < 8) isPassSubject = false;
                             if (practical !== undefined && practical < 8) isPassSubject = false;
                         } else {
-                            // Subject without Practical: Written 70 (Pass 23), MCQ 30 (Pass 10)
                             if (written !== undefined && written < 23) isPassSubject = false;
                             if (mcq !== undefined && mcq < 10) isPassSubject = false;
                         }
                     } 
                     else if (fullMarks === 50) {
-                        // 50 Marks Subject: Written 40 (Pass 13), MCQ 10 (Pass 3)
                         if (written !== undefined && written < 13) isPassSubject = false;
                         if (mcq !== undefined && mcq < 3) isPassSubject = false;
                     }
@@ -192,6 +190,10 @@ export function processStudentResults(
 
         subjectsForStudent.forEach(subjectInfo => {
             const result = subjectResultsMap.get(subjectInfo.name);
+            
+            // Only process subjects that were actually examined (had class data)
+            if (!result) return;
+
             const isOptional = normalize(subjectInfo.name) === optionalSubjectNameNormalized;
 
             if (isOptional) {
@@ -200,7 +202,7 @@ export function processStudentResults(
                 }
             } else if (subjectInfo.fullMarks > 0) {
                 compulsorySubjectsCount++;
-                if (!result || !result.isPass) {
+                if (!result.isPass) {
                     failedInCompulsoryCount++;
                 } else {
                     totalCompulsoryPoints += result.point;
@@ -208,7 +210,7 @@ export function processStudentResults(
             }
         });
 
-        const isPass = failedInCompulsoryCount === 0;
+        const isPass = compulsorySubjectsCount > 0 && failedInCompulsoryCount === 0;
         let gpa = 0;
 
         if (isPass && compulsorySubjectsCount > 0) {

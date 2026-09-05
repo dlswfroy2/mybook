@@ -5,6 +5,8 @@ export interface Subject {
     practical: boolean;
     fullMarks: number;
     isExamSubject?: boolean;
+    isCombined?: boolean;
+    subList?: string[];
 }
 
 export const subjectNameNormalization: { [key: string]: string } = {
@@ -99,8 +101,8 @@ export const getSubjects = (className: string, group?: string): Subject[] => {
             artsSubjects.forEach(s => uniqueSubjects.set(s.name, s));
         } else if (normalizedGroup === 'commerce' || normalizedGroup === 'ব্যবসায় শিক্ষা' || normalizedGroup === 'business') {
             commerceSubjects.forEach(s => uniqueSubjects.set(s.name, s));
-        } else {
-            // Union of all subjects for the "All Groups" view
+        } else if (group === 'all' || !group) {
+            // Union of all subjects for the "All Groups" view or when group is missing
             [...scienceSubjects, ...artsSubjects, ...commerceSubjects].forEach(s => {
                 if (!uniqueSubjects.has(s.name)) {
                     uniqueSubjects.set(s.name, s);
