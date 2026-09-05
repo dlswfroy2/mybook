@@ -775,6 +775,13 @@ export function UserManagementSettings() {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
     const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+    const [, setTick] = useState(0);
+
+    // Auto re-render every 30 seconds to keep live relative timestamps and online status accurate
+    useEffect(() => {
+        const timer = setInterval(() => setTick(t => t + 1), 30000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         if (!db || !currentUser || currentUser.role !== 'admin') return;
@@ -801,6 +808,82 @@ export function UserManagementSettings() {
         });
         return map;
     }, [allStaff]);
+
+    const isUserLiveOnline = useCallback((u: SystemUser): boolean => {
+        if (u.uid === currentUser?.uid) return true;
+        if (!u.isOnline) return false;
+        const effectiveTime = u.lastActiveAt || u.lastLoginAt;
+        if (effectiveTime) {
+            const diffMs = Date.now() - effectiveTime.getTime();
+            return diffMs < 3 * 60 * 1000; // active within 3 minutes
+        }
+        return !!u.isOnline;
+    }, [currentUser?.uid]);
+
+    const renderUserStatus = (isOnline: boolean) => {
+        if (isOnline) {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm whitespace-nowrap">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                    </span>
+                    অনলাইন
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                অফলাইন
+            </span>
+        );
+    };
+
+    const renderLastActive = (u: SystemUser, isOnline: boolean) => {
+        if (isOnline) {
+            return (
+                <span className="text-emerald-700 font-black text-xs flex items-center gap-1.5 whitespace-nowrap">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    এখন সক্রিয়
+                </span>
+            );
+        }
+
+        const time = u.lastActiveAt || u.lastLoginAt;
+        if (!time) {
+            return <span className="text-slate-400 font-medium text-xs">কখনো নয়</span>;
+        }
+
+        const diffMs = Date.now() - time.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMin / 60);
+
+        let relativeText = '';
+        if (diffMin < 1) {
+            relativeText = 'এইমাত্র সক্রিয়';
+        } else if (diffMin < 60) {
+            relativeText = `${toBengaliNumber(diffMin)} মিনিট আগে`;
+        } else if (diffHours < 24) {
+            relativeText = `${toBengaliNumber(diffHours)} ঘণ্টা আগে`;
+        } else {
+            const diffDays = Math.floor(diffHours / 24);
+            if (diffDays === 1) {
+                relativeText = 'গতকাল';
+            } else if (diffDays < 7) {
+                relativeText = `${toBengaliNumber(diffDays)} দিন আগে`;
+            } else {
+                relativeText = format(time, 'PP', { locale: bn });
+            }
+        }
+
+        return (
+            <div className="flex flex-col whitespace-nowrap">
+                <span className="text-slate-800 font-bold text-xs">{relativeText}</span>
+                <span className="text-[10px] text-muted-foreground">{format(time, 'p', { locale: bn })}</span>
+            </div>
+        );
+    };
 
     const handleUpdateRole = async (uid: string, newRole: UserRole) => {
         await updateUserRole(db!, uid, newRole);
@@ -841,6 +924,7 @@ export function UserManagementSettings() {
                                 const isMe = u.uid === currentUser?.uid;
                                 const finalPhoto = staffInfo?.photo || u.photoUrl;
                                 const finalName = staffInfo?.name || u.displayName || 'Admin';
+                                const isOnline = isUserLiveOnline(u);
 
                                 return (
                                     <TableRow key={u.uid} className={isMe ? "bg-primary/5" : ""}>
@@ -863,12 +947,10 @@ export function UserManagementSettings() {
                                             </Select>
                                         </TableCell>
                                         <TableCell>
-                                            {u.isOnline ? <Badge className="bg-green-500 h-5 text-[10px]">অনলাইন</Badge> : <span className="text-[10px] text-muted-foreground">অফলাইন</span>}
+                                            {renderUserStatus(isOnline)}
                                         </TableCell>
                                         <TableCell>
-                                            <p className="text-[10px] font-medium">
-                                                {u.lastLoginAt ? format(u.lastLoginAt, 'PP p', { locale: bn }) : 'কখনো নয়'}
-                                            </p>
+                                            {renderLastActive(u, isOnline)}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">

@@ -58,7 +58,7 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
@@ -91,6 +91,12 @@ function NavbarContent() {
 
   const handleLogout = async () => {
     try {
+      if (user) {
+        await updateDoc(doc(db, 'users', user.uid), {
+          isOnline: false,
+          lastActiveAt: serverTimestamp(),
+        }).catch(() => {});
+      }
       await signOut(auth);
       toast({ title: "লগআউট", description: "আপনি সফলভাবে লগআউট করেছেন।" });
     } catch (error) {

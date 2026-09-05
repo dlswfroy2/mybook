@@ -56,7 +56,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (fbUser) {
         const userDocRef = doc(db, 'users', fbUser.uid);
         
-        unsubscribeSnapshot = onSnapshot(userDocRef, async (docSnap) => {
+        // Mark user online immediately on session init
+        setDoc(userDocRef, {
+          isOnline: true,
+          lastActiveAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp()
+        }, { merge: true }).catch(() => {});
+
+        // Keep presence alive with a 45s heartbeat
+        const heartbeatInterval = setInterval(() => {
+          if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+            setDoc(userDocRef, {
+              isOnline: true,
+              lastActiveAt: serverTimestamp()
+            }, { merge: true }).catch(() => {});
+          }
+        }, 45000);
+
+        const handleVisibility = () => {
+          if (document.visibilityState === 'visible') {
+            setDoc(userDocRef, {
+              isOnline: true,
+              lastActiveAt: serverTimestamp()
+            }, { merge: true }).catch(() => {});
+          }
+        };
+
+        const handleUnload = () => {
+          setDoc(userDocRef, {
+            isOnline: false,
+            lastActiveAt: serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        };
+
+        if (typeof window !== 'undefined') {
+          window.addEventListener('visibilitychange', handleVisibility);
+          window.addEventListener('beforeunload', handleUnload);
+        }
+
+        const docUnsub = onSnapshot(userDocRef, async (docSnap) => {
           if (docSnap.exists()) {
             const userData = userFromDoc(docSnap);
             if (userData.role === 'admin' || fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com') {
@@ -116,6 +154,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(fallbackUser);
             setLoading(false);
         });
+
+        unsubscribeSnapshot = () => {
+          docUnsub();
+          clearInterval(heartbeatInterval);
+          if (typeof window !== 'undefined') {
+            window.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('beforeunload', handleUnload);
+          }
+        };
       } else {
         setUser(null);
         setLoading(false);

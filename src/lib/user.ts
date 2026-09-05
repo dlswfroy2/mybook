@@ -13,27 +13,23 @@ export interface User {
   permissions?: string[];
   marksPermissions?: Record<string, string[]>; // { "6": ["বাংলা প্রথম", "গণিত"], "9": ["পদার্থ"] }
   lastLoginAt?: Date;
+  lastActiveAt?: Date;
 }
 
 export const userFromDoc = (doc: any): User => {
     const data = doc.data();
     
-    // Robust parsing of lastLoginAt field
-    let lastLoginAt: Date | undefined = undefined;
-    if (data.lastLoginAt) {
-        if (typeof data.lastLoginAt.toDate === 'function') {
-            lastLoginAt = data.lastLoginAt.toDate();
-        } else if (data.lastLoginAt instanceof Timestamp) {
-            lastLoginAt = data.lastLoginAt.toDate();
-        } else if (data.lastLoginAt.seconds !== undefined) {
-            lastLoginAt = new Timestamp(data.lastLoginAt.seconds, data.lastLoginAt.nanoseconds || 0).toDate();
-        } else {
-            const parsed = new Date(data.lastLoginAt);
-            if (!isNaN(parsed.getTime())) {
-                lastLoginAt = parsed;
-            }
-        }
-    }
+    const parseDateField = (field: any): Date | undefined => {
+        if (!field) return undefined;
+        if (typeof field.toDate === 'function') return field.toDate();
+        if (field instanceof Timestamp) return field.toDate();
+        if (field.seconds !== undefined) return new Timestamp(field.seconds, field.nanoseconds || 0).toDate();
+        const parsed = new Date(field);
+        return isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+
+    const lastLoginAt = parseDateField(data.lastLoginAt);
+    const lastActiveAt = parseDateField(data.lastActiveAt) || lastLoginAt;
 
     return {
         uid: doc.id,
@@ -45,5 +41,6 @@ export const userFromDoc = (doc: any): User => {
         permissions: data.permissions || [],
         marksPermissions: data.marksPermissions || {},
         lastLoginAt: lastLoginAt,
+        lastActiveAt: lastActiveAt,
     } as User;
 }

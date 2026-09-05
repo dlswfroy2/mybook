@@ -401,6 +401,9 @@ export default function AuthPage() {
             role: 'admin',
             status: 'active',
             permissions: availablePermissions.map(p => p.id),
+            isOnline: true,
+            lastLoginAt: serverTimestamp(),
+            lastActiveAt: serverTimestamp(),
             createdAt: serverTimestamp()
           }, { merge: true });
 
@@ -447,6 +450,9 @@ export default function AuthPage() {
                 status: 'active',
                 staffId: staffSnap.docs[0].id,
                 permissions: defaultPermissions['teacher'] || [],
+                isOnline: true,
+                lastLoginAt: serverTimestamp(),
+                lastActiveAt: serverTimestamp(),
                 createdAt: serverTimestamp()
               });
             } else {
@@ -474,6 +480,12 @@ export default function AuthPage() {
             return;
           }
         }
+
+        await setDoc(userDocRef, {
+          isOnline: true,
+          lastLoginAt: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+        }, { merge: true }).catch(() => {});
 
         toast({ 
           title: isNewTeacherCreated ? "শিক্ষক অ্যাকাউন্ট তৈরি ও লগইন সফল" : "সফল শিক্ষক লগইন" 
