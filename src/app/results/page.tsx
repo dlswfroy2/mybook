@@ -49,7 +49,7 @@ const BENGALI_MONTHS = [
     'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
 ];
 
-const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': 'দশম' };
+const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম' };
 const groupNamesMap: { [key: string]: string } = { 'science': 'বিজ্ঞান', 'arts': 'মানবিক', 'commerce': 'ব্যবসায় শিক্ষা', 'all': 'সকল শাখা' };
 const groupMap: Record<string, string> = { 
     'science': 'science', 'বিজ্ঞান': 'science',
@@ -949,7 +949,7 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                         if (parseInt(className) >= 9) {
                             const rGroupRaw = (r.group || 'none').toLowerCase().trim();
                             const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
-                            const groupKeyNorm = groupMap[gk.toLowerCase().trim()] || groupKey.toLowerCase().trim();
+                            const groupKeyNorm = groupMap[gk.toLowerCase().trim()] || gk.toLowerCase().trim();
                             
                             return rGroupNorm === 'none' || rGroupNorm === groupKeyNorm || gk === 'all';
                         }
@@ -2137,7 +2137,7 @@ export default function ResultsPage() {
     const sidebarItems = useMemo(() => {
         return [
             { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'from-indigo-400 via-indigo-50 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
-            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'from-emerald-400 via-emerald-500 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
+            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'from-emerald-400 via-emerald-50 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
             { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
             { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
             { id: 'full-marks', label: 'বিষয় ও পূর্ণমান', icon: CheckCircle2, color: 'from-violet-400 via-violet-500 to-violet-800 shadow-violet-500/40 text-white', activeBg: 'bg-violet-500/20 border-violet-400/30' },
