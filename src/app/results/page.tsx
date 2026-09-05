@@ -297,7 +297,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                         <SelectContent>{availableSubjects.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
-                <Button onClick={handleLoadStudents} disabled={isLoadingStudents || !subject || !examName} className="h-9 text-xs font-black">{isLoadingStudents ? 'লোড হচ্ছে...' : 'লোড করুন'}</Button>
+                <Button onClick={handleLoadStudents} disabled={isLoadingStudents || !subject || !examName} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">{isLoadingStudents ? 'লোড হচ্ছে...' : 'লোড করুন'}</Button>
             </div>
             
             {studentsForClass.length > 0 && (
@@ -309,8 +309,8 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                          </div>
                          {canUploadMarks && (
                              <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={handleDownloadSample} className="h-8 text-[10px] bg-white"><Download className="mr-2 h-3.5 w-3.5" /> নমুনা</Button>
-                                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-8 text-[10px] bg-white"><FileUp className="mr-2 h-3.5 w-3.5" /> আপলোড</Button>
+                                <Button variant="outline" size="sm" onClick={handleDownloadSample} className="h-8 text-[10px] bg-white font-bold"><Download className="mr-2 h-3.5 w-3.5" /> নমুনা</Button>
+                                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-8 text-[10px] bg-white font-bold"><FileUp className="mr-2 h-3.5 w-3.5" /> আপলোড</Button>
                                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
                             </div>
                          )}
@@ -343,7 +343,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                                 </TableBody>
                             </Table>
                         </div>
-                        <div className="flex justify-end p-4 border-t bg-muted/10"><Button onClick={handleSaveResults} size="lg" className="px-10 font-black shadow-md">প্রাপ্ত নম্বর সেভ করুন</Button></div>
+                        <div className="flex justify-end p-4 border-t bg-muted/10"><Button onClick={handleSaveResults} size="lg" className="px-16 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 text-white shadow-xl active:translate-y-0.5 font-black text-xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
                     </CardContent>
                 </Card>
             )}
@@ -475,7 +475,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
                 <div className="space-y-2">
-                    <Label className="text-xs font-bold">পরীক্ষা</Label>
+                    <Label className="font-bold text-xs">পরীক্ষা</Label>
                     <Select value={examName} onValueChange={setExamName}>
                         <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
                         <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
@@ -504,10 +504,10 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                         <SelectContent>{availableSubjects.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
-                <Button onClick={handleLoadReport} disabled={isLoading || !subject || !examName} className="h-9 text-xs font-black">
+                <Button onClick={handleLoadReport} disabled={isLoading || !subject || !examName} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'রিপোর্ট দেখুন'}
                 </Button>
-                <Button onClick={handlePrintBlank} variant="outline" className="h-9 text-xs font-black border-amber-600 text-amber-700 hover:bg-amber-50">
+                <Button onClick={handlePrintBlank} variant="outline" className="h-10 px-6 rounded-xl border-2 border-amber-600 text-amber-700 hover:bg-amber-50 shadow-sm font-black text-xs">
                     <Printer className="mr-2 h-4 w-4" /> ফাঁকা মার্কশিট
                 </Button>
             </div>
@@ -519,7 +519,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                             <CardTitle className="text-base font-black text-primary">{subject} - নম্বর ফর্দ ({examName})</CardTitle>
                             <CardDescription className="text-[10px] font-bold">শ্রেণি: {classNamesMap[className]} | শাখা: {groupNamesMap[group || 'all']}</CardDescription>
                         </div>
-                        <Button variant="outline" className="font-black h-9 border-primary text-primary" onClick={() => onPrintRequested({ studentData: reportStudents, info: { examName, className, subject, group, fullMarks: results.fullMarks }, isBlank: false })}>
+                        <Button variant="outline" className="h-10 px-6 rounded-xl border-2 border-primary text-primary hover:bg-primary/5 font-black shadow-sm" onClick={() => onPrintRequested({ studentData: reportStudents, info: { examName, className, subject, group, fullMarks: results.fullMarks }, isBlank: false })}>
                             <Printer className="mr-2 h-4 w-4" /> প্রিন্ট (PDF)
                         </Button>
                     </CardHeader>
@@ -921,7 +921,7 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                         </Select>
                     </div>
                 )}
-                <Button onClick={handleViewResults} disabled={isLoading || !examName || !className} className="lg:col-span-1 shadow-md h-9 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'ফলাফল দেখুন'}</Button>
+                <Button onClick={handleViewResults} disabled={isLoading || !examName || !className} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'ফলাফল দেখুন'}</Button>
                 <div className="flex flex-col gap-1.5 lg:col-span-2">
                     <div className="flex gap-2">
                         <Button onClick={handleDownloadExcel} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-emerald-600 text-emerald-700 hover:bg-emerald-50 h-9 font-black text-xs"><FileSpreadsheet className="h-3 w-3 mr-1" /> Excel</Button>
@@ -1365,9 +1365,9 @@ const MeritListTab = ({ allStudents }: { allStudents: Student[] }) => {
                 <div className="space-y-2"><Label className="font-bold text-xs">পরীক্ষা</Label><Select value={examName} onValueChange={setExamName}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><Label className="font-bold text-xs">শ্রেণি</Label><Select value={className} onValueChange={c => { setClassName(c); setGroupFilter('all'); }}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent><SelectItem value="6">৬ষ্ঠ</SelectItem><SelectItem value="7">৭ম</SelectItem><SelectItem value="8">৮ম</SelectItem><SelectItem value="9">৯ম</SelectItem><SelectItem value="10">১০ম</SelectItem></SelectContent></Select></div>
                 {parseInt(className) >= 9 && (<div className="space-y-2"><Label className="font-bold text-xs">শাখা</Label><Select value={groupFilter} onValueChange={setGroupFilter}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সকল" /></SelectTrigger><SelectContent><SelectItem value="all">সকল শাখা</SelectItem><SelectItem value="science">বিজ্ঞান</SelectItem><SelectItem value="arts">মানবিক</SelectItem><SelectItem value="commerce">ব্যবসায় শিক্ষা</SelectItem></SelectContent></Select></div>)}
-                <Button onClick={handleViewMerit} disabled={isLoading || !examName || !className} className="lg:col-span-1 shadow-md h-9 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'মেধা তালিকা দেখুন'}</Button>
+                <Button onClick={handleViewMerit} disabled={isLoading || !examName || !className} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'মেধা তালিকা দেখুন'}</Button>
                 <Link href={`/results/merit-list?academicYear=${selectedYear}&examName=${encodeURIComponent(examName)}&className=${className}&group=${groupFilter}`} target="_blank" className="lg:col-span-1">
-                    <Button disabled={processedResults.length === 0} variant="outline" className="w-full border-primary text-primary hover:bg-primary/5 h-9 font-black text-xs"><Printer className="h-3 w-3 mr-1" /> প্রিন্ট তালিকা</Button>
+                    <Button disabled={processedResults.length === 0} variant="outline" className="w-full border-primary text-primary hover:bg-primary/5 h-10 px-6 rounded-xl border-b-4 border-black/10 font-black text-xs shadow-md"><Printer className="h-3 w-3 mr-1" /> প্রিন্ট তালিকা</Button>
                 </Link>
             </div>
             {processedResults.length > 0 && (
@@ -1595,15 +1595,15 @@ const PromotionTab = ({ allStudents }: { allStudents: Student[] }) => {
                 </div>
                 <div className="space-y-2"><Label className="font-bold text-xs">টার্গেট বছর</Label><Input value={toBengaliNumber(targetYear)} disabled className="bg-slate-50 font-black" /></div>
                 <div className="space-y-2"><Label className="font-bold text-xs">টার্গেট শ্রেণি</Label><Input value={classNamesMap[targetClass] + ' শ্রেণি'} disabled className="bg-slate-50 font-black" /></div>
-                <Button onClick={handleLoadSource} disabled={isLoading} className="h-10 font-black"><Search className="h-4 w-4 mr-2" /> তালিকা লোড</Button>
-                <Button onClick={handleLoadHistory} variant="outline" className="h-10 font-black border-primary text-primary"><History className="h-4 w-4 mr-2" /> হিস্টোরি ও সংশোধন</Button>
+                <Button onClick={handleLoadSource} disabled={isLoading} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs"><Search className="h-4 w-4 mr-2" /> তালিকা লোড</Button>
+                <Button onClick={handleLoadHistory} variant="outline" className="h-10 px-6 rounded-xl border-2 border-primary text-primary hover:bg-primary/5 border-b-4 border-black/10 font-black text-xs shadow-md"><History className="h-4 w-4 mr-2" /> হিস্টোরি ও সংশোধন</Button>
             </div>
 
             {passedStudents.length > 0 && (
                 <Card className="border-2 shadow-xl rounded-3xl overflow-hidden">
                     <CardHeader className="bg-emerald-50 border-b-2 border-emerald-100 flex flex-row justify-between items-center p-6">
                         <div><CardTitle className="text-xl font-black text-emerald-800">পাস করা শিক্ষার্থীদের তালিকা</CardTitle><CardDescription className="font-bold">মেধাক্রম অনুযায়ী অটোমেটিক রোল ১ থেকে এসাইন হবে</CardDescription></div>
-                        <Button onClick={() => handleShowPreview('pass')} className="bg-emerald-600 hover:bg-emerald-700 font-black h-12 px-10 shadow-xl"><CheckCircle2 className="mr-2 h-5 v-5" /> সকল পাসকৃতদের প্রমোশন দিন</Button>
+                        <Button onClick={() => handleShowPreview('pass')} className="h-12 px-8 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 text-white shadow-xl active:translate-y-0.5 font-black text-base"><CheckCircle2 className="mr-2 h-5 v-5" /> সকল পাসকৃতদের প্রমোশন দিন</Button>
                     </CardHeader>
                     <CardContent className="p-0 max-h-[400px] overflow-auto">
                         <Table>
@@ -1618,7 +1618,7 @@ const PromotionTab = ({ allStudents }: { allStudents: Student[] }) => {
                 <Card className="border-2 shadow-xl rounded-3xl overflow-hidden">
                     <CardHeader className="bg-rose-50 border-b-2 border-rose-100 flex flex-row justify-between items-center p-6">
                         <div><CardTitle className="text-xl font-black text-rose-800">অকৃতকার্য শিক্ষার্থীদের তালিকা (বিশেষ পাশ)</CardTitle><CardDescription className="font-bold text-rose-600">কম ফেল এবং বেশি নম্বর অনুযায়ী এরা পাস করাদের পরে সিরিয়াল পাবে</CardDescription></div>
-                        <Button onClick={() => handleShowPreview('special')} disabled={selectedIds.size === 0} className="bg-rose-600 hover:bg-rose-700 font-black h-12 px-8 shadow-xl"><Plus className="mr-2 h-5 v-5" /> নির্বাচিতদের প্রমোশন দিন</Button>
+                        <Button onClick={() => handleShowPreview('special')} disabled={selectedIds.size === 0} className="h-12 px-8 rounded-2xl bg-rose-600 hover:bg-rose-700 border-b-4 border-rose-800 text-white shadow-xl active:translate-y-0.5 font-black text-base"><Plus className="mr-2 h-5 v-5" /> নির্বাচিতদের প্রমোশন দিন</Button>
                     </CardHeader>
                     <CardContent className="p-0 max-h-[400px] overflow-auto">
                         <Table>
@@ -1761,7 +1761,7 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
                                 <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
-                        <Button type="submit" disabled={isSearching} className="w-full h-12 text-lg font-black">{isSearching ? <Loader2 className="animate-spin mr-2" /> : 'খুঁজুন'}</Button>
+                        <Button type="submit" disabled={isSearching} className="w-full h-12 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-lg">{isSearching ? <Loader2 className="animate-spin mr-2" /> : 'খুঁজুন'}</Button>
                     </form>
                 </CardContent>
             </Card>
@@ -1807,7 +1807,7 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
                     <CardFooter className="bg-slate-50 p-4 border-t flex justify-end gap-3">
                         <Button variant="outline" className="font-black" onClick={() => setSearchResult(null)}>অন্য ফলাফল খুঁজুন</Button>
                         <Link href={`/marksheet/${searchResult.student.id}?academicYear=${selectedYear}&examName=${encodeURIComponent(searchExam)}`} target="_blank">
-                            <Button className="font-black shadow-lg"><Printer className="mr-2 h-4 w-4" /> মার্কশিট প্রিন্ট করুন</Button>
+                            <Button className="h-11 px-8 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-sm"><Printer className="mr-2 h-4 w-4" /> মার্কশিট প্রিন্ট করুন</Button>
                         </Link>
                     </CardFooter>
                 </Card>
@@ -1950,7 +1950,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">পরীক্ষা</Label><Select value={selectedExam} onValueChange={setSelectedExam}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="পরীক্ষা" /></SelectTrigger><SelectContent>{specialExams.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">শ্রেণি</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">বিষয়</Label><Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="বিষয়" /></SelectTrigger><SelectContent>{getSubjects(selectedClass).filter(s => s.isExamSubject !== false).map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent></Select></div>
-                        <Button onClick={handleLoadForInput} disabled={isLoading || !selectedMonth || !selectedExam || !selectedSubject} className="font-black h-11 shadow-md">লোড করুন</Button>
+                        <Button onClick={handleLoadForInput} disabled={isLoading || !selectedMonth || !selectedExam || !selectedSubject} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">লোড করুন</Button>
                     </div>
 
                     {filteredStudents.length > 0 && selectedSubject && (
@@ -1976,7 +1976,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                                         </TableBody>
                                     </Table>
                                 </div>
-                                <div className="p-6 bg-slate-50 border-t-2 border-black flex justify-end"><Button onClick={handleSaveSpecialMarks} disabled={isLoading} size="lg" className="px-16 h-14 text-xl font-black shadow-2xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
+                                <div className="p-6 bg-slate-50 border-t-2 border-black flex justify-end"><Button onClick={handleSaveSpecialMarks} disabled={isLoading} size="lg" className="px-16 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 text-white shadow-xl active:translate-y-0.5 font-black text-xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
                             </CardContent>
                         </Card>
                     )}
@@ -1989,8 +1989,8 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                         <div className="space-y-2"><Label className="font-bold">মাস নির্বাচন</Label><Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="মাস" /></SelectTrigger><SelectContent>{BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-2"><Label className="font-bold">শ্রেণি</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
                         <div className="flex gap-2">
-                            <Button onClick={handleLoadFullSheet} disabled={isLoading || !selectedMonth || !selectedClass} className="flex-1 font-black h-11"><Search className="mr-2 h-4 w-4" /> রিপোর্ট লোড করুন</Button>
-                            <Button onClick={() => onPrintRequested({ allSpecialResults, students: filteredStudents, availableSubjects, month: selectedMonth, year: selectedYear })} variant="outline" disabled={allSpecialResults.length === 0} className="h-11 border-2 border-primary text-primary font-black shadow-sm"><Printer className="h-4 w-4" /></Button>
+                            <Button onClick={handleLoadFullSheet} disabled={isLoading || !selectedMonth || !selectedClass} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs flex-1"><Search className="mr-2 h-4 w-4" /> রিপোর্ট লোড করুন</Button>
+                            <Button onClick={() => onPrintRequested({ allSpecialResults, students: filteredStudents, availableSubjects, month: selectedMonth, year: selectedYear })} variant="outline" disabled={allSpecialResults.length === 0} className="h-10 px-6 rounded-xl border-2 border-primary text-primary hover:bg-primary/5 border-b-4 border-black/10 font-black text-xs shadow-md"><Printer className="h-4 w-4" /></Button>
                         </div>
                     </div>
 
@@ -2129,15 +2129,15 @@ export default function ResultsPage() {
 
     const sidebarItems = useMemo(() => {
         return [
-            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'text-indigo-600 bg-indigo-50' },
-            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'text-emerald-600 bg-emerald-50' },
-            { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'text-blue-600 bg-blue-50' },
-            { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'text-blue-600 bg-blue-50' },
-            { id: 'full-marks', label: 'বিষয় ও পূর্ণমান', icon: CheckCircle2, color: 'text-violet-600 bg-violet-50' },
-            { id: 'merit', label: 'মেধা তালিকা', icon: Trophy, color: 'text-amber-600 bg-amber-50' },
-            { id: 'promotion', label: 'প্রমোশন', icon: Star, color: 'text-rose-600 bg-rose-50' },
-            { id: 'upload', label: 'Excel আপলোড', icon: FileUp, color: 'text-blue-600 bg-blue-50' },
-            { id: 'special-exam', label: 'বিশেষ পরীক্ষা', icon: Sparkles, color: 'text-amber-600 bg-amber-50' },
+            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'from-indigo-400 via-indigo-500 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
+            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'from-emerald-400 via-emerald-500 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
+            { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
+            { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
+            { id: 'full-marks', label: 'বিষয় ও পূর্ণমান', icon: CheckCircle2, color: 'from-violet-400 via-violet-500 to-violet-800 shadow-violet-500/40 text-white', activeBg: 'bg-violet-500/20 border-violet-400/30' },
+            { id: 'merit', label: 'মেধা তালিকা', icon: Trophy, color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
+            { id: 'promotion', label: 'প্রমোশন', icon: Star, color: 'from-rose-400 via-rose-500 to-rose-800 shadow-rose-500/40 text-white', activeBg: 'bg-rose-500/20 border-rose-400/30' },
+            { id: 'upload', label: 'Excel আপলোড', icon: FileUp, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
+            { id: 'special-exam', label: 'বিশেষ পরীক্ষা', icon: Sparkles, color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
         ];
     }, []);
 
@@ -2149,7 +2149,23 @@ export default function ResultsPage() {
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">ফলাফল ব্যবস্থাপনা</h2>
                         <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
                             {sidebarItems.map(item => (
-                                <button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit", activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50")}><div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}><item.icon className="h-4 w-4" /></div><span className="text-sm font-black">{item.label}</span>{activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}</button>
+                                <button 
+                                    key={item.id} 
+                                    onClick={() => setActiveSection(item.id)} 
+                                    className={cn(
+                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit", 
+                                        activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "p-2 rounded-full shrink-0 shadow-[0_4px_8px_rgba(0,0,0,0.3),inset_0_1px_2px_rgba(255,255,255,0.4)] border-2 border-white/30 bg-gradient-to-br", 
+                                        item.color
+                                    )}>
+                                        <item.icon className="h-3.5 w-3.5 drop-shadow-sm" />
+                                    </div>
+                                    <span className="text-sm font-black">{item.label}</span>
+                                    {activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}
+                                </button>
                             ))}
                         </div>
                     </aside>
