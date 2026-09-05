@@ -54,7 +54,7 @@ const groupNamesMap: { [key: string]: string } = { 'science': 'বিজ্ঞ�
 const groupMap: Record<string, string> = { 
     'science': 'science', 'বিজ্ঞান': 'science',
     'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts',
-    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
+    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
 };
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
@@ -1144,12 +1144,12 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print sticky top-0 z-[60] backdrop-blur-md">
+            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print sticky top-14 md:top-[78px] z-30 backdrop-blur-md">
                 <div className="w-full md:w-64 space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">১. পরীক্ষা নির্বাচন</Label>
                     <Select value={examName} onValueChange={setExamName}>
                         <SelectTrigger className="h-11 border-2 font-black"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-50">
                             {exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
