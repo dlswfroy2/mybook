@@ -75,7 +75,7 @@ import { availablePermissions, defaultPermissions } from '@/lib/permissions';
 import { studentFromDoc, getStudentPlaceholderImage, sanitizePhotoUrl } from '@/lib/student-data';
 import { getExams, Exam } from '@/lib/exam-data';
 import { getAllResults } from '@/lib/results-data';
-import { getSubjects, Subject as SubjectType } from '@/lib/subjects';
+import { getSubjects, Subject as SubjectType, subjectNameNormalization } from '@/lib/subjects';
 import { processStudentResults, StudentProcessedResult } from '@/lib/results-calculation';
 import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -873,22 +873,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         { interval: '0-32', point: '0.00', grade: 'F' },
     ];
 
-    const normalizeSub = (name: string) => (subjectNameNormalization[name.trim()] || name.trim()).toLowerCase();
-
-    const allSubjectsForGroup = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
-    const subjects = allSubjectsForGroup.filter(subInfo => {
-        const subNameNorm = normalizeSub(subInfo.name);
-        const optSubNorm = normalizeSub(student.optionalSubject || '');
-        const classNum = parseInt(student.className);
-        if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
-            const hmNorm = normalizeSub('উচ্চতর গণিত');
-            const agriNorm = normalizeSub('কৃষি শিক্ষা');
-            if (subNameNorm === hmNorm || subNameNorm === agriNorm) {
-                if (optSubNorm && subNameNorm !== optSubNorm) return false;
-            }
-        }
-        return true;
-    });
+    // Use subjects directly from the result map to ensure all processed subjects are shown
+    const allPossibleSubjects = getSubjects(student.className, student.group);
+    const subjects = allPossibleSubjects.filter(s => result.subjectResults.has(s.name));
 
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
     const displayExamName = examNameEnglishMap[examName] || examName;

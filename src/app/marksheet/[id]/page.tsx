@@ -37,198 +37,6 @@ const normalize = (name: string) => {
     return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
 };
 
-function MarksheetContent() {
-    const params = useParams();
-    const searchParams = useSearchParams();
-    const studentId = params.id as string;
-    const db = useFirestore();
-    const { schoolInfo } = useSchoolInfo();
-
-    const [student, setStudent] = useState<Student | null>(null);
-    const [allStudentsInClass, setAllStudentsInClass] = useState<Student[]>([]);
-    const [resultsBySubject, setResultsBySubject] = useState<ClassResult[]>([]);
-    const [processedResult, setProcessedResult] = useState<StudentProcessedResult | null>(null);
-    const [subjects, setSubjects] = useState<Subject[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [allExams, setAllExams] = useState<Exam[]>([]);
-    const [watermarkOpacity, setWatermarkOpacity] = useState(0.15);
-
-    const academicYear = searchParams.get('academicYear') || new Date().getFullYear().toString();
-    const initialExam = searchParams.get('examName') || 'Annual Examination';
-    const [currentExamName, setCurrentExamName] = useState<string>(initialExam);
-
-    useEffect(() => {
-        const fetchAllData = async () => {
-            if (!db || !studentId) return;
-
-            setIsLoading(true);
-            try {
-                getExams(db, academicYear).then(data => setAllExams(data));
-
-                const studentDoc = await getDoc(doc(db, 'students', studentId));
-                if (!studentDoc.exists()) {
-                    setIsLoading(false);
-                    return;
-                }
-                const studentData = studentFromDoc(studentDoc);
-                setStudent(studentData);
-
-                const classQuery = query(
-                    collection(db, 'students'),
-                    where('academicYear', '==', academicYear),
-                    where('className', '==', studentData.className)
-                );
-                const classSnap = await getDocs(classQuery);
-                const studentsList = classSnap.docs.map(studentFromDoc);
-                setAllStudentsInClass(studentsList);
-
-                const allResults = await getAllResults(db, academicYear, currentExamName);
-                const fetchedResultsBySubject = allResults.filter(r => r.className === studentData.className);
-                setResultsBySubject(fetchedResultsBySubject);
-
-                const allSubjectsForGroup = getSubjects(studentData.className, studentData.group || undefined).filter(s => s.isExamSubject !== false);
-                
-                const allFinalResults = processStudentResults(studentsList, fetchedResultsBySubject, allSubjectsForGroup);
-                const finalResultForThisStudent = allFinalResults.find(res => res.student.id === studentId);
-
-                if (finalResultForThisStudent) {
-                    const subjectsToShow = allSubjectsForGroup.filter(subInfo => {
-                        const subNameNorm = normalize(subInfo.name);
-                        const optSubNorm = normalize(studentData.optionalSubject || '');
-
-                        if (parseInt(studentData.className) >= 9 && (studentData.group?.toLowerCase() === 'science' || studentData.group === 'বিজ্ঞান')) {
-                             const hmNorm = normalize('উচ্চতর গণিত');
-                             const agriNorm = normalize('কৃষি শিক্ষা');
-                             if (optSubNorm && subNameNorm !== optSubNorm) return false;
-                        }
-                        return true;
-                    });
-
-                    setSubjects(subjectsToShow);
-                    setProcessedResult(finalResultForThisStudent);
-                }
-            } catch (e) {
-                console.error("Error fetching data for marksheet:", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchAllData();
-    }, [db, studentId, academicYear, currentExamName]);
-
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-muted-foreground font-medium">Generating marksheet, please wait...</p>
-            </div>
-        );
-    }
-
-    if (!student || !processedResult) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-4 text-center">
-                Marksheet data not found. Please ensure results for all subjects are entered.
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center">
-            <style jsx global>{`
-                @media print {
-                    @page {
-                        size: A4 portrait;
-                        margin: 0.5in !important;
-                    }
-                    html, body {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        height: auto !important;
-                        overflow: visible !important;
-                        width: 100% !important;
-                        background: white !important;
-                    }
-                    .no-print {
-                        display: none !important;
-                    }
-                    .printable-area {
-                        display: block !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    .marksheet-container {
-                        width: 100% !important;
-                        height: auto !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        page-break-after: avoid;
-                    }
-                }
-            `}</style>
-
-            <div className="w-full max-w-[210mm] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print bg-white p-4 rounded-2xl shadow-sm border">
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" size="icon" onClick={() => window.history.back()} className="rounded-xl"><ArrowLeft className="h-4 w-4" /></Button>
-                    <div>
-                        <h1 className="text-lg font-black text-primary">Marksheet Preview</h1>
-                        <p className="text-xs font-bold text-muted-foreground">{student.studentNameEn || student.studentNameBn} | Roll: {student.roll} | Class {student.className}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div className="flex items-center gap-2 flex-1 sm:flex-initial bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                        <Label className="text-[10px] font-black text-slate-500 uppercase px-1">WATERMARK</Label>
-                        <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.max(0, parseFloat((prev - 0.05).toFixed(2))))}>
-                                <Minus className="h-3.5 w-3.5" />
-                            </Button>
-                            <span className="text-[11px] font-black w-8 text-center bg-white border rounded py-0.5">{Math.round(watermarkOpacity * 100)}%</span>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.min(1, parseFloat((prev + 0.05).toFixed(2))))}>
-                                <Plus className="h-3.5 w-3.5" />
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-                        <Select value={currentExamName} onValueChange={setCurrentExamName}>
-                            <SelectTrigger className="h-10 w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
-                                <SelectValue placeholder="Select Examination" />
-                            </SelectTrigger>
-                            <SelectContent className="font-kalpurush">
-                                {allExams.map((e) => (
-                                    <SelectItem key={e.id || e.name} value={e.name} className="font-bold text-xs">
-                                        {examNameEnglishMap[e.name] || e.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <Button onClick={() => window.print()} size="default" className="shadow-md hover:shadow-lg transition-all font-black rounded-xl bg-primary text-white">
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print (A4)
-                    </Button>
-                </div>
-            </div>
-            
-            <div className="printable-area marksheet-container w-[210mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:p-0">
-                <MarksheetTemplate 
-                    result={processedResult} 
-                    schoolInfo={schoolInfo} 
-                    examName={currentExamName} 
-                    academicYear={academicYear}
-                    watermarkOpacity={watermarkOpacity}
-                />
-            </div>
-        </div>
-    );
-}
-
 const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, watermarkOpacity }: any) => {
     const student = result.student;
     const gradingScale = [
@@ -241,19 +49,10 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         { interval: '0-32', point: '0.00', grade: 'F' },
     ];
 
-    const allSubjectsForGroup = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
-    const subjects = allSubjectsForGroup.filter(subInfo => {
-        const subNameNorm = normalize(subInfo.name);
-        const optSubNorm = normalize(student.optionalSubject || '');
-        const classNum = parseInt(student.className);
-        if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
-            const hmNorm = normalize('উচ্চতর গণিত');
-            const agriNorm = normalize('কৃষি শিক্ষা');
-            if (optSubNorm && subNameNorm !== optSubNorm) return false;
-        }
-        return true;
-    });
-
+    // Use subjects directly from the result map to ensure all processed subjects are shown
+    const allPossibleSubjects = getSubjects(student.className, student.group);
+    const subjects = allPossibleSubjects.filter(s => result.subjectResults.has(s.name));
+    
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
     const displayExamName = examNameEnglishMap[examName] || examName;
     const hasPractical = sortedSubjects.some(s => s.practical);
@@ -270,11 +69,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         if (!isPass) return "Work hard to do well in the next exam";
         if (gpa >= 5.0) return "Excellent results. Keep it up!";
         if (gpa >= 4.0) return "Satisfactory performance. Aim higher!";
-        if (gpa >= 3.5) return "Good result. Needs more focus.";
-        if (gpa >= 3.0) return "Average result. Improvement needed.";
-        if (gpa >= 2.0) return "Below average. Study hard.";
-        if (gpa >= 1.0) return "Poor performance. Needs regular study.";
-        return "Work hard to do well in the next exam";
+        return "Keep focusing on studies";
     };
 
     return (
@@ -428,6 +223,184 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         </div>
     );
 };
+
+function MarksheetContent() {
+    const params = useParams();
+    const searchParams = useSearchParams();
+    const studentId = params.id as string;
+    const db = useFirestore();
+    const { schoolInfo } = useSchoolInfo();
+
+    const [student, setStudent] = useState<Student | null>(null);
+    const [allStudentsInClass, setAllStudentsInClass] = useState<Student[]>([]);
+    const [resultsBySubject, setResultsBySubject] = useState<ClassResult[]>([]);
+    const [processedResult, setProcessedResult] = useState<StudentProcessedResult | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [allExams, setAllExams] = useState<Exam[]>([]);
+    const [watermarkOpacity, setWatermarkOpacity] = useState(0.15);
+
+    const academicYear = searchParams.get('academicYear') || new Date().getFullYear().toString();
+    const initialExam = searchParams.get('examName') || 'Annual Examination';
+    const [currentExamName, setCurrentExamName] = useState<string>(initialExam);
+
+    useEffect(() => {
+        const fetchAllData = async () => {
+            if (!db || !studentId) return;
+
+            setIsLoading(true);
+            try {
+                getExams(db, academicYear).then(data => setAllExams(data));
+
+                const studentDoc = await getDoc(doc(db, 'students', studentId));
+                if (!studentDoc.exists()) {
+                    setIsLoading(false);
+                    return;
+                }
+                const studentData = studentFromDoc(studentDoc);
+                setStudent(studentData);
+
+                const classQuery = query(
+                    collection(db, 'students'),
+                    where('academicYear', '==', academicYear),
+                    where('className', '==', studentData.className)
+                );
+                const classSnap = await getDocs(classQuery);
+                const studentsList = classSnap.docs.map(studentFromDoc);
+                setAllStudentsInClass(studentsList);
+
+                const allResults = await getAllResults(db, academicYear, currentExamName);
+                const fetchedResultsBySubject = allResults.filter(r => r.className === studentData.className);
+                setResultsBySubject(fetchedResultsBySubject);
+
+                const allSubjectsForGroup = getSubjects(studentData.className, studentData.group || undefined).filter(s => s.isExamSubject !== false);
+                
+                const allFinalResults = processStudentResults(studentsList, fetchedResultsBySubject, allSubjectsForGroup);
+                const finalResultForThisStudent = allFinalResults.find(res => res.student.id === studentId);
+
+                if (finalResultForThisStudent) {
+                    setProcessedResult(finalResultForThisStudent);
+                }
+            } catch (e) {
+                console.error("Error fetching data for marksheet:", e);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAllData();
+    }, [db, studentId, academicYear, currentExamName]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-muted-foreground font-medium">Generating marksheet, please wait...</p>
+            </div>
+        );
+    }
+
+    if (!student || !processedResult) {
+        return (
+            <div className="flex items-center justify-center min-h-screen p-4 text-center">
+                Marksheet data not found. Please ensure results for all subjects are entered.
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center">
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        size: A4 portrait;
+                        margin: 0.5in !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        height: auto !important;
+                        overflow: visible !important;
+                        width: 100% !important;
+                        background: white !important;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    .printable-area {
+                        display: block !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    .marksheet-inner-content {
+                        width: 100% !important;
+                        height: auto !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        border: 1.5px solid black !important;
+                        box-shadow: none !important;
+                        page-break-after: avoid;
+                    }
+                }
+            `}</style>
+
+            <div className="w-full max-w-[210mm] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 no-print bg-white p-4 rounded-2xl shadow-sm border">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" size="icon" onClick={() => window.history.back()} className="rounded-xl"><ArrowLeft className="h-4 w-4" /></Button>
+                    <div>
+                        <h1 className="text-lg font-black text-primary">Marksheet Preview</h1>
+                        <p className="text-xs font-bold text-muted-foreground">{student.studentNameEn || student.studentNameBn} | Roll: {student.roll} | Class {student.className}</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-2 flex-1 sm:flex-initial bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                        <Label className="text-[10px] font-black text-slate-500 uppercase px-1">WATERMARK</Label>
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.max(0, parseFloat((prev - 0.05).toFixed(2))))}>
+                                <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-[11px] font-black w-8 text-center bg-white border rounded py-0.5">{Math.round(watermarkOpacity * 100)}%</span>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.min(1, parseFloat((prev + 0.05).toFixed(2))))}>
+                                <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                        <Select value={currentExamName} onValueChange={setCurrentExamName}>
+                            <SelectTrigger className="h-10 w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
+                                <SelectValue placeholder="Select Examination" />
+                            </SelectTrigger>
+                            <SelectContent className="font-kalpurush">
+                                {allExams.map((e) => (
+                                    <SelectItem key={e.id || e.name} value={e.name} className="font-bold text-xs">
+                                        {examNameEnglishMap[e.name] || e.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Button onClick={() => window.print()} size="default" className="shadow-md hover:shadow-lg transition-all font-black rounded-xl bg-primary text-white">
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print (A4)
+                    </Button>
+                </div>
+            </div>
+            
+            <div className="printable-area w-full max-w-[210mm] bg-white relative flex flex-col box-border shadow-2xl print:shadow-none print:p-0">
+                <MarksheetTemplate 
+                    result={processedResult} 
+                    schoolInfo={schoolInfo} 
+                    examName={currentExamName} 
+                    academicYear={academicYear}
+                    watermarkOpacity={watermarkOpacity}
+                />
+            </div>
+        </div>
+    );
+}
 
 export default function MarksheetPage() {
     return (

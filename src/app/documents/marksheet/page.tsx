@@ -200,9 +200,13 @@ const MarksheetGeneratorPage = () => {
                                     <div className="space-y-2 pt-4 border-t">
                                         <Label className="font-bold text-xs flex items-center gap-2">Watermark Opacity</Label>
                                         <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border">
-                                            <Button variant="ghost" size="icon" onClick={() => setWatermarkOpacity(prev => Math.max(0, prev - 0.05))}><Minus className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" onClick={() => setWatermarkOpacity(prev => Math.max(0, parseFloat((prev - 0.05).toFixed(2))))}>
+                                                <Minus className="h-4 w-4" />
+                                            </Button>
                                             <span className="font-black flex-1 text-center">{Math.round(watermarkOpacity * 100)}%</span>
-                                            <Button variant="ghost" size="icon" onClick={() => setWatermarkOpacity(prev => Math.min(1, prev + 0.05))}><Plus className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" onClick={() => setWatermarkOpacity(prev => Math.min(1, parseFloat((prev + 0.05).toFixed(2))))}>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -269,12 +273,12 @@ const MarksheetGeneratorPage = () => {
                             overflow: hidden !important;
                             display: block !important;
                         }
-                        .marksheet-container {
+                        .marksheet-inner-content {
                             width: 100% !important;
                             height: auto !important;
                             padding: 0 !important;
                             margin: 0 !important;
-                            border: none !important;
+                            border: 1.5px solid black !important;
                             box-shadow: none !important;
                         }
                     }
@@ -307,18 +311,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         { interval: '0-32', point: '0.00', grade: 'F' },
     ];
 
-    const allSubjectsForGroup = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
-    const subjects = allSubjectsForGroup.filter(subInfo => {
-        const subNameNorm = normalize(subInfo.name);
-        const optSubNorm = normalize(student.optionalSubject || '');
-        const classNum = parseInt(student.className);
-        if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
-            const hmNorm = normalize('উচ্চতর গণিত');
-            const agriNorm = normalize('কৃষি শিক্ষা');
-            if (optSubNorm && subNameNorm !== optSubNorm) return false;
-        }
-        return true;
-    });
+    // Use subjects directly from the result map to ensure all processed subjects are shown
+    const allPossibleSubjects = getSubjects(student.className, student.group);
+    const subjects = allPossibleSubjects.filter(s => result.subjectResults.has(s.name));
 
     const sortedSubjects = [...subjects].sort((a,b) => parseInt(a.code) - parseInt(b.code));
     const displayExamName = examNameEnglishMap[examName] || examName;
