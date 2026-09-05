@@ -234,7 +234,7 @@ function MarksheetContent() {
                 </div>
             </div>
             
-            <div className="printable-area marksheet-container w-[210mm] min-h-[297mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:m-0">
+            <div className="printable-area marksheet-container w-[210mm] bg-white p-8 relative flex flex-col box-border shadow-2xl print:shadow-none print:m-0 print:p-0">
                 {schoolInfo.logoUrl && (
                     <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer" style={{ opacity: watermarkOpacity }}>
                         <img src={schoolInfo.logoUrl} alt="Watermark" className="w-[300px] h-[300px] object-contain" />
@@ -370,12 +370,12 @@ function MarksheetContent() {
                         </p>
                     </section>
 
-                    <footer className="mt-auto pt-8 pb-4 text-[11px]">
+                    <footer className="mt-auto pt-6 pb-2 text-[11px]">
                         <div className="flex justify-between px-16">
                             <div className="text-center w-32 border-t border-black pt-1 font-bold text-gray-700 uppercase">Class Teacher</div>
                             <div className="text-center w-32 border-t border-black pt-1 font-bold text-gray-700 uppercase">Headmaster</div>
                         </div>
-                        <div className="mt-8 flex justify-between items-center text-[9px] text-muted-foreground italic border-t pt-2">
+                        <div className="mt-4 flex justify-between items-center text-[9px] text-muted-foreground italic border-t pt-2">
                             <span>Report Date: {new Date().toLocaleDateString('en-GB')}</span>
                             <span>Powered by: {schoolInfo.nameEn || ""} Management System</span>
                         </div>

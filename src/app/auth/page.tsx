@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -486,19 +485,26 @@ export default function AuthPage() {
           animation-play-state: paused;
         }
         @media print {
-            body * { visibility: hidden; background: white !important; }
-            .printable-area, .printable-area * { visibility: visible; }
+            @page {
+                size: A4 portrait;
+                margin: 0.5in !important;
+            }
+            body * { visibility: hidden !important; background: white !important; }
+            .printable-area, .printable-area * { visibility: visible !important; }
             .printable-area { 
                 position: absolute !important; 
                 left: 0 !important; 
                 top: 0 !important; 
                 width: 100% !important; 
+                height: auto !important;
                 margin: 0 !important; 
-                padding: 10mm !important;
+                padding: 0 !important;
                 background: white !important;
+                border: none !important;
+                overflow: hidden !important;
+                display: block !important;
             }
             .no-print { display: none !important; }
-            @page { size: A4 portrait; margin: 0.5in !important; }
         }
       `}</style>
 
@@ -649,7 +655,7 @@ export default function AuthPage() {
                   </div>
                   <div>
                     <p className="text-2xl md:text-3xl font-black text-slate-800">{toBengaliNumber(stats.attendanceRate.toFixed(1))}%</p>
-                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider mt-0.5">উপস্থিতি</p>
+                    <p className="text-[10px] md:text-xs font-black text-blue-600 uppercase tracking-wider mt-0.5">উপস্থিতি</p>
                   </div>
                </CardContent>
             </Card>
@@ -660,7 +666,7 @@ export default function AuthPage() {
                   </div>
                   <div>
                     <p className="text-2xl md:text-3xl font-black text-slate-800">{toBengaliNumber(stats.passRate.toFixed(1))}%</p>
-                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
+                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
                   </div>
                </CardContent>
             </Card>
@@ -806,84 +812,92 @@ export default function AuthPage() {
 
       {/* Professional English Marksheet for Printing */}
       {searchResult && (
-        <div className="hidden print:block printable-area bg-white text-black p-8 w-[210mm] min-h-[297mm] mx-auto font-sans">
-          <header className="text-center border-b-2 border-black pb-4 mb-6 flex flex-col items-center">
-            {appLogoUrl && <img src={appLogoUrl} alt="Logo" className="w-16 h-16 object-contain mb-2" />}
-            <h1 className="text-2xl font-black uppercase text-[#003366] leading-none mb-1">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
-            <p className="text-sm font-bold text-gray-700">{schoolInfo.address}</p>
-            <div className="mt-3 inline-block bg-slate-100 border border-black px-8 py-1 rounded-full font-black text-sm uppercase">PROGRESS REPORT - {searchYear}</div>
-          </header>
+        <div className="hidden print:block printable-area bg-white text-black p-0 w-full min-h-0 mx-auto font-sans">
+          <div className="border-[1.5px] border-black p-4 flex flex-col h-full bg-white">
+            <header className="text-center border-b-2 border-black pb-4 mb-4 flex flex-col items-center">
+                {appLogoUrl && <img src={appLogoUrl} alt="Logo" className="w-16 h-16 object-contain mb-2" />}
+                <h1 className="text-2xl font-black uppercase text-[#003366] leading-none mb-1">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
+                <p className="text-sm font-bold text-gray-700">{schoolInfo.address}</p>
+                <div className="mt-3 inline-block bg-slate-100 border border-black px-8 py-1 rounded-full font-black text-sm uppercase">PROGRESS REPORT - {searchYear}</div>
+            </header>
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6 text-sm border-2 border-black p-4 rounded-xl font-bold bg-slate-50/30">
-            <div className="flex border-b border-black/10 pb-1">Name: <span className="uppercase font-black ml-1 flex-1">{searchResult.student.studentNameEn || searchResult.student.studentNameBn}</span></div>
-            <div className="flex border-b border-black/10 pb-1">ID No: <span className="font-black ml-1 flex-1">{searchResult.student.generatedId || "-"}</span></div>
-            <div className="flex border-b border-black/10 pb-1">Class: <span className="font-black ml-1 flex-1">{searchClass}</span></div>
-            <div className="flex border-b border-black/10 pb-1">Roll No: <span className="font-black ml-1 flex-1">{searchResult.student.roll}</span></div>
-            <div className="flex border-b border-black/10 pb-1">Group: <span className="font-black ml-1 flex-1 uppercase">{groupMapEn[searchResult.student.group?.toLowerCase() || ''] || searchResult.student.group || "General"}</span></div>
-            <div className="flex border-b border-black/10 pb-1">Exam: <span className="font-black ml-1 flex-1">{searchExam}</span></div>
-          </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-4 text-[11px] border-2 border-black p-4 rounded-xl font-bold bg-slate-50/30">
+                <div className="flex border-b border-black/10 pb-1">Name: <span className="uppercase font-black ml-1 flex-1">{searchResult.student.studentNameEn || searchResult.student.studentNameBn}</span></div>
+                <div className="flex border-b border-black/10 pb-1">ID No: <span className="font-black ml-1 flex-1">{searchResult.student.generatedId || "-"}</span></div>
+                <div className="flex border-b border-black/10 pb-1">Class: <span className="font-black ml-1 flex-1">{searchClass}</span></div>
+                <div className="flex border-b border-black/10 pb-1">Roll No: <span className="font-black ml-1 flex-1">{searchResult.student.roll}</span></div>
+                <div className="flex border-b border-black/10 pb-1">Group: <span className="font-black ml-1 flex-1 uppercase">{groupMapEn[searchResult.student.group?.toLowerCase() || ''] || searchResult.student.group || "General"}</span></div>
+                <div className="flex border-b border-black/10 pb-1">Exam: <span className="font-black ml-1 flex-1">{searchExam}</span></div>
+            </div>
 
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="p-3 border-2 border-black rounded-xl text-center bg-[#003366] text-white">
-                <p className="text-[10px] font-black uppercase mb-1">Status</p>
-                <p className={cn("text-lg font-black", searchResult.isPass ? "text-green-400" : "text-red-400")}>{searchResult.isPass ? "PASSED" : "FAILED"}</p>
+            <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[11px] bg-blue-900 text-white mb-4 rounded-sm">
+                <div className="py-1.5 font-bold">Status: <span className={cn("font-black", searchResult.isPass ? "text-green-400" : "text-red-400")}>{searchResult.isPass ? "PASSED" : "FAILED"}</span></div>
+                <div className="py-1.5 font-bold">GPA: <span className="text-amber-300 font-black">{searchResult.gpa.toFixed(2)}</span></div>
+                <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300 font-black">{searchResult.isPass ? searchResult.finalGrade : "F"}</span></div>
+                <div className="py-1.5 font-bold">Merit Rank: <span>{searchResult.isPass ? (searchResult.meritPosition || "-") : "-"}</span></div>
             </div>
-            <div className="p-3 border-2 border-black rounded-xl text-center">
-                <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">GPA</p>
-                <p className="text-2xl font-black">{searchResult.gpa.toFixed(2)}</p>
-            </div>
-            <div className="p-3 border-2 border-black rounded-xl text-center">
-                <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">Grade</p>
-                <p className="text-2xl font-black">{searchResult.isPass ? searchResult.finalGrade : "F"}</p>
-            </div>
-            <div className="p-3 border-2 border-black rounded-xl text-center">
-                <p className="text-[10px] font-black text-muted-foreground uppercase mb-1">Merit Rank</p>
-                <p className="text-2xl font-black">{searchResult.isPass ? (searchResult.meritPosition || "-") : "-"}</p>
-            </div>
-          </div>
 
-          <table className="w-full text-xs text-center border-collapse border-2 border-black mb-8">
-            <thead className="bg-slate-100 border-b-2 border-black h-10">
-              <tr>
-                <th className="border-r border-black font-black p-1 pl-4 text-left">Subject Name</th>
-                <th className="border-r border-black font-black p-1 w-20">Full Marks</th>
-                <th className="border-r border-black font-black p-1 w-24">Obtained</th>
-                <th className="border-r border-black font-black p-1 w-16">Grade</th>
-                <th className="font-black p-1 w-20">Point</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from(searchResult.subjectResults.entries()).map(([subName, res]) => {
-                const subInfo = searchSubjects.find(s => s.name === subName);
-                return (
-                  <tr key={subName} className="h-9 border-b border-black last:border-0 hover:bg-slate-50">
-                    <td className="border-r border-black text-left pl-4 font-bold uppercase">{subInfo?.englishName || subName}</td>
-                    <td className="border-r border-black font-bold">{res.fullMarks}</td>
-                    <td className="border-r border-black font-black text-blue-900">{res.marks}</td>
-                    <td className={cn("border-r border-black font-black", !res.isPass && "text-red-600")}>{res.grade}</td>
-                    <td className="font-black">{res.point.toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="bg-slate-100 border-t-2 border-black h-10 font-black">
-              <tr>
-                <td colSpan={2} className="border-r border-black text-right pr-6 uppercase">Total Marks & Result</td>
-                <td className="border-r border-black text-lg text-blue-900">{searchResult.totalMarks}</td>
-                <td className="border-r border-black text-lg">{searchResult.finalGrade}</td>
-                <td className="text-lg">{searchResult.gpa.toFixed(2)}</td>
-              </tr>
-            </tfoot>
-          </table>
+            <div className="flex-grow">
+                <table className="w-full text-[10px] text-center border-collapse border-2 border-black">
+                    <thead className="bg-slate-100 border-b-2 border-black">
+                    <tr>
+                        <th className="border-r border-black font-black p-1 w-8">SL</th>
+                        <th className="border-r border-black font-black p-1 pl-4 text-left">Subject Name</th>
+                        <th className="border-r border-black font-black p-1 w-12">Full Marks</th>
+                        <th className="border-r border-black font-black p-1 w-14">Written</th>
+                        <th className="border-r border-black font-black p-1 w-14">MCQ</th>
+                        {searchSubjects.some(s => s.practical) && <th className="border-r border-black font-black p-1 w-14">Practical</th>}
+                        <th className="border-r border-black font-black p-1 w-16">Obtained</th>
+                        <th className="border-r border-black font-black p-1 w-12">Grade</th>
+                        <th className="font-black p-1 w-12">Point</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {Array.from(searchResult.subjectResults.entries()).map(([subName, res], sIdx) => {
+                        const subInfo = searchSubjects.find(s => s.name === subName);
+                        const hasPracticalColumn = searchSubjects.some(s => s.practical);
+                        return (
+                        <tr key={subName} className="h-8 border-b border-black last:border-0 hover:bg-slate-50">
+                            <td className="border-r border-black p-1 text-center font-medium text-gray-500">{sIdx + 1}</td>
+                            <td className="border-r border-black text-left pl-4 font-bold uppercase">{subInfo?.englishName || subName}</td>
+                            <td className="border-r border-black font-bold">{res.fullMarks}</td>
+                            <td className="border-r border-black font-medium">{res.written ?? '-'}</td>
+                            <td className="border-r border-black font-medium">{res.mcq ?? '-'}</td>
+                            {hasPracticalColumn && <td className="border-r border-black font-medium">{res.practical ?? '-'}</td>}
+                            <td className={cn("border-r border-black font-black text-[12px]", !res.isPass ? "text-red-600" : "text-blue-900")}>{res.marks}</td>
+                            <td className={cn("border-r border-black font-black", !res.isPass && "text-red-600")}>{res.grade}</td>
+                            <td className={cn("font-black", !res.isPass && "text-red-600")}>{res.point.toFixed(2)}</td>
+                        </tr>
+                        );
+                    })}
+                    </tbody>
+                    <tfoot className="bg-slate-100 border-t-2 border-black h-10 font-black">
+                    <tr>
+                        <td colSpan={searchSubjects.some(s => s.practical) ? 6 : 5} className="border-r border-black text-right pr-6 uppercase text-[10px]">Total Marks & Final Results</td>
+                        <td className="border-r border-black text-sm text-blue-900">{searchResult.totalMarks}</td>
+                        <td className="border-r border-black text-sm">{searchResult.finalGrade}</td>
+                        <td className="text-sm">{searchResult.gpa.toFixed(2)}</td>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
 
-          <div className="mt-20 flex justify-between px-10 pt-8 border-t border-dashed">
-            <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[10px] uppercase">Class Teacher</div>
-            <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[10px] uppercase">Headmaster</div>
-          </div>
-          
-          <div className="mt-8 text-[8px] text-slate-400 italic flex justify-between px-2">
-            <span>Generated Date: {new Date().toLocaleDateString('en-GB')}</span>
-            <span>Digital Management Portal | {schoolInfo.nameEn || "BPHS"}</span>
+            <div className="mt-4 p-2 border border-black rounded bg-gray-50/30">
+                <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">Remarks:</p>
+                <p className="text-[11px] font-black italic text-blue-900">
+                    "{searchResult.isPass ? (searchResult.gpa >= 5 ? "Excellent results. Keep it up!" : "Satisfactory performance. Aim higher!") : "Work hard to do well in the next exam"}"
+                </p>
+            </div>
+
+            <div className="mt-auto flex justify-between px-10 pt-8 pb-4">
+                <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[10px] uppercase">Class Teacher</div>
+                <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[10px] uppercase">Headmaster</div>
+            </div>
+            
+            <div className="mt-2 text-[7px] text-slate-400 italic flex justify-between border-t border-dashed pt-2">
+                <span>Generated Date: {new Date().toLocaleDateString('en-GB')}</span>
+                <span>Digital Management Portal | {schoolInfo.nameEn || institutionName}</span>
+            </div>
           </div>
         </div>
       )}

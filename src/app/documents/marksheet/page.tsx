@@ -268,20 +268,20 @@ const MarksheetGeneratorPage = () => {
                             margin: 0 !important; 
                             padding: 0 !important; 
                             page-break-after: always !important; 
+                            overflow: hidden !important;
+                            display: block !important;
                         }
                     }
                 `}</style>
                 {resultsToPrint.map((res) => (
-                    <div key={res.student.id} className="print-page-wrapper w-[210mm] h-[297mm] mx-auto overflow-hidden relative bg-white">
-                        <div className="p-0 h-full w-full box-border print:p-0">
-                            <MarksheetTemplate 
-                                result={res} 
-                                schoolInfo={schoolInfo} 
-                                examName={selectedExam?.name || ''} 
-                                academicYear={selectedYear}
-                                watermarkOpacity={watermarkOpacity}
-                            />
-                        </div>
+                    <div key={res.student.id} className="print-page-wrapper w-[210mm] mx-auto overflow-hidden relative bg-white">
+                        <MarksheetTemplate 
+                            result={res} 
+                            schoolInfo={schoolInfo} 
+                            examName={selectedExam?.name || ''} 
+                            academicYear={selectedYear}
+                            watermarkOpacity={watermarkOpacity}
+                        />
                     </div>
                 ))}
             </div>
@@ -330,7 +330,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
     };
 
     return (
-        <div className="marksheet-container w-[210mm] h-[280mm] bg-white relative flex flex-col box-border font-sans text-black">
+        <div className="marksheet-container w-[210mm] bg-white relative flex flex-col box-border font-sans text-black">
             <style jsx>{`
                 .watermark-layer img { visibility: visible !important; display: block !important; }
                 .marksheet-content { border: 1.5px solid black; padding: 16px; height: 100%; display: flex; flex-direction: column; background: transparent; position: relative; z-index: 10; }
@@ -425,11 +425,11 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                     <div className="py-1.5 font-bold">Merit Rank: <span>{result.isPass ? renderMeritPosition(result.meritPosition) : 'N/A'}</span></div>
                 </div>
 
-                <div className="flex-grow">
+                <div className="flex-grow overflow-visible">
                     <table className="w-full border-collapse border-[1.5px] border-black text-[10px]">
                         <thead className="bg-gray-100 font-bold">
                             <tr className="border-b-[1.5px] border-black">
-                                <th className="border-r border-black p-1 w-8">SL</th>
+                                <th className="border-r border-black p-1 w-8 text-center">SL</th>
                                 <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
                                 <th className="border-r border-black p-1 w-12">Full Marks</th>
                                 <th className="border-r border-black p-1 w-14">Written</th>
@@ -475,8 +475,8 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                     <p className="text-[11px] font-black italic text-blue-900">"{getRemarks(result.gpa, result.isPass)}"</p>
                 </div>
 
-                <footer className="mt-auto pt-8 flex flex-col">
-                    <div className="flex justify-between px-12 mb-6">
+                <footer className="mt-auto pt-6 flex flex-col pb-2">
+                    <div className="flex justify-between px-12 mb-4">
                         <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Class Teacher</div>
                         <div className="text-center w-32 border-t border-black pt-1 font-bold text-[10px] uppercase">Headmaster</div>
                     </div>
