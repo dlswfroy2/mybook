@@ -81,7 +81,6 @@ export function processStudentResults(
 
         const groupAllowedSubjects = getSubjects(student.className, studentGroupNormalized);
         
-        // Final subject list for this student (exclude non-exam subjects like continuous assessment with fullMarks 0)
         const subjectsForStudent = groupAllowedSubjects.filter(subInfo => {
             if (subInfo.isExamSubject === false || subInfo.fullMarks === 0) {
                 return false;
@@ -89,7 +88,6 @@ export function processStudentResults(
 
             const currentSubNameNormalized = normalize(subInfo.name);
             
-            // For 9-10 Science: Exclusive check between HM and Agri
             if (studentClassNum >= 9 && studentGroupNormalized === 'science') {
                 const hmNormalized = normalize('উচ্চতর গণিত');
                 const agriNormalized = normalize('কৃষি শিক্ষা');
@@ -98,7 +96,6 @@ export function processStudentResults(
                     if (optionalSubjectNameNormalized) {
                         return currentSubNameNormalized === optionalSubjectNameNormalized;
                     } else {
-                        // Default fallback
                         return currentSubNameNormalized === hmNormalized;
                     }
                 }
@@ -139,6 +136,7 @@ export function processStudentResults(
             let isPassSubject = true;
             const overallPassMark = Math.ceil(fullMarks * 0.33);
 
+            // Separate Pass Logic for NCTB curriculum
             if (obtainedMarks < overallPassMark) {
                 isPassSubject = false;
             } else {
@@ -147,20 +145,24 @@ export function processStudentResults(
 
                 if (!isEnglish) {
                     if (isIct25) {
+                        // ICT 25 Marks (MCQ 25) -> Pass: 8
                         if (mcq !== undefined && mcq < 8) isPassSubject = false;
                     } else if (fullMarks === 100) {
                         if (subjectInfo.practical) {
+                            // Subject with Practical: Written 50 (Pass 17), MCQ 25 (Pass 8), Practical 25 (Pass 8)
                             if (written !== undefined && written < 17) isPassSubject = false;
                             if (mcq !== undefined && mcq < 8) isPassSubject = false;
                             if (practical !== undefined && practical < 8) isPassSubject = false;
                         } else {
+                            // Subject without Practical: Written 70 (Pass 23), MCQ 30 (Pass 10)
                             if (written !== undefined && written < 23) isPassSubject = false;
                             if (mcq !== undefined && mcq < 10) isPassSubject = false;
                         }
                     } 
                     else if (fullMarks === 50) {
-                        if (written !== undefined && written < 12) isPassSubject = false;
-                        if (mcq !== undefined && mcq < 5) isPassSubject = false;
+                        // 50 Marks Subject: Written 40 (Pass 13), MCQ 10 (Pass 3)
+                        if (written !== undefined && written < 13) isPassSubject = false;
+                        if (mcq !== undefined && mcq < 3) isPassSubject = false;
                     }
                 }
             }
