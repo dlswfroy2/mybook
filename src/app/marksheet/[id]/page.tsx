@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Student, studentFromDoc } from '@/lib/student-data';
+import { Student, studentFromDoc, isFemale, getStudentPlaceholderImage, sanitizePhotoUrl } from '@/lib/student-data';
 import { getSubjects, Subject, subjectNameNormalization } from '@/lib/subjects';
 import { getAllResults, ClassResult } from '@/lib/results-data';
 import { processStudentResults, StudentProcessedResult } from '@/lib/results-calculation';
@@ -49,7 +49,6 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         { interval: '0-32', point: '0.00', grade: 'F' },
     ];
 
-    // Use subjects directly from the result map to ensure all processed subjects are shown
     const allPossibleSubjects = getSubjects(student.className, student.group);
     const subjects = allPossibleSubjects.filter(s => result.subjectResults.has(s.name));
     
@@ -74,13 +73,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
 
     return (
         <div className="marksheet-inner-content border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent relative box-border">
-            <style jsx>{`
-                .watermark-layer img { visibility: visible !important; display: block !important; }
-            `}</style>
-
             {schoolInfo.logoUrl && (
                 <div 
-                    className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer"
+                    className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none watermark-layer opacity-10"
                     style={{ opacity: watermarkOpacity }}
                 >
                     <img src={schoolInfo.logoUrl} alt="Watermark" className="w-[300px] h-[300px] object-contain" />
@@ -232,8 +227,6 @@ function MarksheetContent() {
     const { schoolInfo } = useSchoolInfo();
 
     const [student, setStudent] = useState<Student | null>(null);
-    const [allStudentsInClass, setAllStudentsInClass] = useState<Student[]>([]);
-    const [resultsBySubject, setResultsBySubject] = useState<ClassResult[]>([]);
     const [processedResult, setProcessedResult] = useState<StudentProcessedResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [allExams, setAllExams] = useState<Exam[]>([]);
@@ -246,66 +239,31 @@ function MarksheetContent() {
     useEffect(() => {
         const fetchAllData = async () => {
             if (!db || !studentId) return;
-
             setIsLoading(true);
             try {
                 getExams(db, academicYear).then(data => setAllExams(data));
-
                 const studentDoc = await getDoc(doc(db, 'students', studentId));
-                if (!studentDoc.exists()) {
-                    setIsLoading(false);
-                    return;
-                }
+                if (!studentDoc.exists()) { setIsLoading(false); return; }
                 const studentData = studentFromDoc(studentDoc);
                 setStudent(studentData);
-
-                const classQuery = query(
-                    collection(db, 'students'),
-                    where('academicYear', '==', academicYear),
-                    where('className', '==', studentData.className)
-                );
+                const classQuery = query(collection(db, 'students'), where('academicYear', '==', academicYear), where('className', '==', studentData.className));
                 const classSnap = await getDocs(classQuery);
                 const studentsList = classSnap.docs.map(studentFromDoc);
-                setAllStudentsInClass(studentsList);
-
                 const allResults = await getAllResults(db, academicYear, currentExamName);
                 const fetchedResultsBySubject = allResults.filter(r => r.className === studentData.className);
-                setResultsBySubject(fetchedResultsBySubject);
-
                 const allSubjectsForGroup = getSubjects(studentData.className, studentData.group || undefined).filter(s => s.isExamSubject !== false);
-                
                 const allFinalResults = processStudentResults(studentsList, fetchedResultsBySubject, allSubjectsForGroup);
                 const finalResultForThisStudent = allFinalResults.find(res => res.student.id === studentId);
-
-                if (finalResultForThisStudent) {
-                    setProcessedResult(finalResultForThisStudent);
-                }
-            } catch (e) {
-                console.error("Error fetching data for marksheet:", e);
-            } finally {
-                setIsLoading(false);
-            }
+                if (finalResultForThisStudent) setProcessedResult(finalResultForThisStudent);
+            } catch (e) { console.error(e); }
+            finally { setIsLoading(false); }
         };
-
         fetchAllData();
     }, [db, studentId, academicYear, currentExamName]);
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-muted-foreground font-medium">Generating marksheet, please wait...</p>
-            </div>
-        );
-    }
+    if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><Loader2 className="animate-spin" /></div>;
 
-    if (!student || !processedResult) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-4 text-center">
-                Marksheet data not found. Please ensure results for all subjects are entered.
-            </div>
-        );
-    }
+    if (!student || !processedResult) return <div className="flex items-center justify-center min-h-screen">Marksheet data not found.</div>;
 
     return (
         <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center">
@@ -318,28 +276,36 @@ function MarksheetContent() {
                     html, body {
                         margin: 0 !important;
                         padding: 0 !important;
-                        height: auto !important;
-                        overflow: visible !important;
+                        height: 100% !important;
                         width: 100% !important;
+                        overflow: hidden !important;
                         background: white !important;
                     }
                     .no-print {
                         display: none !important;
                     }
                     .printable-area {
-                        display: block !important;
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
                         width: 100% !important;
+                        height: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        display: block !important;
+                        background: white !important;
                     }
                     .marksheet-inner-content {
                         width: 100% !important;
-                        height: auto !important;
-                        padding: 0 !important;
+                        height: 100% !important;
                         margin: 0 !important;
+                        padding: 24px !important;
                         border: 1.5px solid black !important;
-                        box-shadow: none !important;
-                        page-break-after: avoid;
+                        box-sizing: border-box !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        page-break-after: avoid !important;
+                        page-break-inside: avoid !important;
                     }
                 }
             `}</style>
@@ -349,40 +315,35 @@ function MarksheetContent() {
                     <Button variant="outline" size="icon" onClick={() => window.history.back()} className="rounded-xl"><ArrowLeft className="h-4 w-4" /></Button>
                     <div>
                         <h1 className="text-lg font-black text-primary">Marksheet Preview</h1>
-                        <p className="text-xs font-bold text-muted-foreground">{student.studentNameEn || student.studentNameBn} | Roll: {student.roll} | Class {student.className}</p>
+                        <p className="text-xs font-bold text-muted-foreground">{student.studentNameEn || student.studentNameBn} | Roll: {student.roll}</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="flex items-center gap-2 flex-1 sm:flex-initial bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                        <Label className="text-[10px] font-black text-slate-500 uppercase px-1">WATERMARK</Label>
                         <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.max(0, parseFloat((prev - 0.05).toFixed(2))))}>
                                 <Minus className="h-3.5 w-3.5" />
                             </Button>
-                            <span className="text-[11px] font-black w-8 text-center bg-white border rounded py-0.5">{Math.round(watermarkOpacity * 100)}%</span>
+                            <span className="text-[11px] font-black w-8 text-center">{Math.round(watermarkOpacity * 100)}%</span>
                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.min(1, parseFloat((prev + 0.05).toFixed(2))))}>
                                 <Plus className="h-3.5 w-3.5" />
                             </Button>
                         </div>
                     </div>
-
-                    <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-                        <Select value={currentExamName} onValueChange={setCurrentExamName}>
-                            <SelectTrigger className="h-10 w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
-                                <SelectValue placeholder="Select Examination" />
-                            </SelectTrigger>
-                            <SelectContent className="font-kalpurush">
-                                {allExams.map((e) => (
-                                    <SelectItem key={e.id || e.name} value={e.name} className="font-bold text-xs">
-                                        {examNameEnglishMap[e.name] || e.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <Button onClick={() => window.print()} size="default" className="shadow-md hover:shadow-lg transition-all font-black rounded-xl bg-primary text-white">
+                    <Select value={currentExamName} onValueChange={setCurrentExamName}>
+                        <SelectTrigger className="h-10 w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
+                            <SelectValue placeholder="Select Examination" />
+                        </SelectTrigger>
+                        <SelectContent className="font-kalpurush">
+                            {allExams.map((e) => (
+                                <SelectItem key={e.id || e.name} value={e.name} className="font-bold text-xs">
+                                    {examNameEnglishMap[e.name] || e.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button onClick={() => window.print()} className="shadow-md font-black rounded-xl bg-primary text-white">
                         <Printer className="mr-2 h-4 w-4" />
                         Print (A4)
                     </Button>
@@ -404,7 +365,7 @@ function MarksheetContent() {
 
 export default function MarksheetPage() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-50">Loading...</div>}>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
             <MarksheetContent />
         </Suspense>
     );
