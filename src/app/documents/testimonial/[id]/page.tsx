@@ -108,22 +108,20 @@ export default function TestimonialPage() {
                         <div className="text-center flex-grow px-2 overflow-hidden">
                             <p className="text-lg font-bold text-[#2d572c] mb-0.5">প্রধান শিক্ষকের কার্যালয়</p>
                             <h1 className="text-3xl sm:text-4xl font-black mb-1 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis" style={{color: '#2d572c'}}>
-                                {schoolInfo.name || 'বীরগঞ্জ পৌর উচ্চ বিদ্যালয়'}
+                                {schoolInfo.name || ''}
                             </h1>
-                            <p className="text-md font-bold text-[#2d572c] mb-0.5">স্থাপিতঃ ২০১৯ খ্রিঃ</p>
-                            <p className="text-[11px] font-bold text-[#2d572c] tracking-wide">
-                                Upazila: Birganj, Post: Birganj, Zila: Dinajpur | মোবাইলঃ ০১৭১৭৫৭৬০৩০
-                            </p>
-                            <p className="text-[11px] text-red-600 font-bold">
-                                ই-মেইল: birganjpourohsch2019@gmail.com
-                            </p>
+                            {schoolInfo.address && (
+                                <p className="text-[11px] font-bold text-[#2d572c] tracking-wide">
+                                    {schoolInfo.address}
+                                </p>
+                            )}
                         </div>
                         <div className="w-20 h-20"></div>
                     </div>
                 </div>
 
                 <div className="pt-2 pb-1 flex justify-between text-md font-bold">
-                    <span>স্মারক নং- বিপৌউবি/......................</span>
+                    <span>স্মারক নং- ......................</span>
                     <span>তারিখঃ {issueDate}</span>
                 </div>
 
@@ -144,10 +142,10 @@ export default function TestimonialPage() {
                         এই মর্মে প্রত্যয়ন করা যাচ্ছে যে, <span className="font-black text-2xl underline decoration-dotted">{student.studentNameBn}</span>, 
                         পিতা: <span className="font-bold">{student.fatherNameBn}</span>, 
                         মাতা: <span className="font-bold">{student.motherNameBn}</span>, 
-                        গ্রাম: <span className="font-bold">{student.permanentVillage || student.presentVillage || 'বিবিধ'}</span>, 
-                        ডাকঘর: <span className="font-bold">{student.permanentPostOffice || student.presentPostOffice || 'বিবিধ'}</span>, 
-                        উপজেলা: <span className="font-bold">{student.permanentUpazila || student.presentUpazila || 'বীরগঞ্জ'}</span>, 
-                        জেলা: <span className="font-bold">{student.permanentDistrict || student.presentDistrict || 'দিনাজপুর'}</span>। 
+                        গ্রাম: <span className="font-bold">{student.permanentVillage || student.presentVillage || '-'}</span>, 
+                        ডাকঘর: <span className="font-bold">{student.permanentPostOffice || student.presentPostOffice || '-'}</span>, 
+                        উপজেলা: <span className="font-bold">{student.permanentUpazila || student.presentUpazila || '-'}</span>, 
+                        জেলা: <span className="font-bold">{student.permanentDistrict || student.presentDistrict || '-'}</span>। 
                         সে অত্র বিদ্যালয়ে <span className="font-black text-2xl">{classNamesMap[student.className] || student.className}</span> শ্রেণিতে অধ্যয়নরত আছে। 
                         তার শ্রেণি রোল নম্বর <span className="font-bold">{toBengaliNumber(student.roll)}</span> এবং জন্ম তারিখ <span className="font-bold">{studentDob}</span>।
                     </p>

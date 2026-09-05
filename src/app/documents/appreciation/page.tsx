@@ -57,7 +57,7 @@ export default function AppreciationGeneratorPage() {
   });
 
   const [formData, setFormData] = useState({
-    smarak: `বিপৌউবি/প্রসংসা/${new Date().getFullYear()}/`,
+    smarak: `প্রশংসা/${new Date().getFullYear()}/`,
     passingYear: selectedYear,
     gpa: '৫.০০',
     meritPosition: '',
@@ -466,8 +466,8 @@ function AppreciationTemplate({ student, schoolInfo, formData, settings, isEdita
                     মাতা: <span className="border-b-2 border-black border-dotted px-2">{student.motherNameBn}</span>, 
                     গ্রাম: <span className="border-b-2 border-black border-dotted px-2">{student.presentVillage || student.permanentVillage || 'বিবিধ'}</span>, 
                     ডাকঘর: <span className="border-b-2 border-black border-dotted px-2">{student.presentPostOffice || student.permanentPostOffice || 'বিবিধ'}</span>, 
-                    উপজেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentUpazila || 'বীরগঞ্জ'}</span>, 
-                    জেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentDistrict || 'দিনাজপুর'}</span>।
+                    উপজেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentUpazila || ''}</span>, 
+                    জেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentDistrict || ''}</span>।
                 </p>
 
                 <p>

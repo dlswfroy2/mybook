@@ -176,7 +176,7 @@ export default function AuthPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<StudentProcessedResult | null>(null);
 
-  const appName = schoolInfo?.name || 'বীরগঞ্জ পৌর উচ্চ বিদ্যালয়';
+  const appName = schoolInfo?.name || '';
   const appLogoUrl = schoolInfo?.logoUrl || '';
 
   const [scrollingNotices, setScrollingNotices] = useState<any[]>([]);

@@ -205,18 +205,16 @@ function LetterheadTemplate({ schoolInfo, settings, issueDate }: any) {
                     <h1 className="text-[38px] font-black text-[#2d572c] mb-1 leading-none whitespace-nowrap">
                         {schoolInfo.name}
                     </h1>
-                    <p className="text-lg font-bold text-[#2d572c] mb-0.5">স্থাপিতঃ ২০১৯ খ্রিঃ</p>
-                    <p className="text-[12px] font-bold text-[#2d572c] tracking-tight">
-                        Upazila: Birganj, Post: Birganj, Zila: Dinajpur | মোবাইলঃ ০১৭১৭৫৭৬০৩০
-                    </p>
-                    <p className="text-[12px] text-red-600 font-bold mt-1">
-                        ই-মেইল: birganjpourohsch2019@gmail.com
-                    </p>
+                    {schoolInfo.address && (
+                        <p className="text-[12px] font-bold text-[#2d572c] tracking-tight">
+                            {schoolInfo.address}
+                        </p>
+                    )}
                 </div>
             </div>
 
             <div className="flex justify-between font-bold text-base mb-8 px-4">
-                <span contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline px-1">স্মারক নং: বিপৌউবি/......................</span>
+                <span contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline px-1">স্মারক নং: ......................</span>
                 <span contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline px-1">তারিখ: {issueDate} ইং</span>
             </div>
 

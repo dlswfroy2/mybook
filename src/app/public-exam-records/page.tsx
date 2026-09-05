@@ -48,16 +48,14 @@ const educationBoards = [
     'Dinajpur', 'Dhaka', 'Rajshahi', 'Cumilla', 'Jashore', 'Chattogram', 'Barishal', 'Sylhet', 'Mymensingh', 'Madrasah', 'Technical'
 ];
 
-const birganjCenters = [
-    'Birganj Govt. Pilot High School',
-    'Birganj Govt. Girls\' High School',
-    'Gopalganj High School',
-    'Jharbari High School',
-    'Paltapur Adarsha High School',
-    'Mohamadpur High School',
-    'Kholshichandra High School',
-    'Birganj Mohila College',
-    'Birganj Degree College'
+const examCenters = [
+    'Govt. Pilot High School',
+    'Govt. Girls\' High School',
+    'Model High School',
+    'Central High School',
+    'Govt. College',
+    'Mohila College',
+    'Degree College'
 ];
 
 const groups = [
@@ -504,7 +502,7 @@ export default function PublicExamRecordsPage() {
                                                         <Select value={formData.centerName} onValueChange={(v) => setFormData({...formData, centerName: v})}>
                                                             <SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="কেন্দ্র নির্বাচন করুন" /></SelectTrigger>
                                                             <SelectContent>
-                                                                {birganjCenters.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                                                {examCenters.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                     </div>

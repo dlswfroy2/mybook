@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -46,13 +46,13 @@ const initialStudentState: NewAdmissionData = {
   presentVillage: '',
   presentUnion: '',
   presentPostOffice: '',
-  presentUpazila: 'বীরগঞ্জ',
-  presentDistrict: 'দিনাজপুর',
+  presentUpazila: '',
+  presentDistrict: '',
   permanentVillage: '',
   permanentUnion: '',
   permanentPostOffice: '',
-  permanentUpazila: 'বীরগঞ্জ',
-  permanentDistrict: 'দিনাজপুর',
+  permanentUpazila: '',
+  permanentDistrict: '',
   prevRegNo: '',
   prevPassingYear: '',
   prevBoard: '',
@@ -165,8 +165,8 @@ export default function AdmissionPortalPage() {
                 permanentVillage: '',
                 permanentUnion: '',
                 permanentPostOffice: '',
-                permanentUpazila: 'বীরগঞ্জ',
-                permanentDistrict: 'দিনাজপুর',
+                permanentUpazila: '',
+                permanentDistrict: '',
             }));
         }
     };
@@ -709,7 +709,7 @@ function PrintableApplication({ student, schoolInfo }: { student: NewAdmissionDa
                 </div>
                 <div className="text-center italic text-[8px]">
                     <p>আবেদনের তারিখ: {today}</p>
-                    <p>Birganj Pouro High School Portal</p>
+                    <p>{schoolInfo?.nameEn || schoolInfo?.name || 'Digital Management Portal'}</p>
                 </div>
                 <div className="text-center w-56 border-t border-black pt-1">
                     <p className="font-black text-xs">অফিসের স্বাক্ষর ও সিল</p>

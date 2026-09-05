@@ -70,12 +70,14 @@ Mobile: ${student.guardianMobile || student.studentMobile || '-'}`;
 
             <main className="relative z-20 flex-1 flex flex-col items-center pt-0 px-3">
                 {/* School Address - Moved to white section with black color for maximum visibility */}
-                <p className={cn(
-                    "font-black text-slate-800 text-center uppercase tracking-tighter -mt-3 mb-1.5 px-1",
-                    isPrint ? "text-[5.5px]" : "text-[9px]"
-                )}>
-                    Upazila: Birganj, Post: Birganj, Zila: Dinajpur
-                </p>
+                {schoolInfo.address && (
+                    <p className={cn(
+                        "font-black text-slate-800 text-center uppercase tracking-tighter -mt-3 mb-1.5 px-1",
+                        isPrint ? "text-[5.5px]" : "text-[9px]"
+                    )}>
+                        {schoolInfo.address}
+                    </p>
+                )}
 
                 {/* Photo & QR Section - Side by side */}
                 <div className="flex items-center justify-between gap-2 w-full mb-1">

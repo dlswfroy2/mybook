@@ -56,13 +56,13 @@ const initialStudentState: NewStudentData = {
   presentVillage: '',
   presentUnion: '',
   presentPostOffice: '',
-  presentUpazila: 'বীরগঞ্জ',
-  presentDistrict: 'দিনাজপুর',
+  presentUpazila: '',
+  presentDistrict: '',
   permanentVillage: '',
   permanentUnion: '',
   permanentPostOffice: '',
-  permanentUpazila: 'বীরগঞ্জ',
-  permanentDistrict: 'দিনাজপুর',
+  permanentUpazila: '',
+  permanentDistrict: '',
   previousSchool: '',
   prevRegNo: '',
   prevPassingYear: '',
@@ -227,8 +227,8 @@ export default function AddStudentPage() {
                 permanentVillage: '',
                 permanentUnion: '',
                 permanentPostOffice: '',
-                permanentUpazila: 'বীরগঞ্জ',
-                permanentDistrict: 'দিনাজপুর',
+                permanentUpazila: '',
+                permanentDistrict: '',
             }));
         }
     };

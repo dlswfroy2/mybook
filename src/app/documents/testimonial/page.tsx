@@ -53,7 +53,7 @@ export default function TestimonialGeneratorPage() {
   });
 
   const [formData, setFormData] = useState({
-    smarak: `বিপৌউবি/প্রত্যয়ন/${new Date().getFullYear()}/`,
+    smarak: `প্রত্যয়ন/${new Date().getFullYear()}/`,
     conduct: 'অত্যন্ত প্রশংসনীয় ও সন্তোষজনক',
     issueDate: format(new Date(), "d MMMM, yyyy", { locale: bn })
   });
@@ -390,8 +390,8 @@ function TestimonialTemplate({ student, schoolInfo, formData, selectedYear, sett
                     মাতা: <span className="border-b-2 border-black border-dotted px-2">{student.motherNameBn}</span>, 
                     গ্রাম: <span className="border-b-2 border-black border-dotted px-2">{student.permanentVillage || student.presentVillage || 'বিবিধ'}</span>, 
                     ডাকঘর: <span className="border-b-2 border-black border-dotted px-2">{student.presentPostOffice || student.permanentPostOffice || 'বিবিধ'}</span>, 
-                    উপজেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentUpazila || 'বীরগঞ্জ'}</span>, 
-                    জেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentDistrict || 'দিনাজপুর'}</span>।
+                    উপজেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentUpazila || ''}</span>, 
+                    জেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentDistrict || ''}</span>।
                 </p>
 
                 <p>

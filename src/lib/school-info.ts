@@ -14,15 +14,15 @@ export interface SchoolInfo {
 }
 
 // আপনার অ্যাপের আইকন। এটি সরাসরি ছবির লিংক হতে হবে।
-export const APP_ICON_URL = 'https://i.postimg.cc/zvsNP6qY/IMG-20260218-WA0002.jpg';
+export const APP_ICON_URL = '';
 
 export const defaultSchoolInfo: SchoolInfo = {
-    name: 'বীরগঞ্জ পৌর উচ্চ বিদ্যালয়',
-    nameEn: 'Birganj Pouro High School',
-    eiin: '138244',
-    code: '0000',
-    address: 'বীরগঞ্জ, দিনাজপুর',
-    logoUrl: APP_ICON_URL
+    name: '',
+    nameEn: '',
+    eiin: '',
+    code: '',
+    address: '',
+    logoUrl: ''
 };
 
 const SCHOOL_INFO_DOC_PATH = 'school/info';

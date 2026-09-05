@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useSchoolInfo } from '@/context/SchoolInfoContext';
 
 const classNamesMap: Record<string, string> = { '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম' };
 const religionMapBn: Record<string, string> = {
@@ -29,6 +30,7 @@ const religionMapBn: Record<string, string> = {
 export default function AdmissionsManagementPage() {
     const db = useFirestore();
     const { user, hasPermission, loading: authLoading } = useAuth();
+    const { schoolInfo } = useSchoolInfo();
     const { toast } = useToast();
     
     const [isMounted, setIsMounted] = useState(false);
@@ -83,7 +85,8 @@ export default function AdmissionsManagementPage() {
             toast({ title: 'সফল', description: 'শিক্ষার্থীকে সফলভাবে ভর্তি করা হয়েছে।' });
             
             // Send confirmation SMS
-            const msg = `সম্মানিত অভিভাবক, অভিনন্দন! বীরগঞ্জ পৌর উচ্চ বিদ্যালয়ে আপনার সন্তান ${selectedApp.studentNameBn}-এর ভর্তি প্রক্রিয়া সফলভাবে সম্পন্ন হয়েছে। রোল নম্বর: ${Number(rollNumber).toLocaleString('bn-BD')}। ধন্যবাদ। - প্রধান শিক্ষক`;
+            const schoolNamePrefix = schoolInfo?.name ? `${schoolInfo.name}-এ` : 'বিদ্যালয়ে';
+            const msg = `সম্মানিত অভিভাবক, অভিনন্দন! ${schoolNamePrefix} আপনার সন্তান ${selectedApp.studentNameBn}-এর ভর্তি প্রক্রিয়া সফলভাবে সম্পন্ন হয়েছে। রোল নম্বর: ${Number(rollNumber).toLocaleString('bn-BD')}। ধন্যবাদ। - প্রধান শিক্ষক`;
             const encodedMsg = encodeURIComponent(msg);
             const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
             const separator = isIOS ? '&' : '?';
@@ -116,7 +119,8 @@ export default function AdmissionsManagementPage() {
     };
 
     const handleSendDirectSMS = (mobile: string, studentName: string) => {
-        const msg = `সম্মানিত অভিভাবক, বীরগঞ্জ পৌর উচ্চ বিদ্যালয়ে আপনার সন্তান ${studentName}-এর অনলাইন ভর্তি আবেদনটি আমরা পেয়েছি। আবেদনের বিষয়ে বিস্তারিত তথ্যের জন্য বিদ্যালয়ে যোগাযোগ করার অনুরোধ করা হলো। ধন্যবাদ। - প্রধান শিক্ষক`;
+        const schoolNamePrefix = schoolInfo?.name ? `${schoolInfo.name}-এ` : 'বিদ্যালয়ে';
+        const msg = `সম্মানিত অভিভাবক, ${schoolNamePrefix} আপনার সন্তান ${studentName}-এর অনলাইন ভর্তি আবেদনটি আমরা পেয়েছি। আবেদনের বিষয়ে বিস্তারিত তথ্যের জন্য বিদ্যালয়ে যোগাযোগ করার অনুরোধ করা হলো। ধন্যবাদ। - প্রধান শিক্ষক`;
         const encodedMsg = encodeURIComponent(msg);
         const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
         const separator = isIOS ? '&' : '?';
@@ -124,7 +128,8 @@ export default function AdmissionsManagementPage() {
     };
 
     const handleSendWhatsApp = (mobile: string, studentName: string) => {
-        const msg = `সম্মানিত অভিভাবক, বীরগঞ্জ পৌর উচ্চ বিদ্যালয়ে আপনার সন্তান ${studentName}-এর অনলাইন ভর্তি আবেদনটি আমরা পেয়েছি।`;
+        const schoolNamePrefix = schoolInfo?.name ? `${schoolInfo.name}-এ` : 'বিদ্যালয়ে';
+        const msg = `সম্মানিত অভিভাবক, ${schoolNamePrefix} আপনার সন্তান ${studentName}-এর অনলাইন ভর্তি আবেদনটি আমরা পেয়েছি।`;
         const encodedMsg = encodeURIComponent(msg);
         let cleanNum = mobile.replace(/[^\d]/g, '');
         if (cleanNum.startsWith('0')) cleanNum = '88' + cleanNum;

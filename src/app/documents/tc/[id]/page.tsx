@@ -35,7 +35,7 @@ export default function TransferCertificatePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Form parameters from URL
-  const smarakNo = searchParams.get('smarak') || `বিপৌউবি/ছাড়পত্র/${new Date().getFullYear()}/`;
+  const smarakNo = searchParams.get('smarak') || `ছাড়পত্র/${new Date().getFullYear()}/`;
   const reason = searchParams.get('reason') || 'অভিভাবকের স্থানান্তরের কারণে';
   const conduct = searchParams.get('conduct') || 'উত্তম ও সন্তোষজনক';
   const academicStatus = searchParams.get('status') || 'উত্তীর্ণ হয়ে পরবর্তী শ্রেণিতে ভর্তির যোগ্য';
@@ -106,14 +106,16 @@ export default function TransferCertificatePage() {
           </div>
           <div className="text-center flex-grow px-2">
             <h1 className="text-2xl sm:text-3xl font-black mb-1 tracking-tight text-emerald-900">
-              {schoolInfo.name || 'বীরগঞ্জ পৌর উচ্চ বিদ্যালয়'}
+              {schoolInfo.name || ''}
             </h1>
             <p className="text-sm font-bold text-gray-700">
-              {schoolInfo.address || 'বীরগঞ্জ, দিনাজপুর'} | EIIN: {toBengaliNumber(schoolInfo.eiin || '138640')}
+              {schoolInfo.address || ''} {schoolInfo.eiin ? `| EIIN: ${toBengaliNumber(schoolInfo.eiin)}` : ''}
             </p>
-            <p className="text-xs font-bold text-gray-600">
-              কোডঃ {toBengaliNumber(schoolInfo.code || '7752')} | ই-মেইলঃ birganjpourohsch2019@gmail.com
-            </p>
+            {(schoolInfo.code || (schoolInfo as any).email) && (
+              <p className="text-xs font-bold text-gray-600">
+                {schoolInfo.code ? `কোডঃ ${toBengaliNumber(schoolInfo.code)}` : ''} {(schoolInfo as any).email ? `| ই-মেইলঃ ${(schoolInfo as any).email}` : ''}
+              </p>
+            )}
           </div>
           <div className="w-20 h-20 flex items-center justify-center border border-gray-300 rounded text-center text-[10px] text-muted-foreground">
             {student.photoUrl ? (
@@ -150,7 +152,7 @@ export default function TransferCertificatePage() {
             এই মর্মে ছাড়পত্র প্রদান করা যাইতেছে যে, <span className="font-bold border-b border-dotted border-black px-2 text-lg text-emerald-950">{student.studentNameBn}</span>, 
             পিতা: <span className="font-bold border-b border-dotted border-black px-2">{student.fatherNameBn}</span>, 
             মাতা: <span className="font-bold border-b border-dotted border-black px-2">{student.motherNameBn}</span>, 
-            গ্রাম/ঠিকানা: <span className="font-bold border-b border-dotted border-black px-2">{student.village || student.address || 'বীরগঞ্জ, দিনাজপুর'}</span>।
+            গ্রাম/ঠিকানা: <span className="font-bold border-b border-dotted border-black px-2">{student.village || student.address || '-'}</span>।
           </p>
 
           <p>

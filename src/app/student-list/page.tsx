@@ -381,7 +381,7 @@ function StudentListContent() {
     ]);
 
     if (data.length === 0) {
-        data.push(['', '1', 'আব্দুর রহিম', 'Abdur Rahim', 'করিম মিয়া', 'Karim Mia', 'রহিমা বেগম', 'Rahima Begum', '', '', '', '01700000000', '01-01-2010', 'male', 'islam', 'general', '', 'চরপাড়া', 'বীরগঞ্জ', 'বীরগঞ্জ']);
+        data.push(['', '1', 'আব্দুর রহিম', 'Abdur Rahim', 'করিম মিয়া', 'Karim Mia', 'রহিমা বেগম', 'Rahima Begum', '', '', '', '01700000000', '01-01-2010', 'male', 'islam', 'general', '', '', '', '']);
     }
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -856,7 +856,7 @@ function StudentListContent() {
                                         <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full">
                                             <div className="w-full mx-auto bg-white p-4">
                                                 <header className="text-center mb-6">
-                                                    <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || "BIRGANJ POURO HIGH SCHOOL"}</h1>
+                                                    <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
                                                     <p className="text-sm font-bold border-b-2 border-black inline-block px-4 pb-0.5 uppercase tracking-widest">ESIF STUDENT REGISTRATION FORM</p>
                                                     <h2 className="text-xl font-black mt-2">Class {classRomanMap[activeTab]} Registration - {selectedYear}</h2>
                                                 </header>
@@ -1018,16 +1018,16 @@ function StudentListContent() {
                                         <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">বর্তমান ঠিকানা</p>
                                         <p className="text-xs font-bold leading-relaxed">
                                             গ্রাম: {studentToView.presentVillage || '-'}, ইউ: {studentToView.presentUnion || '-'}<br/>
-                                            ডাকঘর: {studentToView.presentPostOffice || '-'}, উপজেলা: {studentToView.presentUpazila || 'বীরগঞ্জ'}<br/>
-                                            জেলা: {studentToView.presentDistrict || 'দিনাজপুর'}
+                                            ডাকঘর: {studentToView.presentPostOffice || '-'}, উপজেলা: {studentToView.presentUpazila || '-'}<br/>
+                                            জেলা: {studentToView.presentDistrict || '-'}
                                         </p>
                                     </div>
                                     <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
                                         <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">স্থায়ী ঠিকানা</p>
                                         <p className="text-xs font-bold leading-relaxed">
                                             গ্রাম: {studentToView.permanentVillage || '-'}, ইউ: {studentToView.permanentUnion || '-'}<br/>
-                                            ডাকঘর: {studentToView.permanentPostOffice || '-'}, উপজেলা: {studentToView.permanentUpazila || 'বীরগঞ্জ'}<br/>
-                                            জেলা: {studentToView.permanentDistrict || 'দিনাজপুর'}
+                                            ডাকঘর: {studentToView.permanentPostOffice || '-'}, উপজেলা: {studentToView.permanentUpazila || '-'}<br/>
+                                            জেলা: {studentToView.permanentDistrict || '-'}
                                         </p>
                                     </div>
                                 </div>

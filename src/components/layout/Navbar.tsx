@@ -83,7 +83,7 @@ function NavbarContent() {
   const userProfileRef = useMemo(() => user ? doc(db, 'users', user.uid) : null, [db, user]);
   const { data: userProfile } = useDoc(userProfileRef);
 
-  const appName = schoolInfo?.name || 'বীরগঞ্জ পৌর উচ্চ বিদ্যালয়';
+  const appName = schoolInfo?.name || '';
   const appLogoUrl = schoolInfo?.logoUrl || '';
 
   const userName = userProfile?.displayName || user?.displayName || 'ব্যবহারকারী';

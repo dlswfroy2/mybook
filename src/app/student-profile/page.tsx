@@ -620,16 +620,16 @@ function StudentProfileSearchContent() {
                                                     <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">{isEn ? "PRESENT ADDRESS" : "বর্তমান ঠিকানা"}</p>
                                                     <p className="text-sm font-bold leading-relaxed">
                                                         গ্রাম: {studentData.presentVillage || '-'}, ইউনিয়ন: {studentData.presentUnion || '-'}<br/>
-                                                        {isEn ? "Post Office:" : "ডাকঘর:"} {studentData.presentPostOffice || '-'}, {isEn ? "Upazila:" : "উপজেলা:"} {studentData.presentUpazila || 'বীরগঞ্জ'}<br/>
-                                                        {isEn ? "District:" : "জেলা:"} {studentData.presentDistrict || 'দিনাজপুর'}
+                                                        {isEn ? "Post Office:" : "ডাকঘর:"} {studentData.presentPostOffice || '-'}, {isEn ? "Upazila:" : "উপজেলা:"} {studentData.presentUpazila || '-'}<br/>
+                                                        {isEn ? "District:" : "জেলা:"} {studentData.presentDistrict || '-'}
                                                     </p>
                                                 </div>
                                                 <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
                                                     <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">স্থায়ী ঠিকানা</p>
                                                     <p className="text-sm font-bold leading-relaxed">
                                                         গ্রাম: {studentData.permanentVillage || '-'}, ইউনিয়ন: {studentData.permanentUnion || '-'}<br/>
-                                                        {isEn ? "Post Office:" : "ডাকঘর:"} {studentData.permanentPostOffice || '-'}, {isEn ? "Upazila:" : "উপজেলা:"} {studentData.permanentUpazila || 'বীরগঞ্জ'}<br/>
-                                                        {isEn ? "District:" : "জেলা:"} {studentData.permanentDistrict || 'দিনাজপুর'}
+                                                        {isEn ? "Post Office:" : "ডাকঘর:"} {studentData.permanentPostOffice || '-'}, {isEn ? "Upazila:" : "উপজেলা:"} {studentData.permanentUpazila || '-'}<br/>
+                                                        {isEn ? "District:" : "জেলা:"} {studentData.permanentDistrict || '-'}
                                                     </p>
                                                 </div>
                                             </CardContent>
@@ -996,7 +996,7 @@ function StudentProfileSearchContent() {
                     </div>
                     
                     <div className="mt-8 text-center text-[9px] text-slate-400 border-t border-dashed pt-2 flex justify-between">
-                         <span>Digital Management Portal | বীরগঞ্জ পৌর উচ্চ বিদ্যালয়</span>
+                         <span>Digital Management Portal{schoolInfo?.name ? ` | ${schoolInfo.name}` : ''}</span>
                          <span>রিপোর্ট জেনারেট: {format(new Date(), 'PPpp', { locale: bn })}</span>
                     </div>
                 </div>

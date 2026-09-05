@@ -53,7 +53,7 @@ export default function TCGeneratorPage() {
   });
 
   const [formData, setFormData] = useState({
-    smarakNo: `বিপৌউবি/ছাড়পত্র/${new Date().getFullYear()}/`,
+    smarakNo: `ছাড়পত্র/${new Date().getFullYear()}/`,
     reason: 'অভিভাবকের স্থানান্তর / পারিবারিক কারণ',
     conduct: 'অত্যন্ত প্রশংসনীয় ও সন্তোষজনক',
     status: 'উত্তীর্ণ হয়ে পরবর্তী শ্রেণিতে ভর্তির যোগ্য',

@@ -363,7 +363,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                         )}
                         <div className="text-left">
                             <h1 className="text-2xl font-black uppercase text-[#003366] leading-none mb-1">
-                                {schoolInfo.nameEn || "BIRGANJ POURO HIGH SCHOOL"}
+                                {schoolInfo.nameEn || schoolInfo.name || ""}
                             </h1>
                             <p className="text-sm font-bold text-gray-700">{schoolInfo.address}</p>
                             <div className="mt-2 inline-block bg-[#eef6ff] px-3 py-1 rounded border border-[#b3d7ff]">
