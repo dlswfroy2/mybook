@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -421,7 +422,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 {/* Summary Table */}
                 <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[11px] bg-blue-900 text-white mb-4 rounded-sm">
                     <div className="py-1.5 font-bold">Status: <span className={result.isPass ? "text-green-400" : "text-red-400"}>{result.isPass ? 'PASSED' : 'FAILED'}</span></div>
-                    <div className="py-1.5 font-bold">GPA: <span className="text-amber-300">{result.gpa.toFixed(2)}</span></div>
+                    <div className="py-1.5 font-bold">GPA: <span className="text-amber-300">{toBengaliNumber(result.gpa.toFixed(2))}</span></div>
                     <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300">{result.finalGrade}</span></div>
                     <div className="py-1.5 font-bold">Merit Rank: <span>{result.isPass ? renderMeritPosition(result.meritPosition) : 'N/A'}</span></div>
                 </div>
@@ -434,9 +435,12 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                 <th className="border-r border-black p-1 w-8">SL</th>
                                 <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
                                 <th className="border-r border-black p-1 w-12">Full Marks</th>
-                                <th className="border-r border-black p-1 w-12">Obtained</th>
-                                <th className="border-r border-black p-1 w-10">Grade</th>
-                                <th className="p-1 w-10">Point</th>
+                                <th className="border-r border-black p-1 w-10">W</th>
+                                <th className="border-r border-black p-1 w-10">M</th>
+                                <th className="border-r border-black p-1 w-10">P</th>
+                                <th className="border-r border-black p-1 w-16">Obtained</th>
+                                <th className="border-r border-black p-1 w-12">Grade</th>
+                                <th className="p-1 w-12">Point</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -448,19 +452,22 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                         <td className="border-r border-black p-1 text-center">{sIdx + 1}</td>
                                         <td className="border-r border-black p-1 pl-4 font-semibold">{sub.englishName}</td>
                                         <td className="border-r border-black p-1 text-center">{sr?.fullMarks ?? sub.fullMarks}</td>
-                                        <td className={cn("border-r border-black p-1 text-center font-bold", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium">{toBengaliNumber(sr?.written ?? '-')}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium">{toBengaliNumber(sr?.mcq ?? '-')}</td>
+                                        <td className="border-r border-black p-1 text-center font-medium">{toBengaliNumber(sr?.practical ?? '-')}</td>
+                                        <td className={cn("border-r border-black p-1 text-center font-bold", isFail ? "text-red-600" : "text-blue-900")}>{toBengaliNumber(sr?.marks ?? '-')}</td>
                                         <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
-                                        <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
+                                        <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? toBengaliNumber(sr.point.toFixed(2)) : '-'}</td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                         <tfoot>
                             <tr className="border-t-[1.5px] border-black font-black bg-blue-50">
-                                <td colSpan={3} className="p-2 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
-                                <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.totalMarks}</td>
+                                <td colSpan={6} className="p-2 pr-4 text-right border-r border-black uppercase text-[10px]">Total Marks & Final Results</td>
+                                <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{toBengaliNumber(result.totalMarks)}</td>
                                 <td className="p-2 text-center border-r border-black text-blue-950 text-sm">{result.finalGrade}</td>
-                                <td className="p-2 text-center text-blue-950 text-sm">{result.gpa.toFixed(2)}</td>
+                                <td className="p-2 text-center text-blue-950 text-sm">{toBengaliNumber(result.gpa.toFixed(2))}</td>
                             </tr>
                         </tfoot>
                     </table>
