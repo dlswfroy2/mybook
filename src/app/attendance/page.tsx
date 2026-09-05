@@ -1,4 +1,3 @@
-
 'use client';
 
 
@@ -1273,7 +1272,7 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                                             </AlertDialogTrigger>
                                                             <AlertDialogContent className="font-kalpurush">
                                                                 <AlertDialogHeader>
-                                                                    <AlertDialogTitle className="text-rose-700 font-black">পুরো দিনের সব হাজিরা মুছতে চান?</AlertDialogTitle>
+                                                                    <AlertDialogTitle className="font-black text-rose-700">পুরো দিনের সব হাজিরা মুছতে চান?</AlertDialogTitle>
                                                                     <AlertDialogDescription className="font-bold text-base leading-relaxed">
                                                                         আপনি কি {toBengaliNumber(fullDateStr)} তারিখের **সকল শ্রেণির** হাজিরা রেকর্ড স্থায়ীভাবে মুছে ফেলতে চান? এটি আর ফিরে পাওয়া যাবে না।
                                                                     </AlertDialogDescription>
@@ -1302,7 +1301,7 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                                                     </AlertDialogTrigger>
                                                                     <AlertDialogContent className="font-kalpurush">
                                                                         <AlertDialogHeader>
-                                                                            <AlertDialogTitle className="text-rose-700 font-black">নিশ্চিত তো?</AlertDialogTitle>
+                                                                            <AlertDialogTitle className="font-black text-rose-700">নিশ্চিত তো?</AlertDialogTitle>
                                                                             <AlertDialogDescription className="font-bold">
                                                                                 আপনি কি {classNamesMap[cls]} শ্রেণির {toBengaliNumber(fullDateStr)} তারিখের হাজিরা রেকর্ডটি পুরোপুরি মুছে ফেলতে চান?
                                                                             </AlertDialogDescription>
@@ -2061,16 +2060,16 @@ export default function AttendancePage() {
                                 {isOnline ? <><Wifi className="h-3 w-3" /> অনলাইন</> : <><WifiOff className="h-3 w-3" /> অফলাইন (লোকাল)</>}
                             </Badge>
                         </div>
-                        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
+                        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">
                             {sidebarItems.map(item => (
                                 <button
                                     key={item.id}
                                     onClick={() => setActiveSection(item.id)}
                                     className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit",
+                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2",
                                         activeSection === item.id 
-                                            ? "bg-white shadow-md text-primary scale-105" 
-                                            : "text-muted-foreground hover:bg-slate-200/50"
+                                            ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" 
+                                            : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
                                     )}
                                 >
                                     <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}>
@@ -2128,4 +2127,5 @@ interface StudentReport {
     absentDays: number;
     totalDays: number;
 }
+
 

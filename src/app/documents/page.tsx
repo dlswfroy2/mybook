@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -133,20 +132,20 @@ export default function DocumentsPage() {
         {/* Sidebar Navigation - Sticky */}
         <aside className="w-full md:w-72 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
             <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">ডকুমেন্ট পোর্টাল</h2>
-            <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
+            <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">
                 {permittedTools.map(item => (
                     <button
                         key={item.id}
                         onClick={() => setActiveTool(item.id)}
                         className={cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit",
-                            activeTool === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2",
+                            activeTool === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
                         )}
                     >
                         <div className={cn("p-1.5 rounded-lg shrink-0", activeTool === item.id ? item.color : "bg-muted")}>
                             <item.icon className="h-4 w-4" />
                         </div>
-                        <span className="text-sm">{item.label}</span>
+                        <span className="text-sm font-black">{item.label}</span>
                         {activeTool === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}
                     </button>
                 ))}
@@ -215,3 +214,4 @@ export default function DocumentsPage() {
     </div>
   );
 }
+

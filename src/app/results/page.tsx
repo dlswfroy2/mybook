@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -9,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from "@/hooks/use-toast";
 import { useAcademicYear } from '@/context/AcademicYearContext';
-import { Student, studentFromDoc, getStudentPlaceholderImage, sanitizePhotoUrl, addStudent, updateStudent } from '@/lib/student-data';
+import { Student, studentFromDoc, isFemale, getStudentPlaceholderImage, sanitizePhotoUrl, addStudent, updateStudent } from '@/lib/student-data';
 import { getSubjects, Subject as SubjectType, subjectNameNormalization } from '@/lib/subjects';
 import { saveClassResults, getResultsForClass, getAllResults, deleteClassResult, ClassResult, StudentResult } from '@/lib/results-data';
 import { processStudentResults, StudentProcessedResult, getGradePoint } from '@/lib/results-calculation';
@@ -2136,15 +2135,15 @@ export default function ResultsPage() {
 
     const sidebarItems = useMemo(() => {
         return [
-            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'from-indigo-400 via-indigo-50 to-indigo-800 shadow-indigo-500/40 text-white', activeBg: 'bg-indigo-500/20 border-indigo-400/30' },
-            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'from-emerald-400 via-emerald-50 to-emerald-800 shadow-emerald-500/40 text-white', activeBg: 'bg-emerald-500/20 border-emerald-400/30' },
-            { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
-            { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
-            { id: 'full-marks', label: 'বিষয় ও পূর্ণমান', icon: CheckCircle2, color: 'from-violet-400 via-violet-500 to-violet-800 shadow-violet-500/40 text-white', activeBg: 'bg-violet-500/20 border-violet-400/30' },
-            { id: 'merit', label: 'মেধা তালিকা', icon: Trophy, color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
-            { id: 'promotion', label: 'প্রমোশন', icon: Star, color: 'from-rose-400 via-rose-500 to-rose-800 shadow-rose-500/40 text-white', activeBg: 'bg-rose-500/20 border-rose-400/30' },
-            { id: 'upload', label: 'Excel আপলোড', icon: FileUp, color: 'from-blue-400 via-blue-500 to-blue-800 shadow-blue-500/40 text-white', activeBg: 'bg-blue-500/20 border-blue-400/30' },
-            { id: 'special-exam', label: 'বিশেষ পরীক্ষা', icon: Sparkles, color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
+            { id: 'management', label: 'নম্বর ইনপুট', icon: FilePen, color: 'text-indigo-600 bg-indigo-50' },
+            { id: 'subject-report', label: 'বিষয় ভিত্তিক রিপোর্ট', icon: FileText, color: 'text-emerald-600 bg-emerald-50' },
+            { id: 'sheet', label: 'ফলাফল শিট', icon: FileSpreadsheet, color: 'text-blue-600 bg-blue-50' },
+            { id: 'search', label: 'ফলাফল অনুসন্ধান', icon: Search, color: 'text-blue-600 bg-blue-50' },
+            { id: 'full-marks', label: 'বিষয় ও পূর্ণমান', icon: CheckCircle2, color: 'text-violet-600 bg-violet-50' },
+            { id: 'merit', label: 'মেধা তালিকা', icon: Trophy, color: 'text-amber-600 bg-amber-50' },
+            { id: 'promotion', label: 'প্রমোশন', icon: Star, color: 'text-rose-600 bg-rose-50' },
+            { id: 'upload', label: 'Excel আপলোড', icon: FileUp, color: 'text-blue-600 bg-blue-50' },
+            { id: 'special-exam', label: 'বিশেষ পরীক্ষা', icon: Sparkles, color: 'text-amber-600 bg-amber-50' },
         ];
     }, []);
 
@@ -2154,21 +2153,18 @@ export default function ResultsPage() {
                 <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                     <aside className="w-full md:w-64 shrink-0 space-y-1 bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">ফলাফল ব্যবস্থাপনা</h2>
-                        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
+                        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">
                             {sidebarItems.map(item => (
                                 <button 
                                     key={item.id} 
                                     onClick={() => setActiveSection(item.id)} 
                                     className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit", 
-                                        activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
+                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2", 
+                                        activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
                                     )}
                                 >
-                                    <div className={cn(
-                                        "p-2 rounded-full shrink-0 shadow-[0_4px_8px_rgba(0,0,0,0.3),inset_0_1px_2px_rgba(255,255,255,0.4)] border-2 border-white/30 bg-gradient-to-br", 
-                                        item.color
-                                    )}>
-                                        <item.icon className="h-3.5 w-3.5 drop-shadow-sm" />
+                                    <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}>
+                                        <item.icon className="h-3.5 w-3.5" />
                                     </div>
                                     <span className="text-sm font-black">{item.label}</span>
                                     {activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}
@@ -2433,3 +2429,4 @@ export default function ResultsPage() {
         </div>
     );
 }
+
