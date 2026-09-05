@@ -11,6 +11,7 @@ export interface SchoolInfo {
   code: string;
   address: string;
   logoUrl: string;
+  phone?: string;
 }
 
 // আপনার অ্যাপের আইকন। এটি সরাসরি ছবির লিংক হতে হবে।
@@ -22,7 +23,8 @@ export const defaultSchoolInfo: SchoolInfo = {
     eiin: '',
     code: '',
     address: '',
-    logoUrl: ''
+    logoUrl: '',
+    phone: '০১৭১৭৫৭৬৩৩০'
 };
 
 const SCHOOL_INFO_DOC_PATH = 'school/info';
@@ -58,6 +60,6 @@ export const saveSchoolInfo = async (db: Firestore, info: Partial<SchoolInfo>): 
         requestResourceData: dataToSave,
       });
       errorEmitter.emit('permission-error', permissionError);
-      throw permissionError;
+      throw serverError;
     });
 };

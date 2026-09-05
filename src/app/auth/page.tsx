@@ -672,7 +672,7 @@ export default function AuthPage() {
                     <LogIn className="w-4 h-4" /> লগইন করুন
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md font-kalpurush border-none p-0 overflow-hidden rounded-2xl shadow-2xl z-[150]">
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl shadow-2xl z-[150]">
                    <div className="bg-[#1e293b] p-6 text-white text-center space-y-2">
                       <div className="bg-white w-16 h-16 rounded-2xl mx-auto flex items-center justify-center p-2 mb-2 shadow-md">
                          {appLogoUrl ? <img src={appLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" /> : <GraduationCap className="w-10 h-10 text-[#1e293b]" />}
@@ -853,7 +853,7 @@ export default function AuthPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl p-0 font-kalpurush overflow-hidden border-none shadow-2xl rounded-2xl z-[150]">
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-none shadow-2xl rounded-2xl z-[150]">
           {!searchResult ? (
             <>
               <DialogHeader className="p-8 bg-[#1e293b] text-white border-b-0 shrink-0">
@@ -1028,7 +1028,7 @@ export default function AuthPage() {
 
       {/* Printable Area for Result Slip */}
       {searchResult && (
-        <div className="hidden print:block printable-area bg-white text-black p-8 font-kalpurush border-2 border-black w-[210mm] h-[297mm] mx-auto">
+        <div className="hidden print:block printable-area bg-white text-black p-8 border-2 border-black w-[210mm] h-[297mm] mx-auto">
           <header className="text-center border-b-2 border-black pb-3 mb-6 flex flex-col items-center">
             {appLogoUrl && <img src={appLogoUrl} alt="Logo" className="w-16 h-16 object-contain mb-1" />}
             <h1 className="text-2xl font-black leading-tight uppercase">{appName}</h1>
@@ -1091,7 +1091,7 @@ export default function AuthPage() {
               <MapPin className="w-3.5 h-3.5 text-[#ef4444]" /> {schoolInfo?.address || 'বাংলাদেশ'}
             </div>
             <div className="flex items-center gap-2">
-              <Phone className="w-3.5 h-3.5 text-[#22c55e]" /> ০১৭১৭৫৭৬৩৩০
+              <Phone className="w-3.5 h-3.5 text-[#22c55e]" /> {toBengaliNumber(schoolInfo?.phone || '')}
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-blue-500/60">

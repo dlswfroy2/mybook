@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { format } from "date-fns";
 import { bn } from 'date-fns/locale';
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { addHoliday, getHolidays, deleteHoliday, Holiday, NewHolidayData, createInitialHolidays } from '@/lib/holiday-data';
 import { getGalleryConfig, saveGalleryConfig, GalleryConfig, GalleryImage, defaultGalleryConfig } from '@/lib/gallery-data';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
@@ -411,6 +411,10 @@ export function SchoolInfoSettings() {
                         <Label htmlFor="schoolCode" className="font-bold">স্কুল কোড</Label>
                         <Input id=" schoolCode" value={info.code} onChange={(e) => handleInputChange('code', e.target.value)} />
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="schoolPhone" className="font-bold">মোবাইল নম্বর (পাবলিক)</Label>
+                        <Input id="schoolPhone" value={info.phone || ''} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="০১৭XXXXXXXX" />
+                    </div>
                     <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="address" className="font-bold">ঠিকানা</Label>
                         <Textarea id="address" value={info.address} onChange={(e) => handleInputChange('address', e.target.value)} />
@@ -587,7 +591,7 @@ const permissionGroups = [
     { title: 'ড্যাশবোর্ড', ids: ['view:dashboard'] },
     { title: 'ভর্তি আবেদন', ids: ['manage:admissions'] },
     { title: 'শিক্ষার্থী ও প্রোফাইল', ids: ['view:students', 'manage:students', 'special:edit-student', 'special:delete-student', 'upload:students', 'view:student-profile'] },
-    { title: 'শিক্ষক ও কর্মচারী', ids: ['view:staff', 'manage:staff', 'manage:staff-attendance', 'manage:staff-attendance-delete', 'view:staff-attendance-report'] },
+    { title: 'শিক্ষকর ও কর্মচারী', ids: ['view:staff', 'manage:staff', 'manage:staff-attendance', 'manage:staff-attendance-delete', 'view:staff-attendance-report'] },
     { title: 'হাজিরা ও উপস্থিতি', ids: ['manage:attendance', 'input:quick-roll-attendance', 'view:missed-attendance', 'input:missed-attendance', 'view:absent-student-list'] },
     { title: 'লেসন প্ল্যান ও সিলেবাস', ids: ['manage:lesson-plans', 'view:syllabus-mgmt', 'manage:syllabus', 'view:syllabus-tracker'] },
     { title: 'নোটিশ বোর্ড', ids: ['view:notices', 'manage:notices'] },
