@@ -258,6 +258,7 @@ const MarksheetGeneratorPage = () => {
                             height: auto !important;
                             overflow: visible !important;
                             width: 100% !important;
+                            background: white !important;
                         }
                         .marksheet-page-wrapper { 
                             width: 100% !important; 
@@ -314,9 +315,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
             const hmNorm = normalize('উচ্চতর গণিত');
             const agriNorm = normalize('কৃষি শিক্ষা');
-            if (subNameNorm === hmNorm || subNameNorm === agriNorm) {
-                if (optSubNorm && subNameNorm !== optSubNorm) return false;
-            }
+            if (optSubNorm && subNameNorm !== optSubNorm) return false;
         }
         return true;
     });
@@ -345,10 +344,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
     };
 
     return (
-        <div className="marksheet-container bg-white p-8 relative flex flex-col box-border font-sans text-black">
+        <div className="marksheet-inner-content border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent relative box-border">
             <style jsx>{`
                 .watermark-layer img { visibility: visible !important; display: block !important; }
-                .marksheet-content { border: 1.5px solid black; padding: 16px; flex-grow: 1; display: flex; flex-direction: column; background: transparent; position: relative; z-index: 10; }
             `}</style>
 
             {schoolInfo.logoUrl && (
@@ -360,7 +358,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 </div>
             )}
             
-            <div className="marksheet-content">
+            <div className="relative z-10 flex flex-col h-full">
                 <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-4">
                         {schoolInfo.logoUrl && (
@@ -401,7 +399,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 </div>
 
                 <div className="text-center mb-4">
-                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">Progress Report</h2>
+                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">
+                        {displayExamName.toUpperCase()} - PROGRESS REPORT
+                    </h2>
                 </div>
 
                 <section className="mb-4 text-[11px] leading-relaxed bg-slate-50/50 p-2 border border-dashed border-gray-300 rounded">

@@ -148,6 +148,7 @@ function MarksheetContent() {
                         height: auto !important;
                         overflow: visible !important;
                         width: 100% !important;
+                        background: white !important;
                     }
                     .no-print {
                         display: none !important;
@@ -155,8 +156,8 @@ function MarksheetContent() {
                     .printable-area {
                         display: block !important;
                         width: 100% !important;
-                        padding: 0 !important;
                         margin: 0 !important;
+                        padding: 0 !important;
                     }
                     .marksheet-container {
                         width: 100% !important;
@@ -165,7 +166,7 @@ function MarksheetContent() {
                         margin: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
-                        page-break-after: always;
+                        page-break-after: avoid;
                     }
                 }
             `}</style>
@@ -248,9 +249,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
         if (classNum >= 9 && (student.group?.toLowerCase() === 'science' || student.group === 'বিজ্ঞান')) {
             const hmNorm = normalize('উচ্চতর গণিত');
             const agriNorm = normalize('কৃষি শিক্ষা');
-            if (subNameNorm === hmNorm || subNameNorm === agriNorm) {
-                if (optSubNorm && subNameNorm !== optSubNorm) return false;
-            }
+            if (optSubNorm && subNameNorm !== optSubNorm) return false;
         }
         return true;
     });
@@ -279,7 +278,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
     };
 
     return (
-        <div className="marksheet-inner-content border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent relative">
+        <div className="marksheet-inner-content border-[1.5px] border-black p-4 h-full flex flex-col bg-transparent relative box-border">
             <style jsx>{`
                 .watermark-layer img { visibility: visible !important; display: block !important; }
             `}</style>
@@ -334,7 +333,9 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 </div>
 
                 <div className="text-center mb-4">
-                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">Progress Report</h2>
+                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">
+                        {displayExamName.toUpperCase()} - PROGRESS REPORT
+                    </h2>
                 </div>
 
                 <section className="mb-4 text-[11px] leading-relaxed bg-slate-50/50 p-2 border border-dashed border-gray-300 rounded">
