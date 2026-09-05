@@ -416,7 +416,7 @@ function renderMeritPosition(position?: number) {
 export default function MarksheetPage() {
     return (
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-50">Loading...</div>}>
-            <MarkasheetContent />
+            <MarksheetContent />
         </Suspense>
     );
 }
