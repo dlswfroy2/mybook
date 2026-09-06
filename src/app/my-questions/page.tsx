@@ -55,6 +55,12 @@ import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+const SUBJECT_ORDER = [
+  'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
+  'হিন্দু ধর্ম শিক্ষা', 'ইসলাম ধর্ম শিক্ষা', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বিজ্ঞান', 
+  'কৃষি শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'
+];
+
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -229,7 +235,15 @@ function MyLibraryContent() {
       ...libraryData.sheets.filter(s => s.classId === selectedClass).map(s => s.subject),
       ...libraryData.pdfSheets.filter(p => p.classId === selectedClass).map(p => p.subject)
     ].filter(Boolean) as string[];
-    return Array.from(new Set([...predefined, ...fromDb])).sort((a, b) => a.localeCompare(b, 'bn'));
+    
+    return Array.from(new Set([...predefined, ...fromDb])).sort((a, b) => {
+        let indexA = SUBJECT_ORDER.indexOf(a);
+        let indexB = SUBJECT_ORDER.indexOf(b);
+        if (indexA === -1) indexA = 99;
+        if (indexB === -1) indexB = 99;
+        if (indexA !== indexB) return indexA - indexB;
+        return a.localeCompare(b, 'bn');
+    });
   }, [selectedClass, libraryData]);
 
   const currentChapters = useMemo(() => {
