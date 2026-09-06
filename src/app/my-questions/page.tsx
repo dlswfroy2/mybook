@@ -496,6 +496,7 @@ function MyLibraryContent() {
               <CardFooter className="pt-0 p-4 flex justify-between items-center text-[9px] font-bold text-muted-foreground bg-slate-50/50 rounded-b-lg">
                 <span className="flex items-center gap-1">
                   <Badge variant="secondary" className="text-[8px] h-4 font-bold px-1.5 border-black">{s.type === 'creative' ? 'সৃজনশীল শিট' : s.type === 'mcq' ? 'MCQ শিট' : 'লেকচার শিট'}</Badge>
+                  <Badge className="text-[8px] h-4 font-black px-1.5 border-black bg-orange-100 text-orange-700 border-orange-200">EDITOR</Badge>
                   <Calendar className="w-3 h-3 ml-2 mr-1" /> {s.updatedAt?.toDate ? format(s.updatedAt.toDate(), 'dd MMM, yy', { locale: bn }) : ''}
                 </span>
                 <Link href={`/create-lecture-sheet?id=${s.id}&print=true`}><Button size="sm" variant="outline" className="h-6 text-[9px] font-bold gap-1 border-black text-orange-600"><Printer className="w-3 h-3" /> প্রিন্ট</Button></Link>
@@ -503,46 +504,54 @@ function MyLibraryContent() {
             </Card>
           ))}
 
-          {currentItems.pdfSheets.map(ps => (
-            <Card key={ps.id} className="hover:border-indigo-400 transition-all shadow-sm bg-white border-2 border-black">
-              <CardHeader className="pb-3 p-4">
-                <div className="flex justify-between items-start">
-                   <div className="flex items-center gap-3 pr-4 min-w-0">
-                     <div className="w-8 h-8 rounded bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0"><FileText className="w-4 h-4" /></div>
-                     <CardTitle className="text-sm font-bold truncate">{ps.chapterName} - {ps.subject}</CardTitle>
-                   </div>
-                   <div className="flex gap-1">
-                     <Button 
-                       variant="ghost" 
-                       size="icon" 
-                       className="h-7 w-7 text-indigo-600"
-                       onClick={() => handleOpenPdf(ps.pdfUrl)}
-                     >
-                       <ExternalLink className="w-3.5 h-3.5" />
-                     </Button>
-                     <AlertDialog>
-                       <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
-                       <AlertDialogContent className="font-kalpurush border-2 border-black"><AlertDialogHeader><AlertDialogTitle className="font-bold">মুছে ফেলবেন?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-black">বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ps.id, 'pdf-sheets')} className="bg-destructive text-white">মুছে ফেলা হয়েছে</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                     </AlertDialog>
-                   </div>
-                </div>
-              </CardHeader>
-              <CardFooter className="pt-0 p-4 flex justify-between items-center text-[9px] font-bold text-muted-foreground bg-indigo-50/20 rounded-b-lg">
-                <span className="flex items-center gap-1">
-                  <Badge variant="outline" className="text-[8px] h-4 font-bold px-1.5 border-black text-indigo-700">{ps.category === 'lecture_sheet' ? 'নোট' : ps.category === 'creative' ? 'সৃজনশীল' : ps.category === 'mcq' ? 'MCQ' : ps.category === 'model_test' ? 'মডেল টেস্ট' : 'উত্তরমালা'}</Badge>
-                  <Calendar className="w-3 h-3 ml-2 mr-1" /> {ps.uploadedAt?.toDate ? format(ps.uploadedAt.toDate(), 'dd MMM, yy', { locale: bn }) : ''}
-                </span>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="h-6 text-[9px] font-bold gap-1 border-black text-indigo-700 bg-white"
-                  onClick={() => handleOpenPdf(ps.pdfUrl)}
-                >
-                  <Download className="w-3 h-3" /> দেখুন
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          {currentItems.pdfSheets.map(ps => {
+            const isPdf = (ps.pdfUrl || '').toLowerCase().includes('pdf') || (ps.pdfUrl || '').startsWith('data:application/pdf');
+            const isWord = (ps.pdfUrl || '').toLowerCase().includes('word') || (ps.pdfUrl || '').includes('officedocument') || (ps.pdfUrl || '').includes('msword');
+            const fileTypeLabel = isPdf ? 'PDF' : (isWord ? 'WORD' : 'FILE');
+            const fileTypeColor = isPdf ? "bg-rose-100 text-rose-700 border-rose-200" : (isWord ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200");
+
+            return (
+              <Card key={ps.id} className="hover:border-indigo-400 transition-all shadow-sm bg-white border-2 border-black">
+                <CardHeader className="pb-3 p-4">
+                  <div className="flex justify-between items-start">
+                     <div className="flex items-center gap-3 pr-4 min-w-0">
+                       <div className="w-8 h-8 rounded bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0"><FileText className="w-4 h-4" /></div>
+                       <CardTitle className="text-sm font-bold truncate">{ps.chapterName} - {ps.subject}</CardTitle>
+                     </div>
+                     <div className="flex gap-1">
+                       <Button 
+                         variant="ghost" 
+                         size="icon" 
+                         className="h-7 w-7 text-indigo-600"
+                         onClick={() => handleOpenPdf(ps.pdfUrl)}
+                       >
+                         <ExternalLink className="w-3.5 h-3.5" />
+                       </Button>
+                       <AlertDialog>
+                         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button></AlertDialogTrigger>
+                         <AlertDialogContent className="font-kalpurush border-2 border-black"><AlertDialogHeader><AlertDialogTitle className="font-bold">মুছে ফেলবেন?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="border-black">বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(ps.id, 'pdf-sheets')} className="bg-destructive text-white">মুছে ফেলা হয়েছে</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                       </AlertDialog>
+                     </div>
+                  </div>
+                </CardHeader>
+                <CardFooter className="pt-0 p-4 flex justify-between items-center text-[9px] font-bold text-muted-foreground bg-indigo-50/20 rounded-b-lg">
+                  <span className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-[8px] h-4 font-bold px-1.5 border-black text-indigo-700">{ps.category === 'lecture_sheet' ? 'নোট' : ps.category === 'creative' ? 'সৃজনশীল' : ps.category === 'mcq' ? 'MCQ' : ps.category === 'model_test' ? 'মডেল টেস্ট' : 'উত্তরমালা'}</Badge>
+                    <Badge className={cn("text-[8px] h-4 font-black px-1.5 border-black", fileTypeColor)}>{fileTypeLabel}</Badge>
+                    <Calendar className="w-3 h-3 ml-2 mr-1" /> {ps.uploadedAt?.toDate ? format(ps.uploadedAt.toDate(), 'dd MMM, yy', { locale: bn }) : ''}
+                  </span>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-6 text-[9px] font-bold gap-1 border-black text-indigo-700 bg-white"
+                    onClick={() => handleOpenPdf(ps.pdfUrl)}
+                  >
+                    <Download className="w-3 h-3" /> দেখুন
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
 
           {currentItems.questions.map(q => {
             const isSelected = selectedDocIds.includes(q.id);
