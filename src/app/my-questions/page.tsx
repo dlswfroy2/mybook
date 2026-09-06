@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect, Suspense } from 'react';
+import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useFirestore, useUser, useCollection } from '@/firebase';
 import { collection, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -11,30 +11,20 @@ import {
   Edit, 
   Trash2, 
   Loader2, 
-  Calendar, 
   BookOpen, 
-  GraduationCap, 
-  Library as LibraryIcon,
-  Book,
+  BrainCircuit, 
+  ArrowLeft, 
+  X, 
+  PlusCircle, 
+  FilePlus, 
+  Layers, 
+  LayoutGrid, 
+  Download, 
+  AlertTriangle, 
+  FileType, 
+  Eye, 
   Printer,
-  ChevronRight,
-  Folder,
-  BrainCircuit,
-  ArrowLeft,
-  CheckCircle2,
-  X,
-  PlusCircle,
-  FilePlus,
-  HelpCircle,
-  Layers,
-  LayoutGrid,
-  ExternalLink,
-  Download,
-  AlertTriangle,
-  FileType,
-  Eye,
-  FilePen,
-  FileCode
+  CheckCircle2
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -56,8 +46,6 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
-import { bn } from 'date-fns/locale';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +57,10 @@ function toBengaliNumber(n: number | string | undefined | null): string {
   return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
 }
 
-function getNormalizedChapterKey(name: string): string {
+/**
+ * Normalized key for robust data mapping.
+ */
+function getNormalizedKey(name: string): string {
   if (!name) return 'general';
   let n = name.toString().toLowerCase().trim();
   const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
@@ -102,7 +93,7 @@ function getNormalizedChapterKey(name: string): string {
 }
 
 function getChapterSortValue(name: string): number {
-  const norm = getNormalizedChapterKey(name);
+  const norm = getNormalizedKey(name);
   const num = parseInt(norm);
   return isNaN(num) ? 998 : num;
 }
@@ -127,6 +118,22 @@ function MyLibraryContent() {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [merging, setMerging] = useState(false);
+
+  // Dynamic ref tracking for scroll syncing
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollSync = (source: 'top' | 'table') => {
+    const top = topScrollRef.current;
+    const table = tableContainerRef.current;
+    if (!top || !table) return;
+
+    if (source === 'top') {
+      table.scrollLeft = top.scrollLeft;
+    } else {
+      top.scrollLeft = table.scrollLeft;
+    }
+  };
 
   useEffect(() => { if (!userLoading && !user) router.push('/auth'); }, [user, userLoading, router]);
 
@@ -201,7 +208,7 @@ function MyLibraryContent() {
     const dbChapters = itemsInSubj.map(i => (i as any).chapter || (i as any).topic || (i as any).chapterName).filter(Boolean) as string[];
     const chapterMap = new Map<string, string>();
     [...predefinedList, ...dbChapters].forEach(name => {
-      const key = getNormalizedChapterKey(name);
+      const key = getNormalizedKey(name);
       if (!chapterMap.has(key) || (predefinedList.includes(name) && !predefinedList.includes(chapterMap.get(key)!))) {
         chapterMap.set(key, name);
       }
@@ -236,10 +243,10 @@ function MyLibraryContent() {
     }
     if (selectedChapter) { 
       const isGeneral = selectedChapter === 'সাধারণ অধ্যায়';
-      const selectedKey = getNormalizedChapterKey(selectedChapter);
-      qs = qs.filter(q => isGeneral ? (!q.chapter) : (getNormalizedChapterKey(q.chapter) === selectedKey));
-      ss = ss.filter(s => isGeneral ? (!s.topic) : (getNormalizedChapterKey(s.topic) === selectedKey));
-      ps = ps.filter(p => isGeneral ? (!p.chapterName) : (getNormalizedChapterKey(p.chapterName) === selectedKey));
+      const selectedKey = getNormalizedKey(selectedChapter);
+      qs = qs.filter(q => isGeneral ? (!q.chapter) : (getNormalizedKey(q.chapter) === selectedKey));
+      ss = ss.filter(s => isGeneral ? (!s.topic) : (getNormalizedKey(s.topic) === selectedKey));
+      ps = ps.filter(p => isGeneral ? (!p.chapterName) : (getNormalizedKey(p.chapterName) === selectedKey));
     }
 
     if (activeCategory === 'sheet') {
@@ -392,7 +399,7 @@ function MyLibraryContent() {
         <Card key={sub} onClick={() => { setSelectedSubject(sub); setViewMode('chapters'); }} className="cursor-pointer hover:border-primary hover:shadow-md transition-all group border-2 border-black">
           <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
             <div className="w-12 h-12 rounded-xl bg-orange-50/10 flex items-center justify-center text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-all">
-              <Book className="w-6 h-6" />
+              <BookOpen className="w-6 h-6" />
             </div>
             <p className="font-bold text-sm">{sub}</p>
           </CardContent>
@@ -465,7 +472,7 @@ function MyLibraryContent() {
       <section className="space-y-6">
         <div className="flex flex-col gap-4 border-b-2 border-black pb-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-foreground flex items-center gap-2 uppercase tracking-wider"><Folder className="w-4 h-4" /> আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
+            <h3 className="text-sm font-black text-foreground flex items-center gap-2 uppercase tracking-wider"><LayoutGrid className="w-4 h-4" /> আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
             {currentItemsRaw.questions.length > 0 && (
               <Button variant={isSelecting ? "destructive" : "outline"} size="sm" onClick={() => { setIsSelecting(!isSelecting); setSelectedDocIds([]); }} className="h-8 gap-2 font-bold text-xs border-black">
                 {isSelecting ? <X className="w-3.5 h-3.5" /> : <BrainCircuit className="w-3.5 h-3.5" />}{isSelecting ? "বাতিল" : "প্রশ্ন বাছাই করুন"}</Button>
@@ -518,13 +525,25 @@ function MyLibraryContent() {
           </div>
         </div>
 
-        <div className="border-2 border-black rounded-xl overflow-hidden shadow-xl bg-white animate-in slide-in-from-bottom-4 duration-300">
-          <Table className="border-collapse">
+        <div 
+          ref={topScrollRef}
+          onScroll={() => handleScrollSync('top')}
+          className="overflow-x-auto no-print mb-1 h-3 scrollbar-thin scrollbar-thumb-primary/20"
+        >
+          <div style={{ width: '1000px', height: '1px' }} />
+        </div>
+
+        <div 
+          ref={tableContainerRef}
+          onScroll={() => handleScrollSync('table')}
+          className="border-2 border-black rounded-xl overflow-auto shadow-xl bg-white animate-in slide-in-from-bottom-4 duration-300"
+        >
+          <Table className="border-collapse min-w-[900px]">
             <TableHeader>
               <TableRow className="bg-blue-100 border-b-2 border-black h-12">
-                <TableHead className="w-24 text-center font-black border-r border-black text-black">ক্রমিক নং</TableHead>
-                <TableHead className="font-black border-r border-black text-black">শিরোনাম</TableHead>
-                <TableHead className="text-center font-black border-r border-black text-black w-32">ধরন</TableHead>
+                <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
+                <TableHead className="font-black border-r-2 border-black text-black">শিরোনাম</TableHead>
+                <TableHead className="text-center font-black border-r-2 border-black text-black w-32">ধরন</TableHead>
                 <TableHead className="text-center font-black text-black w-[200px]">একশন</TableHead>
               </TableRow>
             </TableHeader>
@@ -539,75 +558,80 @@ function MyLibraryContent() {
                   <TableRow 
                     key={item.id} 
                     className={cn(
-                      "h-12 border-b border-black transition-colors hover:bg-slate-50",
+                      "h-14 border-b-2 border-black transition-colors hover:bg-slate-50",
                       isSelecting && "cursor-pointer",
                       isSelected && "bg-primary/5"
                     )}
                     onClick={() => isSelecting && toggleSelection(item.id)}
                   >
-                    <TableCell className="text-center font-black border-r border-black bg-cyan-400 text-white w-24">
+                    <TableCell className="text-center font-black border-r-2 border-black bg-cyan-400 text-white w-24">
                       {isSelecting ? (
-                        <div className={cn("w-5 h-5 mx-auto rounded-full border-2 flex items-center justify-center border-white", isSelected ? "bg-white text-primary" : "")}>
-                          {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                        <div className={cn("w-6 h-6 mx-auto rounded-full border-2 flex items-center justify-center border-white", isSelected ? "bg-white text-primary" : "")}>
+                          {isSelected && <CheckCircle2 className="w-5 h-5" />}
                         </div>
                       ) : toBengaliNumber(idx + 1).padStart(2, '০')}
                     </TableCell>
-                    <TableCell className="font-bold border-r border-black bg-green-50 px-4 text-xs md:text-sm">
+                    <TableCell className="font-bold border-r-2 border-black bg-green-50 px-4 text-xs md:text-sm">
                       {item.displayTitle}
                     </TableCell>
-                    <TableCell className="text-center border-r border-black w-32">
-                      {item.fileType === 'PDF' && (
-                        <Badge className="bg-rose-100 text-rose-700 border-rose-200 font-black text-[10px] gap-1.5 h-6 px-3">
-                          <FileText className="w-3 h-3" /> PDF
-                        </Badge>
-                      )}
-                      {item.fileType === 'WORD' && (
-                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 font-black text-[10px] gap-1.5 h-6 px-3">
-                          <FileType className="w-3 h-3" /> WORD
-                        </Badge>
-                      )}
-                      {item.fileType === 'EDITOR' && (
-                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 font-black text-[10px] gap-1.5 h-6 px-3">
-                          <Edit className="w-3 h-3" /> Editor
-                        </Badge>
-                      )}
+                    <TableCell className="text-center border-r-2 border-black w-32">
+                      <div className="flex items-center justify-center">
+                        {item.fileType === 'PDF' && (
+                          <div className="flex items-center gap-2 text-rose-600 font-black text-xs">
+                             <div className="p-1.5 bg-rose-50 rounded-lg"><FileText className="w-5 h-5" /></div>
+                             <span>PDF</span>
+                          </div>
+                        )}
+                        {item.fileType === 'WORD' && (
+                          <div className="flex items-center gap-2 text-blue-600 font-black text-xs">
+                             <div className="p-1.5 bg-blue-50 rounded-lg"><FileType className="w-5 h-5" /></div>
+                             <span>WORD</span>
+                          </div>
+                        )}
+                        {item.fileType === 'EDITOR' && (
+                          <div className="flex items-center gap-2 text-orange-600 font-black text-xs">
+                             <div className="p-1.5 bg-orange-50 rounded-lg"><Edit className="w-5 h-5" /></div>
+                             <span>Editor</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
                         {item.fileType === 'EDITOR' ? (
-                          <div className="flex gap-1">
+                          <div className="flex gap-2">
                             {item.source === 'lecture-sheets' ? (
                               <>
-                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-lecture-sheet?id=${item.id}`}><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-lecture-sheet?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
                               </>
                             ) : (
                               <>
-                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-question?id=${item.id}`}><Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-question?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
                               </>
                             )}
                           </div>
                         ) : (
-                          <div className="flex gap-1">
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPdf(item.pdfUrl)} title="দেখুন"><Eye className="w-4 h-4" /></Button>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600" onClick={() => handleOpenPdf(item.pdfUrl)} title="ডাউনলোড"><Download className="w-4 h-4" /></Button>
+                          <div className="flex gap-2">
+                             <Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20" onClick={() => handleOpenPdf(item.pdfUrl)} title="দেখুন"><Eye className="w-4 h-4" /></Button>
+                             <Button variant="outline" size="icon" className="h-9 w-9 text-indigo-600 border-2 border-indigo-200" onClick={() => handleOpenPdf(item.pdfUrl)} title="ডাউনলোড"><Download className="w-4 h-4" /></Button>
                           </div>
                         )}
                         
                         {!isSelecting && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" title="মুছে ফেলুন"><Trash2 className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50" title="মুছে ফেলুন"><Trash2 className="w-4 h-4" /></Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="font-kalpurush border-2 border-black">
                               <AlertDialogHeader><AlertDialogTitle className="font-bold">আপনি কি নিশ্চিত?</AlertDialogTitle></AlertDialogHeader>
                               <div className="py-4 text-sm font-bold text-muted-foreground">এই আইটেমটি স্থায়ীভাবে মুছে ফেলা হবে।</div>
                               <AlertDialogFooter>
-                                <AlertDialogCancel className="border-black">বাতিল</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(item.id, item.source)} className="bg-destructive text-white">হ্যাঁ, মুছুন</AlertDialogAction>
+                                <AlertDialogCancel className="border-black font-bold">বাতিল</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(item.id, item.source)} className="bg-destructive text-white font-black">হ্যাঁ, মুছুন</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -656,7 +680,7 @@ function MyLibraryContent() {
       <header className="flex flex-col gap-4 border-b-2 border-black pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm border border-white/20"><LibraryIcon className="w-7 h-7" /></div>
+            <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm border border-white/20"><Library className="w-7 h-7" /></div>
             <div><h2 className="text-2xl font-bold">আমার লাইব্রেরি</h2><p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p></div>
           </div>
         </div>
