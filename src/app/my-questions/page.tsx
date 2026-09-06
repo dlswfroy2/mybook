@@ -444,17 +444,35 @@ function MyLibraryContent() {
   };
 
   const renderClasses = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-      {CLASSES.map(cls => (
-        <Card key={cls.id} onClick={() => { setSelectedClass(cls.id); setViewMode('subjects'); }} className="cursor-pointer hover:border-primary hover:shadow-md transition-all group border-2 border-black">
-          <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-              <GraduationCap className="w-6 h-6" />
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
+      {CLASSES.map(cls => {
+        const colors: Record<string, string> = {
+          '6': 'bg-blue-600 hover:bg-blue-700 border-blue-800',
+          '7': 'bg-emerald-600 hover:bg-emerald-700 border-emerald-800',
+          '8': 'bg-violet-600 hover:bg-violet-700 border-violet-800',
+          '9': 'bg-orange-600 hover:bg-orange-700 border-orange-800',
+          '10': 'bg-red-600 hover:bg-red-700 border-red-800',
+        };
+        const colorClass = colors[cls.id] || 'bg-primary border-primary-foreground';
+        
+        return (
+          <button 
+            key={cls.id} 
+            onClick={() => { setSelectedClass(cls.id); setViewMode('subjects'); }} 
+            className={cn(
+              "group relative flex flex-col items-center justify-center p-8 rounded-2xl transition-all duration-200 active:translate-y-1 active:border-b-0 border-b-[6px] shadow-xl text-white",
+              colorClass
+            )}
+          >
+            <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">
+              <div className="relative">
+                <BookOpen className="w-14 h-14 text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]" />
+              </div>
             </div>
-            <p className="font-black text-base">{cls.label} শ্রেণি</p>
-          </CardContent>
-        </Card>
-      ))}
+            <span className="font-black text-xl drop-shadow-md">{cls.label} শ্রেণি</span>
+          </button>
+        );
+      })}
     </div>
   );
 
