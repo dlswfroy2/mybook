@@ -28,15 +28,50 @@ function BottomNavContent() {
 
   const handleMenuSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = searchQuery.trim();
+    const q = searchQuery.trim().toLowerCase();
     if (!q) return;
 
-    if (q.includes('ফলাফল')) {
+    // Comprehensive Search Mapping
+    if (q.includes('ফলাফল') || q.includes('রেজাল্ট')) {
       router.push('/results');
-    } else if (q.includes('শিট')) {
+    } else if (q.includes('শিট') || q.includes('লেকচার')) {
       router.push('/create-lecture-sheet');
     } else if (q.includes('বিষয়') || q.includes('পূর্ণমান') || q.includes('পূণমান')) {
       router.push('/results?tab=full-marks');
+    } else if (q.includes('হোম') || q.includes('ড্যাশবোর্ড')) {
+      router.push('/');
+    } else if (q.includes('বই') || q.includes('বোর্ড')) {
+      router.push('/board-books');
+    } else if (q.includes('ডায়েরি') || q.includes('ডায়েরি')) {
+      router.push('/diary');
+    } else if (q.includes('প্রশ্ন') || q.includes('তৈরি')) {
+      router.push('/create-question');
+    } else if (q.includes('প্রোফাইল')) {
+      router.push('/student-profile');
+    } else if (q.includes('ভর্তি') && !q.includes('আবেদন')) {
+      router.push('/add-student');
+    } else if (q.includes('তালিকা') || q.includes('লিস্ট')) {
+      router.push('/student-list');
+    } else if (q.includes('হাজিরা') || q.includes('উপস্থিতি')) {
+      router.push('/attendance');
+    } else if (q.includes('হিসাব') || q.includes('টাকা') || q.includes('বেতন') || q.includes('পেমেন্ট')) {
+      router.push('/accounts');
+    } else if (q.includes('মেসেজ') || q.includes('এসএমএস')) {
+      router.push('/messaging');
+    } else if (q.includes('স্টাফ') || q.includes('শিক্ষক')) {
+      router.push('/staff');
+    } else if (q.includes('ডকুমেন্ট') || q.includes('প্রত্যয়ন') || q.includes('প্রশংসা') || q.includes('আইডি')) {
+      router.push('/documents');
+    } else if (q.includes('রুটিন')) {
+      router.push('/routines');
+    } else if (q.includes('রেকর্ড') || q.includes('পাবলিক')) {
+      router.push('/public-exam-records');
+    } else if (q.includes('লাইব্রেরি') || q.includes('সংগ্রহ')) {
+      router.push('/my-questions');
+    } else if (q.includes('আবেদন')) {
+      router.push('/admissions-management');
+    } else if (q.includes('সেটিংস') || q.includes('নিয়ন্ত্রণ')) {
+      router.push('/settings');
     }
     
     setSearchQuery('');
@@ -64,7 +99,7 @@ function BottomNavContent() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[40px] h-12 rounded-lg transition-all relative shrink-0",
+                "flex items-center justify-center min-w-[40px] h-12 rounded-lg transition-all relative shrink-0 flex-col",
                 isActive 
                   ? "bg-white/20 text-white" 
                   : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -95,7 +130,7 @@ function BottomNavContent() {
             </DialogHeader>
             <form onSubmit={handleMenuSearch} className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label className="font-bold">কিওয়ার্ড লিখুন (উদা: ফলাফল, শিট, বিষয় ও পূর্ণমান)</Label>
+                <Label className="font-bold">কিওয়ার্ড লিখুন (উদা: ফলাফল, শিট, হাজিরা, স্টাফ, রুটিন ইত্যাদি)</Label>
                 <Input 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
