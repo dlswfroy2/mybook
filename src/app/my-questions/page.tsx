@@ -58,7 +58,7 @@ import { subjectNameNormalization } from '@/lib/subjects';
 
 const SUBJECT_ORDER = [
   'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
-  'হিন্দু ধর্ম', 'ইসলাম ধর্ম', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বিজ্ঞান', 
+  'ইসলাম ধর্ম ও নৈতিক শিক্ষা', 'হিন্দু ধর্ম ও নৈতিক শিক্ষা', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'সাধারণ বিজ্ঞান', 
   'কৃষি শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'
 ];
 
@@ -68,9 +68,6 @@ function toBengaliNumber(n: number | string | undefined | null): string {
   return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
 }
 
-/**
- * Normalized key for robust data mapping.
- */
 function getNormalizedKey(name: string): string {
   if (!name) return 'general';
   let n = name.toString().toLowerCase().trim();
@@ -204,16 +201,25 @@ function MyLibraryContent() {
 
   const currentSubjects = useMemo(() => {
     if (!selectedClass) return [];
-    const predefined = getSubjectsForClass(selectedClass);
+    const baseList = getSubjectsForClass(selectedClass);
+    
+    // Split religion for library display
+    const listWithSplitReligion = baseList.flatMap(s => {
+      if (s === 'ধর্ম ও নৈতিক শিক্ষা') {
+        return ['ইসলাম ধর্ম ও নৈতিক শিক্ষা', 'হিন্দু ধর্ম ও নৈতিক শিক্ষা'];
+      }
+      return s;
+    });
+
     const fromDb = [
       ...libraryData.questions.filter(q => q.classId === selectedClass).map(q => q.subject),
       ...libraryData.sheets.filter(s => s.classId === selectedClass).map(s => s.subject),
       ...libraryData.pdfSheets.filter(p => p.classId === selectedClass).map(p => p.subject)
     ].filter(Boolean) as string[];
     
-    return Array.from(new Set([...predefined, ...fromDb])).sort((a, b) => {
-        let indexA = SUBJECT_ORDER.indexOf(normalize(a));
-        let indexB = SUBJECT_ORDER.indexOf(normalize(b));
+    return Array.from(new Set([...listWithSplitReligion, ...fromDb])).sort((a, b) => {
+        let indexA = SUBJECT_ORDER.indexOf(a);
+        let indexB = SUBJECT_ORDER.indexOf(b);
         if (indexA === -1) indexA = 99;
         if (indexB === -1) indexB = 99;
         if (indexA !== indexB) return indexA - indexB;
@@ -225,11 +231,13 @@ function MyLibraryContent() {
     if (!selectedClass || !selectedSubject) return [];
     const normalizedSubject = normalize(selectedSubject);
     const predefinedList = getChaptersForSubject(selectedClass, selectedSubject);
+    
     const itemsInSubj = [
        ...libraryData.questions.filter(q => q.classId === selectedClass && normalize(q.subject) === normalizedSubject),
        ...libraryData.sheets.filter(s => s.classId === selectedClass && normalize(s.subject) === normalizedSubject),
        ...libraryData.pdfSheets.filter(p => p.classId === selectedClass && normalize(p.subject) === normalizedSubject)
     ];
+
     const dbChapters = itemsInSubj.map(i => (i as any).chapter || (i as any).topic || (i as any).chapterName).filter(Boolean) as string[];
     const chapterMap = new Map<string, string>();
     [...predefinedList, ...dbChapters].forEach(name => {
