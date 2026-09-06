@@ -12,7 +12,8 @@ import { BookOpen, HelpCircle, FileText, Download, Loader2, BookCopy, Printer, X
 import Link from 'next/link';
 import { notFound, useRouter } from 'next/navigation';
 import { useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
+import { collection, query, where, doc, or } from 'firebase/firestore';
+import { subjectNameNormalization } from '@/lib/subjects';
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '';
@@ -114,10 +115,19 @@ export default function SubjectPage() {
 
   const bookQuery = useMemo(() => {
     if (!db || !id || !subject) return null;
+    
+    // Normalize subject name to handle variations like "বিজ্ঞান" vs "সাধারণ বিজ্ঞান"
+    const normalizedName = (subjectNameNormalization[subject] || subject).trim();
+    const alternateNames = Object.entries(subjectNameNormalization)
+      .filter(([key, val]) => val === normalizedName || key === normalizedName)
+      .map(([key]) => key);
+    
+    const namesToQuery = Array.from(new Set([subject, normalizedName, ...alternateNames]));
+
     return query(
       collection(db, 'books'),
       where('classId', '==', id),
-      where('subject', '==', subject)
+      where('subject', 'in', namesToQuery)
     );
   }, [db, id, subject]);
 

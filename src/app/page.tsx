@@ -34,7 +34,7 @@ import {
   UserCheck,
   CheckCircle2,
   XCircle,
-  Image as ImageIcon,
+  ImageIcon,
   AlertCircle
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
@@ -897,7 +897,7 @@ export default function Home() {
         </Link>
       </section>
 
-      <section>
+      <section id="board-books">
         <div className="flex items-center justify-between mb-4 border-b-2 border-black pb-2">
           <h3 className="text-lg font-black text-foreground flex items-center gap-2">
             <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-primary" />

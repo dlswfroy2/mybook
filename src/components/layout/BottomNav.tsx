@@ -4,7 +4,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen, BookOpenText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
 
@@ -21,6 +21,7 @@ function BottomNavContent() {
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/' },
+    { label: 'বোর্ড বই', icon: BookOpenText, href: '/#board-books' },
     { label: 'ডায়েরি', icon: NotebookPen, href: '/diary' },
     { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question' },
     { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet' },
@@ -39,7 +40,7 @@ function BottomNavContent() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[50px] h-12 rounded-lg transition-all relative shrink-0",
+                "flex flex-col items-center justify-center min-w-[45px] h-12 rounded-lg transition-all relative shrink-0",
                 isActive 
                   ? "bg-white/20 text-white" 
                   : "text-white/70 hover:bg-white/10 hover:text-white"
