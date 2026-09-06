@@ -1007,8 +1007,11 @@ export default function Home() {
                               <div className="text-[8px] font-black mt-0.5 text-cyan-900 uppercase">ড্রপ ডাউন</div>
                             </td>
                             {chunk.map(ch => (
-                              <td key={ch.key} className="min-w-[45px] border-r-2 border-black bg-yellow-100 p-1.5 text-center font-black text-[10px] align-middle text-black">
-                                {formatChapterDisplay(ch.display)}
+                              <td key={ch.key} className="min-w-[55px] max-w-[55px] border-r-2 border-black bg-yellow-100 p-1 text-center font-black text-[10px] align-middle text-black whitespace-normal break-words">
+                                <div className="leading-tight">{formatChapterDisplay(ch.display)}</div>
+                                <div className="text-[8px] font-bold opacity-70 mt-0.5 leading-tight">
+                                  {ch.display.includes(':') ? ch.display.split(':')[1].trim() : ''}
+                                </div>
                               </td>
                             ))}
                           </tr>
