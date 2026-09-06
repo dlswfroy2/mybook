@@ -555,13 +555,19 @@ export default function Home() {
     
     const aggregate = (cid: string, sub: string, chRaw: string, type: string) => {
       if (!classData[cid]) return;
-      const normalizedSub = normalize(sub);
-      if (!classData[cid][normalizedSub]) classData[cid][normalizedSub] = {};
+      
+      let targetSub = normalize(sub);
+      const lowerSub = sub.toLowerCase();
+      // Split religion for dashboard counts
+      if (lowerSub.includes('ইসলাম') || lowerSub.includes('islam')) targetSub = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
+      else if (lowerSub.includes('হিন্দু') || lowerSub.includes('hindu')) targetSub = 'হিন্দু ধর্ম ও নৈতিক শিক্ষা';
+
+      if (!classData[cid][targetSub]) classData[cid][targetSub] = {};
       const key = getNormalizedKey(chRaw);
-      if (!classData[cid][normalizedSub][key]) {
-        classData[cid][normalizedSub][key] = { creative: 0, lectureSheet: 0, mcq: 0, answerKey: 0, modelTest: 0 };
+      if (!classData[cid][targetSub][key]) {
+        classData[cid][targetSub][key] = { creative: 0, lectureSheet: 0, mcq: 0, answerKey: 0, modelTest: 0 };
       }
-      classData[cid][normalizedSub][key][type]++;
+      classData[cid][targetSub][key][type]++;
     };
 
     allPdfSheets?.forEach(item => {
@@ -959,11 +965,21 @@ export default function Home() {
         
         <div className="space-y-10">
           {CLASSES.filter(c => c.id === selectedDashboardClass).map((cls) => {
-            const allSubjects = getSubjectsForClass(cls.id);
+            const allSubjects = getSubjectsForClass(cls.id).flatMap(s => {
+              if (s === 'ধর্ম ও নৈতিক শিক্ষা') {
+                return ['ইসলাম ধর্ম ও নৈতিক শিক্ষা', 'হিন্দু ধর্ম ও নৈতিক শিক্ষা'];
+              }
+              return s;
+            });
             const selectedSubjectRaw = selectedSubjects[cls.id] || allSubjects[0];
-            const selectedSubjectNormalized = normalize(selectedSubjectRaw);
-            const classChaptersStats = stats.classData[cls.id]?.[selectedSubjectNormalized] || {};
             
+            // Special normalization for dashboard to match aggregated keys
+            let selectedSubjectNormalized = normalize(selectedSubjectRaw);
+            const lowerRaw = selectedSubjectRaw.toLowerCase();
+            if (lowerRaw.includes('ইসলাম') || lowerRaw.includes('islam')) selectedSubjectNormalized = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
+            else if (lowerRaw.includes('হিন্দু') || lowerRaw.includes('hindu')) selectedSubjectNormalized = 'হিন্দু ধর্ম ও নৈতিক শিক্ষা';
+
+            const classChaptersStats = stats.classData[cls.id]?.[selectedSubjectNormalized] || {};
             const predefined = getChaptersForSubject(cls.id, selectedSubjectRaw);
             
             const chapterMap = new Map();
