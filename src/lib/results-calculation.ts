@@ -1,3 +1,4 @@
+
 'use client';
 import type { Student } from './student-data';
 import { getSubjects, subjectNameNormalization } from './subjects';
