@@ -22,7 +22,7 @@ const classNamesMap: { [key: string]: string } = {
 
 export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => {
     return (
-        <div className="admit-card font-kalpurush flex flex-col p-4 border-2 border-black rounded-sm w-[98mm] h-[138mm] text-black bg-white relative overflow-hidden box-border">
+        <div className="admit-card font-kalpurush flex flex-col p-4 border-2 border-black rounded-sm w-[92mm] h-[135mm] text-black bg-white relative overflow-hidden box-border">
             <header className="flex justify-between items-start mb-2 pb-2 border-b-2 border-black printable-header">
                 <div className="flex items-center gap-2">
                     <div className="w-12 h-12 relative flex items-center justify-center">
@@ -83,7 +83,6 @@ export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => 
                 </div>
             </main>
 
-            {/* Rules section moved higher up, right after student info */}
             <div className="text-[10px] leading-tight bg-gray-50 p-2 mt-2 rounded border border-dashed border-gray-300">
                 <p className="font-black underline mb-1">পরীক্ষার্থীদের নিয়মাবলী:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-gray-900 font-bold">
@@ -93,7 +92,6 @@ export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => 
                 </ul>
             </div>
 
-            {/* Signature section remains at the absolute bottom */}
             <footer className="mt-auto print-footer flex flex-col pb-2">
                 <div className="flex justify-between items-end px-2">
                     <div className="text-center w-32 border-t-2 border-black pt-1">

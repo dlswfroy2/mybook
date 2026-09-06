@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ export default function AppreciationGeneratorPage() {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isFetchingResults, setIsFetchingResults] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
+  const [editableBody, setEditableBody] = useState<string>('');
 
   // Customization Settings
   const [customSettings, setCustomSettings] = useState({
@@ -140,6 +141,33 @@ export default function AppreciationGeneratorPage() {
     fetchResults();
   }, [db, selectedStudent, selectedYear, isClient]);
 
+  // Sync Body
+  const studentDob = useMemo(() => selectedStudent?.dob ? toBengaliNumber(format(new Date(selectedStudent.dob), "d MMMM, yyyy", { locale: bn })) : 'প্রযোজ্য নয়', [selectedStudent]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      const defaultBody = `<p class="indent-20">
+          এতদ্বারা প্রত্যয়ন করা যাচ্ছে যে, <span class="font-black border-b-2 border-black border-dotted px-2 text-blue-950">${selectedStudent.studentNameBn}</span>, 
+          পিতা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.fatherNameBn}</span>, 
+          মাতা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.motherNameBn}</span>, 
+          গ্রাম: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.presentVillage || selectedStudent.permanentVillage || 'বিবিধ'}</span>, 
+          ডাকঘর: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.presentPostOffice || selectedStudent.permanentPostOffice || 'বিবিধ'}</span>, 
+          উপজেলা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.presentUpazila || ''}</span>, 
+          জেলা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.presentDistrict || ''}</span>।
+      </p>
+      <p>
+          সে অত্র বিদ্যালয়ে <span class="px-2">${toBengaliNumber(formData.passingYear)}</span> শিক্ষাবর্ষে <span class="px-2">${classNamesMap[selectedStudent.className] || selectedStudent.className}</span> শ্রেণিতে (রোল নম্বর: <span className="font-black px-2">${toBengaliNumber(selectedStudent.roll)}</span>) নিয়মিত শিক্ষার্থী হিসেবে সফলতার সাথে অধ্যয়ন সম্পন্ন করেছে। বিদ্যালয়ের রেকর্ড অনুযায়ী তার জন্ম তারিখ: <span className="font-black px-2">${studentDob}</span>।
+      </p>
+      <p>
+          অত্র বিদ্যালয়ে অধ্যয়নকালীন মেধা তালিকায় ${formData.meritPosition ? `(মেধাক্রম: <span class="font-black px-1">${toBengaliNumber(formData.meritPosition)}</span>)` : ''} তার অর্জিত GPA: <span className="font-black px-2 border-b-2 border-black border-dotted text-blue-950">${toBengaliNumber(formData.gpa)}</span>। আমার জানামতে সে কোনো প্রকার রাষ্ট্রবিরোধী বা প্রতিষ্ঠানিক শৃঙ্খলা-পরিপন্থী কাজের সাথে জড়িত ছিল না। তার চরিত্র <span className="font-black px-2 border-b-2 border-black border-dotted">${formData.conduct}</span>। ${formData.extraContent}
+      </p>
+      <p class="italic text-blue-950 font-black text-center pt-4">
+          আমি তার উজ্জ্বল ভবিষ্যৎ ও জীবনের সর্বাঙ্গীণ সাফল্য কামনা করি।
+      </p>`;
+      setEditableBody(defaultBody);
+    }
+  }, [selectedStudent, formData, studentDob]);
+
   const handleFieldChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -147,7 +175,6 @@ export default function AppreciationGeneratorPage() {
   if (!isClient) {
     return (
         <div className="flex min-h-screen w-full flex-col bg-slate-100">
-            
             <main className="p-8">
                 <Skeleton className="h-64 w-full rounded-xl" />
             </main>
@@ -157,12 +184,11 @@ export default function AppreciationGeneratorPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-100 font-kalpurush">
-      
       <main className="flex-1 p-4 md:p-8 no-print">
         <div className="max-w-[1400px] mx-auto space-y-6">
             <div className="flex items-center gap-4">
                 <Link href="/documents">
-                    <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" className="border-2 border-b-4 shadow-xl text-primary"><ArrowLeft className="h-4 w-4" /></Button>
                 </Link>
                 <div>
                     <h1 className="text-2xl font-black text-primary">প্রশংসাপত্র (Appreciation) জেনারেটর</h1>
@@ -345,7 +371,7 @@ export default function AppreciationGeneratorPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className={cn("h-8 font-black gap-2", isEditable ? "bg-amber-100 border-amber-500 text-amber-700" : "bg-white")}
+                                className={cn("h-8 font-black gap-2", isEditable ? "bg-amber-100 border-amber-500 text-amber-700" : "bg-white border-2 border-b-4 shadow-xl")}
                                 onClick={() => setIsEditable(!isEditable)}
                             >
                                 <FilePen className="h-4 w-4" /> {isEditable ? 'এডিট মোড বন্ধ' : 'ম্যানুয়ালি এডিট'}
@@ -360,6 +386,8 @@ export default function AppreciationGeneratorPage() {
                                 formData={formData}
                                 settings={customSettings}
                                 isEditable={isEditable}
+                                content={editableBody}
+                                onContentChange={setEditableBody}
                             />
                         ) : (
                             <div className="w-[210mm] h-[297mm] flex flex-col items-center justify-center bg-white text-muted-foreground gap-4">
@@ -380,6 +408,7 @@ export default function AppreciationGeneratorPage() {
                 schoolInfo={schoolInfo} 
                 formData={formData} 
                 settings={customSettings}
+                content={editableBody}
             />
         )}
       </div>
@@ -387,9 +416,7 @@ export default function AppreciationGeneratorPage() {
   );
 }
 
-function AppreciationTemplate({ student, schoolInfo, formData, settings, isEditable = false }: any) {
-    const studentDob = student?.dob ? toBengaliNumber(format(new Date(student.dob), "d MMMM, yyyy", { locale: bn })) : 'প্রযোজ্য নয়';
-
+function AppreciationTemplate({ student, schoolInfo, formData, settings, isEditable = false, content, onContentChange }: any) {
     return (
         <div className={cn(
             "appreciation-container bg-white mx-auto relative text-black flex flex-col p-12 box-border border-blue-900 font-kalpurush overflow-hidden",
@@ -398,9 +425,9 @@ function AppreciationTemplate({ student, schoolInfo, formData, settings, isEdita
         )}>
             <style jsx global>{`
                 @media print {
-                    @page { size: A4; margin: 0.4in !important; }
+                    @page { size: A4; margin: 0.5in !important; }
                     .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                    .appreciation-container { width: 100% !important; min-height: 260mm !important; height: auto !important; padding: 10mm !important; }
+                    .appreciation-container { width: 100% !important; min-height: 270mm !important; height: auto !important; padding: 0 !important; border-width: 4px !important; }
                 }
                 @media screen {
                     .appreciation-container { width: 210mm; min-height: 297mm; }
@@ -459,29 +486,9 @@ function AppreciationTemplate({ student, schoolInfo, formData, settings, isEdita
                 style={{ fontSize: `${settings?.fontSize || 20}px` }}
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
-            >
-                <p className="indent-20">
-                    এতদ্বারা প্রত্যয়ন করা যাচ্ছে যে, <span className="font-black border-b-2 border-black border-dotted px-2 text-blue-950">{student.studentNameBn}</span>, 
-                    পিতা: <span className="border-b-2 border-black border-dotted px-2">{student.fatherNameBn}</span>, 
-                    মাতা: <span className="border-b-2 border-black border-dotted px-2">{student.motherNameBn}</span>, 
-                    গ্রাম: <span className="border-b-2 border-black border-dotted px-2">{student.presentVillage || student.permanentVillage || 'বিবিধ'}</span>, 
-                    ডাকঘর: <span className="border-b-2 border-black border-dotted px-2">{student.presentPostOffice || student.permanentPostOffice || 'বিবিধ'}</span>, 
-                    উপজেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentUpazila || ''}</span>, 
-                    জেলা: <span className="border-b-2 border-black border-dotted px-2">{student.presentDistrict || ''}</span>।
-                </p>
-
-                <p>
-                    সে অত্র বিদ্যালয়ে <span className="px-2">{toBengaliNumber(formData.passingYear)}</span> শিক্ষাবর্ষে <span className="px-2">{classNamesMap[student.className] || student.className}</span> শ্রেণিতে (রোল নম্বর: <span className="font-black px-2">{toBengaliNumber(student.roll)}</span>) নিয়মিত শিক্ষার্থী হিসেবে সফলতার সাথে অধ্যয়ন সম্পন্ন করেছে। বিদ্যালয়ের রেকর্ড অনুযায়ী তার জন্ম তারিখ: <span className="font-black px-2">{studentDob}</span>।
-                </p>
-
-                <p>
-                    অত্র বিদ্যালয়ে অধ্যয়নকালীন মেধা তালিকায় {formData.meritPosition && <>(মেধাক্রম: <span className="font-black px-1">{toBengaliNumber(formData.meritPosition)}</span>)</>} তার অর্জিত GPA: <span className="font-black px-2 border-b-2 border-black border-dotted text-blue-950">{toBengaliNumber(formData.gpa)}</span>। আমার জানামতে সে কোনো প্রকার রাষ্ট্রবিরোধী বা প্রতিষ্ঠানিক শৃঙ্খলা-পরিপন্থী কাজের সাথে জড়িত ছিল না। তার চরিত্র <span className="font-black px-2 border-b-2 border-black border-dotted">{formData.conduct}</span>। {formData.extraContent}
-                </p>
-                
-                <p className="italic text-blue-950 font-black text-center pt-4">
-                    আমি তার উজ্জ্বল ভবিষ্যৎ ও জীবনের সর্বাঙ্গীণ সাফল্য কামনা করি।
-                </p>
-            </div>
+                onBlur={(e) => isEditable && onContentChange?.(e.currentTarget.innerHTML)}
+                dangerouslySetInnerHTML={{ __html: content }}
+            />
 
             {/* Footer */}
             <footer className="relative z-10 px-16 bg-white pb-6 pt-12 print:pt-6 mt-auto">

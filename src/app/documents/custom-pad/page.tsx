@@ -36,6 +36,13 @@ export default function CustomPadPage() {
         headerPadding: 'pb-4'
     });
 
+    // Content States
+    const [smarak, setSmarak] = useState('স্মারক নং: ......................');
+    const [issueDate, setIssueDate] = useState(`তারিখ: ${toBengaliNumber(format(new Date(), "d MMMM, yyyy", { locale: bn }))} ইং`);
+    const [body, setBody] = useState('<p>আপনার ডকুমেন্টের বিষয়বস্তু এখানে লিখুন...</p>');
+    const [signName, setSignName] = useState('');
+    const [signDesignation, setSignDesignation] = useState('প্রধান শিক্ষক');
+
     useEffect(() => {
         setIsClient(true);
     }, []);
@@ -43,17 +50,14 @@ export default function CustomPadPage() {
     if (!isClient || isSchoolInfoLoading) {
         return <div className="flex items-center justify-center min-h-screen bg-gray-100 font-kalpurush text-primary font-black animate-pulse">লোড হচ্ছে...</div>;
     }
-    
-    const issueDate = toBengaliNumber(format(new Date(), "d MMMM, yyyy", { locale: bn }));
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
-            
             <main className="flex-1 p-4 md:p-8 no-print pb-40">
                 <div className="max-w-[1400px] mx-auto space-y-6">
                     <div className="flex items-center gap-4">
                         <Link href="/documents">
-                            <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="icon" className="border-2 border-b-4 shadow-xl text-primary"><ArrowLeft className="h-4 w-4" /></Button>
                         </Link>
                         <div>
                             <h1 className="text-2xl font-black text-primary">প্রতিষ্ঠানের প্যাড (Letterhead)</h1>
@@ -146,8 +150,12 @@ export default function CustomPadPage() {
                             <div className="bg-white border-4 border-black/10 rounded-xl overflow-hidden shadow-2xl origin-top-left scale-[0.45] sm:scale-[0.52] lg:scale-[0.55] xl:scale-[0.7] min-w-[210mm] min-h-[297mm]">
                                 <LetterheadTemplate 
                                     schoolInfo={schoolInfo} 
-                                    settings={customSettings} 
-                                    issueDate={issueDate}
+                                    settings={customSettings}
+                                    smarak={smarak} setSmarak={setSmarak}
+                                    issueDate={issueDate} setIssueDate={setIssueDate}
+                                    body={body} setBody={setBody}
+                                    signName={signName} setSignName={setSignName}
+                                    signDesignation={signDesignation} setSignDesignation={setSignDesignation}
                                 />
                             </div>
                         </div>
@@ -159,22 +167,22 @@ export default function CustomPadPage() {
             <div className="hidden print:block printable-area">
                 <LetterheadTemplate 
                     schoolInfo={schoolInfo} 
-                    settings={customSettings} 
-                    issueDate={issueDate}
+                    settings={customSettings}
+                    smarak={smarak} issueDate={issueDate} body={body} signName={signName} signDesignation={signDesignation}
                 />
             </div>
         </div>
     );
 }
 
-function LetterheadTemplate({ schoolInfo, settings, issueDate }: any) {
+function LetterheadTemplate({ schoolInfo, settings, smarak, setSmarak, issueDate, setIssueDate, body, setBody, signName, setSignName, signDesignation, setSignDesignation }: any) {
     return (
         <div className="letterhead-container bg-white mx-auto relative text-black flex flex-col p-12 box-border font-kalpurush overflow-hidden">
             <style jsx global>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 0.4in !important; }
+                    @page { size: A4 portrait; margin: 0.5in !important; }
                     .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                    .letterhead-container { width: 100% !important; min-height: 275mm !important; height: auto !important; padding: 10mm !important; }
+                    .letterhead-container { width: 100% !important; min-height: 275mm !important; height: auto !important; padding: 0 !important; }
                 }
                 @media screen {
                     .letterhead-container { width: 210mm; min-height: 297mm; }
@@ -182,7 +190,6 @@ function LetterheadTemplate({ schoolInfo, settings, issueDate }: any) {
                 .no-print-outline:focus { outline: none !important; background-color: rgba(59, 130, 246, 0.05); }
             `}</style>
 
-            {/* Header Section Redesigned based on Image */}
             <div className={cn(
                 "w-full mb-6 relative px-4 flex items-center justify-center min-h-[160px] border-slate-300",
                 settings.borderStyle,
@@ -214,11 +221,20 @@ function LetterheadTemplate({ schoolInfo, settings, issueDate }: any) {
             </div>
 
             <div className="flex justify-between font-bold text-base mb-8 px-4">
-                <span contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline px-1">স্মারক নং: ......................</span>
-                <span contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline px-1">তারিখ: {issueDate} ইং</span>
+                <span 
+                    contentEditable={!!setSmarak} 
+                    suppressContentEditableWarning={true} 
+                    className="no-print-outline px-1"
+                    onBlur={(e) => setSmarak?.(e.currentTarget.innerText)}
+                >{smarak}</span>
+                <span 
+                    contentEditable={!!setIssueDate} 
+                    suppressContentEditableWarning={true} 
+                    className="no-print-outline px-1"
+                    onBlur={(e) => setIssueDate?.(e.currentTarget.innerText)}
+                >{issueDate}</span>
             </div>
 
-            {/* Watermark */}
             {schoolInfo.logoUrl && settings.watermarkOpacity > 0 && (
                 <div 
                     className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none"
@@ -228,22 +244,30 @@ function LetterheadTemplate({ schoolInfo, settings, issueDate }: any) {
                 </div>
             )}
 
-            {/* Main Body - Fully Editable */}
             <main 
-                className="relative z-10 flex-grow text-justify leading-relaxed px-6 text-slate-900 no-print-outline"
+                className="relative z-10 flex-grow text-justify leading-relaxed px-6 text-slate-900 no-print-outline outline-none"
                 style={{ fontSize: `${settings.fontSize}px` }}
-                contentEditable={true}
+                contentEditable={!!setBody}
                 suppressContentEditableWarning={true}
-            >
-                <p>আপনার ডকুমেন্টের বিষয়বস্তু এখানে লিখুন...</p>
-            </main>
+                onBlur={(e) => setBody?.(e.currentTarget.innerHTML)}
+                dangerouslySetInnerHTML={{ __html: body }}
+            />
 
-            {/* Footer / Signature - Fully Editable */}
             <footer className="relative z-10 px-6 pb-10 flex justify-end mt-20">
                 <div className="text-center min-w-[250px]">
                     <div className="border-t-2 border-black pt-2">
-                        <div contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline font-black text-xl mb-0.5 min-h-[1.5em] empty:before:content-['[নাম_লিখুন]'] empty:before:text-gray-300"></div>
-                        <div contentEditable={true} suppressContentEditableWarning={true} className="no-print-outline font-bold text-lg text-gray-700 min-h-[1.2em] empty:before:content-['[পদবি_লিখুন]'] empty:before:text-gray-300">প্রধান শিক্ষক</div>
+                        <div 
+                            contentEditable={!!setSignName} 
+                            suppressContentEditableWarning={true} 
+                            className="no-print-outline font-black text-xl mb-0.5 min-h-[1.5em] empty:before:content-['[নাম_লিখুন]'] empty:before:text-gray-300"
+                            onBlur={(e) => setSignName?.(e.currentTarget.innerText)}
+                        >{signName}</div>
+                        <div 
+                            contentEditable={!!setSignDesignation} 
+                            suppressContentEditableWarning={true} 
+                            className="no-print-outline font-bold text-lg text-gray-700 min-h-[1.2em] empty:before:content-['[পদবি_লিখুন]'] empty:before:text-gray-300"
+                            onBlur={(e) => setSignDesignation?.(e.currentTarget.innerText)}
+                        >{signDesignation}</div>
                         <p className="font-bold text-gray-600 text-sm">{schoolInfo.name}</p>
                     </div>
                 </div>

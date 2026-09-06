@@ -88,7 +88,6 @@ const AdmitCardGeneratorPage = () => {
     if (!isClient) {
         return (
             <div className="flex min-h-screen w-full flex-col bg-slate-100">
-                
                 <main className="p-8">
                     <Skeleton className="h-64 w-full rounded-xl" />
                 </main>
@@ -98,12 +97,33 @@ const AdmitCardGeneratorPage = () => {
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-slate-100 font-kalpurush">
-            
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        size: A4;
+                        margin: 0.5in !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        height: 100% !important;
+                        background: white !important;
+                    }
+                    .printable-area {
+                        display: block !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                    }
+                    .no-print { display: none !important; }
+                }
+            `}</style>
+
             <main className="flex-1 p-4 md:p-8 no-print">
                 <div className="max-w-[1400px] mx-auto space-y-6">
                     <div className="flex items-center gap-4">
                         <Link href="/documents">
-                            <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="icon" className="border-2 border-b-4 shadow-xl text-primary"><ArrowLeft className="h-4 w-4" /></Button>
                         </Link>
                         <div>
                             <h1 className="text-2xl font-black text-primary">প্রবেশ পত্র (Admit Card) জেনারেটর</h1>
@@ -167,7 +187,7 @@ const AdmitCardGeneratorPage = () => {
                                 </div>
 
                                 <div className="pt-6 border-t">
-                                    <Button onClick={() => window.print()} className="w-full h-12 text-lg font-black shadow-lg" disabled={!selectedExam || !selectedClass || (mode === 'single' && !selectedStudentId)}>
+                                    <Button onClick={() => window.print()} className="w-full h-12 text-lg font-black shadow-xl" disabled={!selectedExam || !selectedClass || (mode === 'single' && !selectedStudentId)}>
                                         <Printer className="mr-2 h-5 w-5" /> প্রিন্ট করুন (A4)
                                     </Button>
                                     <p className="text-[10px] text-muted-foreground mt-4 italic text-center">
@@ -202,12 +222,12 @@ const AdmitCardGeneratorPage = () => {
             {/* Printable Area */}
             <div className="hidden print:block printable-area">
                 {mode === 'single' && previewStudent && selectedExam && (
-                    <div className="flex justify-center items-center h-screen">
+                    <div className="flex justify-center items-center h-full">
                         <AdmitCard student={previewStudent} schoolInfo={schoolInfo} examName={selectedExam.name} />
                     </div>
                 )}
                 {mode === 'bulk' && selectedExam && bulkStudentsGrouped.map((group, groupIdx) => (
-                    <div key={groupIdx} className="h-screen w-screen p-0 m-0 overflow-hidden relative" style={{ pageBreakAfter: 'always' }}>
+                    <div key={groupIdx} className="h-screen w-full p-0 m-0 overflow-hidden relative" style={{ pageBreakAfter: 'always' }}>
                         <div className="grid grid-cols-2 grid-rows-2 h-full w-full">
                             {group.map(student => (
                                 <div key={student.id} className="flex items-center justify-center border border-dashed border-gray-300">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ export default function TCGeneratorPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
+  const [editableBody, setEditableBody] = useState<string>('');
 
   // Customization Settings
   const [customSettings, setCustomSettings] = useState({
@@ -88,6 +89,31 @@ export default function TCGeneratorPage() {
     fetchStudents();
   }, [db, className, selectedYear, isClient]);
 
+  // Sync Content
+  const studentDob = useMemo(() => selectedStudent?.dob ? toBengaliNumber(format(new Date(selectedStudent.dob), "d MMMM, yyyy", { locale: bn })) : 'প্রযোজ্য নয়', [selectedStudent]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      const defaultBody = `<p class="indent-16">
+          এতদ্বারা প্রত্যয়ন করা যাচ্ছে যে, <span class="font-black border-b-2 border-black border-dotted px-2">${selectedStudent.studentNameBn}</span>, 
+          পিতা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.fatherNameBn}</span>, 
+          মাতা: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.motherNameBn}</span>, 
+          গ্রাম: <span class="border-b-2 border-black border-dotted px-2">${selectedStudent.permanentVillage || selectedStudent.presentVillage || 'বিবিধ'}</span>।
+      </p>
+      <p>
+          সে অত্র বিদ্যালয়ে <span class="font-black px-2">${toBengaliNumber(selectedYear)}</span> শিক্ষাবর্ষে <span class="font-black px-2">${classNamesMap[selectedStudent.className] || selectedStudent.className}</span> শ্রেণিতে (রোল নম্বর: <span className="font-black px-2">${toBengaliNumber(selectedStudent.roll)}</span>) নিয়মিত শিক্ষার্থী হিসেবে অধ্যয়ন সম্পন্ন করেছে। বিদ্যালয়ের রেকর্ড অনুযায়ী তার জন্ম তারিখ: <span className="font-black px-2">${studentDob}</span>।
+      </p>
+      <p>
+          আমার জানামতে সে কোনো প্রকার রাষ্ট্রবিরোধী বা প্রতিষ্ঠানিক শৃঙ্খলা-পরিপন্থী কাজের সাথে জড়িত ছিল না। তার চরিত্র <span class="font-black border-b-2 border-black border-dotted px-2">${formData.conduct}</span>। পড়াশোনার অগ্রগতি ও ফলাফল <span class="font-black border-b-2 border-black border-dotted px-2">${formData.status}</span>।
+      </p>
+      <p>বিদ্যালয় ত্যাগের কারণ: <span className="font-black border-b-2 border-black border-dotted px-2">${formData.reason}</span>। বিদ্যালয়ের পাওনা সংক্রান্ত অবস্থা: <span className="font-black border-b-2 border-black border-dotted px-2">${formData.dues}</span>।</p>
+      <p class="italic text-emerald-950 font-black text-center pt-8">
+          আমি তার উজ্জ্বল ভবিষ্যৎ ও জীবনের সর্বাঙ্গীণ সাফল্য কামনা করি।
+      </p>`;
+      setEditableBody(defaultBody);
+    }
+  }, [selectedStudent, selectedYear, studentDob, formData]);
+
   const handleFieldChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -95,7 +121,6 @@ export default function TCGeneratorPage() {
   if (!isClient) {
     return (
         <div className="flex min-h-screen w-full flex-col bg-slate-100">
-            
             <main className="p-8">
                 <Skeleton className="h-64 w-full rounded-xl" />
             </main>
@@ -105,12 +130,11 @@ export default function TCGeneratorPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-100 font-kalpurush">
-      
       <main className="flex-1 p-4 md:p-8 no-print">
         <div className="max-w-[1400px] mx-auto space-y-6">
             <div className="flex items-center gap-4">
                 <Link href="/documents">
-                    <Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" className="border-2 border-b-4 shadow-xl text-primary"><ArrowLeft className="h-4 w-4" /></Button>
                 </Link>
                 <div>
                     <h1 className="text-2xl font-black text-primary">ছাড়পত্র (TC) জেনারেটর</h1>
@@ -260,7 +284,7 @@ export default function TCGeneratorPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className={cn("h-8 font-black gap-2", isEditable ? "bg-amber-100 border-amber-500 text-amber-700" : "bg-white")}
+                                className={cn("h-8 font-black gap-2", isEditable ? "bg-amber-100 border-amber-500 text-amber-700" : "bg-white border-2 border-b-4 shadow-xl")}
                                 onClick={() => setIsEditable(!isEditable)}
                             >
                                 <FilePen className="h-4 w-4" /> {isEditable ? 'এডিট মোড বন্ধ' : 'ম্যানুয়ালি এডিট'}
@@ -275,6 +299,8 @@ export default function TCGeneratorPage() {
                                 formData={formData} 
                                 settings={customSettings} 
                                 isEditable={isEditable}
+                                content={editableBody}
+                                onContentChange={setEditableBody}
                             />
                         ) : (
                             <div className="w-[210mm] h-[297mm] bg-white flex flex-col items-center justify-center text-muted-foreground italic">
@@ -289,15 +315,13 @@ export default function TCGeneratorPage() {
       </main>
 
       <div className="hidden print:block printable-area">
-        {selectedStudent && <TCTemplate student={selectedStudent} schoolInfo={schoolInfo} formData={formData} settings={customSettings} />}
+        {selectedStudent && <TCTemplate student={selectedStudent} schoolInfo={schoolInfo} formData={formData} settings={customSettings} content={editableBody} />}
       </div>
     </div>
   );
 }
 
-function TCTemplate({ student, schoolInfo, formData, settings, isEditable = false }: any) {
-    const studentDob = student?.dob ? toBengaliNumber(format(new Date(student.dob), "d MMMM, yyyy", { locale: bn })) : 'প্রযোজ্য নয়';
-
+function TCTemplate({ student, schoolInfo, formData, settings, isEditable = false, content, onContentChange }: any) {
     return (
         <div className={cn(
             "tc-container bg-white mx-auto relative text-black flex flex-col p-12 box-border border-emerald-800 font-kalpurush overflow-hidden",
@@ -306,9 +330,9 @@ function TCTemplate({ student, schoolInfo, formData, settings, isEditable = fals
         )}>
             <style jsx global>{`
                 @media print {
-                    @page { size: A4; margin: 0.4in !important; }
+                    @page { size: A4; margin: 0.5in !important; }
                     .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                    .tc-container { width: 100% !important; min-height: 260mm !important; height: auto !important; padding: 10mm !important; }
+                    .tc-container { width: 100% !important; min-height: 270mm !important; height: auto !important; padding: 0 !important; border-width: 4px !important; }
                 }
                 @media screen {
                     .tc-container { width: 210mm; min-height: 297mm; }
@@ -351,27 +375,11 @@ function TCTemplate({ student, schoolInfo, formData, settings, isEditable = fals
                 style={{ fontSize: `${settings?.fontSize || 20}px` }}
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
-            >
-                <p className="indent-16">
-                    এতদ্বারা প্রত্যয়ন করা যাচ্ছে যে, <span className="font-black border-b-2 border-black border-dotted px-2">{student.studentNameBn}</span>, 
-                    পিতা: <span className="border-b-2 border-black border-dotted px-2">{student.fatherNameBn}</span>, 
-                    মাতা: <span className="border-b-2 border-black border-dotted px-2">{student.motherNameBn}</span>, 
-                    গ্রাম: <span className="border-b-2 border-black border-dotted px-2">{student.permanentVillage || student.presentVillage || 'বিবিধ'}</span>।
-                </p>
-                <p>
-                    সে অত্র বিদ্যালয়ে <span className="font-black px-2">{toBengaliNumber(student.academicYear)}</span> শিক্ষাবর্ষে <span className="font-black px-2">{classNamesMap[student.className] || student.className}</span> শ্রেণিতে (রোল নম্বর: <span className="font-black px-2">{toBengaliNumber(student.roll)}</span>) নিয়মিত শিক্ষার্থী হিসেবে অধ্যয়ন সম্পন্ন করেছে। বিদ্যালয়ের রেকর্ড অনুযায়ী তার জন্ম তারিখ: <span className="font-black px-2">{studentDob}</span>।
-                </p>
-                <p>
-                    আমার জানামতে সে কোনো প্রকার রাষ্ট্রবিরোধী বা প্রতিষ্ঠানিক শৃঙ্খলা-পরিপন্থী কাজের সাথে জড়িত ছিল না। তার চরিত্র <span className="font-black border-b-2 border-black border-dotted px-2">{formData.conduct}</span>। পড়াশোনার অগ্রগতি ও ফলাফল <span className="font-black border-b-2 border-black border-dotted px-2">{formData.status}</span>।
-                </p>
-                <p>বিদ্যালয় ত্যাগের কারণ: <span className="font-black border-b-2 border-black border-dotted px-2">{formData.reason}</span>। বিদ্যালয়ের পাওনা সংক্রান্ত অবস্থা: <span className="font-black border-b-2 border-black border-dotted px-2">{formData.dues}</span>।</p>
-                
-                <p className="italic text-emerald-950 font-black text-center pt-8">
-                    আমি তার উজ্জ্বল ভবিষ্যৎ ও জীবনের সর্বাঙ্গীণ সাফল্য কামনা করি।
-                </p>
-            </div>
+                onBlur={(e) => isEditable && onContentChange?.(e.currentTarget.innerHTML)}
+                dangerouslySetInnerHTML={{ __html: content }}
+            />
 
-            <footer className="relative z-10 px-10 bg-white pb-6 pt-12 print:pt-6">
+            <footer className="relative z-10 px-10 bg-white pb-6 pt-12 print:pt-6 mt-auto">
                 <div className="flex justify-around items-end">
                     <div className="text-center">
                         <div className="w-48 border-t border-black pt-1 font-bold text-sm">শ্রেণি শিক্ষকের স্বাক্ষর</div>
@@ -386,4 +394,3 @@ function TCTemplate({ student, schoolInfo, formData, settings, isEditable = fals
         </div>
     );
 }
-
