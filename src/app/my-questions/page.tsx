@@ -44,7 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/Dialog";
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -99,6 +99,38 @@ function getChapterSortValue(name: string): number {
   const num = parseInt(norm);
   return isNaN(num) ? 998 : num;
 }
+
+const subjectNameNormalization: { [key: string]: string } = {
+    'ধর্ম শিক্ষা': 'ধর্ম ও নৈতিক শিক্ষা',
+    'ইসলাম ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
+    'হিন্দু ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
+    'বাংলা ১ম': 'বাংলা প্রথম', 'বাংলা 1st': 'বাংলা প্রথম',
+    'বাংলা ২য়': 'বাংলা দ্বিতীয়', 'বাংলা 2nd': 'বাংলা দ্বিতীয়',
+    'ইংরেজি ১ম': 'ইংরেজি প্রথম', 'ইংরেজি 1st': 'ইংরেজি প্রথম',
+    'ইংরেজী ১ম': 'ইংরেজি প্রথম',
+    'ইংরেজি ২য়': 'ইংরেজি দ্বিতীয়', 'ইংরেজি 2nd': 'ইংরেজি দ্বিতীয়',
+    'ইংরেজী ২য়': 'ইংরেজি দ্বিতীয়',
+    'ইংরেজী২য়': 'ইংরেজি দ্বিতীয়',
+    'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি',
+    'বিজিএস': 'বাংলাদেশ ও বিশ্ব পরিচয়',
+    'বি ও বি পরিচয়': 'বাংলাদেশ ও বিশ্ব পরিচয়',
+    'বাংলাদেশ ও বিশ্বপরিচয়': 'বাংলাদেশ ও বিশ্ব পরিচয়',
+    'পদার্থবিজ্ঞান': 'পদার্থ',
+    'রসায়ন': 'রসায়ন',
+    'জীববিজ্ঞান': 'জীব বিজ্ঞান',
+    'সাধারণ গণিত': 'গণিত',
+    'সাধারন গণিত': 'গণিত',
+    'ম্যাথ': 'গণিত',
+    'Mathematics': 'গণিত',
+    'Math': 'গণিত',
+    'জেনারেল ম্যাথ': 'গণিত',
+};
+
+const normalize = (name: string) => {
+    if (!name) return "";
+    const trimmed = name.trim();
+    return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
+};
 
 type ViewMode = 'classes' | 'subjects' | 'chapters' | 'content';
 type Category = 'all' | 'sheet' | 'creative' | 'mcq' | 'model' | 'answer';
@@ -605,27 +637,27 @@ function MyLibraryContent() {
                               <>
                                 <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="h-4 w-4" /></Button></Link>
                                 <Link href={`/create-lecture-sheet?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="h-4 w-4" /></Button></Link>
                               </>
                             ) : (
                               <>
-                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="h-4 w-4" /></Button></Link>
                                 <Link href={`/create-question?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
-                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="h-4 w-4" /></Button></Link>
                               </>
                             )}
                           </div>
                         ) : (
                           <div className="flex gap-2">
                              <Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20" onClick={() => handleOpenPdf(item.pdfUrl)} title="দেখুন"><Eye className="h-4 w-4" /></Button>
-                             <Button variant="outline" size="icon" className="h-9 w-9 text-indigo-600 border-2 border-indigo-200" onClick={() => handleOpenPdf(item.pdfUrl)} title="ডাউনলোড"><Download className="w-4 h-4" /></Button>
+                             <Button variant="outline" size="icon" className="h-9 w-9 text-indigo-600 border-2 border-indigo-200" onClick={() => handleOpenPdf(item.pdfUrl)} title="ডাউনলোড"><Download className="h-4 w-4" /></Button>
                           </div>
                         )}
                         
                         {!isSelecting && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50" title="মুছে ফেলুন"><Trash2 className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50" title="মুছে ফেলুন"><Trash2 className="h-4 w-4" /></Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="font-kalpurush border-2 border-black">
                               <AlertDialogHeader><AlertDialogTitle className="font-bold">আপনি কি নিশ্চিত?</AlertDialogTitle></AlertDialogHeader>
@@ -689,7 +721,7 @@ function MyLibraryContent() {
           <div className="flex items-center gap-2 text-xs font-bold overflow-x-auto whitespace-nowrap pb-1 text-muted-foreground scrollbar-hide">
             <span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'classes' && "text-primary")} onClick={() => { setViewMode('classes'); setSelectedClass(null); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>লাইব্রেরি</span>
             {selectedClass && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'subjects' && "text-primary")} onClick={() => { setViewMode('subjects'); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>{CLASSES.find(c => c.id === selectedClass)?.label} শ্রেণি</span></>)}
-            {selectedSubject && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'subjects' && "text-primary")} onClick={() => { setViewMode('chapters'); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>{selectedSubject}</span></>)}
+            {selectedSubject && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'subjects' && "text-primary")} onClick={() => { setViewMode('subjects'); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>{selectedSubject}</span></>)}
             {selectedChapter && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'content' && "text-primary")} onClick={() => { setViewMode('content'); }}>{selectedChapter}</span></>)}
           </div>
           <Button variant="outline" size="sm" onClick={handleBack} className="gap-2 font-bold border-black text-primary h-8 self-end sm:self-center bg-white shadow-sm hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-3.5 h-3.5" /> ফিরে যান</Button>
