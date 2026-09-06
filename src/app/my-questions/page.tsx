@@ -26,7 +26,8 @@ import {
   Printer,
   CheckCircle2,
   Library,
-  ExternalLink
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -740,3 +741,4 @@ export default function MyLibraryPage() {
     </Suspense>
   );
 }
+
