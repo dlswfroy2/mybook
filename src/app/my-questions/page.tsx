@@ -159,7 +159,7 @@ function MyLibraryContent() {
     if (!url) return;
     const isDataUri = url.startsWith('data:');
     const isPdf = url.startsWith('data:application/pdf');
-    const isWord = url.startsWith('data:application/msword') || url.startsWith('data:application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    const isWord = url.startsWith('data:application/vnd.openxmlformats-officedocument') || url.startsWith('data:application/msword');
 
     if (isDataUri && (isPdf || isWord)) {
       try {
@@ -265,14 +265,21 @@ function MyLibraryContent() {
       ss = [];
       ps = ps.filter(p => {
         const url = (p.pdfUrl || '').toLowerCase();
-        return url.includes('pdf') || url.startsWith('http');
+        const fName = (p.fileName || '').toLowerCase();
+        // Improved PDF detection: check both filename and mime header
+        const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
+        const isPdf = (url.startsWith('data:application/pdf') || fName.endsWith('.pdf') || (url.includes('pdf') && url.startsWith('http'))) && !isWord;
+        return isPdf;
       });
     } else if (activeFileType === 'word') {
       qs = [];
       ss = [];
       ps = ps.filter(p => {
         const url = (p.pdfUrl || '').toLowerCase();
-        return url.includes('word') || url.includes('officedocument') || url.includes('msword');
+        const fName = (p.fileName || '').toLowerCase();
+        // Improved Word detection
+        const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
+        return isWord;
       });
     } else if (activeFileType === 'editor') {
       ps = [];
@@ -286,7 +293,7 @@ function MyLibraryContent() {
     const key = getNormalizedChapterKey(chapterName);
     const chapterSheets = libraryData.sheets.filter(s => s.classId === selectedClass && s.subject === selectedSubject && (isGeneral ? !s.topic : getNormalizedChapterKey(s.topic) === key));
     const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && p.subject === selectedSubject && (isGeneral ? !p.chapterName : getNormalizedChapterKey(p.chapterName) === key));
-    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject && (isGeneral ? !q.chapter : getNormalizedChapterKey(q.chapter) === key));
+    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject && (isGeneral ? !q.chapter : getNormalizedKey(q.chapter) === key));
     
     let totalQuestions = 0, mcqCount = 0, creativeCount = 0;
     chapterQuestionSets.forEach(set => {
@@ -505,8 +512,12 @@ function MyLibraryContent() {
           ))}
 
           {currentItems.pdfSheets.map(ps => {
-            const isPdf = (ps.pdfUrl || '').toLowerCase().includes('pdf') || (ps.pdfUrl || '').startsWith('data:application/pdf');
-            const isWord = (ps.pdfUrl || '').toLowerCase().includes('word') || (ps.pdfUrl || '').includes('officedocument') || (ps.pdfUrl || '').includes('msword');
+            const url = (ps.pdfUrl || '').toLowerCase();
+            const fName = (ps.fileName || '').toLowerCase();
+            // Robust detection for PDF and Word
+            const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
+            const isPdf = (url.startsWith('data:application/pdf') || fName.endsWith('.pdf') || (url.includes('pdf') && url.startsWith('http'))) && !isWord;
+            
             const fileTypeLabel = isPdf ? 'PDF' : (isWord ? 'WORD' : 'FILE');
             const fileTypeColor = isPdf ? "bg-rose-100 text-rose-700 border-rose-200" : (isWord ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200");
 
