@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Student, studentFromDoc } from '@/lib/student-data';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
-import { Printer, ArrowLeft, FileText, Info, Settings2, Type, FilePen } from 'lucide-react';
+import { Printer, ArrowLeft, FileText, Info, Settings2, Type, FilePen, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Rows3 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const classNamesMap: { [key: string]: string } = {
   '6': 'ষষ্ঠ', '7': 'সপ্তম', '8': 'অষ্টম', '9': 'নবম', '10': 'দশম',
@@ -50,6 +51,12 @@ export default function TCGeneratorPage() {
     watermarkOpacity: 0.05,
     borderStyle: 'border-double',
     fontSize: 20,
+    lineHeight: 2.1,
+    bold: false,
+    italic: false,
+    underline: false,
+    color: '#000000',
+    align: 'justify',
     borderWidth: 'border-8'
   });
 
@@ -118,6 +125,25 @@ export default function TCGeneratorPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleFormatting = useCallback((command: string, value: string | null = null) => {
+    if (isEditable) {
+      document.execCommand(command, false, value || '');
+    } else {
+      setCustomSettings(prev => {
+        const next = { ...prev };
+        if (command === 'bold') next.bold = !prev.bold;
+        else if (command === 'italic') next.italic = !prev.italic;
+        else if (command === 'underline') next.underline = !prev.underline;
+        else if (command === 'foreColor') next.color = value || '#000000';
+        else if (command.startsWith('justify')) {
+          const alignMap: any = { justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right', justifyFull: 'justify' };
+          next.align = alignMap[command];
+        }
+        return next;
+      });
+    }
+  }, [isEditable]);
+
   if (!isClient) {
     return (
         <div className="flex min-h-screen w-full flex-col bg-slate-100">
@@ -185,85 +211,57 @@ export default function TCGeneratorPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Live Customization Card */}
+                    {/* Live Customization Card - Word like tools */}
                     <Card className="shadow-lg border-2 border-amber-200">
                         <CardHeader className="bg-amber-50 border-b">
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <Settings2 className="h-5 w-5 text-amber-700" /> টেমপ্লেট কাস্টমাইজেশন (লাইভ)
+                                <Settings2 className="h-5 w-5 text-amber-700" /> টেক্সট ফরম্যাটিং (Word-like Tools)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="font-bold text-xs flex items-center gap-2">
-                                            স্কুল লোগো জলছাপ (Opacity)
-                                        </Label>
-                                        <Select 
-                                            value={customSettings.watermarkOpacity.toString()} 
-                                            onValueChange={(v) => setCustomSettings(prev => ({ ...prev, watermarkOpacity: parseFloat(v) }))}
-                                        >
-                                            <SelectTrigger className="bg-white h-9"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="0.05">৫% (হালকা)</SelectItem>
-                                                <SelectItem value="0.1">১০% (স্পষ্ট)</SelectItem>
-                                                <SelectItem value="0.15">১৫% (গাঢ়)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Label className="font-bold text-xs flex items-center gap-2">জলছাপ ব্রাইটনেস</Label>
+                                        <Slider value={[customSettings.watermarkOpacity * 100]} min={0} max={20} step={1} onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, watermarkOpacity: v / 100 }))} />
                                     </div>
-
                                     <div className="space-y-2">
-                                        <Label className="font-bold text-xs flex items-center gap-2">
-                                            বর্ডার ডিজাইন
-                                        </Label>
-                                        <Select 
-                                            value={customSettings.borderStyle} 
-                                            onValueChange={(v) => setCustomSettings(prev => ({ ...prev, borderStyle: v }))}
-                                        >
-                                            <SelectTrigger className="bg-white h-9"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="border-double">ডাবল (Double)</SelectItem>
-                                                <SelectItem value="border-solid">সলিড (Solid)</SelectItem>
-                                                <SelectItem value="border-dashed">ড্যাশ (Dashed)</SelectItem>
-                                                <SelectItem value="border-none">বর্ডার নেই</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Label className="font-bold text-xs">টেক্সট অ্যালাইনমেন্ট</Label>
+                                        <div className="flex gap-1">
+                                          <Button variant={customSettings.align === 'left' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyLeft')}><AlignLeft className="h-4 w-4" /></Button>
+                                          <Button variant={customSettings.align === 'center' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyCenter')}><AlignCenter className="h-4 w-4" /></Button>
+                                          <Button variant={customSettings.align === 'right' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyRight')}><AlignRight className="h-4 w-4" /></Button>
+                                          <Button variant={customSettings.align === 'justify' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyFull')}><AlignJustify className="h-4 w-4" /></Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="font-bold text-xs">টেক্সট স্টাইল</Label>
+                                        <div className="flex gap-2">
+                                            <Button variant={customSettings.bold ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('bold')}><Bold className="h-4 w-4" /></Button>
+                                            <Button variant={customSettings.italic ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('italic')}><Italic className="h-4 w-4" /></Button>
+                                            <Button variant={customSettings.underline ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('underline')}><Underline className="h-4 w-4" /></Button>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center">
-                                            <Label className="font-bold text-xs flex items-center gap-2">
-                                                <Type className="h-4 w-4" /> ফন্ট সাইজ (Font Size)
-                                            </Label>
+                                            <Label className="font-bold text-xs flex items-center gap-2"><Type className="h-4 w-4" /> ফন্ট সাইজ</Label>
                                             <Badge variant="outline" className="font-black h-5">{toBengaliNumber(customSettings.fontSize)}px</Badge>
                                         </div>
-                                        <Slider 
-                                            value={[customSettings.fontSize]} 
-                                            min={10} 
-                                            max={28} 
-                                            step={1} 
-                                            onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, fontSize: v }))} 
-                                        />
+                                        <Slider value={[customSettings.fontSize]} min={12} max={36} step={1} onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, fontSize: v }))} />
                                     </div>
-
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="font-bold text-xs flex items-center gap-2"><Rows3 className="h-4 w-4" /> লাইন স্পেসিং</Label>
+                                            <Badge variant="outline" className="font-black h-5">{toBengaliNumber(customSettings.lineHeight)}</Badge>
+                                        </div>
+                                        <Slider value={[customSettings.lineHeight * 10]} min={10} max={40} step={1} onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, lineHeight: v / 10 }))} />
+                                    </div>
                                     <div className="space-y-2">
-                                        <Label className="font-bold text-xs flex items-center gap-2">
-                                            বর্ডার পুরুত্ব (Width)
-                                        </Label>
-                                        <Select 
-                                            value={customSettings.borderWidth} 
-                                            onValueChange={(v) => setCustomSettings(prev => ({ ...prev, borderWidth: v }))}
-                                        >
-                                            <SelectTrigger className="bg-white h-9"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="border-4">৪px (চিকন)</SelectItem>
-                                                <SelectItem value="border-8">৮px (মাঝারি)</SelectItem>
-                                                <SelectItem value="border-[12px]">১২px (মোটা)</SelectItem>
-                                                <SelectItem value="border-[16px]">১৬px (খুব মোটা)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Label className="font-bold text-xs">রং (Color)</Label>
+                                        <input type="color" value={customSettings.color} onChange={(e) => handleFormatting('foreColor', e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                                     </div>
                                 </div>
                             </div>
@@ -331,8 +329,9 @@ function TCTemplate({ student, schoolInfo, formData, settings, isEditable = fals
             <style jsx global>{`
                 @media print {
                     @page { size: A4; margin: 0.5in !important; }
-                    .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                    .tc-container { width: 100% !important; min-height: 270mm !important; height: auto !important; padding: 0 !important; border-width: 4px !important; }
+                    html, body { margin: 0 !important; padding: 0 !important; }
+                    .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; height: auto !important; }
+                    .tc-container { width: 100% !important; min-height: 275mm !important; height: auto !important; padding: 10mm !important; border-width: 4px !important; margin: 0 !important; }
                 }
                 @media screen {
                     .tc-container { width: 210mm; min-height: 297mm; }
@@ -369,10 +368,18 @@ function TCTemplate({ student, schoolInfo, formData, settings, isEditable = fals
 
             <div 
                 className={cn(
-                    "relative z-10 flex-grow space-y-6 font-semibold leading-[2.1] px-4 text-justify outline-none pb-4 text-slate-900",
+                    "relative z-10 flex-grow space-y-6 font-semibold px-4 text-justify outline-none pb-4 text-slate-900",
                     isEditable && "bg-amber-50/50 p-2 rounded-xl ring-2 ring-amber-200"
                 )}
-                style={{ fontSize: `${settings?.fontSize || 20}px` }}
+                style={{ 
+                  fontSize: `${settings?.fontSize || 20}px`,
+                  lineHeight: settings?.lineHeight || 2.1,
+                  fontWeight: settings?.bold ? 'bold' : 'inherit',
+                  fontStyle: settings?.italic ? 'italic' : 'inherit',
+                  textDecoration: settings?.underline ? 'underline' : 'inherit',
+                  color: settings?.color || '#000000',
+                  textAlign: settings?.align as any || 'justify'
+                }}
                 contentEditable={isEditable}
                 suppressContentEditableWarning={true}
                 onBlur={(e) => isEditable && onContentChange?.(e.currentTarget.innerHTML)}

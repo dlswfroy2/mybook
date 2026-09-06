@@ -8,6 +8,11 @@ interface AdmitCardProps {
     student: Student;
     schoolInfo: SchoolInfo;
     examName: string;
+    settings?: {
+      fontSize?: number;
+      lineHeight?: number;
+      watermarkOpacity?: number;
+    };
 }
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
@@ -20,9 +25,18 @@ const classNamesMap: { [key: string]: string } = {
     '6': 'ষষ্ঠ', '7': 'সপ্তম', '8': 'অষ্টম', '9': 'নবম', '10': 'দশম',
 };
 
-export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => {
+export const AdmitCard = ({ student, schoolInfo, examName, settings }: AdmitCardProps) => {
+    const fontSize = settings?.fontSize || 13;
+    const lineHeight = settings?.lineHeight || 1.5;
+    const watermarkOpacity = settings?.watermarkOpacity ?? 0.1;
+
     return (
         <div className="admit-card font-kalpurush flex flex-col p-4 border-2 border-black rounded-sm w-[92mm] h-[135mm] text-black bg-white relative overflow-hidden box-border">
+            <style jsx>{`
+                @media print {
+                  .admit-card { margin: 0 !important; }
+                }
+            `}</style>
             <header className="flex justify-between items-start mb-2 pb-2 border-b-2 border-black printable-header">
                 <div className="flex items-center gap-2">
                     <div className="w-12 h-12 relative flex items-center justify-center">
@@ -38,9 +52,15 @@ export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => 
                 </div>
             </header>
 
-            <main className="flex flex-col py-1">
+            {schoolInfo.logoUrl && (
+                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none" style={{ opacity: watermarkOpacity }}>
+                    <Image src={schoolInfo.logoUrl} alt="Watermark" width={300} height={300} />
+                </div>
+            )}
+
+            <main className="flex flex-col py-1 relative z-10">
                 <div className="flex justify-between items-start">
-                    <div className="space-y-1.5 text-[13px] flex-1">
+                    <div className="space-y-1.5 flex-1" style={{ fontSize: `${fontSize}px`, lineHeight: lineHeight }}>
                         <div className="flex">
                             <span className="w-24 font-black">পরীক্ষার নাম</span>
                             <span className="font-black">: {examName}</span>
@@ -83,7 +103,7 @@ export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => 
                 </div>
             </main>
 
-            <div className="text-[10px] leading-tight bg-gray-50 p-2 mt-2 rounded border border-dashed border-gray-300">
+            <div className="text-[10px] leading-tight bg-gray-50 p-2 mt-2 rounded border border-dashed border-gray-300 relative z-10">
                 <p className="font-black underline mb-1">পরীক্ষার্থীদের নিয়মাবলী:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-gray-900 font-bold">
                     <li>পরীক্ষা শুরুর ৩০ মিনিট পূর্বে আসনে বসতে হবে।</li>
@@ -92,7 +112,7 @@ export const AdmitCard = ({ student, schoolInfo, examName }: AdmitCardProps) => 
                 </ul>
             </div>
 
-            <footer className="mt-auto print-footer flex flex-col pb-2">
+            <footer className="mt-auto print-footer flex flex-col pb-2 relative z-10">
                 <div className="flex justify-between items-end px-2">
                     <div className="text-center w-32 border-t-2 border-black pt-1">
                         <p className="font-black text-[10px]">শ্রেণি শিক্ষকের স্বাক্ষর</p>

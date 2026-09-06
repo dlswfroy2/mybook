@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Printer, ArrowLeft, Settings2, Type, Info, FileText } from 'lucide-react';
+import { Printer, ArrowLeft, Settings2, Type, Info, FileText, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, Rows3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
     if (!str && str !== 0) return '';
@@ -33,6 +34,7 @@ export default function CustomPadPage() {
         watermarkOpacity: 0.05,
         borderStyle: 'border-b-2',
         fontSize: 20,
+        lineHeight: 1.5,
         headerPadding: 'pb-4'
     });
 
@@ -45,6 +47,10 @@ export default function CustomPadPage() {
 
     useEffect(() => {
         setIsClient(true);
+    }, []);
+
+    const handleFormatting = useCallback((command: string, value: string | null = null) => {
+        document.execCommand(command, false, value || '');
     }, []);
 
     if (!isClient || isSchoolInfoLoading) {
@@ -71,16 +77,14 @@ export default function CustomPadPage() {
                             <Card className="shadow-lg border-2 border-primary/10">
                                 <CardHeader className="bg-primary/5 border-b">
                                     <CardTitle className="text-lg flex items-center gap-2">
-                                        <Settings2 className="h-5 w-5 text-primary" /> টেমপ্লেট কাস্টমাইজেশন (লাইভ)
+                                        <Settings2 className="h-5 w-5 text-primary" /> টেমপ্লেট ও টেক্সট টুলস
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-6 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-4">
                                             <div className="space-y-2">
-                                                <Label className="font-bold text-xs flex items-center gap-2">
-                                                    স্কুল লোগো জলছাপ (Opacity)
-                                                </Label>
+                                                <Label className="font-bold text-xs">জলছাপ ব্রাইটনেস</Label>
                                                 <select 
                                                     className="w-full h-9 rounded-md border-2 border-slate-200 px-3 text-xs font-bold focus:border-primary outline-none"
                                                     value={customSettings.watermarkOpacity.toString()} 
@@ -92,45 +96,43 @@ export default function CustomPadPage() {
                                                     <option value="0">জলছাপ বন্ধ</option>
                                                 </select>
                                             </div>
-
                                             <div className="space-y-2">
-                                                <Label className="font-bold text-xs flex items-center gap-2">
-                                                    হেডার স্টাইল
-                                                </Label>
-                                                <select 
-                                                    className="w-full h-9 rounded-md border-2 border-slate-200 px-3 text-xs font-bold focus:border-primary outline-none"
-                                                    value={customSettings.borderStyle} 
-                                                    onChange={(e) => setCustomSettings(prev => ({ ...prev, borderStyle: e.target.value }))}
-                                                >
-                                                    <option value="border-b-2">সলিড লাইন</option>
-                                                    <option value="border-b-4 border-double">ডাবল লাইন</option>
-                                                    <option value="border-none">লাইন নেই</option>
-                                                </select>
+                                                <Label className="font-bold text-xs">টেক্সট অ্যালাইনমেন্ট</Label>
+                                                <div className="flex gap-1">
+                                                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyLeft')}><AlignLeft className="h-4 w-4" /></Button>
+                                                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyCenter')}><AlignCenter className="h-4 w-4" /></Button>
+                                                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyRight')}><AlignRight className="h-4 w-4" /></Button>
+                                                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('justifyFull')}><AlignJustify className="h-4 w-4" /></Button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="font-bold text-xs">টেক্সট স্টাইল</Label>
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('bold')}><Bold className="h-4 w-4" /></Button>
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('italic')}><Italic className="h-4 w-4" /></Button>
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleFormatting('underline')}><Underline className="h-4 w-4" /></Button>
+                                                </div>
                                             </div>
                                         </div>
 
                                         <div className="space-y-4">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <Label className="font-bold text-xs flex items-center gap-2">
-                                                        <Type className="h-4 w-4" /> ফন্ট সাইজ (Font Size)
-                                                    </Label>
+                                                    <Label className="font-bold text-xs flex items-center gap-2"><Type className="h-4 w-4" /> ফন্ট সাইজ</Label>
                                                     <Badge variant="outline" className="font-black h-5">{toBengaliNumber(customSettings.fontSize)}px</Badge>
                                                 </div>
-                                                <Slider 
-                                                    value={[customSettings.fontSize]} 
-                                                    min={12} 
-                                                    max={32} 
-                                                    step={1} 
-                                                    onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, fontSize: v }))} 
-                                                />
+                                                <Slider value={[customSettings.fontSize]} min={12} max={32} step={1} onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, fontSize: v }))} />
                                             </div>
-
-                                            <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
-                                                <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                                                <p className="text-[10px] font-bold text-blue-800 leading-tight">
-                                                    ডান পাশের প্রিভিউতে সরাসরি টাইপ করুন। নাম ও পদবিও নিজের মতো পরিবর্তন করতে পারবেন।
-                                                </p>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="font-bold text-xs flex items-center gap-2"><Rows3 className="h-4 w-4" /> লাইন স্পেসিং</Label>
+                                                    <Badge variant="outline" className="font-black h-5">{toBengaliNumber(customSettings.lineHeight)}</Badge>
+                                                </div>
+                                                <Slider value={[customSettings.lineHeight * 10]} min={10} max={30} step={1} onValueChange={([v]) => setCustomSettings(prev => ({ ...prev, lineHeight: v / 10 }))} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="font-bold text-xs">রং (Color)</Label>
+                                                <input type="color" className="w-full h-8 rounded cursor-pointer" onChange={(e) => handleFormatting('foreColor', e.target.value)} />
                                             </div>
                                         </div>
                                     </div>
@@ -181,8 +183,9 @@ function LetterheadTemplate({ schoolInfo, settings, smarak, setSmarak, issueDate
             <style jsx global>{`
                 @media print {
                     @page { size: A4 portrait; margin: 0.5in !important; }
-                    .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                    .letterhead-container { width: 100% !important; min-height: 275mm !important; height: auto !important; padding: 0 !important; }
+                    html, body { margin: 0 !important; padding: 0 !important; }
+                    .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; height: auto !important; }
+                    .letterhead-container { width: 100% !important; min-height: 275mm !important; height: auto !important; padding: 10mm !important; margin: 0 !important; }
                 }
                 @media screen {
                     .letterhead-container { width: 210mm; min-height: 297mm; }
@@ -245,8 +248,8 @@ function LetterheadTemplate({ schoolInfo, settings, smarak, setSmarak, issueDate
             )}
 
             <main 
-                className="relative z-10 flex-grow text-justify leading-relaxed px-6 text-slate-900 no-print-outline outline-none"
-                style={{ fontSize: `${settings.fontSize}px` }}
+                className="relative z-10 flex-grow text-justify px-6 text-slate-900 no-print-outline outline-none"
+                style={{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight }}
                 contentEditable={!!setBody}
                 suppressContentEditableWarning={true}
                 onBlur={(e) => setBody?.(e.currentTarget.innerHTML)}
