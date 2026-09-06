@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from 'react';
-import { useFirestore, useUser, useCollection } from '@/firebase';
+import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   Library,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -190,9 +191,9 @@ function MyLibraryContent() {
   const sheetsQuery = useMemo(() => db && user?.uid ? query(collection(db, 'lecture-sheets'), where('userId', '==', user.uid)) : null, [db, user?.uid]);
   const pdfSheetsQuery = useMemo(() => db && user?.uid ? query(collection(db, 'pdf-sheets')) : null, [db, user?.uid]);
 
-  const { data: rawQuestions, loading: questionsLoading, error: qError } = useCollection(questionsQuery);
-  const { data: rawSheets, loading: sheetsLoading, error: sError } = useCollection(sheetsQuery);
-  const { data: rawPdfSheets, loading: pdfSheetsLoading, error: pError } = useCollection(pdfSheetsQuery);
+  const { data: rawQuestions, loading: questionsLoading } = useCollection(questionsQuery);
+  const { data: rawSheets, loading: sheetsLoading } = useCollection(sheetsQuery);
+  const { data: rawPdfSheets, loading: pdfSheetsLoading } = useCollection(pdfSheetsQuery);
 
   const libraryData = useMemo(() => ({ 
     questions: rawQuestions || [], 
@@ -365,23 +366,6 @@ function MyLibraryContent() {
     });
   }, [currentItemsRaw]);
 
-  const getChapterStats = (chapterName: string) => {
-    const isGeneral = chapterName === 'সাধারণ অধ্যায়';
-    const key = getNormalizedKey(chapterName);
-    const chapterSheets = libraryData.sheets.filter(s => s.classId === selectedClass && s.subject === selectedSubject && (isGeneral ? !s.topic : getNormalizedKey(s.topic) === key));
-    const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && p.subject === selectedSubject && (isGeneral ? !p.chapterName : getNormalizedKey(p.chapterName) === key));
-    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject && (isGeneral ? !q.chapter : getNormalizedKey(q.chapter) === key));
-    
-    let totalQuestions = 0, mcqCount = 0, creativeCount = 0;
-    chapterQuestionSets.forEach(set => {
-      if (set.questions) {
-        totalQuestions += set.questions.length;
-        set.questions.forEach((q: any) => { if (q.type === 'mcq') mcqCount++; else if (q.type === 'creative') creativeCount++; });
-      }
-    });
-    return { sheets: chapterSheets.length + chapterPdfSheets.length, total: totalQuestions, mcq: mcqCount, creative: creativeCount };
-  };
-
   const getGranularChapterStats = (chapterName: string) => {
     const isGeneral = chapterName === 'সাধারণ অধ্যায়';
     const key = getNormalizedKey(chapterName);
@@ -461,17 +445,41 @@ function MyLibraryContent() {
   );
 
   const renderSubjects = () => (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {currentSubjects.map(sub => (
-        <Card key={sub} onClick={() => { setSelectedSubject(sub); setViewMode('chapters'); }} className="cursor-pointer hover:border-primary hover:shadow-md transition-all group border-2 border-black">
-          <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-            <div className="w-12 h-12 rounded-xl bg-orange-50/10 flex items-center justify-center text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-all">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <p className="font-bold text-sm">{sub}</p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="border-2 border-black rounded-xl overflow-hidden shadow-xl bg-white animate-in slide-in-from-bottom-4 duration-300">
+      <div className="overflow-x-auto">
+        <Table className="border-collapse min-w-[800px]">
+          <TableHeader>
+            <TableRow className="bg-blue-100 border-b-2 border-black h-12">
+              <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
+              <TableHead className="font-black border-r-2 border-black text-black">অধ্যায়ের নাম</TableHead>
+              <TableHead className="text-center font-black text-black w-48">অধ্যায়সমূহ দেখুন</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {currentSubjects.map((sub, idx) => (
+              <TableRow 
+                key={sub} 
+                onClick={() => { setSelectedSubject(sub); setViewMode('chapters'); }}
+                className="h-14 border-b-2 border-black cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                <TableCell className="text-center font-black border-r-2 border-black bg-cyan-400 text-black">
+                  {toBengaliNumber(idx + 1).padStart(2, '০')}
+                </TableCell>
+                <TableCell className="font-black border-r-2 border-black bg-green-100 text-black px-4">
+                  {sub}
+                </TableCell>
+                <TableCell className="text-center p-2">
+                  <Button 
+                    className="bg-red-600 hover:bg-red-700 text-white font-black h-9 px-6 rounded-lg shadow-md border-b-4 border-red-800 active:border-b-0 transition-all"
+                  >
+                    অধ্যায়সমূহ দেখুন
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 
@@ -744,31 +752,6 @@ function MyLibraryContent() {
   );
 
   if (userLoading || questionsLoading || sheetsLoading || pdfSheetsLoading) return <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]"><Loader2 className="w-10 h-10 animate-spin text-primary" /><p className="mt-4 text-muted-foreground font-bold">লাইব্রেরি লোড হচ্ছে...</p></div>;
-
-  if (qError || sError || pError) {
-    const isBuilding = qError?.message.includes('building') || sError?.message.includes('building') || pError?.message.includes('building');
-    return (
-      <div className="max-w-xl mx-auto p-10 text-center space-y-6 font-kalpurush">
-        <AlertTriangle className={cn("w-16 h-16 text-destructive mx-auto", isBuilding ? "animate-pulse" : "animate-bounce")} />
-        <h2 className="text-2xl font-black text-destructive">{isBuilding ? "ইনডেক্স তৈরির কাজ চলছে..." : "লাইব্রেরি লোড হতে সমস্যা হয়েছে"}</h2>
-        <p className="text-muted-foreground font-bold">
-          {isBuilding 
-            ? "ফায়ারবেস বর্তমানে প্রয়োজনীয় ইনডেক্সগুলো তৈরি করছে। এটি সম্পন্ন হতে ২-৫ মিনিট সময় লাগতে পারে। অনুগ্রহ করে কিছুক্ষণ পর পেজটি রিফ্রেশ করুন।" 
-            : "ডাটাবেসে ইনডেক্স প্রয়োজন। নিচের লিঙ্কে ক্লিক করে ইনডেক্স তৈরি করুন।"}
-        </p>
-        {!isBuilding && (
-          <a 
-            href="https://console.firebase.google.com/v1/r/project/birganj-pouro-high-schoo-9d39d/firestore/indexes" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-black hover:bg-indigo-700 transition-all shadow-lg"
-          >
-            <ExternalLink className="w-5 h-5" /> ফায়ারবেস কনসোল
-          </a>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6 animate-fade-in pb-16 font-kalpurush">
