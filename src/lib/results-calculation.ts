@@ -76,12 +76,11 @@ export function processStudentResults(
     return students.map(student => {
         // Step 1: Identify student's group and optional subject
         const rawGroup = (student.group || '').toLowerCase().trim();
-        const studentGroupNormalized = groupMap[rawGroup] || 'science'; // Defaulting to science if undefined for 9-10
+        const studentGroupNormalized = groupMap[rawGroup] || 'science'; 
         const optionalSubjectNameNormalized = normalize(student.optionalSubject || '');
         const studentClassNum = parseInt(student.className);
 
         // Step 2: Get the list of subjects THIS student is supposed to study
-        // We pass the student's group to getSubjects to get only relevant subjects
         const groupAllowedSubjects = getSubjects(student.className, studentGroupNormalized);
         
         // Filter for valid exam subjects
@@ -97,14 +96,10 @@ export function processStudentResults(
                 const hmNormalized = normalize('উচ্চতর গণিত');
                 const agriNormalized = normalize('কৃষি শিক্ষা');
                 
-                // If this is one of the electives, only keep it if it matches student's selection
-                // Or if it's the default (usually HM is compulsory elective in some setups, 
-                // but here we follow student's optional field)
                 if (currentSubNameNormalized === hmNormalized || currentSubNameNormalized === agriNormalized) {
                     if (optionalSubjectNameNormalized) {
                         return currentSubNameNormalized === optionalSubjectNameNormalized;
                     }
-                    // Default logic: if nothing specified, keep HM as the studied one
                     return currentSubNameNormalized === hmNormalized;
                 }
             }
@@ -140,7 +135,6 @@ export function processStudentResults(
             const studentResult = classResult?.results.find(r => r.studentId === student.id);
             const fullMarks = classResult?.fullMarks || subjectInfo.fullMarks;
 
-            // If subject study list exists but NO MARKS entry is found -> Fail (F)
             if (!classResult || !studentResult) {
                 subjectResultsMap.set(subjectInfo.name, {
                     marks: 0,
@@ -156,7 +150,6 @@ export function processStudentResults(
                 return;
             }
 
-            // Normal processing for found results
             const written = studentResult.written;
             const mcq = studentResult.mcq;
             const practical = studentResult.practical;
@@ -168,7 +161,6 @@ export function processStudentResults(
             if (obtainedMarks < overallPassMark) {
                 isPassSubject = false;
             } else {
-                // Component based pass criteria
                 const isEnglish = normalizedSubjectName === normalize('ইংরেজি প্রথম') || normalizedSubjectName === normalize('ইংরেজি দ্বিতীয়');
                 const isIct25 = (normalizedSubjectName.includes('তথ্য ও যোগাযোগ') || normalizedSubjectName.includes('আইসিটি')) && fullMarks === 25;
 
