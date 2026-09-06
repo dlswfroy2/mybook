@@ -5,7 +5,7 @@ import { CLASSES } from '@/lib/constants';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BookOpen, ArrowLeft, GraduationCap } from 'lucide-react';
+import { BookOpen, ArrowLeft, GraduationCap, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
