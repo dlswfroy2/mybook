@@ -1,23 +1,47 @@
 
 "use client";
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen, BookOpenText } from 'lucide-react';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
+import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen, BookOpenText, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 function BottomNavContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user, loading } = useUser();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isPrintMode = searchParams.get('print') === 'true';
 
   if (loading || !user || pathname === '/auth' || isPrintMode) {
     return null;
   }
+
+  const handleMenuSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+
+    if (q.includes('ফলাফল')) {
+      router.push('/results');
+    } else if (q.includes('শিট')) {
+      router.push('/create-lecture-sheet');
+    } else if (q.includes('বিষয়') || q.includes('পূর্ণমান') || q.includes('পূণমান')) {
+      router.push('/results?tab=full-marks');
+    }
+    
+    setSearchQuery('');
+    setSearchOpen(false);
+  };
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/' },
@@ -40,7 +64,7 @@ function BottomNavContent() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[45px] h-12 rounded-lg transition-all relative shrink-0",
+                "flex flex-col items-center justify-center min-w-[40px] h-12 rounded-lg transition-all relative shrink-0",
                 isActive 
                   ? "bg-white/20 text-white" 
                   : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -54,6 +78,36 @@ function BottomNavContent() {
             </Link>
           );
         })}
+
+        {/* Menu Search Button */}
+        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <DialogTrigger asChild>
+            <button
+              className="flex flex-col items-center justify-center min-w-[40px] h-12 rounded-lg transition-all text-white/70 hover:bg-white/10 hover:text-white shrink-0"
+            >
+              <Search className="w-5 h-5" />
+              <span className="text-[8px] mt-0.5 font-bold whitespace-nowrap">সার্চ</span>
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md font-kalpurush border-2 border-primary">
+            <DialogHeader>
+              <DialogTitle className="text-primary font-black text-xl">মেনু অনুসন্ধান</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleMenuSearch} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="font-bold">কিওয়ার্ড লিখুন (উদা: ফলাফল, শিট, বিষয় ও পূর্ণমান)</Label>
+                <Input 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  placeholder="এখানে লিখে এন্টার দিন..." 
+                  autoFocus 
+                  className="h-12 border-2 border-primary/20 text-lg font-bold"
+                />
+              </div>
+              <Button type="submit" className="w-full h-11 font-black shadow-lg">পেজে যান</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </nav>
   );
