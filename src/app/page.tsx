@@ -74,7 +74,7 @@ const classNamesMap: Record<string, string> = {
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
-    return (subjectNameNormalization[trimmed] || trimmed);
+    return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
 };
 
 const GalleryCard = () => {
@@ -596,8 +596,6 @@ export default function Home() {
     );
   }
 
-  const glassCardClass = "backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]";
-
   return (
     <div className="space-y-8 animate-fade-in font-kalpurush">
       <NoticeTicker />
@@ -699,7 +697,6 @@ export default function Home() {
           </Dialog>
       </div>
 
-      {/* 5 Stat Cards matching user screenshot */}
       <div className="grid gap-4 md:grid-cols-2 md:gap-4 lg:grid-cols-5">
         <GalleryCard />
         
