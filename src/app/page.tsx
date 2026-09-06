@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Student, studentFromDoc } from '@/lib/student-data';
 import { getAttendanceForDate, saveDailyAttendance, StudentAttendance, DailyAttendance, getAttendanceForClassAndDate } from '@/lib/attendance-data';
@@ -939,7 +940,7 @@ export default function Home() {
       <section className="space-y-8">
         <div className="flex items-center justify-between border-b-2 border-black pb-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center animate-bounce shadow-lg border border-white/20">
+            <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center shadow-lg border border-white/20">
               <LayoutGrid className="w-5 h-5" />
             </div>
             <h3 className="text-xl font-black text-foreground uppercase tracking-tight">লাইভ কন্টেন্ট ড্যাশবোর্ড</h3>
@@ -982,7 +983,7 @@ export default function Home() {
             const chapterChunks = chunkArray(sortedChapterList, 20); 
 
             return (
-              <div key={cls.id} className={cn("backdrop-blur-2xl border-2 border-black shadow-[0_12px_40px_rgba(0,0,0,0.15)]", "rounded-xl overflow-hidden bg-white/40 p-1")}>
+              <div key={cls.id} className="rounded-xl overflow-hidden bg-white/40 p-1">
                 <div className="overflow-x-auto custom-scrollbar pb-2">
                   {chapterChunks.length > 0 ? (
                     chapterChunks.map((chunk, chunkIdx) => (
