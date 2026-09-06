@@ -112,7 +112,7 @@ function NavbarContent() {
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'from-cyan-400 via-cyan-500 to-cyan-800 shadow-cyan-500/40 text-white', activeBg: 'bg-cyan-500/20 border-cyan-400/30' },
-    { label: 'বোর্ড বই', icon: BookOpenText, href: '/#board-books', color: 'from-sky-400 via-sky-500 to-sky-800 shadow-sky-500/40 text-white', activeBg: 'bg-sky-500/20 border-sky-400/30' },
+    { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books', color: 'from-sky-400 via-sky-500 to-sky-800 shadow-sky-500/40 text-white', activeBg: 'bg-sky-500/20 border-sky-400/30' },
     { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'from-lime-400 via-lime-500 to-lime-800 shadow-lime-500/40 text-white', activeBg: 'bg-lime-500/20 border-lime-400/30' },
     { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', color: 'from-orange-400 via-orange-500 to-orange-800 shadow-orange-500/40 text-white', activeBg: 'bg-orange-500/20 border-orange-400/30' },
     { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', color: 'from-purple-400 via-purple-500 to-purple-800 shadow-purple-500/40 text-white', activeBg: 'bg-purple-500/20 border-purple-400/30' },

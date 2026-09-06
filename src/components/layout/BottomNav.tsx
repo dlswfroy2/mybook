@@ -21,7 +21,7 @@ function BottomNavContent() {
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/' },
-    { label: 'বোর্ড বই', icon: BookOpenText, href: '/#board-books' },
+    { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books' },
     { label: 'ডায়েরি', icon: NotebookPen, href: '/diary' },
     { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question' },
     { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet' },

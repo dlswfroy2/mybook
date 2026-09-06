@@ -63,7 +63,6 @@ const commonSubjectsFor9to10: Subject[] = [
     { name: 'ইংরেজি দ্বিতীয়', englishName: 'English 2nd Paper', code: '108', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'গণিত', englishName: 'Mathematics', code: '109', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ধর্ম ও নৈতিক শিক্ষা', englishName: 'Religion & Moral Education', code: '111/112', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'বাংলাদেশ ও বিশ্ব পরিচয়', englishName: 'Bangladesh & Global Studies', code: '150', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'তথ্য ও যোগাযোগ প্রযুক্তি', englishName: 'ICT', code: '154', practical: false, fullMarks: 25, isExamSubject: true },
 ];
 
@@ -71,6 +70,7 @@ const scienceSubjects: Subject[] = [
     { name: 'পদার্থ', englishName: 'Physics', code: '136', practical: true, fullMarks: 100, isExamSubject: true },
     { name: 'রসায়ন', englishName: 'Chemistry', code: '137', practical: true, fullMarks: 100, isExamSubject: true },
     { name: 'জীব বিজ্ঞান', englishName: 'Biology', code: '138', practical: true, fullMarks: 100, isExamSubject: true },
+    { name: 'বাংলাদেশ ও বিশ্ব পরিচয়', englishName: 'Bangladesh & Global Studies', code: '150', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'কৃষি শিক্ষা', englishName: 'Agriculture Studies', code: '134', practical: true, fullMarks: 100, isExamSubject: true },
     { name: 'উচ্চতর গণিত', englishName: 'Higher Mathematics', code: '126', practical: true, fullMarks: 100, isExamSubject: true },
 ];
