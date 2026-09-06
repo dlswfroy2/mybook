@@ -24,7 +24,9 @@ import {
   FileType, 
   Eye, 
   Printer,
-  CheckCircle2
+  CheckCircle2,
+  Library,
+  ExternalLink
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -42,7 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/Dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -119,7 +121,6 @@ function MyLibraryContent() {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [merging, setMerging] = useState(false);
 
-  // Dynamic ref tracking for scroll syncing
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
 
@@ -602,7 +603,7 @@ function MyLibraryContent() {
                           <div className="flex gap-2">
                             {item.source === 'lecture-sheets' ? (
                               <>
-                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="w-4 h-4" /></Button></Link>
+                                <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="h-4 w-4" /></Button></Link>
                                 <Link href={`/create-lecture-sheet?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
                                 <Link href={`/create-lecture-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="w-4 h-4" /></Button></Link>
                               </>
@@ -616,7 +617,7 @@ function MyLibraryContent() {
                           </div>
                         ) : (
                           <div className="flex gap-2">
-                             <Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20" onClick={() => handleOpenPdf(item.pdfUrl)} title="দেখুন"><Eye className="w-4 h-4" /></Button>
+                             <Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20" onClick={() => handleOpenPdf(item.pdfUrl)} title="দেখুন"><Eye className="h-4 w-4" /></Button>
                              <Button variant="outline" size="icon" className="h-9 w-9 text-indigo-600 border-2 border-indigo-200" onClick={() => handleOpenPdf(item.pdfUrl)} title="ডাউনলোড"><Download className="w-4 h-4" /></Button>
                           </div>
                         )}
