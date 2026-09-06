@@ -42,6 +42,8 @@ import * as XLSX from 'xlsx';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast, toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { bn } from "date-fns/locale";
 
 // --- Utility Functions ---
 const toBengaliNumber = (str: string | number | undefined | null) => {

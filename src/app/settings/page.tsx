@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
@@ -532,8 +531,8 @@ function SettingsContent() {
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
                         className={cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit w-full text-left",
-                            activeTab === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit w-full text-left border-2",
+                            activeTab === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
                         )}
                     >
                         <div className={cn("p-1.5 rounded-lg shrink-0", activeTab === item.id ? item.color : "bg-muted")}>
