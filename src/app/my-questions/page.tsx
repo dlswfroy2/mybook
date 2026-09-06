@@ -382,6 +382,39 @@ function MyLibraryContent() {
     return { sheets: chapterSheets.length + chapterPdfSheets.length, total: totalQuestions, mcq: mcqCount, creative: creativeCount };
   };
 
+  const getGranularChapterStats = (chapterName: string) => {
+    const isGeneral = chapterName === 'সাধারণ অধ্যায়';
+    const key = getNormalizedKey(chapterName);
+    
+    const matches = (val: any) => {
+      if (isGeneral) return !val;
+      return getNormalizedKey(val || '') === key;
+    };
+
+    const chapterSheets = libraryData.sheets.filter(s => s.classId === selectedClass && s.subject === selectedSubject && matches(s.topic));
+    const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && p.subject === selectedSubject && matches(p.chapterName));
+    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject && matches(q.chapter));
+    
+    const stats = {
+      lectureSheet: chapterSheets.length + chapterPdfSheets.filter(p => p.category === 'lecture_sheet').length,
+      creative: chapterPdfSheets.filter(p => p.category === 'creative').length,
+      mcq: chapterPdfSheets.filter(p => p.category === 'mcq').length,
+      modelTest: chapterPdfSheets.filter(p => p.category === 'model_test').length,
+      answerKey: chapterPdfSheets.filter(p => p.category === 'answer_key').length,
+    };
+
+    chapterQuestionSets.forEach(set => {
+      if (set.examType === 'model_test') {
+        stats.modelTest++;
+      } else {
+        if (set.isMcq) stats.mcq++;
+        else stats.creative++;
+      }
+    });
+
+    return stats;
+  };
+
   const toggleSelection = (id: string) => { if (!isSelecting) return; setSelectedDocIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); };
 
   const handleMergeAndCreate = async () => {
@@ -443,28 +476,56 @@ function MyLibraryContent() {
   );
 
   const renderChapters = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {currentChapters.map(ch => {
-        const stats = getChapterStats(ch);
-        return (
-          <Card key={ch} onClick={() => { setSelectedChapter(ch); setViewMode('content'); }} className="cursor-pointer hover:border-primary hover:shadow-md transition-all group border-2 border-black bg-slate-50/30 overflow-hidden">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <p className="font-bold text-xs flex-1 line-clamp-2">{ch}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-100">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded"><FileText className="w-3 h-3" /> সিট/ফাইল: {toBengaliNumber(stats.sheets)}</div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"><BrainCircuit className="w-3 h-3" /> প্রশ্ন: {toBengaliNumber(stats.total)}</div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded">সৃজনশীল: {toBengaliNumber(stats.creative)}</div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100/50 px-2 py-1 rounded">MCQ: {toBengaliNumber(stats.mcq)}</div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+    <div className="border-2 border-black rounded-xl overflow-hidden shadow-xl bg-white animate-in slide-in-from-bottom-4 duration-300">
+      <div className="overflow-x-auto">
+        <Table className="border-collapse min-w-[1000px]">
+          <TableHeader>
+            <TableRow className="bg-blue-100 border-b-2 border-black h-12">
+              <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
+              <TableHead className="font-black border-r-2 border-black text-black">অধ্যায়ের নাম</TableHead>
+              <TableHead className="text-center font-black border-r-2 border-black text-black w-32">লেকচার শিট</TableHead>
+              <TableHead className="text-center font-black border-r-2 border-black text-black w-32">সৃজনশীল প্রশ্ন</TableHead>
+              <TableHead className="text-center font-black border-r-2 border-black text-black w-32">বহুনির্বাচনী প্রশ্ন</TableHead>
+              <TableHead className="text-center font-black border-r-2 border-black text-black w-32">মডেল টেস্ট প্রশ্ন</TableHead>
+              <TableHead className="text-center font-black text-black w-32">উত্তরমালা</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {currentChapters.map((ch, idx) => {
+              const stats = getGranularChapterStats(ch);
+              return (
+                <TableRow 
+                  key={ch} 
+                  onClick={() => { setSelectedChapter(ch); setViewMode('content'); }}
+                  className="h-12 border-b-2 border-black cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                  <TableCell className="text-center font-black border-r-2 border-black bg-cyan-400 text-black">
+                    {toBengaliNumber(idx + 1).padStart(2, '০')}
+                  </TableCell>
+                  <TableCell className="font-black border-r-2 border-black bg-green-100 text-black px-4">
+                    {ch}
+                  </TableCell>
+                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                    {toBengaliNumber(stats.lectureSheet)} টি
+                  </TableCell>
+                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                    {toBengaliNumber(stats.creative)} টি
+                  </TableCell>
+                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                    {toBengaliNumber(stats.mcq)} টি
+                  </TableCell>
+                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                    {toBengaliNumber(stats.modelTest)} টি
+                  </TableCell>
+                  <TableCell className="text-center font-black text-xs">
+                    {toBengaliNumber(stats.answerKey)} টি
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 
@@ -605,7 +666,7 @@ function MyLibraryContent() {
                         </div>
                       ) : toBengaliNumber(idx + 1).padStart(2, '০')}
                     </TableCell>
-                    <TableCell className="font-bold border-r-2 border-black bg-green-50 px-4 text-xs md:text-sm">
+                    <TableCell className="font-bold border-r-2 border-black bg-green-100 px-4 text-xs md:text-sm">
                       {item.displayTitle}
                     </TableCell>
                     <TableCell className="text-center border-r-2 border-black w-32">
@@ -741,4 +802,3 @@ export default function MyLibraryPage() {
     </Suspense>
   );
 }
-
