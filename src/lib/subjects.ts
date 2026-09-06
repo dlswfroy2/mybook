@@ -12,15 +12,17 @@ export interface Subject {
 
 export const subjectNameNormalization: { [key: string]: string } = {
     'ধর্ম শিক্ষা': 'ধর্ম ও নৈতিক শিক্ষা',
-    'ইসলাম ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
-    'হিন্দু ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
-    'বাংলা ১ম': 'বাংলা প্রথম', 'বাংলা 1st': 'বাংলা প্রথম',
+    'ধর্ম ও নৈতিক শিক্ষা': 'ধর্ম ও নৈতিক শিক্ষা',
+    'ইসলাম ধর্ম শিক্ষা': 'ইসলাম ধর্ম',
+    'হিন্দু ধর্ম শিক্ষা': 'হিন্দু ধর্ম',
+    'ইসলাম ধর্ম': 'ইসলাম ধর্ম',
+    'হিন্দু ধর্ম': 'হিন্দু ধর্ম',
+    'বাংলা ১ম': 'বাংলা প্রথম', 'বাংলা 1st': 'বাংলা প্রথম', 'বাংলাপ্রথম': 'বাংলা প্রথম',
     'বাংলা ২য়': 'বাংলা দ্বিতীয়', 'বাংলা 2nd': 'বাংলা দ্বিতীয়',
     'ইংরেজি ১ম': 'ইংরেজি প্রথম', 'ইংরেজি 1st': 'ইংরেজি প্রথম',
-    'ইংরেজী ১ম': 'ইংরেজি প্রথম',
+    'ইংরেজী ১ম': 'ইংরেজি প্রথম', 'ইংরেজী প্রথম': 'ইংরেজি প্রথম',
     'ইংরেজি ২য়': 'ইংরেজি দ্বিতীয়', 'ইংরেজি 2nd': 'ইংরেজি দ্বিতীয়',
-    'ইংরেজী ২য়': 'ইংরেজি দ্বিতীয়',
-    'ইংরেজী২য়': 'ইংরেজি দ্বিতীয়',
+    'ইংরেজী ২য়': 'ইংরেজি দ্বিতীয়', 'ইংরেজী দ্বিতীয়': 'ইংরেজি দ্বিতীয়',
     'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি',
     'বিজিএস': 'বাংলাদেশ ও বিশ্ব পরিচয়',
     'বি ও বি পরিচয়': 'বাংলাদেশ ও বিশ্ব পরিচয়',
@@ -34,6 +36,8 @@ export const subjectNameNormalization: { [key: string]: string } = {
     'Mathematics': 'গণিত',
     'Math': 'গণিত',
     'জেনারেল ম্যাথ': 'গণিত',
+    'বিজ্ঞান': 'বিজ্ঞান',
+    'সাধারণ বিজ্ঞান': 'বিজ্ঞান'
 };
 
 const subjectsFor6to8: Subject[] = [
@@ -42,10 +46,10 @@ const subjectsFor6to8: Subject[] = [
     { name: 'ইংরেজি প্রথম', englishName: 'English 1st Paper', code: '107', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ইংরেজি দ্বিতীয়', englishName: 'English 2nd Paper', code: '108', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'গণিত', englishName: 'Mathematics', code: '109', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'হিন্দু ধর্ম শিক্ষা', englishName: 'Hindu Religion & Moral Education', code: '112', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'ইসলাম ধর্ম শিক্ষা', englishName: 'Islam Religion & Moral Education', code: '111', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'হিন্দু ধর্ম', englishName: 'Hindu Religion & Moral Education', code: '112', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'ইসলাম ধর্ম', englishName: 'Islam Religion & Moral Education', code: '111', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'বাংলাদেশ ও বিশ্ব পরিচয়', englishName: 'Bangladesh & Global Studies', code: '150', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'সাধারণ বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'কৃষি শিক্ষা', englishName: 'Agriculture Studies', code: '134', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'তথ্য ও যোগাযোগ প্রযুক্তি', englishName: 'ICT', code: '154', practical: false, fullMarks: 25, isExamSubject: true },
     { name: 'শারীরিক শিক্ষা', englishName: 'Physical Education', code: '147', practical: false, fullMarks: 0, isExamSubject: false },
@@ -57,8 +61,8 @@ const commonSubjectsFor9to10: Subject[] = [
     { name: 'ইংরেজি প্রথম', englishName: 'English 1st Paper', code: '107', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ইংরেজি দ্বিতীয়', englishName: 'English 2nd Paper', code: '108', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'গণিত', englishName: 'Mathematics', code: '109', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'হিন্দু ধর্ম শিক্ষা', englishName: 'Hindu Religion & Moral Education', code: '112', practical: false, fullMarks: 100, isExamSubject: true },
-    { name: 'ইসলাম ধর্ম শিক্ষা', englishName: 'Islam Religion & Moral Education', code: '111', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'হিন্দু ধর্ম', englishName: 'Hindu Religion & Moral Education', code: '112', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'ইসলাম ধর্ম', englishName: 'Islam Religion & Moral Education', code: '111', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'বাংলাদেশ ও বিশ্ব পরিচয়', englishName: 'Bangladesh & Global Studies', code: '150', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'তথ্য ও যোগাযোগ প্রযুক্তি', englishName: 'ICT', code: '154', practical: false, fullMarks: 25, isExamSubject: true },
 ];
@@ -72,7 +76,7 @@ const scienceSubjects: Subject[] = [
 ];
 
 const artsSubjects: Subject[] = [
-    { name: 'সাধারণ বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা', englishName: 'Bangladesh History & World Civilization', code: '153', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ভূগোল ও পরিবেশ', englishName: 'Geography & Environment', code: '110', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'পৌরনীতি ও নাগরিকতা', englishName: 'Civics & Citizenship', code: '140', practical: false, fullMarks: 100, isExamSubject: true },
@@ -80,7 +84,7 @@ const artsSubjects: Subject[] = [
 ];
 
 const commerceSubjects: Subject[] = [
-    { name: 'সাধারণ বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
+    { name: 'বিজ্ঞান', englishName: 'General Science', code: '127', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'হিসাব বিজ্ঞান', englishName: 'Accounting', code: '146', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ফিন্যান্স ও ব্যাংকিং', englishName: 'Finance & Banking', code: '152', practical: false, fullMarks: 100, isExamSubject: true },
     { name: 'ব্যবসায় উদ্যোগ', englishName: 'Business Entrepreneurship', code: '143', practical: false, fullMarks: 100, isExamSubject: true },

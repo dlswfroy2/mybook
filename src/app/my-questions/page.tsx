@@ -54,10 +54,11 @@ import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/const
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { subjectNameNormalization } from '@/lib/subjects';
 
 const SUBJECT_ORDER = [
   'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
-  'হিন্দু ধর্ম শিক্ষা', 'ইসলাম ধর্ম শিক্ষা', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বিজ্ঞান', 
+  'হিন্দু ধর্ম', 'ইসলাম ধর্ম', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বিজ্ঞান', 
   'কৃষি শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'
 ];
 
@@ -108,36 +109,10 @@ function getChapterSortValue(name: string): number {
   return isNaN(num) ? 998 : num;
 }
 
-const subjectNameNormalization: { [key: string]: string } = {
-    'ধর্ম শিক্ষা': 'ধর্ম ও নৈতিক শিক্ষা',
-    'ইসলাম ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
-    'হিন্দু ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
-    'বাংলা ১ম': 'বাংলা প্রথম', 'বাংলা 1st': 'বাংলা প্রথম',
-    'বাংলা ২য়': 'বাংলা দ্বিতীয়', 'বাংলা 2nd': 'বাংলা দ্বিতীয়',
-    'ইংরেজি ১ম': 'ইংরেজি প্রথম', 'ইংরেজি 1st': 'ইংরেজি প্রথম',
-    'ইংরেজী ১ম': 'ইংরেজি প্রথম',
-    'ইংরেজি ২য়': 'ইংরেজি দ্বিতীয়', 'ইংরেজি 2nd': 'ইংরেজি দ্বিতীয়',
-    'ইংরেজী ২য়': 'ইংরেজি দ্বিতীয়',
-    'ইংরেজী২য়': 'ইংরেজি দ্বিতীয়',
-    'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি',
-    'বিজিএস': 'বাংলাদেশ ও বিশ্ব পরিচয়',
-    'বি ও বি পরিচয়': 'বাংলাদেশ ও বিশ্ব পরিচয়',
-    'বাংলাদেশ ও বিশ্বপরিচয়': 'বাংলাদেশ ও বিশ্ব পরিচয়',
-    'পদার্থবিজ্ঞান': 'পদার্থ',
-    'রসায়ন': 'রসায়ন',
-    'জীববিজ্ঞান': 'জীব বিজ্ঞান',
-    'সাধারণ গণিত': 'গণিত',
-    'সাধারন গণিত': 'গণিত',
-    'ম্যাথ': 'গণিত',
-    'Mathematics': 'গণিত',
-    'Math': 'গণিত',
-    'জেনারেল ম্যাথ': 'গণিত',
-};
-
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
-    return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
+    return (subjectNameNormalization[trimmed] || trimmed);
 };
 
 type ViewMode = 'classes' | 'subjects' | 'chapters' | 'content';
@@ -237,8 +212,8 @@ function MyLibraryContent() {
     ].filter(Boolean) as string[];
     
     return Array.from(new Set([...predefined, ...fromDb])).sort((a, b) => {
-        let indexA = SUBJECT_ORDER.indexOf(a);
-        let indexB = SUBJECT_ORDER.indexOf(b);
+        let indexA = SUBJECT_ORDER.indexOf(normalize(a));
+        let indexB = SUBJECT_ORDER.indexOf(normalize(b));
         if (indexA === -1) indexA = 99;
         if (indexB === -1) indexB = 99;
         if (indexA !== indexB) return indexA - indexB;
@@ -248,11 +223,12 @@ function MyLibraryContent() {
 
   const currentChapters = useMemo(() => {
     if (!selectedClass || !selectedSubject) return [];
+    const normalizedSubject = normalize(selectedSubject);
     const predefinedList = getChaptersForSubject(selectedClass, selectedSubject);
     const itemsInSubj = [
-       ...libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject),
-       ...libraryData.sheets.filter(s => s.classId === selectedClass && s.subject === selectedSubject),
-       ...libraryData.pdfSheets.filter(p => p.classId === selectedClass && p.subject === selectedSubject)
+       ...libraryData.questions.filter(q => q.classId === selectedClass && normalize(q.subject) === normalizedSubject),
+       ...libraryData.sheets.filter(s => s.classId === selectedClass && normalize(s.subject) === normalizedSubject),
+       ...libraryData.pdfSheets.filter(p => p.classId === selectedClass && normalize(p.subject) === normalizedSubject)
     ];
     const dbChapters = itemsInSubj.map(i => (i as any).chapter || (i as any).topic || (i as any).chapterName).filter(Boolean) as string[];
     const chapterMap = new Map<string, string>();
@@ -286,9 +262,10 @@ function MyLibraryContent() {
       ps = ps.filter(p => p.classId === selectedClass);
     }
     if (selectedSubject) { 
-      qs = qs.filter(q => q.subject === selectedSubject); 
-      ss = ss.filter(s => s.subject === selectedSubject);
-      ps = ps.filter(p => p.subject === selectedSubject);
+      const normalizedSub = normalize(selectedSubject);
+      qs = qs.filter(q => normalize(q.subject) === normalizedSub); 
+      ss = ss.filter(s => normalize(s.subject) === normalizedSub);
+      ps = ps.filter(p => normalize(p.subject) === normalizedSub);
     }
     if (selectedChapter) { 
       const isGeneral = selectedChapter === 'সাধারণ অধ্যায়';
@@ -383,15 +360,16 @@ function MyLibraryContent() {
   const getGranularChapterStats = (chapterName: string) => {
     const isGeneral = chapterName === 'সাধারণ অধ্যায়';
     const key = getNormalizedKey(chapterName);
+    const normalizedSelectedSubject = normalize(selectedSubject || '');
     
     const matches = (val: any) => {
       if (isGeneral) return !val;
       return getNormalizedKey(val || '') === key;
     };
 
-    const chapterSheets = libraryData.sheets.filter(s => s.classId === selectedClass && s.subject === selectedSubject && matches(s.topic));
-    const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && p.subject === selectedSubject && matches(p.chapterName));
-    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && q.subject === selectedSubject && matches(q.chapter));
+    const chapterSheets = libraryData.sheets.filter(s => s.classId === selectedClass && normalize(s.subject) === normalizedSelectedSubject && matches(s.topic));
+    const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && normalize(p.subject) === normalizedSelectedSubject && matches(p.chapterName));
+    const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && normalize(q.subject) === normalizedSelectedSubject && matches(q.chapter));
     
     const stats = {
       lectureSheet: chapterSheets.length + chapterPdfSheets.filter(p => p.category === 'lecture_sheet').length,
