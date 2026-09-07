@@ -31,51 +31,63 @@ function BottomNavContent() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return;
 
+    let targetPath = '';
+
     // Comprehensive Search Mapping
     if (q.includes('ফলাফল') || q.includes('রেজাল্ট')) {
-      router.push('/results');
+      targetPath = '/results';
     } else if (q.includes('শিট') || q.includes('লেকচার')) {
-      router.push('/create-lecture-sheet');
+      targetPath = '/create-lecture-sheet';
     } else if (q.includes('বিষয়') || q.includes('পূর্ণমান') || q.includes('পূণমান')) {
-      router.push('/results?tab=full-marks');
-    } else if (q.includes('হোম') || q.includes('ড্যাশবোর্ড')) {
-      router.push('/');
+      targetPath = '/results?tab=full-marks';
+    } else if (q.includes('হোম') || q.includes('ড্যাশবোর্ড') || q.includes('মূল')) {
+      targetPath = '/';
     } else if (q.includes('বই') || q.includes('বোর্ড')) {
-      router.push('/board-books');
-    } else if (q.includes('ডায়েরি') || q.includes('ডায়েরি')) {
-      router.push('/diary');
+      targetPath = '/board-books';
+    } else if (q.includes('ডায়েরি') || q.includes('ডায়েরি') || q.includes('ডাইরী')) {
+      targetPath = '/diary';
     } else if (q.includes('প্রশ্ন') || q.includes('তৈরি')) {
-      router.push('/create-question');
-    } else if (q.includes('প্রোফাইল')) {
-      router.push('/student-profile');
+      targetPath = '/create-question';
+    } else if (q.includes('প্রোফাইল') || q.includes('শিক্ষার্থী তথ্য')) {
+      targetPath = '/student-profile';
     } else if (q.includes('ভর্তি') && !q.includes('আবেদন')) {
-      router.push('/add-student');
+      targetPath = '/add-student';
     } else if (q.includes('তালিকা') || q.includes('লিস্ট')) {
-      router.push('/student-list');
+      targetPath = '/student-list';
     } else if (q.includes('হাজিরা') || q.includes('উপস্থিতি')) {
-      router.push('/attendance');
+      targetPath = '/attendance';
     } else if (q.includes('হিসাব') || q.includes('টাকা') || q.includes('বেতন') || q.includes('পেমেন্ট')) {
-      router.push('/accounts');
+      targetPath = '/accounts';
     } else if (q.includes('মেসেজ') || q.includes('এসএমএস')) {
-      router.push('/messaging');
+      targetPath = '/messaging';
     } else if (q.includes('স্টাফ') || q.includes('শিক্ষক')) {
-      router.push('/staff');
+      targetPath = '/staff';
     } else if (q.includes('ডকুমেন্ট') || q.includes('প্রত্যয়ন') || q.includes('প্রশংসা') || q.includes('আইডি')) {
-      router.push('/documents');
+      targetPath = '/documents';
     } else if (q.includes('রুটিন')) {
-      router.push('/routines');
+      targetPath = '/routines';
     } else if (q.includes('রেকর্ড') || q.includes('পাবলিক')) {
-      router.push('/public-exam-records');
-    } else if (q.includes('লাইব্রেরি') || q.includes('সংগ্রহ')) {
-      router.push('/my-questions');
+      targetPath = '/public-exam-records';
+    } else if (q.includes('লাইব্রেরি') || q.includes('সংগ্রহ') || q.includes('লাইব্রেরী')) {
+      targetPath = '/my-questions';
     } else if (q.includes('আবেদন')) {
-      router.push('/admissions-management');
-    } else if (q.includes('সেটিংস') || q.includes('নিয়ন্ত্রণ')) {
-      router.push('/settings');
+      targetPath = '/admissions-management';
+    } else if (q.includes('সেটিংস') || q.includes('নিয়ন্ত্রণ') || q.includes('সেটিং')) {
+      targetPath = '/settings';
     }
-    
-    setSearchQuery('');
-    setSearchOpen(false);
+
+    if (targetPath) {
+      setSearchOpen(false);
+      setSearchQuery('');
+      
+      // Use push with a slight delay or handle same-page refresh
+      if (pathname === targetPath || (targetPath.includes('?') && pathname === targetPath.split('?')[0])) {
+        router.replace(targetPath);
+        router.refresh();
+      } else {
+        router.push(targetPath);
+      }
+    }
   };
 
   const navItems = [
