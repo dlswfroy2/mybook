@@ -243,7 +243,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                         <td className="border-r border-black p-1 text-center font-bold">{sr?.fullMarks ?? sub.fullMarks}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.written ?? '-'}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.mcq ?? '-'}</td>
-                                        {hasPractical && <td className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</td>}
+                                        {hasPractical && <th className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</th>}
                                         <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
                                         <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
                                         <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
@@ -336,9 +336,9 @@ const BackgroundGallery = () => {
               fill 
               unoptimized
               priority={idx === 0}
-              className="object-cover object-center brightness-[1.10] contrast-[1.05]"
+              className="object-cover object-center brightness-[1.50] contrast-[1.05]"
             />
-            <div className="absolute inset-0 bg-black/40" />
+            <div className="absolute inset-0 bg-black/15" />
           </div>
         ))
       ) : (
