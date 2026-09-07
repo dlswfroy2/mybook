@@ -531,19 +531,19 @@ function MyLibraryContent() {
                   <TableCell className="font-black border-r-2 border-black bg-green-100 text-black px-4">
                     {ch}
                   </TableCell>
-                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.lectureSheet > 0 ? "text-blue-600" : "text-red-600")}>
                     {toBengaliNumber(stats.lectureSheet)} টি
                   </TableCell>
-                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.creative > 0 ? "text-blue-600" : "text-red-600")}>
                     {toBengaliNumber(stats.creative)} টি
                   </TableCell>
-                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.mcq > 0 ? "text-blue-600" : "text-red-600")}>
                     {toBengaliNumber(stats.mcq)} টি
                   </TableCell>
-                  <TableCell className="text-center border-r-2 border-black font-black text-xs">
+                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.modelTest > 0 ? "text-blue-600" : "text-red-600")}>
                     {toBengaliNumber(stats.modelTest)} টি
                   </TableCell>
-                  <TableCell className="text-center font-black text-xs">
+                  <TableCell className={cn("text-center font-black text-xs", stats.answerKey > 0 ? "text-blue-600" : "text-red-600")}>
                     {toBengaliNumber(stats.answerKey)} টি
                   </TableCell>
                 </TableRow>
