@@ -243,7 +243,7 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                                         <td className="border-r border-black p-1 text-center font-bold">{sr?.fullMarks ?? sub.fullMarks}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.written ?? '-'}</td>
                                         <td className="border-r border-black p-1 text-center font-medium">{sr?.mcq ?? '-'}</td>
-                                        {hasPractical && <th className="border-r border-black p-1 text-center font-medium">{sr?.practical ?? '-'}</th>}
+                                        {hasPractical && <th className="border-r border-black p-1 w-14">Practical</th>}
                                         <td className={cn("border-r border-black p-1 text-center font-black text-[12px]", isFail ? "text-red-600" : "text-blue-900")}>{sr?.marks ?? '-'}</td>
                                         <td className={cn("border-r border-black p-1 text-center font-black", isFail ? "text-red-600" : "")}>{sr?.grade ?? '-'}</td>
                                         <td className={cn("p-1 text-center font-bold", isFail ? "text-red-600" : "")}>{sr?.point !== undefined ? sr.point.toFixed(2) : '-'}</td>
@@ -338,7 +338,7 @@ const BackgroundGallery = () => {
               priority={idx === 0}
               className="object-cover object-center brightness-[1.50] contrast-[1.05]"
             />
-            <div className="absolute inset-0 bg-black/15" />
+            <div className="absolute inset-0 bg-black/5" />
           </div>
         ))
       ) : (
@@ -867,8 +867,7 @@ export default function AuthPage() {
                      <Trophy className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-3xl font-black text-slate-800">{toBengaliNumber(stats.passRate.toFixed(1))}%</p>
-                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
+                    <p className="text-2xl md:text-3xl font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
                   </div>
                </CardContent>
             </Card>
