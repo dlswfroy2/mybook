@@ -203,7 +203,6 @@ function MyLibraryContent() {
     if (!selectedClass) return [];
     const baseList = getSubjectsForClass(selectedClass);
     
-    // Split religion for library display
     const listWithSplitReligion = baseList.flatMap(s => {
       if (s === 'ধর্ম ও নৈতিক শিক্ষা') {
         return ['ইসলাম ধর্ম ও নৈতিক শিক্ষা', 'হিন্দু ধর্ম ও নৈতিক শিক্ষা'];
@@ -337,6 +336,7 @@ function MyLibraryContent() {
         ...i, 
         source: 'lecture-sheets' as const, 
         displayTitle: i.topic || 'শিরোনামহীন শিট',
+        saveName: i.topic || '-',
         fileType: 'EDITOR' as const 
       })),
       ...currentItemsRaw.pdfSheets.map(i => {
@@ -348,6 +348,7 @@ function MyLibraryContent() {
           ...i, 
           source: 'pdf-sheets' as const, 
           displayTitle: `${i.chapterName} - ${i.subject}`,
+          saveName: i.fileName || '-',
           fileType: ft as const
         };
       }),
@@ -355,6 +356,7 @@ function MyLibraryContent() {
         ...i, 
         source: 'questions' as const, 
         displayTitle: `${i.exam || 'পরীক্ষা'} - ${i.chapter || 'অধ্যায় নেই'}`,
+        saveName: i.exam || '-',
         fileType: 'EDITOR' as const 
       }))
     ];
@@ -664,6 +666,7 @@ function MyLibraryContent() {
               <TableRow className="bg-blue-100 border-b-2 border-black h-12">
                 <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
                 <TableHead className="font-black border-r-2 border-black text-black">শিরোনাম</TableHead>
+                <TableHead className="font-black border-r-2 border-black text-black">সেভ নাম</TableHead>
                 <TableHead className="text-center font-black border-r-2 border-black text-black w-32">ধরন</TableHead>
                 <TableHead className="text-center font-black text-black w-[200px]">একশন</TableHead>
               </TableRow>
@@ -671,9 +674,9 @@ function MyLibraryContent() {
             <TableBody>
               {combinedItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-20 text-muted-foreground font-bold italic">এই ক্যাটাগরিতে কোনো তথ্য পাওয়া যায়নি</TableCell>
+                  <TableCell colSpan={5} className="text-center py-20 text-muted-foreground font-bold italic">এই ক্যাটাগরিতে কোনো তথ্য পাওয়া যায়নি</TableCell>
                 </TableRow>
-              ) : combinedItems.map((item, idx) => {
+              ) : combinedItems.map((item: any, idx) => {
                 const isSelected = selectedDocIds.includes(item.id);
                 return (
                   <TableRow 
@@ -694,6 +697,9 @@ function MyLibraryContent() {
                     </TableCell>
                     <TableCell className="font-bold border-r-2 border-black bg-green-100 px-4 text-xs md:text-sm">
                       {item.displayTitle}
+                    </TableCell>
+                    <TableCell className="font-bold border-r-2 border-black px-4 text-xs">
+                      {item.saveName || '-'}
                     </TableCell>
                     <TableCell className="text-center border-r-2 border-black w-32">
                       <div className="flex items-center justify-center">
