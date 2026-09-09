@@ -1,8 +1,8 @@
-
 import type {Metadata} from 'next';
 import './globals.css';
 import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Footer } from '@/components/layout/Footer';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthProvider } from '@/context/AuthContext';
@@ -36,10 +36,7 @@ export default function RootLayout({
                 <main className="flex-1 pt-20 pb-6 container mx-auto px-4">
                   {children}
                 </main>
-                <footer className="py-6 text-center text-[10px] text-muted-foreground border-t bg-muted/5 mb-10 no-print font-bold">
-                  <p className="tracking-widest uppercase">© ২০২৪-২৬ টপ গ্রেড টিউটোরিয়ালস।</p>
-                  <p className="mt-1 text-primary/60">সর্বস্বত্ব সংরক্ষিত।</p>
-                </footer>
+                <Footer />
                 <BottomNav />
                 <Toaster />
               </AcademicYearProvider>

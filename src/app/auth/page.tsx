@@ -80,6 +80,7 @@ import { processStudentResults, StudentProcessedResult } from '@/lib/results-cal
 import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
   if (!str && str !== 0) return '';
@@ -353,6 +354,7 @@ export default function AuthPage() {
   const db = useFirestore();
   const router = useRouter();
   const { schoolInfo } = useSchoolInfo();
+  const { selectedYear } = useAcademicYear();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeAuthTab, setActiveAuthTab] = useState<'teacher' | 'admin' | 'signup'>('teacher');
@@ -362,7 +364,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchYear, setSearchYear] = useState(new Date().getFullYear().toString());
+  const [searchYear, setSearchYear] = useState(selectedYear);
   const [searchClass, setSearchClass] = useState('6');
   const [searchExam, setSearchExam] = useState('');
   const [searchExams, setSearchExams] = useState<Exam[]>([]);
@@ -382,19 +384,18 @@ export default function AuthPage() {
     teachers: 0,
     attendanceRate: 0,
     passRate: 0,
-    sscYear: new Date().getFullYear().toString()
+    sscYear: selectedYear
   });
 
   useEffect(() => {
     if (!db) return;
     const fetchStats = async () => {
       try {
-        const currentYear = new Date().getFullYear().toString();
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         
-        const sPromise = getDocs(query(collection(db, 'students'), where('academicYear', '==', currentYear)));
+        const sPromise = getDocs(query(collection(db, 'students'), where('academicYear', '==', selectedYear)));
         const tPromise = getDocs(query(collection(db, 'staff'), where('isActive', '==', true), where('staffType', '==', 'teacher')));
-        const attPromise = getDocs(query(collection(db, 'attendance'), where('academicYear', '==', currentYear), where('date', '==', todayStr)));
+        const attPromise = getDocs(query(collection(db, 'attendance'), where('academicYear', '==', selectedYear), where('date', '==', todayStr)));
         const sscRecordsPromise = getDocs(query(collection(db, 'publicExamRecords'), where('examType', '==', 'SSC')));
 
         const [sSnap, tSnap, attSnap, allSscSnap] = await Promise.all([
@@ -415,8 +416,8 @@ export default function AuthPage() {
           }
         });
 
-        let sscYear = currentYear;
-        let sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === currentYear);
+        let sscYear = selectedYear;
+        let sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === selectedYear);
         
         if (sscDocs.length === 0 && (allSscSnap as any).docs.length > 0) {
           const yearsWithRecords = Array.from(new Set((allSscSnap as any).docs.map((d: any) => d.data().academicYear).filter(Boolean))).sort().reverse();
@@ -451,7 +452,7 @@ export default function AuthPage() {
       }
     };
     fetchStats();
-  }, [db, schoolInfo]);
+  }, [db, schoolInfo, selectedYear]);
 
   useEffect(() => {
     if (!db) return;
@@ -726,7 +727,7 @@ export default function AuthPage() {
              <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black px-3 rounded-sm text-slate-500 hover:bg-slate-100">English</Button>
           </div>
           <div className="bg-[#334155] px-3 py-1 rounded-full border border-slate-500/50">
-            <span className="text-[10px] font-black text-slate-200">সেশন: ২০২৫</span>
+            <span className="text-[10px] font-black text-slate-200">সেশন: {toBengaliNumber(selectedYear)}</span>
           </div>
         </div>
       </header>
@@ -1028,7 +1029,7 @@ export default function AuthPage() {
         <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-wrap justify-center gap-4 md:gap-8 text-[10px] md:text-xs font-bold uppercase tracking-wider">
             <div className="flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5" /> © ২০২৬ {appName}
+              <Globe className="w-3.5 h-3.5" /> © {toBengaliNumber(selectedYear)} {appName}
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5 text-[#ef4444]" /> {schoolInfo?.address || 'বাংলাদেশ'}
