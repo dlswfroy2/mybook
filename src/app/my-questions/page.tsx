@@ -381,24 +381,64 @@ function MyLibraryContent() {
     const chapterPdfSheets = libraryData.pdfSheets.filter(p => p.classId === selectedClass && normalize(p.subject) === normalizedSelectedSubject && matches(p.chapterName));
     const chapterQuestionSets = libraryData.questions.filter(q => q.classId === selectedClass && normalize(q.subject) === normalizedSelectedSubject && matches(q.chapter));
     
-    const stats = {
-      lectureSheet: chapterSheets.length + chapterPdfSheets.filter(p => p.category === 'lecture_sheet').length,
-      creative: chapterPdfSheets.filter(p => p.category === 'creative').length,
-      mcq: chapterPdfSheets.filter(p => p.category === 'mcq').length,
-      modelTest: chapterPdfSheets.filter(p => p.category === 'model_test').length,
-      answerKey: chapterPdfSheets.filter(p => p.category === 'answer_key').length,
+    const init = () => ({ total: 0, pdf: 0, word: 0, editor: 0 });
+    const stats: Record<string, any> = {
+      lectureSheet: init(),
+      creative: init(),
+      mcq: init(),
+      modelTest: init(),
+      answerKey: init(),
     };
 
+    const getFileType = (p: any) => {
+        const url = (p.pdfUrl || '').toLowerCase();
+        const fName = (p.fileName || '').toLowerCase();
+        const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
+        return isWord ? 'word' : 'pdf';
+    };
+
+    chapterSheets.forEach(s => {
+        stats.lectureSheet.total++;
+        stats.lectureSheet.editor++;
+    });
+
+    chapterPdfSheets.forEach(p => {
+        const cat = p.category === 'lecture_sheet' ? 'lectureSheet' : p.category;
+        if (stats[cat]) {
+            const type = getFileType(p);
+            stats[cat].total++;
+            stats[cat][type]++;
+        }
+    });
+
     chapterQuestionSets.forEach(set => {
-      if (set.examType === 'model_test') {
-        stats.modelTest++;
-      } else {
-        if (set.isMcq) stats.mcq++;
-        else stats.creative++;
-      }
+        const cat = set.examType === 'model_test' ? 'modelTest' : (set.isMcq ? 'mcq' : 'creative');
+        if (stats[cat]) {
+            stats[cat].total++;
+            stats[cat].editor++;
+        }
     });
 
     return stats;
+  };
+
+  const renderStatCell = (stat: any) => {
+    const breakdown = [];
+    if (stat.pdf > 0) breakdown.push(`P:${toBengaliNumber(stat.pdf)}`);
+    if (stat.word > 0) breakdown.push(`W:${toBengaliNumber(stat.word)}`);
+    
+    return (
+        <div className="flex flex-col items-center justify-center leading-tight">
+            <span className={cn("font-black text-xs", stat.total > 0 ? "text-blue-600" : "text-red-600")}>
+                {toBengaliNumber(stat.total)} টি
+            </span>
+            {breakdown.length > 0 && (
+                <span className="text-[9px] font-bold text-muted-foreground opacity-60">
+                    ({breakdown.join(', ')})
+                </span>
+            )}
+        </div>
+    );
   };
 
   const toggleSelection = (id: string) => { if (!isSelecting) return; setSelectedDocIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); };
@@ -471,7 +511,7 @@ function MyLibraryContent() {
           <TableHeader>
             <TableRow className="bg-blue-100 border-b-2 border-black h-12">
               <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
-              <TableHead className="font-black border-r-2 border-black text-black">অধ্যায়ের নাম</TableHead>
+              <TableHead className="font-black border-r-2 border-black text-black">বিষয়ের নাম</TableHead>
               <TableHead className="text-center font-black text-black w-48">অধ্যায়সমূহ দেখুন</TableHead>
             </TableRow>
           </TableHeader>
@@ -533,20 +573,20 @@ function MyLibraryContent() {
                   <TableCell className="font-black border-r-2 border-black bg-green-100 text-black px-4">
                     {ch}
                   </TableCell>
-                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.lectureSheet > 0 ? "text-blue-600" : "text-red-600")}>
-                    {toBengaliNumber(stats.lectureSheet)} টি
+                  <TableCell className="text-center border-r-2 border-black">
+                    {renderStatCell(stats.lectureSheet)}
                   </TableCell>
-                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.creative > 0 ? "text-blue-600" : "text-red-600")}>
-                    {toBengaliNumber(stats.creative)} টি
+                  <TableCell className="text-center border-r-2 border-black">
+                    {renderStatCell(stats.creative)}
                   </TableCell>
-                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.mcq > 0 ? "text-blue-600" : "text-red-600")}>
-                    {toBengaliNumber(stats.mcq)} টি
+                  <TableCell className="text-center border-r-2 border-black">
+                    {renderStatCell(stats.mcq)}
                   </TableCell>
-                  <TableCell className={cn("text-center border-r-2 border-black font-black text-xs", stats.modelTest > 0 ? "text-blue-600" : "text-red-600")}>
-                    {toBengaliNumber(stats.modelTest)} টি
+                  <TableCell className="text-center border-r-2 border-black">
+                    {renderStatCell(stats.modelTest)}
                   </TableCell>
-                  <TableCell className={cn("text-center font-black text-xs", stats.answerKey > 0 ? "text-blue-600" : "text-red-600")}>
-                    {toBengaliNumber(stats.answerKey)} টি
+                  <TableCell className="text-center">
+                    {renderStatCell(stats.answerKey)}
                   </TableCell>
                 </TableRow>
               );
