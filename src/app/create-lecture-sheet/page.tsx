@@ -425,7 +425,6 @@ function CreateLectureSheetContent() {
       setUploading(false);
       setUploadFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      router.push('/my-questions');
     } catch (e: any) {
       toast({ variant: "destructive", title: "ত্রুটি", description: e.message });
       setUploading(false);
@@ -622,7 +621,7 @@ function CreateLectureSheetContent() {
                   </CardHeader>
                   <CardContent className="py-10 flex flex-col items-center justify-center space-y-6">
                     <div 
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => !uploading && fileInputRef.current?.click()}
                       className="w-full max-w-md border-2 border-dashed border-indigo-300 rounded-3xl p-10 flex flex-col items-center justify-center gap-4 bg-indigo-50/20 hover:bg-indigo-50/40 transition-all cursor-pointer group"
                     >
                       <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
