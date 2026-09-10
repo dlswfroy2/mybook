@@ -227,7 +227,6 @@ function normalizeForSort(name: string): number {
   return isNaN(num) ? 998 : num;
 }
 
-// Scrolling Notice Ticker Component
 const NoticeTicker = () => {
     const db = useFirestore();
     const { user } = useUser();
@@ -324,14 +323,12 @@ export default function Home() {
   const [totalPresent, setTotalPresent] = useState(0);
   const [totalAbsent, setTotalAbsent] = useState(0);
 
-  // Quick Payment States
   const [isQuickPaymentOpen, setIsQuickPaymentOpen] = useState(false);
   const [quickSearchInput, setQuickSearchInput] = useState('');
   const [quickSearchClass, setQuickSearchClass] = useState<string>('');
   const [studentsForYear, setStudentsForYear] = useState<Student[]>([]);
   const [quickFeeStudent, setQuickFeeStudent] = useState<Student | null>(null);
 
-  // Quick Attendance States
   const [isQuickAttendanceOpen, setIsQuickAttendanceOpen] = useState(false);
   const [quickAttendanceClass, setQuickAttendanceClass] = useState<string>('6');
   const [quickAttendanceInput, setQuickAttendanceInput] = useState('');
@@ -558,7 +555,6 @@ export default function Home() {
       
       let targetSub = normalize(sub);
       const lowerSub = sub.toLowerCase();
-      // Split religion for dashboard counts
       if (lowerSub.includes('ইসলাম') || lowerSub.includes('islam')) targetSub = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
       else if (lowerSub.includes('হিন্দু') || lowerSub.includes('hindu')) targetSub = 'হিন্দু ধর্ম ও নৈতিক শিক্ষা';
 
@@ -606,7 +602,6 @@ export default function Home() {
     <div className="space-y-8 animate-fade-in font-kalpurush">
       <NoticeTicker />
 
-      {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 items-center justify-center sm:justify-start">
           <Link href="/add-student">
               <Button className="h-12 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
@@ -973,7 +968,6 @@ export default function Home() {
             });
             const selectedSubjectRaw = selectedSubjects[cls.id] || allSubjects[0];
             
-            // Special normalization for dashboard to match aggregated keys
             let selectedSubjectNormalized = normalize(selectedSubjectRaw);
             const lowerRaw = selectedSubjectRaw.toLowerCase();
             if (lowerRaw.includes('ইসলাম') || lowerRaw.includes('islam')) selectedSubjectNormalized = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
@@ -1034,72 +1028,87 @@ export default function Home() {
 
                           <tr className="border-b border-black bg-blue-50">
                             <td className="border-r-2 border-black p-1 text-center font-black text-[10px] text-blue-900">লেকচার শিট</td>
-                            {chunk.map(ch => (
-                              <td key={ch.key} className="border-r-2 border-black p-1 text-center font-black text-[12px]">
-                                <Link 
-                                  href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=sheet`}
-                                  className="hover:text-blue-600 hover:underline transition-all"
-                                >
-                                  {toBengaliNumber(classChaptersStats[ch.key]?.lectureSheet || 0)}
-                                </Link>
-                              </td>
-                            ))}
+                            {chunk.map(ch => {
+                              const count = classChaptersStats[ch.key]?.lectureSheet || 0;
+                              return (
+                                <td key={ch.key} className={cn("border-r-2 border-black p-1 text-center font-black text-[12px]", count > 0 ? "text-blue-600" : "text-red-600")}>
+                                  <Link 
+                                    href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=sheet`}
+                                    className="hover:underline transition-all"
+                                  >
+                                    {toBengaliNumber(count)}
+                                  </Link>
+                                </td>
+                              );
+                            })}
                           </tr>
 
                           <tr className="border-b border-black bg-orange-50">
                             <td className="border-r-2 border-black p-1 text-center font-black text-[10px] text-orange-900">সৃজনশীল</td>
-                            {chunk.map(ch => (
-                              <td key={ch.key} className="border-r-2 border-black p-1 text-center font-black text-[12px]">
-                                <Link 
-                                  href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=creative`}
-                                  className="hover:text-orange-600 hover:underline transition-all"
-                                >
-                                  {toBengaliNumber(classChaptersStats[ch.key]?.creative || 0)}
-                                </Link>
-                              </td>
-                            ))}
+                            {chunk.map(ch => {
+                              const count = classChaptersStats[ch.key]?.creative || 0;
+                              return (
+                                <td key={ch.key} className={cn("border-r-2 border-black p-1 text-center font-black text-[12px]", count > 0 ? "text-blue-600" : "text-red-600")}>
+                                  <Link 
+                                    href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=creative`}
+                                    className="hover:underline transition-all"
+                                  >
+                                    {toBengaliNumber(count)}
+                                  </Link>
+                                </td>
+                              );
+                            })}
                           </tr>
 
                           <tr className="border-b border-black bg-indigo-50">
                             <td className="border-r-2 border-black p-1 text-center font-black text-[10px] text-indigo-900">বহুনির্বাচনী</td>
-                            {chunk.map(ch => (
-                              <td key={ch.key} className="border-r-2 border-black p-1 text-center font-black text-[12px]">
-                                <Link 
-                                  href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=mcq`}
-                                  className="hover:text-indigo-600 hover:underline transition-all"
-                                >
-                                  {toBengaliNumber(classChaptersStats[ch.key]?.mcq || 0)}
-                                </Link>
-                              </td>
-                            ))}
+                            {chunk.map(ch => {
+                              const count = classChaptersStats[ch.key]?.mcq || 0;
+                              return (
+                                <td key={ch.key} className={cn("border-r-2 border-black p-1 text-center font-black text-[12px]", count > 0 ? "text-blue-600" : "text-red-600")}>
+                                  <Link 
+                                    href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=mcq`}
+                                    className="hover:underline transition-all"
+                                  >
+                                    {toBengaliNumber(count)}
+                                  </Link>
+                                </td>
+                              );
+                            })}
                           </tr>
 
                           <tr className="border-b border-black bg-green-50">
                             <td className="border-r-2 border-black p-1 text-center font-black text-[10px] text-green-900">উত্তরমালা</td>
-                            {chunk.map(ch => (
-                              <td key={ch.key} className="border-r-2 border-black p-1 text-center font-black text-[12px]">
-                                <Link 
-                                  href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=answer`}
-                                  className="hover:text-green-600 hover:underline transition-all"
-                                >
-                                  {toBengaliNumber(classChaptersStats[ch.key]?.answerKey || 0)}
-                                </Link>
-                              </td>
-                            ))}
+                            {chunk.map(ch => {
+                              const count = classChaptersStats[ch.key]?.answerKey || 0;
+                              return (
+                                <td key={ch.key} className={cn("border-r-2 border-black p-1 text-center font-black text-[12px]", count > 0 ? "text-blue-600" : "text-red-600")}>
+                                  <Link 
+                                    href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=answer`}
+                                    className="hover:underline transition-all"
+                                  >
+                                    {toBengaliNumber(count)}
+                                  </Link>
+                                </td>
+                              );
+                            })}
                           </tr>
 
                           <tr className="bg-rose-50">
                             <td className="border-r-2 border-black p-1 text-center font-black text-[10px] text-rose-900">মডেল টেস্ট</td>
-                            {chunk.map(ch => (
-                              <td key={ch.key} className="border-r-2 border-black p-1 text-center font-black text-[12px]">
-                                <Link 
-                                  href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=model`}
-                                  className="hover:text-rose-600 hover:underline transition-all"
-                                >
-                                  {toBengaliNumber(classChaptersStats[ch.key]?.modelTest || 0)}
-                                </Link>
-                              </td>
-                            ))}
+                            {chunk.map(ch => {
+                              const count = classChaptersStats[ch.key]?.modelTest || 0;
+                              return (
+                                <td key={ch.key} className={cn("border-r-2 border-black p-1 text-center font-black text-[12px]", count > 0 ? "text-blue-600" : "text-red-600")}>
+                                  <Link 
+                                    href={`/my-questions?classId=${cls.id}&subject=${encodeURIComponent(selectedSubjectRaw)}&chapter=${encodeURIComponent(ch.display)}&category=model`}
+                                    className="hover:underline transition-all"
+                                  >
+                                    {toBengaliNumber(count)}
+                                  </Link>
+                                </td>
+                              );
+                            })}
                           </tr>
                         </tbody>
                       </table>
@@ -1117,7 +1126,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Direct Fee Dialog for Quick Search */}
       {quickFeeStudent && (
           <StudentFeeDialog 
             student={quickFeeStudent} 
