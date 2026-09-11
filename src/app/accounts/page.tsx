@@ -509,7 +509,7 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="table-container !max-h-[600px] !border-0 !rounded-none">
+                    <div className="table-container !max-h-[600px] !border-0 !rounded-none overflow-y-auto">
                         <Table>
                             <TableHeader className="bg-slate-50 sticky top-0 z-30">
                                 <TableRow className="border-b-2 border-black">
@@ -1654,7 +1654,7 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
                     <TableBody>
                         {reportData.map((row, i) => (
                             <TableRow key={i} className="h-[18px] border-b border-black">
-                                <TableCell className="border-r border-black text-center font-black text-black p-0 w-8">{fmt(row.roll)}</TableCell>
+                                <TableCell className="border-r-black text-center font-black text-black p-0 w-8">{fmt(row.roll)}</TableCell>
                                 <TableCell className="border-r border-black font-bold whitespace-nowrap text-black text-left pl-2 p-0 w-28 border-r border-black">{row.name}</TableCell>
                                 <TableCell className="border-r border-black text-center text-black font-black p-0 w-12">{row.admission > 0 ? fmt(row.admission) : '-'}</TableCell>
                                 <TableCell className="border-r border-black text-center text-black font-black p-0 w-12">{row.session > 0 ? fmt(row.session) : '-'}</TableCell>
@@ -1689,4 +1689,5 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
 }
 
 type AccountsPrintType = 'fee-setup' | 'annual-potential' | 'annual-collection' | null;
+
 
