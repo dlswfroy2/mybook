@@ -55,13 +55,18 @@
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  main {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+  main, .container {
+    padding: 0 !important;
     margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 }
 

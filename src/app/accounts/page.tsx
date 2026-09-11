@@ -1586,22 +1586,24 @@ export default function AccountsPage() {
 function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allStudents: Student[], selectedYear: string, schoolInfo: any }) {
     const classes = ['6', '7', '8', '9', '10'];
     return (
-        <div className="printable-area bg-white text-black font-kalpurush w-full">
+        <div className="printable-area bg-white text-black font-kalpurush w-full p-0 m-0">
             <style jsx global>{`
                 @media print {
                     @page { size: A4 portrait; margin: 0.5in !important; }
-                    .printable-area { padding: 0 !important; margin: 0 !important; width: 100% !important; }
-                    table { width: 100% !important; border-collapse: collapse !important; border: 2px solid black !important; table-layout: auto !important; }
-                    th, td { border: 1px solid black !important; padding: 4px 6px !important; }
-                    th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+                    main, .container { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+                    .printable-area { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+                    .printable-area table { width: 100% !important; border-collapse: collapse !important; border: 2px solid black !important; table-layout: fixed !important; }
+                    .printable-area th, .printable-area td { border: 1px solid black !important; padding: 5px 6px !important; }
+                    .printable-area th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
             `}</style>
             {classes.map(cls => {
                 const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === cls).sort((a, b) => (Number(a.roll) || 0) - (Number(b.roll) || 0));
                 if (classStudents.length === 0) return null;
                 return (
-                    <div key={cls} className="mb-10 break-after-page">
-                        <header className="flex items-center gap-6 border-b-4 border-emerald-800 pb-4 mb-6">
+                    <div key={cls} className="mb-10 break-after-page w-full">
+                        <header className="flex items-center gap-6 border-b-4 border-emerald-800 pb-4 mb-6 w-full">
                             {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={60} height={60} className="object-contain" />}
                             <div className="text-center flex-grow">
                                 <h1 className="text-3xl font-black text-emerald-950 leading-tight">{schoolInfo.name}</h1>
@@ -1615,21 +1617,21 @@ function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allS
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-slate-100">
-                                    <th className="w-14 text-center font-black">রোল</th>
-                                    <th className="font-black text-left pl-3 min-w-[200px]">শিক্ষার্থীর নাম</th>
-                                    <th className="w-20 text-center font-black">বেতন</th>
-                                    <th className="w-20 text-center font-black">অর্ধ-বার্ষিক</th>
-                                    <th className="w-20 text-center font-black">বার্ষিক ফি</th>
-                                    <th className="w-20 text-center font-black">সেশন ফি</th>
-                                    <th className="w-20 text-center font-black">ভর্তি ফি</th>
-                                    <th className="w-20 text-center font-black">অন্যান্য</th>
+                                    <th className="w-[8%] text-center font-black">রোল</th>
+                                    <th className="w-[28%] font-black text-left pl-3">শিক্ষার্থীর নাম</th>
+                                    <th className="w-[11%] text-center font-black">বেতন</th>
+                                    <th className="w-[11%] text-center font-black">অর্ধ-বার্ষিক</th>
+                                    <th className="w-[11%] text-center font-black">বার্ষিক ফি</th>
+                                    <th className="w-[11%] text-center font-black">সেশন ফি</th>
+                                    <th className="w-[10%] text-center font-black">ভর্তি ফি</th>
+                                    <th className="w-[10%] text-center font-black">অন্যান্য</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {classStudents.map(student => (
                                     <tr key={student.id} className="h-10">
                                         <td className="text-center font-black">{toBengaliNumber(student.roll)}</td>
-                                        <td className="font-bold px-3 whitespace-nowrap text-left">{student.studentNameBn}</td>
+                                        <td className="font-bold px-3 truncate text-left">{student.studentNameBn}</td>
                                         <td className="text-center">{toBengaliNumber(student.monthlyFee || 0)}</td>
                                         <td className="text-center">{toBengaliNumber(student.examFeeHalfYearly || 0)}</td>
                                         <td className="text-center">{toBengaliNumber(student.examFeeAnnual || 0)}</td>
@@ -1640,7 +1642,7 @@ function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allS
                                 ))}
                             </tbody>
                         </table>
-                        <footer className="mt-16 flex justify-between px-10">
+                        <footer className="mt-16 flex justify-between px-10 w-full">
                             <div className="text-center w-48 border-t-2 border-black pt-1 font-black">হিসাবরক্ষক</div>
                             <div className="text-center w-48 border-t-2 border-black pt-1 font-black">প্রধান শিক্ষক</div>
                         </footer>
@@ -1676,18 +1678,20 @@ function PrintablePotentialAnnualReport({ allStudents, selectedYear, schoolInfo,
     });
 
     return (
-        <div className="printable-area bg-white text-black font-kalpurush p-2 w-full">
+        <div className="printable-area bg-white text-black font-kalpurush w-full p-0 m-0">
             <style jsx global>{`
                 @media print { 
                     @page { size: A4 landscape; margin: 0.5in !important; } 
-                    .printable-area { width: 100% !important; padding: 0 !important; margin: 0 !important; } 
-                    .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } 
-                    .printable-area th, .printable-area td { border: 1px solid black !important; padding: 4px 6px !important; } 
+                    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; } 
+                    main, .container { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; } 
+                    .printable-area { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; } 
+                    .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: fixed !important; } 
+                    .printable-area th, .printable-area td { border: 1px solid black !important; padding: 4px 2px !important; } 
                     .printable-area th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
             `}</style>
             <div className="mb-20 break-after-page min-h-screen w-full">
-                <header className="flex items-center justify-between border-b-4 border-emerald-800 pb-2 mb-4">
+                <header className="flex items-center justify-between border-b-4 border-emerald-800 pb-2 mb-4 w-full">
                     {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={50} height={50} className="object-contain" />}
                     <div className="text-center flex-grow">
                         <h1 className="text-2xl font-black text-slate-900">{displaySchoolName}</h1>
@@ -1701,45 +1705,45 @@ function PrintablePotentialAnnualReport({ allStudents, selectedYear, schoolInfo,
                 <table className="w-full text-[10px] border-collapse">
                     <thead>
                         <tr className="bg-slate-100">
-                            <th className="border-2 border-black font-black text-center w-8 text-black">{isEn ? 'Roll' : 'রোল'}</th>
-                            <th className="border-2 border-black font-black w-28 text-black text-left pl-2">{isEn ? "Student's Name" : 'শিক্ষার্থীর নাম'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Admission' : 'ভর্তি ফি'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Session Fee' : 'সেশন ফি'}</th>
-                            {months.map(m => <th key={m} className="border-2 border-black font-black text-center text-black px-0.5 w-7 text-[9px]">{m.slice(0,3)}</th>)}
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Exam' : 'পরীক্ষা'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Other' : 'অন্যান্য'}</th>
-                            <th className="font-black border-2 border-black text-right pr-2 text-white bg-blue-900 w-16">{isEn ? 'Total Dues' : 'মোট পাওনা'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[4%]">{isEn ? 'Roll' : 'রোল'}</th>
+                            <th className="border-2 border-black font-black text-black text-left pl-2 w-[18%]">{isEn ? "Student's Name" : 'শিক্ষার্থীর নাম'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[5.5%]">{isEn ? 'Admission' : 'ভর্তি ফি'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[5.5%]">{isEn ? 'Session Fee' : 'সেশন ফি'}</th>
+                            {months.map(m => <th key={m} className="border-2 border-black font-black text-center text-black px-0.5 w-[4.3%] text-[9px]">{m.slice(0,3)}</th>)}
+                            <th className="border-2 border-black font-black text-center text-black w-[5.2%]">{isEn ? 'Exam' : 'পরীক্ষা'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[4.5%]">{isEn ? 'Other' : 'অন্যান্য'}</th>
+                            <th className="font-black border-2 border-black text-right pr-2 text-white bg-blue-900 w-[6%]">{isEn ? 'Total Dues' : 'মোট পাওনা'}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {studentRows.map((row, i) => (
                             <tr key={i} className="h-7 border-b-2 border-black">
-                                <td className="border-2 border-black text-center font-black text-black w-8">{fmt(row.roll)}</td>
-                                <td className="border-2 border-black font-bold whitespace-nowrap text-black text-left pl-2 w-28">{row.name}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.admission > 0 ? fmt(row.admission) : '-'}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.session > 0 ? fmt(row.session) : '-'}</td>
+                                <td className="border-2 border-black text-center font-black text-black">{fmt(row.roll)}</td>
+                                <td className="border-2 border-black font-bold truncate text-black text-left pl-2">{row.name}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.admission > 0 ? fmt(row.admission) : '-'}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.session > 0 ? fmt(row.session) : '-'}</td>
                                 {row.months.map((val, j) => (
-                                    <td key={j} className="border-2 border-black text-center text-black font-black w-7 text-[9px]">{val > 0 ? fmt(Math.round(val)) : '-'}</td>
+                                    <td key={j} className="border-2 border-black text-center text-black font-black text-[9px]">{val > 0 ? fmt(Math.round(val)) : '-'}</td>
                                 ))}
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.exam > 0 ? fmt(row.exam) : '-'}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.other > 0 ? fmt(row.other) : '-'}</td>
-                                <td className="text-right pr-2 font-black bg-blue-50 text-blue-900 border-2 border-black w-16">{fmt(row.total)}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.exam > 0 ? fmt(row.exam) : '-'}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.other > 0 ? fmt(row.other) : '-'}</td>
+                                <td className="text-right pr-2 font-black bg-blue-50 text-blue-900 border-2 border-black">{fmt(row.total)}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr className="h-10 border-t-[3px] border-black bg-slate-200 font-black">
-                            <td colSpan={2} className="text-right pr-2 border-r-2 border-black text-black border-r-2 border-black">{isEn ? 'Grand Total:' : 'সর্বমোট:'}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.admission)}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.session)}</td>
-                            {grandTotals.months.map((val, j) => <td key={j} className="border-2 border-black text-center text-black w-7 text-[9px]">{fmt(Math.round(val))}</td>)}
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.exam)}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.other)}</td>
-                            <td className="text-right pr-2 text-[14px] bg-blue-950 text-white border-2 border-black w-16">{fmt(grandTotals.total)} ৳</td>
+                            <td colSpan={2} className="text-right pr-2 border-r-2 border-black text-black">{isEn ? 'Grand Total:' : 'সর্বমোট:'}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.admission)}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.session)}</td>
+                            {grandTotals.months.map((val, j) => <td key={j} className="border-2 border-black text-center text-black text-[9px]">{fmt(Math.round(val))}</td>)}
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.exam)}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.other)}</td>
+                            <td className="text-right pr-2 text-[14px] bg-blue-950 text-white border-2 border-black">{fmt(grandTotals.total)} ৳</td>
                         </tr>
                     </tfoot>
                 </table>
-                <footer className="mt-12 flex justify-between px-10">
+                <footer className="mt-12 flex justify-between px-10 w-full">
                     <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[12px]">{isEn ? 'Accountant' : 'হিসাবরক্ষক'}</div>
                     <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[12px]">{isEn ? 'Headmaster' : 'প্রধান শিক্ষক'}</div>
                 </footer>
@@ -1772,18 +1776,20 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
     }
 
     return (
-        <div className="printable-area bg-white text-black font-kalpurush p-2 w-full box-border">
+        <div className="printable-area bg-white text-black font-kalpurush w-full p-0 m-0 box-border">
              <style jsx global>{`
                 @media print { 
                     @page { size: A4 landscape; margin: 0.5in !important; } 
-                    .printable-area { width: 100% !important; padding: 0 !important; margin: 0 !important; } 
-                    .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } 
-                    .printable-area th, .printable-area td { border: 1px solid black !important; padding: 4px 6px !important; } 
+                    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; } 
+                    main, .container { margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; } 
+                    .printable-area { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; } 
+                    .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: fixed !important; } 
+                    .printable-area th, .printable-area td { border: 1px solid black !important; padding: 4px 2px !important; } 
                     .printable-area th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
              `}</style>
             <div className="mb-20 break-after-page min-h-screen w-full">
-                <header className="flex items-center justify-between border-b-4 border-emerald-800 pb-2 mb-4">
+                <header className="flex items-center justify-between border-b-4 border-emerald-800 pb-2 mb-4 w-full">
                     {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={50} height={50} className="object-contain" />}
                     <div className="text-center flex-grow">
                         <h1 className="text-2xl font-black text-emerald-950">{displaySchoolName}</h1>
@@ -1796,45 +1802,45 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
                 <table className="w-full text-[10px] border-collapse">
                     <thead>
                         <tr className="bg-slate-100">
-                            <th className="border-2 border-black font-black text-center w-8 text-black">{isEn ? 'Roll' : 'রোল'}</th>
-                            <th className="border-2 border-black font-black w-28 text-black text-left pl-2">{isEn ? "Student's Name" : 'শিক্ষার্থীর নাম'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Admission' : 'ভর্তি ফি'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Session Fee' : 'সেশন ফি'}</th>
-                            {months.map(m => <th key={m} className="border-2 border-black font-black text-center text-black px-0.5 w-7 text-[9px]">{m.slice(0,3)}</th>)}
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Exam' : 'পরীক্ষা'}</th>
-                            <th className="border-2 border-black font-black text-center text-black w-12">{isEn ? 'Other' : 'অন্যান্য'}</th>
-                            <th className="font-black border-2 border-black text-right pr-2 text-white bg-emerald-900 w-16">{isEn ? 'Total' : 'মোট'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[4%]">{isEn ? 'Roll' : 'রোল'}</th>
+                            <th className="border-2 border-black font-black text-black text-left pl-2 w-[18%]">{isEn ? "Student's Name" : 'শিক্ষার্থীর নাম'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[5.5%]">{isEn ? 'Admission' : 'ভর্তি ফি'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[5.5%]">{isEn ? 'Session Fee' : 'সেশন ফি'}</th>
+                            {months.map(m => <th key={m} className="border-2 border-black font-black text-center text-black px-0.5 w-[4.3%] text-[9px]">{m.slice(0,3)}</th>)}
+                            <th className="border-2 border-black font-black text-center text-black w-[5.2%]">{isEn ? 'Exam' : 'পরীক্ষা'}</th>
+                            <th className="border-2 border-black font-black text-center text-black w-[4.5%]">{isEn ? 'Other' : 'অন্যান্য'}</th>
+                            <th className="font-black border-2 border-black text-right pr-2 text-white bg-emerald-900 w-[6%]">{isEn ? 'Total' : 'মোট'}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reportData.map((row, i) => (
                             <tr key={i} className="h-7 border-b-2 border-black">
-                                <td className="border-2 border-black text-center font-black text-black w-8">{fmt(row.roll)}</td>
-                                <td className="border-2 border-black font-bold whitespace-nowrap text-black text-left pl-2 w-28">{row.name}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.admission > 0 ? fmt(row.admission) : '-'}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.session > 0 ? fmt(row.session) : '-'}</td>
+                                <td className="border-2 border-black text-center font-black text-black">{fmt(row.roll)}</td>
+                                <td className="border-2 border-black font-bold truncate text-black text-left pl-2">{row.name}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.admission > 0 ? fmt(row.admission) : '-'}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.session > 0 ? fmt(row.session) : '-'}</td>
                                 {row.months.map((val: number, j: number) => (
-                                    <td key={j} className="border-2 border-black text-center text-black font-black w-7 text-[9px]">{val > 0 ? fmt(Math.round(val)) : '-'}</td>
+                                    <td key={j} className="border-2 border-black text-center text-black font-black text-[9px]">{val > 0 ? fmt(Math.round(val)) : '-'}</td>
                                 ))}
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.exam > 0 ? fmt(row.exam) : '-'}</td>
-                                <td className="border-2 border-black text-center text-black font-black w-12">{row.other > 0 ? fmt(row.other) : '-'}</td>
-                                <td className="text-right pr-2 font-black bg-emerald-50 text-emerald-900 border-2 border-black w-16">{fmt(row.total)}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.exam > 0 ? fmt(row.exam) : '-'}</td>
+                                <td className="border-2 border-black text-center text-black font-black">{row.other > 0 ? fmt(row.other) : '-'}</td>
+                                <td className="text-right pr-2 font-black bg-emerald-50 text-emerald-900 border-2 border-black">{fmt(row.total)}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr className="h-10 border-t-[3px] border-black bg-slate-200 font-black">
-                            <td colSpan={2} className="text-right pr-2 border-r-2 border-black text-black border-r-2 border-black">{isEn ? 'Grand Total:' : 'সর্বমোট:'}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.admission)}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.session)}</td>
-                            {grandTotals.months.map((val, j) => <td key={j} className="border-2 border-black text-center text-black w-7 text-[9px]">{fmt(Math.round(val))}</td>)}
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.exam)}</td>
-                            <td className="border-2 border-black text-center text-black w-12">{fmt(grandTotals.other)}</td>
-                            <td className="text-right pr-2 text-[14px] bg-emerald-950 text-white border-2 border-black w-16">{fmt(grandTotals.total)} ৳</td>
+                            <td colSpan={2} className="text-right pr-2 border-r-2 border-black text-black">{isEn ? 'Grand Total:' : 'সর্বমোট:'}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.admission)}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.session)}</td>
+                            {grandTotals.months.map((val, j) => <td key={j} className="border-2 border-black text-center text-black text-[9px]">{fmt(Math.round(val))}</td>)}
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.exam)}</td>
+                            <td className="border-2 border-black text-center text-black">{fmt(grandTotals.other)}</td>
+                            <td className="text-right pr-2 text-[14px] bg-emerald-950 text-white border-2 border-black">{fmt(grandTotals.total)} ৳</td>
                         </tr>
                     </tfoot>
                 </table>
-                <footer className="mt-12 flex justify-between px-10">
+                <footer className="mt-12 flex justify-between px-10 w-full">
                     <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[12px]">{isEn ? 'Accountant' : 'হিসাবরক্ষক'}</div>
                     <div className="text-center w-40 border-t-2 border-black pt-1 font-black text-[12px]">{isEn ? 'Headmaster' : 'প্রধান শিক্ষক'}</div>
                 </footer>
