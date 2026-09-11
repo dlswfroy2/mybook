@@ -882,7 +882,7 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
             studentsInYear.forEach(s => {
                 let effectiveTuition = s.monthlyFee || 0;
                 if (s.feeCategory === 'full-free') effectiveTuition = 0;
-                else if (s.feeCategory === 'half-free') effectiveTuition = Math.floor(effectiveTuition / 2);
+                else if (s.feeCategory === 'half-free') effectiveMonthlyFee = Math.floor(effectiveTuition / 2);
                 potential += effectiveTuition;
                 if (idx === 0) potential += (s.admissionFee || 0) + (s.sessionFee || 0) + (s.otherFee || 0);
                 if (idx === 5) potential += (s.examFeeHalfYearly || 0);
@@ -1466,7 +1466,7 @@ function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allS
                 const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === cls).sort((a, b) => (Number(a.roll) || 0) - (Number(b.roll) || 0));
                 if (classStudents.length === 0) return null;
                 return (
-                    <div key={cls} className="mb-10 break-after-page p-10">
+                    <div key={cls} className="mb-10 break-after-page">
                         <header className="flex items-center gap-6 border-b-4 border-emerald-800 pb-4 mb-6">
                             {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={60} height={60} className="object-contain" />}
                             <div className="text-center flex-grow">
@@ -1482,7 +1482,7 @@ function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allS
                             <thead>
                                 <tr className="bg-slate-100">
                                     <th className="w-14 text-center font-black">রোল</th>
-                                    <th className="font-black text-left pl-3">শিক্ষার্থীর নাম</th>
+                                    <th className="font-black text-left pl-3 min-w-[200px]">শিক্ষার্থীর নাম</th>
                                     <th className="w-20 text-center font-black">বেতন</th>
                                     <th className="w-20 text-center font-black">অর্ধ-বার্ষিক</th>
                                     <th className="w-20 text-center font-black">বার্ষিক ফি</th>
@@ -1495,7 +1495,7 @@ function PrintableFeeSetupArea({ allStudents, selectedYear, schoolInfo }: { allS
                                 {classStudents.map(student => (
                                     <tr key={student.id} className="h-10">
                                         <td className="text-center font-black">{toBengaliNumber(student.roll)}</td>
-                                        <td className="font-bold px-3">{student.studentNameBn}</td>
+                                        <td className="font-bold px-3 whitespace-nowrap">{student.studentNameBn}</td>
                                         <td className="text-center">{toBengaliNumber(student.monthlyFee || 0)}</td>
                                         <td className="text-center">{toBengaliNumber(student.examFeeHalfYearly || 0)}</td>
                                         <td className="text-center">{toBengaliNumber(student.examFeeAnnual || 0)}</td>
@@ -1543,7 +1543,7 @@ function PrintablePotentialAnnualReport({ allStudents, selectedYear, schoolInfo,
 
     return (
         <div className="printable-area bg-white text-black font-kalpurush p-2 w-full">
-            <style jsx global>{`@media print { @page { size: A4 landscape; margin: 0.4in !important; } .printable-area { width: 100% !important; padding: 0 !important; } .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } .printable-area th, .printable-area td { border: 1px solid black !important; padding: 2px !important; } }`}</style>
+            <style jsx global>{`@media print { @page { size: A4 landscape; margin: 0.5in !important; } .printable-area { width: 100% !important; padding: 0 !important; } .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } .printable-area th, .printable-area td { border: 1px solid black !important; padding: 2px !important; } }`}</style>
             <div className="mb-20 break-after-page min-h-screen w-full">
                 <header className="flex items-center justify-between border-b-4 border-[#2d572c] pb-2 mb-4">
                     {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={50} height={50} className="object-contain" />}
@@ -1632,7 +1632,7 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
 
     return (
         <div className="printable-area bg-white text-black font-kalpurush p-2 w-full box-border">
-             <style jsx global>{`@media print { @page { size: A4 landscape; margin: 0.4in !important; } .printable-area { width: 100% !important; padding: 0 !important; } .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } .printable-area th, .printable-area td { border: 1px solid black !important; padding: 2px !important; } }`}</style>
+             <style jsx global>{`@media print { @page { size: A4 landscape; margin: 0.5in !important; } .printable-area { width: 100% !important; padding: 0 !important; } .printable-area table { border-collapse: collapse !important; border: 2px solid black !important; width: 100% !important; table-layout: auto !important; } .printable-area th, .printable-area td { border: 1px solid black !important; padding: 2px !important; } }`}</style>
             <div className="mb-20 break-after-page min-h-screen w-full">
                 <header className="flex items-center justify-between border-b-4 border-emerald-800 pb-2 mb-4">
                     {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={50} height={50} className="object-contain" />}
