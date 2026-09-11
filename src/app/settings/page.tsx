@@ -334,7 +334,7 @@ function SettingsContent() {
   };
 
   const handleUpdateSoftware = async () => {
-    if (!isAdmin || !db) return;
+    if (!isAdmin || !db || !softwareDocRef) return;
     setSavingSoftware(true);
     const data = { appName: appName || '', appLogoUrl: appLogoUrl || '' };
     try {

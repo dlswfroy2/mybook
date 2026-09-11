@@ -343,13 +343,13 @@ function MyLibraryContent() {
         const url = (i.pdfUrl || '').toLowerCase();
         const fName = (i.fileName || '').toLowerCase();
         const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
-        const ft = isWord ? 'WORD' : 'PDF';
+        const ft: 'WORD' | 'PDF' = isWord ? 'WORD' : 'PDF';
         return { 
           ...i, 
           source: 'pdf-sheets' as const, 
           displayTitle: `${i.chapterName} - ${i.subject}`,
           saveName: i.fileName || '-',
-          fileType: ft as const
+          fileType: ft
         };
       }),
       ...currentItemsRaw.questions.map(i => ({ 
