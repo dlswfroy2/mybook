@@ -52,7 +52,7 @@ const numberToBengaliWords = (n: number): string => {
     }
     if (n >= 100) {
         const hundreds = Math.floor(n / 100);
-        res += (hundreds > 1 ? words[hundreds] : '') + ' শত ';
+        res += words[hundreds] + 'শত ';
         n %= 100;
     }
     if (n > 0) {
@@ -265,10 +265,6 @@ ${isEn ? 'Date:' : 'তারিখ:'} ${format(collection.collectionDate, 'dd/M
                             <div className="text-center min-w-[90px]">
                                 <div className="h-6"></div>
                                 <div className="w-24 border-t border-black pt-0.5 font-black text-[10px] text-emerald-950">{isEn ? "Headmaster's Signature" : 'প্রধান শিক্ষকের স্বাক্ষর'}</div>
-                            </div>
-                            <div className="text-center min-w-[90px]">
-                                <div className="h-6"></div>
-                                <div className="w-24 border-t border-black pt-0.5 font-black text-[10px] text-emerald-950">{isEn ? "Guardian's Signature" : 'অভিভাবকের স্বাক্ষর'}</div>
                             </div>
                         </div>
                         <div className="p-1 border border-emerald-900 bg-white rounded-md shadow-sm shrink-0">
