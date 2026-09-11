@@ -510,18 +510,18 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="table-container !max-h-[600px] !border-0 !rounded-none overflow-y-auto scrollbar-thin">
-                        <Table>
-                            <TableHeader className="bg-slate-50 sticky top-0 z-30">
+                        <Table className="w-full border-collapse">
+                            <TableHeader className="bg-slate-50 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="border-b-2 border-black">
-                                    <TableHead className="w-16 text-center font-black border-r text-black">রোল</TableHead>
-                                    <TableHead className="min-w-[150px] font-black border-r text-black">নাম ও সেটিংস</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">বেতন</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">অর্ধ-বার্ষিক</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">বার্ষিক ফি</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">সেশন ফি</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">ভর্তি ফি</TableHead>
-                                    <TableHead className="w-24 text-center font-black border-r text-black">অন্যান্য</TableHead>
-                                    <TableHead className="w-32 text-center font-black border-r text-black">ক্যাটাগরি</TableHead>
+                                    <TableHead className="w-16 text-center font-black border-r border-slate-300 text-black">রোল</TableHead>
+                                    <TableHead className="min-w-[150px] font-black border-r border-slate-300 text-black">নাম ও সেটিংস</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">বেতন</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">অর্ধ-বার্ষিক</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">বার্ষিক ফি</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">সেশন ফি</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">ভর্তি ফি</TableHead>
+                                    <TableHead className="w-24 text-center font-black border-r border-slate-300 text-black">অন্যান্য</TableHead>
+                                    <TableHead className="w-32 text-center font-black border-r border-slate-300 text-black">ক্যাটাগরি</TableHead>
                                     <TableHead className="w-20 text-center font-black text-black">উপবৃত্তি</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -533,23 +533,23 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                                     const getVal = (field: keyof Student): number => (changes[field] !== undefined ? (changes[field] as number) : ((student[field] as number) || 0));
 
                                     return (
-                                        <TableRow key={student.id} className={cn("hover:bg-primary/5 transition-colors", Object.keys(changes).length > 0 && "bg-amber-50")}>
-                                            <TableCell className="text-center font-black border-r">{toBengaliNumber(student.roll)}</TableCell>
-                                            <TableCell className="font-bold border-r text-slate-800 text-xs">
+                                        <TableRow key={student.id} className={cn("hover:bg-primary/5 transition-colors border-b border-slate-200", Object.keys(changes).length > 0 && "bg-amber-50")}>
+                                            <TableCell className="text-center font-black border-r border-slate-300">{toBengaliNumber(student.roll)}</TableCell>
+                                            <TableCell className="font-bold border-r border-slate-300 text-slate-800 text-xs">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="truncate">{student.studentNameBn}</span>
                                                     <Button variant="ghost" size="icon" className="h-6 w-6 text-primary hover:bg-primary/10 no-print" onClick={() => setConfigFreeStudent(student)} title="ফ্রি সেটিংস"><Gift className="h-3.5 w-3.5" /></Button>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('monthlyFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'monthlyFee', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('examFeeHalfYearly') ?? ''} onChange={e => handleIndividualChange(student.id, 'examFeeHalfYearly', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('examFeeAnnual') ?? ''} onChange={e => handleIndividualChange(student.id, 'examFeeAnnual', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('sessionFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'sessionFee', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('admissionFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'admissionFee', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r"><Input type="number" value={getVal('otherFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'otherFee', parseInt(e.target.value) || 0)} className="h-8 text-center font-black text-blue-900 border-none bg-transparent" /></TableCell>
-                                            <TableCell className="p-1 border-r">
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('monthlyFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'monthlyFee', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('examFeeHalfYearly') ?? ''} onChange={e => handleIndividualChange(student.id, 'examFeeHalfYearly', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('examFeeAnnual') ?? ''} onChange={e => handleIndividualChange(student.id, 'examFeeAnnual', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('sessionFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'sessionFee', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('admissionFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'admissionFee', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300"><Input type="number" value={getVal('otherFee') ?? ''} onChange={e => handleIndividualChange(student.id, 'otherFee', parseInt(e.target.value) || 0)} className="h-8 w-full text-center font-black text-blue-900 border-none bg-transparent shadow-none focus-visible:ring-0" /></TableCell>
+                                            <TableCell className="p-1 border-r border-slate-300">
                                                 <Select value={changes.feeCategory !== undefined ? changes.feeCategory : (student.feeCategory || 'general')} onValueChange={v => handleIndividualChange(student.id, 'feeCategory', v)}>
-                                                    <SelectTrigger className="h-8 text-[10px] font-bold border-none bg-transparent"><SelectValue /></SelectTrigger>
+                                                    <SelectTrigger className="h-8 text-[10px] font-bold border-none bg-transparent shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
                                                     <SelectContent><SelectItem value="general">সাধারণ</SelectItem><SelectItem value="half-free">হাফ-ফ্রি</SelectItem><SelectItem value="full-free">ফুল-ফ্রি</SelectItem></SelectContent>
                                                 </Select>
                                             </TableCell>
