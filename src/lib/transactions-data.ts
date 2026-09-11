@@ -44,11 +44,28 @@ const TRANSACTIONS_COLLECTION = 'transactions';
 
 export const transactionFromDoc = (doc: DocumentData): Transaction => {
     const data = doc.data();
+    let txDate: Date;
+    try {
+        if (data.date && typeof data.date.toDate === 'function') {
+            txDate = data.date.toDate();
+        } else if (data.date instanceof Date) {
+            txDate = data.date;
+        } else if (data.date) {
+            txDate = new Date(data.date);
+        } else {
+            txDate = new Date();
+        }
+        if (isNaN(txDate.getTime())) {
+            txDate = new Date();
+        }
+    } catch {
+        txDate = new Date();
+    }
     return {
         id: doc.id,
         ...data,
         method: data.method || 'cash',
-        date: data.date.toDate(),
+        date: txDate,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
     } as Transaction;

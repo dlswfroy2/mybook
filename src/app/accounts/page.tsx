@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Transaction, NewTransactionData, addTransaction, getTransactions, deleteTransaction, TransactionType, PaymentMethod } from '@/lib/transactions-data';
+import { Transaction, NewTransactionData, addTransaction, getTransactions, deleteTransaction, TransactionType, PaymentMethod, transactionFromDoc } from '@/lib/transactions-data';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { StudentFeeDialog } from '@/components/StudentFeeDialog';
@@ -1165,92 +1165,186 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
 
 function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transaction[], selectedYear: string }) {
     const { schoolInfo } = useSchoolInfo(); 
+    const { availableYears } = useAcademicYear();
+    const [reportYear, setReportYear] = useState<string>(selectedYear);
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+
+    useEffect(() => {
+        if (selectedYear) {
+            setReportYear(selectedYear);
+        }
+    }, [selectedYear]);
     
     const reportData = useMemo(() => {
-        const monthIndex = parseInt(selectedMonth); 
-        const reportYear = parseInt(selectedYear); 
-        const firstDayOfMonth = new Date(reportYear, monthIndex, 1); 
-        const lastDayOfMonth = new Date(reportYear, monthIndex + 1, 0);
+        const monthIndex = parseInt(selectedMonth, 10); 
+        const numericYear = parseInt(String(reportYear).replace(/[০-৯]/g, d => "০১২৩৪৫৬৭৮৯".indexOf(d).toString()), 10) || new Date().getFullYear();
         
         let openingCash = 0; 
         let openingBank = 0; 
         const incomeHeads: Record<string, number> = {}; 
         const expenseHeads: Record<string, number> = {};
         
+        const isCashToBank = (head: string) => 
+            head === 'Cash to Bank' || head === 'ব্যাংকে জমা (Cash to Bank)' || head.includes('Cash to Bank') || (head.includes('ব্যাংক') && head.includes('জমা'));
+        const isBankToCash = (head: string) => 
+            head === 'Bank to Cash' || head === 'ব্যাংক থেকে উত্তোলন (Bank to Cash)' || head.includes('Bank to Cash') || (head.includes('ব্যাংক') && head.includes('উত্তোলন'));
+
         transactions.forEach(t => { 
-            const tDate = new Date(t.date); 
+            const tDate = t.date instanceof Date ? t.date : (t.date ? new Date(t.date) : null);
+            if (!tDate || isNaN(tDate.getTime())) return;
             const amount = Number(t.amount) || 0; 
             const method = t.method || 'cash';
-            
-            if (isBefore(tDate, firstDayOfMonth)) { 
-                if (t.accountHead === 'ব্যাংকে জমা (Cash to Bank)') { 
-                    openingCash -= amount; openingBank += amount; 
-                } else if (t.accountHead === 'ব্যাংক থেকে উত্তোলন (Bank to Cash)') { 
-                    openingCash += amount; openingBank -= amount; 
+            const head = t.accountHead || 'অন্যান্য';
+
+            const txYear = tDate.getFullYear();
+            const txMonth = tDate.getMonth();
+
+            const isPrior = txYear < numericYear || (txYear === numericYear && txMonth < monthIndex);
+            const isCurrentMonth = txYear === numericYear && txMonth === monthIndex;
+
+            if (isPrior) { 
+                if (isCashToBank(head)) { 
+                    openingCash -= amount; 
+                    openingBank += amount; 
+                } else if (isBankToCash(head)) { 
+                    openingCash += amount; 
+                    openingBank -= amount; 
                 } else if (t.type === 'income') { 
-                    if (method === 'cash') openingCash += amount; else openingBank += amount; 
+                    if (method === 'cash') openingCash += amount; 
+                    else openingBank += amount; 
                 } else { 
-                    if (method === 'cash') openingCash -= amount; else openingBank -= amount; 
+                    if (method === 'cash') openingCash -= amount; 
+                    else openingBank -= amount; 
                 } 
-            } else if (tDate >= firstDayOfMonth && tDate <= lastDayOfMonth) { 
-                if (t.accountHead.includes('উত্তোলন') || t.accountHead.includes('জমা')) return; 
-                if (t.type === 'income') incomeHeads[t.accountHead] = (incomeHeads[t.accountHead] || 0) + amount; 
-                else expenseHeads[t.accountHead] = (expenseHeads[t.accountHead] || 0) + amount; 
+            } else if (isCurrentMonth) { 
+                if (isCashToBank(head) || isBankToCash(head)) {
+                    return; 
+                }
+                if (t.type === 'income') {
+                    incomeHeads[head] = (incomeHeads[head] || 0) + amount; 
+                } else {
+                    expenseHeads[head] = (expenseHeads[head] || 0) + amount; 
+                }
             } 
         });
 
         const totalIncome = Object.values(incomeHeads).reduce((a, b) => a + b, 0); 
         const totalExpense = Object.values(expenseHeads).reduce((a, b) => a + b, 0); 
+        
         let closingCash = openingCash; 
         let closingBank = openingBank;
 
-        transactions.filter(t => new Date(t.date) >= firstDayOfMonth && new Date(t.date) <= lastDayOfMonth).forEach(t => { 
-            const amount = Number(t.amount) || 0; 
-            const method = t.method || 'cash'; 
-            if (t.accountHead === 'ব্যাংকে জমা (Cash to Bank)') { closingCash -= amount; closingBank += amount; } 
-            else if (t.accountHead === 'ব্যাংক থেকে উত্তোলন (Bank to Cash)') { closingCash += amount; closingBank -= amount; } 
-            else if (t.type === 'income') { if (method === 'cash') closingCash += amount; else closingBank += amount; } 
-            else { if (method === 'cash') closingCash -= amount; else closingBank -= amount; } 
+        transactions.forEach(t => {
+            const tDate = t.date instanceof Date ? t.date : (t.date ? new Date(t.date) : null);
+            if (!tDate || isNaN(tDate.getTime())) return;
+            const txYear = tDate.getFullYear();
+            const txMonth = tDate.getMonth();
+
+            if (txYear === numericYear && txMonth === monthIndex) {
+                const amount = Number(t.amount) || 0; 
+                const method = t.method || 'cash'; 
+                const head = t.accountHead || 'অন্যান্য';
+
+                if (isCashToBank(head)) { 
+                    closingCash -= amount; 
+                    closingBank += amount; 
+                } else if (isBankToCash(head)) { 
+                    closingCash += amount; 
+                    closingBank -= amount; 
+                } else if (t.type === 'income') { 
+                    if (method === 'cash') closingCash += amount; 
+                    else closingBank += amount; 
+                } else { 
+                    if (method === 'cash') closingCash -= amount; 
+                    else closingBank -= amount; 
+                } 
+            }
         });
 
         return { openingCash, openingBank, incomeHeads, expenseHeads, totalIncome, totalExpense, closingCash, closingBank };
-    }, [transactions, selectedMonth, selectedYear]);
+    }, [transactions, selectedMonth, reportYear]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <style jsx global>{`
                 @media print {
-                    @page { size: A4 portrait; margin: 0.5in !important; }
-                    .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; }
+                    @page {
+                        size: A4 portrait;
+                        margin: 0.5in !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #fff !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    body * {
+                        visibility: hidden;
+                    }
+                    #monthly-report-printable, #monthly-report-printable * {
+                        visibility: visible;
+                    }
+                    #monthly-report-printable {
+                        position: fixed !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        border-radius: 0 !important;
+                        background: #fff !important;
+                    }
+                    .report-print-grid {
+                        display: grid !important;
+                        grid-template-columns: 1fr 1fr !important;
+                        gap: 1.5rem !important;
+                    }
                 }
             `}</style>
             <div className="flex flex-col sm:flex-row justify-between items-end gap-4 no-print bg-white p-5 rounded-2xl border-2 border-indigo-100 shadow-sm">
-                <div className="space-y-2 flex-1 w-full">
-                    <Label className="font-black text-primary uppercase text-[10px] ml-1">মাস নির্বাচন করুন:</Label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                        <SelectTrigger className="h-11 font-black border-2 border-black/10 bg-slate-50 text-lg"><SelectValue /></SelectTrigger>
-                        <SelectContent className="font-kalpurush border-2 border-black">
-                            {BENGALI_MONTHS.map((m, i) => <SelectItem key={m} value={i.toString()} className="font-bold">{m}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
+                    <div className="space-y-2">
+                        <Label className="font-black text-primary uppercase text-[10px] ml-1">মাস নির্বাচন করুন:</Label>
+                        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                            <SelectTrigger className="h-11 font-black border-2 border-black/10 bg-slate-50 text-lg"><SelectValue /></SelectTrigger>
+                            <SelectContent className="font-kalpurush border-2 border-black">
+                                {BENGALI_MONTHS.map((m, i) => <SelectItem key={m} value={i.toString()} className="font-bold">{m}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="font-black text-primary uppercase text-[10px] ml-1">বছর নির্বাচন করুন:</Label>
+                        <Select value={reportYear} onValueChange={setReportYear}>
+                            <SelectTrigger className="h-11 font-black border-2 border-black/10 bg-slate-50 text-lg"><SelectValue /></SelectTrigger>
+                            <SelectContent className="font-kalpurush border-2 border-black">
+                                {(availableYears && availableYears.length > 0 ? availableYears : [reportYear, '2026', '2025', '2024']).map(y => (
+                                    <SelectItem key={y} value={y} className="font-bold">{toBengaliNumber(y)}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-                <Button onClick={() => window.print()} className="font-black px-12 h-11 shadow-2xl border-2 border-black bg-indigo-600 hover:bg-indigo-700 text-white text-lg uppercase tracking-wider">
+                <Button onClick={() => window.print()} className="font-black px-12 h-11 shadow-2xl border-2 border-black bg-indigo-600 hover:bg-indigo-700 text-white text-lg uppercase tracking-wider shrink-0">
                     <Printer className="mr-2 h-5 w-5" /> রিপোর্ট প্রিন্ট করুন
                 </Button>
             </div>
 
-            <div className="printable-area bg-white text-black p-10 font-kalpurush border-[3px] border-black shadow-2xl rounded-3xl overflow-hidden">
+            <div id="monthly-report-printable" className="printable-area bg-white text-black p-10 font-kalpurush border-[3px] border-black shadow-2xl rounded-3xl overflow-hidden">
                 <div className="text-center mb-8 border-b-4 border-emerald-800 pb-6">
                     <h1 className="text-4xl font-black text-emerald-950 mb-1">{schoolInfo.name}</h1>
                     <p className="font-bold text-slate-700 text-lg">{schoolInfo.address}</p>
                     <div className="mt-4 inline-block bg-emerald-50 px-10 py-1.5 rounded-full border-2 border-emerald-800">
                         <h2 className="text-2xl font-black uppercase tracking-widest">
-                            মাসিক আয়-ব্যয় বিবরণী - {BENGALI_MONTHS[parseInt(selectedMonth)]} {toBengaliNumber(selectedYear)}
+                            মাসিক আয়-ব্যয় বিবরণী - {BENGALI_MONTHS[parseInt(selectedMonth)]} {toBengaliNumber(reportYear)}
                         </h2>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 report-print-grid">
                     <div className="space-y-6">
                         <h3 className="text-2xl font-black border-b-2 border-emerald-700 pb-2 text-emerald-800 flex items-center gap-2"><div className="h-6 w-1.5 bg-emerald-600 rounded-full" /> আয় (Incomes)</h3>
                         <Table className="border-2 border-black overflow-hidden rounded-lg">
@@ -1271,6 +1365,11 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                                         <TableCell className="text-right font-black">{toBengaliNumber(amount)}</TableCell>
                                     </TableRow>
                                 ))}
+                                {Object.entries(reportData.incomeHeads).length === 0 && (
+                                    <TableRow className="h-10 border-b text-slate-400 italic">
+                                        <TableCell colSpan={2} className="text-center">এই মাসে কোনো আয়ের লেনদেন নেই</TableCell>
+                                    </TableRow>
+                                )}
                                 <TableRow className="bg-emerald-100 font-black text-emerald-950 border-t-2 border-black h-12">
                                     <TableCell className="text-lg">সর্বমোট আয় (জের সহ)</TableCell>
                                     <TableCell className="text-right text-xl">{toBengaliNumber(reportData.openingCash + reportData.openingBank + reportData.totalIncome)} ৳</TableCell>
@@ -1294,6 +1393,11 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                                         <TableCell className="text-right font-black">{toBengaliNumber(amount)}</TableCell>
                                     </TableRow>
                                 ))}
+                                {Object.entries(reportData.expenseHeads).length === 0 && (
+                                    <TableRow className="h-10 border-b text-slate-400 italic">
+                                        <TableCell colSpan={2} className="text-center">এই মাসে কোনো ব্যয়ের লেনদেন নেই</TableCell>
+                                    </TableRow>
+                                )}
                                 <TableRow className="bg-rose-100 font-black text-rose-950 border-t-2 border-black h-12">
                                     <TableCell className="text-lg">সর্বমোট ব্যয়</TableCell>
                                     <TableCell className="text-right text-xl">{toBengaliNumber(reportData.totalExpense)} ৳</TableCell>
@@ -1310,7 +1414,7 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                         </Table>
                     </div>
                 </div>
-                <div className="mt-20 flex justify-between px-10">
+                <div className="mt-20 print:mt-16 flex justify-between px-10 print:px-4">
                     <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">ক্যাশিয়ার / হিসাবরক্ষক</div>
                     <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">অডিটর / কমিটির স্বাক্ষর</div>
                     <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">প্রধান শিক্ষকের স্বাক্ষর</div>
@@ -1381,7 +1485,26 @@ export default function AccountsPage() {
     }
     setIsLoadingStudents(false); 
   }); return unsubscribe; }, [db, user?.uid, selectedYear]);
-  useEffect(() => { setIsClient(true); fetchTransactions(); const unsub = fetchStudents(); return () => unsub?.(); }, [fetchTransactions, fetchStudents]);
+  useEffect(() => { 
+    setIsClient(true); 
+    if (!db || !user?.uid) return;
+    setIsLoading(true);
+    const qTx = query(collection(db, 'transactions'), where('academicYear', '==', selectedYear));
+    const unsubTx = onSnapshot(qTx, (snap) => {
+        setTransactions(snap.docs.map(transactionFromDoc));
+        setIsLoading(false);
+    }, (error) => {
+        if (error.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'transactions', operation: 'list' }));
+        }
+        setIsLoading(false);
+    });
+    const unsubStudents = fetchStudents(); 
+    return () => {
+        unsubTx();
+        unsubStudents?.();
+    }; 
+  }, [db, user?.uid, selectedYear, fetchStudents]);
   
   const sidebarItems = useMemo(() => { 
       const items = [{ id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard, color: 'text-indigo-600 bg-indigo-50' }]; 
