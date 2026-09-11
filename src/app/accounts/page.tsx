@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import Image from 'next/image';
@@ -776,18 +775,15 @@ function FeeCollectionTab({ studentsForYear, isLoading, onFeeCollected }: { stud
     )
 }
 
-function CollectionReportTab({ allStudents, onDeleteSuccess }: { allStudents: Student[], onDeleteSuccess: () => void }) {
+function CollectionReportTab({ allStudents, onDeleteSuccess, onPrintReceipt }: { allStudents: Student[], onDeleteSuccess: () => void, onPrintReceipt: (c: FeeCollection, s: Student) => void }) {
     const db = useFirestore();
     const { user, hasPermission } = useAuth();
     const { selectedYear } = useAcademicYear();
-    const { schoolInfo } = useSchoolInfo();
     const { toast } = useToast();
     const [notices, setNotices] = useState<FeeCollection[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
     const [collectorFilter, setCollectorFilter] = useState<string>('all');
-    const [printingCollection, setPrintingCollection] = useState<FeeCollection | null>(null);
-    const [printingStudent, setPrintingStudent] = useState<Student | null>(null);
 
     const canDelete = hasPermission('special:delete-transaction') || user?.role === 'admin';
 
@@ -808,7 +804,7 @@ function CollectionReportTab({ allStudents, onDeleteSuccess }: { allStudents: St
     const uniqueCollectors = useMemo(() => { const collectors = new Set<string>(); notices.forEach(c => { if (c.collectorName) collectors.add(c.collectorName); }); return Array.from(collectors).sort(); }, [notices]);
     const filteredCollections = useMemo(() => notices.filter(c => { const matchesCollector = collectorFilter === 'all' || c.collectorName === collectorFilter; const matchesDate = !dateFilter || format(c.collectionDate, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd'); return matchesCollector && matchesDate; }), [notices, collectorFilter, dateFilter]);
 
-    const handlePrintReceipt = (collection: FeeCollection) => { const student = studentMap.get(collection.studentId); if (!student) return; setPrintingCollection(collection); setPrintingStudent(student); setTimeout(() => { window.print(); setPrintingCollection(null); setPrintingStudent(null); }, 300); };
+    const handlePrintRequest = (collection: FeeCollection) => { const student = studentMap.get(collection.studentId); if (!student) return; onPrintReceipt(collection, student); };
 
     const handleDeleteCollection = async (collectionData: FeeCollection) => {
         if (!db || !canDelete) return;
@@ -829,8 +825,7 @@ function CollectionReportTab({ allStudents, onDeleteSuccess }: { allStudents: St
             <div className="flex flex-col md:flex-row gap-4 bg-muted/30 p-4 rounded-xl shadow-sm border-2 no-print"><div className="space-y-2 flex-1"><Label className="text-xs font-black uppercase text-primary">তারিখ দিয়ে ফিল্টার</Label><DatePicker value={dateFilter} onChange={setDateFilter} placeholder="তারিখ নির্বাচন করুন" /></div><div className="space-y-2 flex-1"><Label className="font-black text-xs uppercase text-primary">আদায়কারী</Label><Select value={collectorFilter} onValueChange={setCollectorFilter}><SelectTrigger className="bg-white h-10 border-2 font-bold"><SelectValue placeholder="সকল আদায়কারী" /></SelectTrigger><SelectContent><SelectItem value="all">সকল আদায়কারী</SelectItem>{uniqueCollectors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div></div>
             <Card className="border-none shadow-none no-print"><CardHeader className="px-0 pt-0"><CardTitle className="text-xl font-black flex items-center gap-2 text-slate-800"><ListChecks className="h-6 w-6 text-primary" /> আদায় রিপোর্ট ও ইতিহাস</CardTitle></CardHeader><CardContent className="px-0 pt-2"><div className="table-container shadow-xl border-2"><Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm"><TableRow><TableHead className="font-black">তারিখ</TableHead><TableHead className="text-center w-20 font-black">রোল</TableHead><TableHead className="font-black">নাম</TableHead><TableHead className="font-black">শ্রেণি</TableHead><TableHead className="text-right font-black">মোট আদায়</TableHead><TableHead className="text-center font-black">রসিদ</TableHead><TableHead className="font-black">আদায়কারী</TableHead><TableHead className="text-right no-print pr-6 font-black">একশন</TableHead></TableRow></TableHeader>
-                            <TableBody>{isLoading ? (<TableRow><TableCell colSpan={8} className="text-center py-20 italic"><span>লোড হচ্ছে...</span></TableCell></TableRow>) : filteredCollections.length === 0 ? (<TableRow><TableCell colSpan={8} className="text-center py-20 italic font-bold text-muted-foreground">কোনো রেকর্ড পাওয়া যায়নি।</TableCell></TableRow>) : (filteredCollections.map(c => { const student = studentMap.get(c.studentId); return (<TableRow key={c.id} className="hover:bg-accent/5 h-14 transition-colors"><TableCell className="whitespace-nowrap font-bold text-slate-600">{format(c.collectionDate, 'PP', { locale: bn })}</TableCell><TableCell className="font-black text-center text-lg">{toBengaliNumber(student?.roll || '')}</TableCell><TableCell className="whitespace-nowrap font-black text-primary">{student?.studentNameBn || '-'}</TableCell><TableCell className="whitespace-nowrap font-bold text-slate-600">{student ? (classNamesMap[student.className] || student.className) : '-'}</TableCell><TableCell className="text-right font-black text-emerald-700 text-lg">{toBengaliNumber(c.totalAmount ?? 0)} ৳</TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-primary hover:bg-primary/5" onClick={() => handlePrintReceipt(c)}><Printer className="h-5 w-5" /></Button></TableCell><TableCell className="whitespace-nowrap text-xs font-bold text-slate-600">{c.collectorName || '-'}</TableCell><TableCell className="text-right no-print pr-6">{canDelete && (<AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent className="font-kalpurush"><AlertDialogHeader><AlertDialogTitle>রেকর্ডটি মুছতে চান?</AlertDialogTitle><AlertDialogDescription className="font-bold">আদায়ের এই রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="font-bold">না, বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCollection(c)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-black">হ্যাঁ, মুছুন</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>)}</TableCell></TableRow>); }))}</TableBody></Table></div></CardContent></Card>
-            {printingCollection && printingStudent && (<div className="hidden print:block printable-area bg-white"><div className="flex flex-col"><MoneyReceipt collection={printingCollection} student={printingStudent} schoolInfo={schoolInfo} /></div></div>)}
+                            <TableBody>{isLoading ? (<TableRow><TableCell colSpan={8} className="text-center py-20 italic"><span>লোড হচ্ছে...</span></TableCell></TableRow>) : filteredCollections.length === 0 ? (<TableRow><TableCell colSpan={8} className="text-center py-20 italic font-bold text-muted-foreground">কোনো রেকর্ড পাওয়া যায়নি।</TableCell></TableRow>) : (filteredCollections.map(c => { const student = studentMap.get(c.studentId); return (<TableRow key={c.id} className="hover:bg-accent/5 h-14 transition-colors"><TableCell className="whitespace-nowrap font-bold text-slate-600">{format(c.collectionDate, 'PP', { locale: bn })}</TableCell><TableCell className="font-black text-center text-lg">{toBengaliNumber(student?.roll || '')}</TableCell><TableCell className="whitespace-nowrap font-black text-primary">{student?.studentNameBn || '-'}</TableCell><TableCell className="whitespace-nowrap font-bold text-slate-600">{student ? (classNamesMap[student.className] || student.className) : '-'}</TableCell><TableCell className="text-right font-black text-emerald-700 text-lg">{toBengaliNumber(c.totalAmount ?? 0)} ৳</TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-primary hover:bg-primary/5" onClick={() => handlePrintRequest(c)}><Printer className="h-5 w-5" /></Button></TableCell><TableCell className="whitespace-nowrap text-xs font-bold text-slate-600">{c.collectorName || '-'}</TableCell><TableCell className="text-right no-print pr-6">{canDelete && (<AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 className="h-5 w-5" /></Button></AlertDialogTrigger><AlertDialogContent className="font-kalpurush"><AlertDialogHeader><AlertDialogTitle>রেকর্ডটি মুছতে চান?</AlertDialogTitle><AlertDialogDescription className="font-bold">আদায়ের এই রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="font-bold">না, বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCollection(c)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-black">হ্যাঁ, মুছুন</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>)}</TableCell></TableRow>); }))}</TableBody></Table></div></CardContent></Card>
         </div>
     );
 }
@@ -1148,7 +1143,7 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                                         <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
                                         {row.months.map((val: number, j: number) => (
-                                            <TableCell key={j} className="border-r border-slate-200 text-center text-[11px] font-bold text-slate-600">{val > 0 ? toBengaliNumber(Math.round(val)) : '-'}</TableCell>
+                                            <TableCell key={j} className="border-r border-black text-center text-[11px] font-bold text-slate-600">{val > 0 ? toBengaliNumber(Math.round(val)) : '-'}</TableCell>
                                         ))}
                                         <TableCell className="border-l-2 border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
@@ -1382,6 +1377,10 @@ export default function AccountsPage() {
   const [potentialPrintParams, setPotentialPrintParams] = useState<{ cls: string } | null>(null);
   const [annualReportPrintData, setAnnualReportPrintData] = useState<any[]>([]);
   
+  // States for individual collection printing
+  const [printingCollection, setPrintingCollection] = useState<FeeCollection | null>(null);
+  const [printingStudent, setPrintingStudent] = useState<Student | null>(null);
+
   const fetchTransactions = useCallback(async () => { if (!db || !user?.uid) return; setIsLoading(true); const fetched = await getTransactions(db, selectedYear); setTransactions(fetched); setIsLoading(false); }, [db, user?.uid, selectedYear]);
   const fetchStudents = useCallback(() => { if (!db || !user?.uid) return; setIsLoadingStudents(true); const q = query(collection(db, 'students'), where('academicYear', '==', selectedYear)); const unsubscribe = onSnapshot(q, (snap) => { setAllStudents(snap.docs.map(studentFromDoc)); setIsLoadingStudents(false); }, (error) => { 
     if (error.code === 'permission-denied') {
@@ -1429,6 +1428,16 @@ export default function AccountsPage() {
       }, 500);
   };
 
+  const handleReceiptPrint = (c: FeeCollection, s: Student) => {
+    setPrintingCollection(c);
+    setPrintingStudent(s);
+    setTimeout(() => {
+        window.print();
+        setPrintingCollection(null);
+        setPrintingStudent(null);
+    }, 300);
+  };
+
   if (!isClient) return null;
 
   return (
@@ -1438,7 +1447,7 @@ export default function AccountsPage() {
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
             <aside className="w-full md:w-60 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start"><h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">হিসাব শাখা</h2><div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">{sidebarItems.map(item => (<button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2", activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30")}> <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}> <item.icon className="h-4 w-4" /> </div> <span className="text-sm font-black">{item.label}</span> {activeSection === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}</button>))}</div></aside>
             <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-              <div className="p-4 sm:p-6 lg:p-8 flex-1">{isLoadingStudents && allStudents.length === 0 ? <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div> : (<><div className="mb-6 border-b pb-4 flex justify-between items-center no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p></div></div>{activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}{activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}{activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}{activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}{activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} />}{activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}{activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}{activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}{activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}{activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}{activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}{activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}</>)}</div>
+              <div className="p-4 sm:p-6 lg:p-8 flex-1">{isLoadingStudents && allStudents.length === 0 ? <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div> : (<><div className="mb-6 border-b pb-4 flex justify-between items-center no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p></div></div>{activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}{activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}{activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}{activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}{activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} onPrintReceipt={handleReceiptPrint} />}{activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}{activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}{activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}{activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}{activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}{activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}{activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}</>)}</div>
             </div>
         </div>
       </main>
@@ -1447,6 +1456,13 @@ export default function AccountsPage() {
       {activePrintReport === 'fee-setup' && <PrintableFeeSetupArea allStudents={allStudents} selectedYear={selectedYear} schoolInfo={schoolInfo} />}
       {activePrintReport === 'annual-potential' && potentialPrintParams && <PrintablePotentialAnnualReport allStudents={allStudents} selectedYear={selectedYear} schoolInfo={schoolInfo} cls={potentialPrintParams.cls} />}
       {activePrintReport === 'annual-collection' && <PrintableClasswiseAnnualReport reportData={annualReportPrintData} selectedYear={selectedYear} schoolInfo={schoolInfo} />}
+      {printingCollection && printingStudent && (
+        <div className="hidden print:block printable-area bg-white">
+            <div className="flex flex-col">
+                <MoneyReceipt collection={printingCollection} student={printingStudent} schoolInfo={schoolInfo} />
+            </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1662,7 +1678,7 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
                         {reportData.map((row, i) => (
                             <TableRow key={i} className="h-[18px] border-b border-black">
                                 <TableCell className="border-r-black text-center font-black text-black p-0 w-8">{fmt(row.roll)}</TableCell>
-                                <TableCell className="border-r border-black font-bold whitespace-nowrap text-black text-left pl-2 p-0 w-28 border-r border-black">{row.name}</TableCell>
+                                <TableCell className="border-r-black font-bold whitespace-nowrap text-black text-left pl-2 p-0 w-28 border-r border-black">{row.name}</TableCell>
                                 <TableCell className="border-r border-black text-center text-black font-black p-0 w-12">{row.admission > 0 ? fmt(row.admission) : '-'}</TableCell>
                                 <TableCell className="border-r border-black text-center text-black font-black p-0 w-12">{row.session > 0 ? fmt(row.session) : '-'}</TableCell>
                                 {row.months.map((val: number, j: number) => (
@@ -1696,4 +1712,3 @@ function PrintableClasswiseAnnualReport({ reportData, selectedYear, schoolInfo }
 }
 
 type AccountsPrintType = 'fee-setup' | 'annual-potential' | 'annual-collection' | null;
-
