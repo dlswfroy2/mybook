@@ -159,6 +159,18 @@ ${isEn ? 'Date:' : 'তারিখ:'} ${format(collection.collectionDate, 'dd/M
 
     return (
         <div className="money-receipt font-kalpurush w-[148mm] h-[210mm] p-3.5 sm:p-4 bg-white text-black border-[8px] border-double border-emerald-900 relative overflow-hidden flex flex-col mx-auto my-1 shadow-none print:m-0 box-border">
+            <style jsx>{`
+                @media print {
+                    @page { size: A4 portrait; margin: 0.5in !important; }
+                    .money-receipt { 
+                        width: 100% !important; 
+                        height: auto !important; 
+                        margin: 0 !important;
+                        padding: 8mm !important;
+                        border-width: 6px !important;
+                    }
+                }
+            `}</style>
             {/* Background Watermark Pattern */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: 'radial-gradient(#064e3b 1px, transparent 1px)', backgroundSize: '12px 12px' }} />
             
