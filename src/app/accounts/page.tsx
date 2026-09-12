@@ -923,7 +923,7 @@ function FeeCollectionTab({ studentsForYear, isLoading, onFeeCollected }: { stud
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex flex-col sm:flex-row gap-4 p-4 border-2 border-primary/10 rounded-2xl bg-white/50 items-end shadow-sm"><div className="space-y-2 flex-1"><Label className="font-black text-primary">শ্রেণি নির্বাচন করুন</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-white h-11 border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div></div>
+            <div className="flex flex-col sm:flex-row gap-4 p-4 border-2 border-primary/10 rounded-2xl bg-white/50 items-end shadow-sm"><div className="space-y-2 flex-1"><Label className="font-black text-primary">শ্রেণি নির্বাচন করুন</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-white h-11 border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]}</SelectItem>)}</SelectContent></Select></div></div>
             <Card className="border-2 border-teal-100 shadow-xl rounded-2xl overflow-hidden">
                 <CardContent className="p-0">
                     <div className="table-container">
@@ -1124,7 +1124,7 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                             <Label className="font-black text-xs uppercase text-slate-700">শ্রেণি:</Label>
                             <Select value={previewClass} onValueChange={setPreviewClass}>
                                 <SelectTrigger className="w-40 bg-white border-2 border-black font-black h-10"><SelectValue /></SelectTrigger>
-                                <SelectContent className="font-kalpurush border-2 border-black">{['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c} className="font-bold">{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent>
+                                <SelectContent className="font-kalpurush border-2 border-black">{['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c} className="font-bold">{classNamesMap[c]}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                         <Button onClick={() => onPrintPotentialReport(previewClass)} className="font-black h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl border-2 border-black px-6 uppercase tracking-wider"><Printer className="mr-2 h-4 w-4" /> প্রিন্ট করুন</Button>
@@ -1275,7 +1275,7 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                     <Select value={selectedClass} onValueChange={setSelectedClass}>
                         <SelectTrigger className="bg-slate-50 border-2 border-black/10 font-black h-11 text-lg"><SelectValue /></SelectTrigger>
                         <SelectContent className="font-kalpurush border-2 border-black">
-                            {['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c} className="font-bold">{classNamesMap[c]} শ্রেণি</SelectItem>)}
+                            {['6', '7', '8', '9', '10'].map(c => <SelectItem key={c} value={c} className="font-bold">{classNamesMap[c]}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
@@ -1285,7 +1285,7 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
             <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-2xl bg-white">
                 <CardHeader className="bg-primary/5 border-b-[3px] border-black no-print p-6">
                     <CardTitle className="text-xl font-black flex justify-between items-center uppercase tracking-tight">
-                        <span>শ্রেণিভিত্তিক বার্ষিক আদায় বিবরণী - {toBengaliNumber(selectedYear)} ({classNamesMap[selectedClass]} শ্রেণি)</span>
+                        <span>শ্রেণিভিত্তিক বার্ষিক আদায় বিবরণী - {toBengaliNumber(selectedYear)} ({classNamesMap[selectedClass]})</span>
                         <Badge variant="outline" className="font-black border-primary text-primary px-6 h-8 bg-white shadow-sm">মোট শিক্ষার্থী: {toBengaliNumber(reportData.length)} জন</Badge>
                     </CardTitle>
                 </CardHeader>
