@@ -354,7 +354,7 @@ export default function AuthPage() {
   const db = useFirestore();
   const router = useRouter();
   const { schoolInfo } = useSchoolInfo();
-  const { selectedYear } = useAcademicYear();
+  const { selectedYear, setSelectedYear, availableYears } = useAcademicYear();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeAuthTab, setActiveAuthTab] = useState<'teacher' | 'admin' | 'signup'>('teacher');
@@ -389,6 +389,7 @@ export default function AuthPage() {
     sscPassed: 0,
     sscGpa5: 0,
     sscGpa4: 0,
+    sscGpa3_5: 0,
     sscGpa3: 0,
     sscGpa2: 0,
     sscGpa1: 0,
@@ -423,20 +424,11 @@ export default function AuthPage() {
           }
         });
 
-        let sscYear = selectedYear;
-        let sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === selectedYear);
-        
-        if (sscDocs.length === 0 && (allSscSnap as any).docs.length > 0) {
-          const yearsWithRecords = Array.from(new Set((allSscSnap as any).docs.map((d: any) => d.data().academicYear).filter(Boolean))).sort().reverse();
-          if (yearsWithRecords.length > 0) {
-            sscYear = yearsWithRecords[0] as string;
-            sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === sscYear);
-          }
-        }
+        const sscDocs = (allSscSnap as any).docs.filter((d: any) => d.data().academicYear === selectedYear);
 
         let passRatePercent = 0;
         let sscPassed = 0;
-        let sscGpa5 = 0, sscGpa4 = 0, sscGpa3 = 0, sscGpa2 = 0, sscGpa1 = 0;
+        let sscGpa5 = 0, sscGpa4 = 0, sscGpa3_5 = 0, sscGpa3 = 0, sscGpa2 = 0, sscGpa1 = 0;
 
         if (sscDocs.length > 0) {
           sscDocs.forEach((doc: any) => {
@@ -448,6 +440,7 @@ export default function AuthPage() {
               sscPassed++;
               if (gpa >= 5.0) sscGpa5++;
               else if (gpa >= 4.0) sscGpa4++;
+              else if (gpa >= 3.5) sscGpa3_5++;
               else if (gpa >= 3.0) sscGpa3++;
               else if (gpa >= 2.0) sscGpa2++;
               else if (gpa >= 1.0) sscGpa1++;
@@ -463,11 +456,12 @@ export default function AuthPage() {
           teachers: activeTeachersCount,
           attendanceRate: totalStudentsCount > 0 ? (presentCount / totalStudentsCount) * 100 : 0,
           passRate: passRatePercent,
-          sscYear: sscYear,
+          sscYear: selectedYear,
           sscTotal: sscDocs.length,
           sscPassed,
           sscGpa5,
           sscGpa4,
+          sscGpa3_5,
           sscGpa3,
           sscGpa2,
           sscGpa1,
@@ -751,8 +745,18 @@ export default function AuthPage() {
              <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black px-3 rounded-sm bg-[#4f46e5] text-white hover:bg-[#4f46e5]/90">বাংলা</Button>
              <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black px-3 rounded-sm text-slate-500 hover:bg-slate-100">English</Button>
           </div>
-          <div className="bg-[#334155] px-3 py-1 rounded-full border border-slate-500/50">
-            <span className="text-[10px] font-black text-slate-200">সেশন: {toBengaliNumber(selectedYear)}</span>
+          <div className="bg-[#334155] rounded-full border border-slate-500/50 px-2.5 py-0.5 flex items-center gap-1">
+            <span className="text-[10px] font-black text-slate-300">সেশন:</span>
+            <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSearchYear(val); }}>
+              <SelectTrigger className="h-6 border-0 bg-transparent text-white font-black text-xs p-0 focus:ring-0 gap-1 shadow-none">
+                <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="font-kalpurush bg-slate-900 border-slate-700 text-white z-[200]">
+                {availableYears.slice(0, 15).map(y => (
+                  <SelectItem key={y} value={y} className="font-bold text-white focus:bg-slate-800 focus:text-white">{toBengaliNumber(y)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </header>
@@ -889,11 +893,23 @@ export default function AuthPage() {
             </Card>
             <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all col-span-2 md:col-span-1">
                <CardContent className="p-4 md:p-5 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="bg-rose-50 w-8 h-8 rounded-lg flex items-center justify-center text-rose-600 shrink-0">
-                       <Trophy className="w-4 h-4" />
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="bg-rose-50 w-7 h-7 rounded-lg flex items-center justify-center text-rose-600 shrink-0">
+                         <Trophy className="w-3.5 h-3.5" />
+                      </div>
+                      <p className="text-xs md:text-sm font-black text-rose-600 truncate">এস এস সি পরীক্ষা</p>
                     </div>
-                    <p className="text-sm font-black text-rose-600 leading-tight">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
+                    <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSearchYear(val); }}>
+                      <SelectTrigger className="h-6 w-[76px] text-[11px] font-black border border-rose-200 bg-rose-50 text-rose-700 rounded-lg px-1.5 focus:ring-0 shadow-none shrink-0">
+                        <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="font-kalpurush z-[200]">
+                        {availableYears.slice(0, 15).map(y => (
+                          <SelectItem key={y} value={y} className="font-bold">{toBengaliNumber(y)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   {stats.sscTotal > 0 ? (
                     <>
@@ -911,23 +927,24 @@ export default function AuthPage() {
                           <p className="text-[9px] font-black text-blue-600 uppercase">পাশের হার</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-5 gap-1 text-center mt-0.5">
+                      <div className="grid grid-cols-6 gap-0.5 sm:gap-1 text-center mt-0.5">
                         {[
                           { label: 'GPA ৫', val: stats.sscGpa5, color: 'bg-violet-50 text-violet-700' },
                           { label: 'GPA ৪', val: stats.sscGpa4, color: 'bg-blue-50 text-blue-700' },
+                          { label: 'GPA ৩.৫', val: stats.sscGpa3_5, color: 'bg-sky-50 text-sky-700' },
                           { label: 'GPA ৩', val: stats.sscGpa3, color: 'bg-emerald-50 text-emerald-700' },
                           { label: 'GPA ২', val: stats.sscGpa2, color: 'bg-amber-50 text-amber-700' },
                           { label: 'GPA ১', val: stats.sscGpa1, color: 'bg-orange-50 text-orange-700' },
                         ].map(g => (
                           <div key={g.label} className={`${g.color} rounded-lg p-1`}>
                             <p className="text-xs font-black">{toBengaliNumber(g.val)}</p>
-                            <p className="text-[8px] font-bold leading-tight">{g.label}</p>
+                            <p className="text-[7.5px] sm:text-[8px] font-bold leading-tight">{g.label}</p>
                           </div>
                         ))}
                       </div>
                     </>
                   ) : (
-                    <p className="text-xs font-bold text-slate-400 italic">রেকর্ড শাখায় কোনো তথ্য নেই</p>
+                    <p className="text-xs font-bold text-slate-400 italic py-3 text-center">রেকর্ড শাখায় কোনো তথ্য নেই</p>
                   )}
                </CardContent>
             </Card>
