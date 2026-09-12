@@ -53,7 +53,7 @@ const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ শ্র�
 // --- Reusable Top Table Scrollbar Controller ---
 function TopTableScrollbar({
     targetRef,
-    minScrollWidth = 1300
+    minScrollWidth = 1100
 }: {
     targetRef: React.RefObject<HTMLDivElement | null>;
     minScrollWidth?: number;
@@ -62,37 +62,24 @@ function TopTableScrollbar({
     const [scrollWidth, setScrollWidth] = useState(minScrollWidth);
     const isSyncing = useRef(false);
 
-    useEffect(() => {
-        const updateWidth = () => {
-            if (targetRef.current) {
-                const sw = targetRef.current.scrollWidth;
-                const cw = targetRef.current.clientWidth;
-                if (sw > 0) {
-                    setScrollWidth(Math.max(sw, minScrollWidth));
-                }
+    // Calculate dummy width so maxScroll(top) === maxScroll(table)
+    const updateWidth = useCallback(() => {
+        const table = targetRef.current;
+        const top = topScrollRef.current;
+        if (table && top) {
+            const tableScrollableDist = Math.max(0, table.scrollWidth - table.clientWidth);
+            if (tableScrollableDist > 0) {
+                // Exact 1:1 scroll mapping: dummyWidth = tableScrollableDist + top.clientWidth
+                const dummyWidth = tableScrollableDist + top.clientWidth;
+                setScrollWidth(Math.max(dummyWidth, minScrollWidth));
+            } else {
+                setScrollWidth(Math.max(table.scrollWidth, minScrollWidth));
             }
-        };
-
-        updateWidth();
-        const t1 = setTimeout(updateWidth, 150);
-        const t2 = setTimeout(updateWidth, 600);
-
-        let ro: ResizeObserver | null = null;
-        if (typeof ResizeObserver !== 'undefined' && targetRef.current) {
-            ro = new ResizeObserver(() => updateWidth());
-            ro.observe(targetRef.current);
-            const tbl = targetRef.current.querySelector('table');
-            if (tbl) ro.observe(tbl);
         }
-
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-            if (ro) ro.disconnect();
-        };
     }, [targetRef, minScrollWidth]);
 
-    const handleScrollSync = (source: 'top' | 'table') => {
+    // Handle bidirectional scroll sync
+    const handleScrollSync = useCallback((source: 'top' | 'table') => {
         if (isSyncing.current) return;
         isSyncing.current = true;
         const top = topScrollRef.current;
@@ -107,21 +94,87 @@ function TopTableScrollbar({
         requestAnimationFrame(() => {
             isSyncing.current = false;
         });
-    };
-
-    useEffect(() => {
-        const tableEl = targetRef.current;
-        if (!tableEl) return;
-        const onTableScroll = () => handleScrollSync('table');
-        tableEl.addEventListener('scroll', onTableScroll, { passive: true });
-        return () => {
-            tableEl.removeEventListener('scroll', onTableScroll);
-        };
     }, [targetRef]);
 
+    // Attach scroll listener to table container
+    useEffect(() => {
+        let cleanup: (() => void) | null = null;
+        let attachedEl: HTMLElement | null = null;
+
+        const attachListener = () => {
+            const table = targetRef.current;
+            if (table && table !== attachedEl) {
+                if (cleanup) cleanup();
+                attachedEl = table;
+                const onTableScroll = () => handleScrollSync('table');
+                table.addEventListener('scroll', onTableScroll, { passive: true });
+                cleanup = () => {
+                    table.removeEventListener('scroll', onTableScroll);
+                    attachedEl = null;
+                };
+                updateWidth();
+                return true;
+            }
+            return false;
+        };
+
+        attachListener();
+        const pollInterval = setInterval(() => {
+            if (!attachedEl && targetRef.current) {
+                attachListener();
+            } else if (attachedEl) {
+                updateWidth();
+            }
+        }, 300);
+
+        return () => {
+            clearInterval(pollInterval);
+            if (cleanup) cleanup();
+        };
+    }, [targetRef, handleScrollSync, updateWidth]);
+
+    // Resize observer & periodic sync for dynamic layout changes
+    useEffect(() => {
+        updateWidth();
+        const t1 = setTimeout(updateWidth, 50);
+        const t2 = setTimeout(updateWidth, 200);
+        const t3 = setTimeout(updateWidth, 600);
+        const t4 = setTimeout(updateWidth, 1200);
+
+        let ro: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            ro = new ResizeObserver(() => updateWidth());
+            if (targetRef.current) {
+                ro.observe(targetRef.current);
+                const tbl = targetRef.current.querySelector('table');
+                if (tbl) ro.observe(tbl);
+            }
+            if (topScrollRef.current) {
+                ro.observe(topScrollRef.current);
+            }
+        }
+
+        window.addEventListener('resize', updateWidth);
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
+            clearTimeout(t4);
+            if (ro) ro.disconnect();
+            window.removeEventListener('resize', updateWidth);
+        };
+    }, [targetRef, updateWidth]);
+
+    // Quick scroll by offset on button click
     const handleScrollBy = (amount: number) => {
-        if (targetRef.current) {
-            targetRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+        const table = targetRef.current;
+        if (table) {
+            table.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+        const top = topScrollRef.current;
+        if (top) {
+            top.scrollBy({ left: amount, behavior: 'smooth' });
         }
     };
 
@@ -132,7 +185,7 @@ function TopTableScrollbar({
                 variant="outline"
                 size="sm"
                 onClick={() => handleScrollBy(-350)}
-                className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
                 title="টেবিল বামে সরান"
             >
                 <ChevronLeft className="w-4 h-4 text-blue-600" /> বামে
@@ -153,7 +206,7 @@ function TopTableScrollbar({
                 variant="outline"
                 size="sm"
                 onClick={() => handleScrollBy(350)}
-                className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
                 title="টেবিল ডানে সরান"
             >
                 ডানে <ChevronRight className="w-4 h-4 text-blue-600" />
@@ -623,10 +676,10 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="p-3 pb-0 no-print">
-                        <TopTableScrollbar targetRef={tableContainerRef} minScrollWidth={900} />
+                        <TopTableScrollbar targetRef={tableContainerRef} minScrollWidth={1100} />
                     </div>
-                    <div ref={tableContainerRef} className="table-container !max-h-[600px] !border-0 !rounded-none overflow-y-auto scrollbar-thin">
-                        <Table className="w-full border-collapse">
+                    <div ref={tableContainerRef} className="table-container !max-h-[600px] !border-0 !rounded-none overflow-auto permanent-scroll">
+                        <table className="w-full min-w-[1100px] border-collapse caption-bottom text-sm">
                             <TableHeader className="bg-slate-50 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="border-b-2 border-black">
                                     <TableHead className="w-16 text-center font-black border-r border-slate-300 text-black">রোল</TableHead>
@@ -650,7 +703,7 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
 
                                     return (
                                         <TableRow key={student.id} className={cn("hover:bg-primary/5 transition-colors border-b border-slate-200", Object.keys(changes).length > 0 && "bg-amber-50")}>
-                                            <TableCell className="text-center font-black border-r border-slate-300">{toBengaliNumber(student.roll)}</TableCell>
+                                             <TableCell className="text-center font-black border-r border-slate-300">{toBengaliNumber(student.roll)}</TableCell>
                                             <TableCell className="font-bold border-r border-slate-300 text-slate-800 text-xs">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="truncate">{student.studentNameBn}</span>
@@ -674,7 +727,7 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                                     );
                                 })}
                             </TableBody>
-                        </Table>
+                        </table>
                     </div>
                     <div className="flex justify-between items-center p-6 border-t-2 border-black bg-slate-50 no-print">
                         <p className="text-xs font-bold text-muted-foreground flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600" /> তথ্য পরিবর্তন করার পর অবশ্যই নিচের সেভ বাটনে ক্লিক করবেন।</p>
@@ -1079,8 +1132,8 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={potentialTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={potentialTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-x-auto custom-scrollbar">
-                        <Table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black">
+                    <div ref={potentialTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-auto permanent-scroll">
+                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 border-b-2 border-black">
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] text-center w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
@@ -1120,7 +1173,7 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                                     <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-black leading-none">{toBengaliNumber(potentialGrandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
-                        </Table>
+                        </table>
                     </div>
                 </CardContent>
             </Card>
@@ -1238,15 +1291,15 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={classwiseTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-x-auto custom-scrollbar">
-                        <Table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black">
+                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-auto permanent-scroll">
+                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 border-b-2 border-black">
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] text-center w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] min-w-[100px] text-black sticky left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">ভর্তি ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">সেশন ফি</TableHead>
-                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r-2 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
+                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">পরীক্ষা ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">অন্যান্য</TableHead>
                                     <TableHead className="font-black border-b-2 border-black text-[13px] text-right pr-6 text-white bg-blue-900 sticky right-0 z-40 uppercase">মোট আদায়</TableHead>
@@ -1279,7 +1332,7 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                                     <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-black leading-none">{toBengaliNumber(grandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
-                        </Table>
+                        </table>
                     </div>
                 </CardContent>
             </Card>
