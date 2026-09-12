@@ -354,7 +354,7 @@ export default function AuthPage() {
   const db = useFirestore();
   const router = useRouter();
   const { schoolInfo } = useSchoolInfo();
-  const { selectedYear, setSelectedYear, availableYears } = useAcademicYear();
+  const { selectedYear } = useAcademicYear();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeAuthTab, setActiveAuthTab] = useState<'teacher' | 'admin' | 'signup'>('teacher');
@@ -745,18 +745,8 @@ export default function AuthPage() {
              <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black px-3 rounded-sm bg-[#4f46e5] text-white hover:bg-[#4f46e5]/90">বাংলা</Button>
              <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black px-3 rounded-sm text-slate-500 hover:bg-slate-100">English</Button>
           </div>
-          <div className="bg-[#334155] rounded-full border border-slate-500/50 px-2.5 py-0.5 flex items-center gap-1">
-            <span className="text-[10px] font-black text-slate-300">সেশন:</span>
-            <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSearchYear(val); }}>
-              <SelectTrigger className="h-6 border-0 bg-transparent text-white font-black text-xs p-0 focus:ring-0 gap-1 shadow-none">
-                <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent className="font-kalpurush bg-slate-900 border-slate-700 text-white z-[200]">
-                {availableYears.slice(0, 15).map(y => (
-                  <SelectItem key={y} value={y} className="font-bold text-white focus:bg-slate-800 focus:text-white">{toBengaliNumber(y)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="bg-[#334155] px-3 py-1 rounded-full border border-slate-500/50">
+            <span className="text-[10px] font-black text-slate-200">সেশন: {toBengaliNumber(selectedYear)}</span>
           </div>
         </div>
       </header>
@@ -893,23 +883,11 @@ export default function AuthPage() {
             </Card>
             <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all col-span-2 md:col-span-1">
                <CardContent className="p-4 md:p-5 flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="bg-rose-50 w-7 h-7 rounded-lg flex items-center justify-center text-rose-600 shrink-0">
-                         <Trophy className="w-3.5 h-3.5" />
-                      </div>
-                      <p className="text-xs md:text-sm font-black text-rose-600 truncate">এস এস সি পরীক্ষা</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="bg-rose-50 w-8 h-8 rounded-lg flex items-center justify-center text-rose-600 shrink-0">
+                       <Trophy className="w-4 h-4" />
                     </div>
-                    <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSearchYear(val); }}>
-                      <SelectTrigger className="h-6 w-[76px] text-[11px] font-black border border-rose-200 bg-rose-50 text-rose-700 rounded-lg px-1.5 focus:ring-0 shadow-none shrink-0">
-                        <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="font-kalpurush z-[200]">
-                        {availableYears.slice(0, 15).map(y => (
-                          <SelectItem key={y} value={y} className="font-bold">{toBengaliNumber(y)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <p className="text-sm font-black text-rose-600 leading-tight">এস এস সি পরীক্ষা-{toBengaliNumber(selectedYear)}</p>
                   </div>
                   {stats.sscTotal > 0 ? (
                     <>
