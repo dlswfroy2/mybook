@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Student, studentFromDoc } from '@/lib/student-data';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useFirestore } from '@/firebase';
 import { collection, onSnapshot, query, where, orderBy, FirestoreError, doc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
@@ -15,7 +15,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Trash2, Smartphone, Search, AlertCircle, TrendingUp, Banknote, CreditCard, Wallet, PieChart as PieChartIcon, LayoutDashboard, Loader2, PlusCircle, MinusCircle, Landmark, Coins, FileText, Hash, ChevronRight, BookOpen, LayoutGrid, ListChecks, Printer, Phone, MessageCircle, MessageSquareDashed, Calendar, FileSpreadsheet, FileBarChart, FilePen, BarChart3, Receipt, Settings2, ShieldCheck, UserCheck, Save, Sparkles, Gift, Clock, Table as TableIcon } from 'lucide-react';
+import { Trash2, Smartphone, Search, AlertCircle, TrendingUp, Banknote, CreditCard, Wallet, PieChart as PieChartIcon, LayoutDashboard, Loader2, PlusCircle, MinusCircle, Landmark, Coins, FileText, Hash, ChevronRight, ChevronLeft, BookOpen, LayoutGrid, ListChecks, Printer, Phone, MessageCircle, MessageSquareDashed, Calendar, FileSpreadsheet, FileBarChart, FilePen, BarChart3, Receipt, Settings2, ShieldCheck, UserCheck, Save, Sparkles, Gift, Clock, Table as TableIcon } from 'lucide-react';
 import { format, isToday, isSameMonth, startOfMonth, endOfMonth, isBefore } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -49,6 +49,118 @@ const ENGLISH_MONTHS = [
 ];
 
 const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ শ্রেণি', '7': 'সপ্তম শ্রেণি', '8': 'অষ্টম শ্রেণি', '9': 'নবম শ্রেণি', '10': 'দশম শ্রেণি' };
+
+// --- Reusable Top Table Scrollbar Controller ---
+function TopTableScrollbar({
+    targetRef,
+    minScrollWidth = 1300
+}: {
+    targetRef: React.RefObject<HTMLDivElement | null>;
+    minScrollWidth?: number;
+}) {
+    const topScrollRef = useRef<HTMLDivElement>(null);
+    const [scrollWidth, setScrollWidth] = useState(minScrollWidth);
+    const isSyncing = useRef(false);
+
+    useEffect(() => {
+        const updateWidth = () => {
+            if (targetRef.current) {
+                const sw = targetRef.current.scrollWidth;
+                const cw = targetRef.current.clientWidth;
+                if (sw > 0) {
+                    setScrollWidth(Math.max(sw, minScrollWidth));
+                }
+            }
+        };
+
+        updateWidth();
+        const t1 = setTimeout(updateWidth, 150);
+        const t2 = setTimeout(updateWidth, 600);
+
+        let ro: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined' && targetRef.current) {
+            ro = new ResizeObserver(() => updateWidth());
+            ro.observe(targetRef.current);
+            const tbl = targetRef.current.querySelector('table');
+            if (tbl) ro.observe(tbl);
+        }
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            if (ro) ro.disconnect();
+        };
+    }, [targetRef, minScrollWidth]);
+
+    const handleScrollSync = (source: 'top' | 'table') => {
+        if (isSyncing.current) return;
+        isSyncing.current = true;
+        const top = topScrollRef.current;
+        const table = targetRef.current;
+        if (top && table) {
+            if (source === 'top') {
+                table.scrollLeft = top.scrollLeft;
+            } else {
+                top.scrollLeft = table.scrollLeft;
+            }
+        }
+        requestAnimationFrame(() => {
+            isSyncing.current = false;
+        });
+    };
+
+    useEffect(() => {
+        const tableEl = targetRef.current;
+        if (!tableEl) return;
+        const onTableScroll = () => handleScrollSync('table');
+        tableEl.addEventListener('scroll', onTableScroll, { passive: true });
+        return () => {
+            tableEl.removeEventListener('scroll', onTableScroll);
+        };
+    }, [targetRef]);
+
+    const handleScrollBy = (amount: number) => {
+        if (targetRef.current) {
+            targetRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    };
+
+    return (
+        <div className="bg-slate-100/90 border-2 border-slate-300 rounded-xl p-2 mb-2 no-print shadow-sm flex items-center gap-2">
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleScrollBy(-350)}
+                className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                title="টেবিল বামে সরান"
+            >
+                <ChevronLeft className="w-4 h-4 text-blue-600" /> বামে
+            </Button>
+
+            <div
+                ref={topScrollRef}
+                onScroll={() => handleScrollSync('top')}
+                className="flex-1 overflow-x-scroll permanent-scroll top-scrollbar-track rounded-lg border border-slate-300 bg-white cursor-pointer"
+                style={{ height: '24px' }}
+                title="স্ক্রোলবারটি ডানে-বামে টেনে পুরো টেবিল সরান"
+            >
+                <div style={{ width: `${scrollWidth}px`, height: '2px' }} />
+            </div>
+
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleScrollBy(350)}
+                className="h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm"
+                title="টেবিল ডানে সরান"
+            >
+                ডানে <ChevronRight className="w-4 h-4 text-blue-600" />
+            </Button>
+        </div>
+    );
+}
 
 // --- Sub Components ---
 
@@ -368,6 +480,7 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
     
     const [editedStudents, setEditedStudents] = useState<Record<string, Partial<Student>>>({});
     const [configFreeStudent, setConfigFreeStudent] = useState<Student | null>(null);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
 
     const filteredStudents = useMemo(() => {
         return allStudents
@@ -509,7 +622,10 @@ function FeeSetupTab({ allStudents, selectedYear, onPrint }: { allStudents: Stud
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="table-container !max-h-[600px] !border-0 !rounded-none overflow-y-auto scrollbar-thin">
+                    <div className="p-3 pb-0 no-print">
+                        <TopTableScrollbar targetRef={tableContainerRef} minScrollWidth={900} />
+                    </div>
+                    <div ref={tableContainerRef} className="table-container !max-h-[600px] !border-0 !rounded-none overflow-y-auto scrollbar-thin">
                         <Table className="w-full border-collapse">
                             <TableHeader className="bg-slate-50 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="border-b-2 border-black">
@@ -851,6 +967,7 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
     const [collections, setCollections] = useState<FeeCollection[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [previewClass, setPreviewClass] = useState<string>('6');
+    const potentialTableRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!db) return;
@@ -958,8 +1075,11 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                         <Button onClick={() => onPrintPotentialReport(previewClass)} className="font-black h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl border-2 border-black px-6 uppercase tracking-wider"><Printer className="mr-2 h-4 w-4" /> প্রিন্ট করুন</Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0 overflow-x-auto custom-scrollbar">
-                    <div className="table-container !max-h-[500px] !border-0 !rounded-none">
+                <CardContent className="p-0">
+                    <div className="p-4 pb-0 no-print">
+                        <TopTableScrollbar targetRef={potentialTableRef} minScrollWidth={1300} />
+                    </div>
+                    <div ref={potentialTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-x-auto custom-scrollbar">
                         <Table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 border-b-2 border-black">
@@ -1013,6 +1133,7 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
     const [selectedClass, setSelectedClass] = useState('6');
     const [collections, setCollections] = useState<FeeCollection[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const classwiseTableRef = useRef<HTMLDivElement>(null);
 
     const fetchCollections = useCallback(async () => {
         if (!db) return;
@@ -1113,8 +1234,11 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                         <Badge variant="outline" className="font-black border-primary text-primary px-6 h-8 bg-white shadow-sm">মোট শিক্ষার্থী: {toBengaliNumber(reportData.length)} জন</Badge>
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 overflow-x-auto custom-scrollbar">
-                    <div className="table-container !max-h-[500px] !border-0 !rounded-none">
+                <CardContent className="p-0">
+                    <div className="p-4 pb-0 no-print">
+                        <TopTableScrollbar targetRef={classwiseTableRef} minScrollWidth={1300} />
+                    </div>
+                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-x-auto custom-scrollbar">
                         <Table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 border-b-2 border-black">
