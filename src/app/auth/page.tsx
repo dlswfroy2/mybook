@@ -384,7 +384,14 @@ export default function AuthPage() {
     teachers: 0,
     attendanceRate: 0,
     passRate: 0,
-    sscYear: selectedYear
+    sscYear: selectedYear,
+    sscTotal: 0,
+    sscPassed: 0,
+    sscGpa5: 0,
+    sscGpa4: 0,
+    sscGpa3: 0,
+    sscGpa2: 0,
+    sscGpa1: 0,
   });
 
   useEffect(() => {
@@ -428,14 +435,25 @@ export default function AuthPage() {
         }
 
         let passRatePercent = 0;
+        let sscPassed = 0;
+        let sscGpa5 = 0, sscGpa4 = 0, sscGpa3 = 0, sscGpa2 = 0, sscGpa1 = 0;
+
         if (sscDocs.length > 0) {
-          const passedCount = sscDocs.filter((doc: any) => {
+          sscDocs.forEach((doc: any) => {
             const data = doc.data();
             const grade = (data.grade || '').toString().trim().toUpperCase();
             const gpa = Number(data.gpa) || 0;
-            return grade !== '' && grade !== 'F' && gpa > 0;
-          }).length;
-          passRatePercent = (passedCount / sscDocs.length) * 100;
+            const passed = grade !== '' && grade !== 'F' && gpa > 0;
+            if (passed) {
+              sscPassed++;
+              if (gpa >= 5.0) sscGpa5++;
+              else if (gpa >= 4.0) sscGpa4++;
+              else if (gpa >= 3.0) sscGpa3++;
+              else if (gpa >= 2.0) sscGpa2++;
+              else if (gpa >= 1.0) sscGpa1++;
+            }
+          });
+          passRatePercent = (sscPassed / sscDocs.length) * 100;
         } else if ((schoolInfo as any)?.passingRate) {
           passRatePercent = parseFloat((schoolInfo as any).passingRate) || 0;
         }
@@ -445,7 +463,14 @@ export default function AuthPage() {
           teachers: activeTeachersCount,
           attendanceRate: totalStudentsCount > 0 ? (presentCount / totalStudentsCount) * 100 : 0,
           passRate: passRatePercent,
-          sscYear: sscYear
+          sscYear: sscYear,
+          sscTotal: sscDocs.length,
+          sscPassed,
+          sscGpa5,
+          sscGpa4,
+          sscGpa3,
+          sscGpa2,
+          sscGpa1,
         });
       } catch (e) {
         console.warn('Stats fetch error:', e);
@@ -862,14 +887,48 @@ export default function AuthPage() {
                   </div>
                </CardContent>
             </Card>
-            <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all">
-               <CardContent className="p-4 md:p-6 flex flex-col gap-3">
-                  <div className="bg-rose-50 w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors">
-                     <Trophy className="w-5 h-5 md:w-6 md:h-6" />
+            <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all col-span-2 md:col-span-1">
+               <CardContent className="p-4 md:p-5 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="bg-rose-50 w-8 h-8 rounded-lg flex items-center justify-center text-rose-600 shrink-0">
+                       <Trophy className="w-4 h-4" />
+                    </div>
+                    <p className="text-sm font-black text-rose-600 leading-tight">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
                   </div>
-                  <div>
-                    <p className="text-2xl md:text-3xl font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
-                  </div>
+                  {stats.sscTotal > 0 ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-1 text-center">
+                        <div className="bg-slate-50 rounded-lg p-1.5">
+                          <p className="text-base font-black text-slate-800">{toBengaliNumber(stats.sscTotal)}</p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase">পরীক্ষার্থী</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-1.5">
+                          <p className="text-base font-black text-emerald-700">{toBengaliNumber(stats.sscPassed)}</p>
+                          <p className="text-[9px] font-black text-emerald-600 uppercase">পাশ</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-1.5">
+                          <p className="text-base font-black text-blue-700">{toBengaliNumber(stats.passRate.toFixed(1))}%</p>
+                          <p className="text-[9px] font-black text-blue-600 uppercase">পাশের হার</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 text-center mt-0.5">
+                        {[
+                          { label: 'GPA ৫', val: stats.sscGpa5, color: 'bg-violet-50 text-violet-700' },
+                          { label: 'GPA ৪', val: stats.sscGpa4, color: 'bg-blue-50 text-blue-700' },
+                          { label: 'GPA ৩', val: stats.sscGpa3, color: 'bg-emerald-50 text-emerald-700' },
+                          { label: 'GPA ২', val: stats.sscGpa2, color: 'bg-amber-50 text-amber-700' },
+                          { label: 'GPA ১', val: stats.sscGpa1, color: 'bg-orange-50 text-orange-700' },
+                        ].map(g => (
+                          <div key={g.label} className={`${g.color} rounded-lg p-1`}>
+                            <p className="text-xs font-black">{toBengaliNumber(g.val)}</p>
+                            <p className="text-[8px] font-bold leading-tight">{g.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs font-bold text-slate-400 italic">রেকর্ড শাখায় কোনো তথ্য নেই</p>
+                  )}
                </CardContent>
             </Card>
           </div>
