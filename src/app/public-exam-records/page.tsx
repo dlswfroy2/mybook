@@ -340,7 +340,8 @@ export default function PublicExamRecordsPage() {
                 }
             `}</style>
 
-            <main className="flex-1 p-4 md:p-6 lg:p-10 gap-8 pb-40">
+            <main className="flex-1 p-4 md:p-6 lg:p-10 pb-40">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                 
                 {/* Sidebar Navigation */}
                 <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
@@ -710,6 +711,7 @@ export default function PublicExamRecordsPage() {
                             </div>
                         </CardFooter>
                     </Card>
+                </div>
                 </div>
             </main>
         </div>
