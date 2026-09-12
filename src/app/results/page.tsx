@@ -547,9 +547,9 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                         </Button>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="table-container !max-h-[550px]">
+                        <div className="table-container !max-h-[550px] !overflow-auto">
                             <Table>
-                                <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                                <TableHeader className="bg-slate-100 sticky top-0 z-10 shadow-sm">
                                     <TableRow>
                                         <TableHead className="w-20 text-center font-black">রোল</TableHead>
                                         <TableHead className="font-black">নাম</TableHead>
