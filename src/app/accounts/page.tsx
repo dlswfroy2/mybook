@@ -60,40 +60,51 @@ function TopTableScrollbar({
 }) {
     const topScrollRef = useRef<HTMLDivElement>(null);
     const [scrollWidth, setScrollWidth] = useState(minScrollWidth);
-    const isSyncing = useRef(false);
+    
+    // Active driver of the scroll ('top' | 'table') to eliminate ping-pong jitter
+    const activeScroller = useRef<'top' | 'table' | null>(null);
+    const scrollEndTimer = useRef<NodeJS.Timeout | null>(null);
 
-    // Calculate dummy width so maxScroll(top) === maxScroll(table)
+    // Update width only when size truly changes, and NEVER while actively scrolling
     const updateWidth = useCallback(() => {
+        if (activeScroller.current) return;
         const table = targetRef.current;
-        const top = topScrollRef.current;
-        if (table && top) {
-            const tableScrollableDist = Math.max(0, table.scrollWidth - table.clientWidth);
-            if (tableScrollableDist > 0) {
-                // Exact 1:1 scroll mapping: dummyWidth = tableScrollableDist + top.clientWidth
-                const dummyWidth = tableScrollableDist + top.clientWidth;
-                setScrollWidth(Math.max(dummyWidth, minScrollWidth));
-            } else {
-                setScrollWidth(Math.max(table.scrollWidth, minScrollWidth));
+        if (table) {
+            const sw = table.scrollWidth;
+            if (sw > 0) {
+                setScrollWidth(prev => {
+                    if (Math.abs(prev - sw) > 5) {
+                        return Math.max(sw, minScrollWidth);
+                    }
+                    return prev;
+                });
             }
         }
     }, [targetRef, minScrollWidth]);
 
-    // Handle bidirectional scroll sync
+    // Bidirectional scroll sync with echo suppression
     const handleScrollSync = useCallback((source: 'top' | 'table') => {
-        if (isSyncing.current) return;
-        isSyncing.current = true;
+        if (activeScroller.current && activeScroller.current !== source) return;
+        activeScroller.current = source;
+
+        if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
+        scrollEndTimer.current = setTimeout(() => {
+            activeScroller.current = null;
+        }, 80);
+
         const top = topScrollRef.current;
         const table = targetRef.current;
-        if (top && table) {
-            if (source === 'top') {
+        if (!top || !table) return;
+
+        if (source === 'top') {
+            if (Math.abs(table.scrollLeft - top.scrollLeft) >= 1) {
                 table.scrollLeft = top.scrollLeft;
-            } else {
+            }
+        } else {
+            if (Math.abs(top.scrollLeft - table.scrollLeft) >= 1) {
                 top.scrollLeft = table.scrollLeft;
             }
         }
-        requestAnimationFrame(() => {
-            isSyncing.current = false;
-        });
     }, [targetRef]);
 
     // Attach scroll listener to table container
@@ -122,10 +133,8 @@ function TopTableScrollbar({
         const pollInterval = setInterval(() => {
             if (!attachedEl && targetRef.current) {
                 attachListener();
-            } else if (attachedEl) {
-                updateWidth();
             }
-        }, 300);
+        }, 500);
 
         return () => {
             clearInterval(pollInterval);
@@ -133,13 +142,11 @@ function TopTableScrollbar({
         };
     }, [targetRef, handleScrollSync, updateWidth]);
 
-    // Resize observer & periodic sync for dynamic layout changes
+    // Resize observer
     useEffect(() => {
         updateWidth();
-        const t1 = setTimeout(updateWidth, 50);
-        const t2 = setTimeout(updateWidth, 200);
-        const t3 = setTimeout(updateWidth, 600);
-        const t4 = setTimeout(updateWidth, 1200);
+        const t1 = setTimeout(updateWidth, 100);
+        const t2 = setTimeout(updateWidth, 500);
 
         let ro: ResizeObserver | null = null;
         if (typeof ResizeObserver !== 'undefined') {
@@ -149,9 +156,6 @@ function TopTableScrollbar({
                 const tbl = targetRef.current.querySelector('table');
                 if (tbl) ro.observe(tbl);
             }
-            if (topScrollRef.current) {
-                ro.observe(topScrollRef.current);
-            }
         }
 
         window.addEventListener('resize', updateWidth);
@@ -159,8 +163,6 @@ function TopTableScrollbar({
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
-            clearTimeout(t3);
-            clearTimeout(t4);
             if (ro) ro.disconnect();
             window.removeEventListener('resize', updateWidth);
         };
@@ -1132,45 +1134,45 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={potentialTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={potentialTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-auto permanent-scroll">
-                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black caption-bottom text-sm">
+                    <div ref={potentialTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-auto permanent-scroll">
+                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
-                                <TableRow className="h-12 border-b-2 border-black">
+                                <TableRow className="h-12 bg-slate-100">
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] text-center w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] min-w-[100px] text-black sticky left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">ভর্তি ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">সেশন ফি</TableHead>
-                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r border-slate-200 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
+                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r-2 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">পরীক্ষা ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">অন্যান্য</TableHead>
-                                    <TableHead className="font-black border-b-2 border-black text-[13px] text-right pr-6 text-white bg-blue-900 sticky right-0 z-40 uppercase">মোট পাওনা</TableHead>
+                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 sticky right-0 z-40 uppercase">মোট পাওনা</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {potentialPreviewData.map((row, i) => (
-                                    <TableRow key={i} className="h-10 border-b-2 border-black hover:bg-slate-50 transition-colors">
-                                        <TableCell className="border-r-2 border-black text-center font-black text-[13px] sticky left-0 z-20 bg-white">{toBengaliNumber(row.roll)}</TableCell>
-                                        <TableCell className="border-r-2 border-black font-black text-[13px] truncate sticky left-14 z-20 bg-white px-3">{row.name}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
+                                    <TableRow key={i} className="h-10 hover:bg-slate-50 transition-colors">
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[13px] sticky left-0 z-20 bg-white">{toBengaliNumber(row.roll)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[13px] truncate sticky left-14 z-20 bg-white px-3">{row.name}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
                                         {Array(12).fill(row.tuition).map((val, j) => (
-                                            <TableCell key={j} className="border-r-2 border-black text-center text-[11px] font-bold text-slate-600">{val > 0 ? toBengaliNumber(val) : '-'}</TableCell>
+                                            <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[11px] font-bold text-slate-800">{val > 0 ? toBengaliNumber(val) : '-'}</TableCell>
                                         ))}
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
-                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sticky right-0 z-20 border-l-2 border-black">{toBengaliNumber(row.total)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
+                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sticky right-0 z-20 border-l-2 border-b-2 border-black">{toBengaliNumber(row.total)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                             <TableFooter className="sticky bottom-0 z-30">
                                 <TableRow className="h-12 border-t-[3px] border-black bg-slate-200 font-black">
-                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট সম্ভাব্য পাওনা:</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.admission)}</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.session)}</TableCell>
-                                    {potentialGrandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.exam)}</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.other)}</TableCell>
-                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-black leading-none">{toBengaliNumber(potentialGrandTotals.total)} ৳</TableCell>
+                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট সম্ভাব্য পাওনা:</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.admission)}</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.session)}</TableCell>
+                                    {potentialGrandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.exam)}</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.other)}</TableCell>
+                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-b-2 border-black leading-none">{toBengaliNumber(potentialGrandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </table>
@@ -1291,45 +1293,45 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={classwiseTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] !border-0 !rounded-none overflow-auto permanent-scroll">
-                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] border-collapse border-black caption-bottom text-sm">
+                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-auto permanent-scroll">
+                        <table className="border-separate border-spacing-0 w-full min-w-[1300px] caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
-                                <TableRow className="h-12 border-b-2 border-black">
+                                <TableRow className="h-12 bg-slate-100">
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] text-center w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] min-w-[100px] text-black sticky left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">ভর্তি ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">সেশন ফি</TableHead>
-                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
+                                    {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r-2 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">পরীক্ষা ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">অন্যান্য</TableHead>
-                                    <TableHead className="font-black border-b-2 border-black text-[13px] text-right pr-6 text-white bg-blue-900 sticky right-0 z-40 uppercase">মোট আদায়</TableHead>
+                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 sticky right-0 z-40 uppercase">মোট আদায়</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {reportData.map((row, i) => (
-                                    <TableRow key={i} className="h-10 border-b-2 border-black hover:bg-slate-50 transition-colors">
-                                        <TableCell className="border-r-2 border-black text-center font-black text-[13px] sticky left-0 z-20 bg-white">{toBengaliNumber(row.roll)}</TableCell>
-                                        <TableCell className="border-r-2 border-black font-black text-[13px] truncate sticky left-14 z-20 bg-white px-3">{row.name}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
+                                    <TableRow key={i} className="h-10 hover:bg-slate-50 transition-colors">
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[13px] sticky left-0 z-20 bg-white">{toBengaliNumber(row.roll)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[13px] truncate sticky left-14 z-20 bg-white px-3">{row.name}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
                                         {row.months.map((val: number, j: number) => (
-                                            <TableCell key={j} className="border-r-2 border-black text-center text-[11px] font-bold text-slate-600">{val > 0 ? toBengaliNumber(Math.round(val)) : '-'}</TableCell>
+                                            <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[11px] font-bold text-slate-800">{val > 0 ? toBengaliNumber(Math.round(val)) : '-'}</TableCell>
                                         ))}
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
-                                        <TableCell className="border-r-2 border-black text-center text-[12px] font-bold text-slate-600">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
-                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sticky right-0 z-20 border-l-2 border-black">{toBengaliNumber(row.total)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
+                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sticky right-0 z-20 border-l-2 border-b-2 border-black">{toBengaliNumber(row.total)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                             <TableFooter className="sticky bottom-0 z-30">
                                 <TableRow className="h-12 border-t-[3px] border-black bg-slate-200 font-black">
-                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট আদায়:</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.admission)}</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.session)}</TableCell>
-                                    {grandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.exam)}</TableCell>
-                                    <TableCell className="border-r-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.other)}</TableCell>
-                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-black leading-none">{toBengaliNumber(grandTotals.total)} ৳</TableCell>
+                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট আদায়:</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.admission)}</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.session)}</TableCell>
+                                    {grandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.exam)}</TableCell>
+                                    <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.other)}</TableCell>
+                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sticky right-0 z-50 border-l-2 border-b-2 border-black leading-none">{toBengaliNumber(grandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </table>
