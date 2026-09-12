@@ -117,16 +117,20 @@ export default function PublicExamRecordsPage() {
     // Scroll Sync Refs
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
+    const isScrollingRef = useRef<string | null>(null);
 
     const handleScrollSync = (source: 'top' | 'table') => {
         const top = topScrollRef.current;
         const table = tableContainerRef.current;
         if (!top || !table) return;
+        if (isScrollingRef.current && isScrollingRef.current !== source) return;
+        isScrollingRef.current = source;
         if (source === 'top') {
             table.scrollLeft = top.scrollLeft;
         } else {
             top.scrollLeft = table.scrollLeft;
         }
+        setTimeout(() => { isScrollingRef.current = null; }, 50);
     };
 
     const canView = hasPermission('view:public-records') || user?.role === 'admin';
@@ -607,56 +611,56 @@ export default function PublicExamRecordsPage() {
                                     onScroll={() => handleScrollSync('table')}
                                     className="overflow-x-auto border-2 border-black rounded-lg"
                                 >
-                                    <Table className="border-collapse border-spacing-0 w-full min-w-full">
-                                        <TableHeader className="bg-slate-100">
-                                            <TableRow className="h-8 border-b-[3px] border-black">
-                                                <TableHead className="border-l-2 border-r-2 border-black text-center font-black text-black text-[13px] w-12">ছবি</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-20">বোর্ড</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-24">রেজিস্ট্রেশন নং</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-20">বোর্ড রোল</TableHead>
-                                                {activeTab === 'Scholarship' && <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-24">বৃত্তির ধরন</TableHead>}
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-16">শ্রেণি রোল</TableHead>
-                                                <TableHead className="border-r-2 border-black text-left pl-3 font-black text-black text-[13px] min-w-[250px]">শিক্ষার্থীর নাম</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-16">বিভাগ</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] min-w-[200px]">কেন্দ্র</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-14">নম্বর</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-12">গ্রেড</TableHead>
-                                                <TableHead className="border-r-2 border-black text-center font-black text-black text-[13px] w-12">GPA</TableHead>
-                                                <TableHead className="border-r-2 border-black text-right pr-6 font-black text-black text-[13px] no-print">কার্যক্রম</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
+                                    <table className="border-collapse border-spacing-0 w-full caption-bottom text-sm">
+                                        <thead className="bg-slate-100 [&_tr]:border-b">
+                                            <tr className="h-8 border-b-[3px] border-black transition-colors hover:bg-muted/50">
+                                                <th className="border-l-2 border-r-2 border-black text-center font-black text-black text-[13px] w-12 h-12 px-4 align-middle">ছবি</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-20 h-12 px-4 align-middle">বোর্ড</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-24 h-12 px-4 align-middle">রেজিস্ট্রেশন নং</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-20 h-12 px-4 align-middle">বোর্ড রোল</th>
+                                                {activeTab === 'Scholarship' && <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-24 h-12 px-4 align-middle">বৃত্তির ধরন</th>}
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-16 h-12 px-4 align-middle">শ্রেণি রোল</th>
+                                                <th className="border-r-2 border-black text-left pl-3 font-black text-black text-[13px] min-w-[250px] h-12 px-4 align-middle">শিক্ষার্থীর নাম</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-16 h-12 px-4 align-middle">বিভাগ</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] min-w-[200px] h-12 px-4 align-middle">কেন্দ্র</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-14 h-12 px-4 align-middle">নম্বর</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-12 h-12 px-4 align-middle">গ্রেড</th>
+                                                <th className="border-r-2 border-black text-center font-black text-black text-[13px] w-12 h-12 px-4 align-middle">GPA</th>
+                                                <th className="border-r-2 border-black text-right pr-6 font-black text-black text-[13px] no-print h-12 px-4 align-middle">কার্যক্রম</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="[&_tr:last-child]:border-0">
                                             {isLoading ? (
-                                                <TableRow><TableCell colSpan={activeTab === 'Scholarship' ? 13 : 12} className="text-center py-20 italic font-bold text-muted-foreground"><Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" /> লোড হচ্ছে...</TableCell></TableRow>
+                                                <tr><td colSpan={activeTab === 'Scholarship' ? 13 : 12} className="text-center py-20 italic font-bold text-muted-foreground p-4 align-middle"><Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" /> লোড হচ্ছে...</td></tr>
                                             ) : records.length === 0 ? (
-                                                <TableRow><TableCell colSpan={activeTab === 'Scholarship' ? 13 : 12} className="text-center py-24 text-xl font-black text-slate-300 italic border-b-2 border-black">কোনো রেকর্ড পাওয়া যায়নি।</TableCell></TableRow>
+                                                <tr><td colSpan={activeTab === 'Scholarship' ? 13 : 12} className="text-center py-24 text-xl font-black text-slate-300 italic border-b-2 border-black p-4 align-middle">কোনো রেকর্ড পাওয়া যায়নি।</td></tr>
                                             ) : (
                                                 records.map((record) => (
-                                                    <TableRow key={record.id} className="h-8 border-b-2 border-black hover:bg-slate-50 transition-colors">
-                                                        <TableCell className="border-l-2 border-r-2 border-black text-center p-1">
+                                                    <tr key={record.id} className="h-8 border-b-2 border-black hover:bg-slate-50 transition-colors">
+                                                        <td className="border-l-2 border-r-2 border-black text-center p-1 align-middle">
                                                             <Avatar className="h-8 w-8 border shadow-sm mx-auto">
                                                                 <AvatarImage src={record.photoUrl || getStudentPlaceholderImage()} className="object-cover" />
                                                                 <AvatarFallback className="font-black text-xs">S</AvatarFallback>
                                                             </Avatar>
-                                                        </TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-bold text-sm text-slate-700">{record.boardName || '-'}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-black text-base text-slate-800">{toBengaliNumber(record.registrationNo)}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-black text-base text-rose-700">{toBengaliNumber(record.examRoll || '-')}</TableCell>
+                                                        </td>
+                                                        <td className="border-r-2 border-black text-center font-bold text-sm text-slate-700 p-4 align-middle">{record.boardName || '-'}</td>
+                                                        <td className="border-r-2 border-black text-center font-black text-base text-slate-800 p-4 align-middle">{toBengaliNumber(record.registrationNo)}</td>
+                                                        <td className="border-r-2 border-black text-center font-black text-base text-rose-700 p-4 align-middle">{toBengaliNumber(record.examRoll || '-')}</td>
                                                         {activeTab === 'Scholarship' && (
-                                                            <TableCell className="border-r-2 border-black text-center font-black text-base text-emerald-700">
-                                                                {record.grade || 'পায়নী'}
-                                                            </TableCell>
+                                                            <td className="border-r-2 border-black text-center font-black text-base text-emerald-700 p-4 align-middle">
+                                                                {record.grade || 'পায়নী'}
+                                                            </td>
                                                         )}
-                                                        <TableCell className="border-r-2 border-black text-center font-black text-base text-slate-800">{toBengaliNumber(record.rollNo)}</TableCell>
-                                                        <TableCell className="border-r-2 border-black font-black text-base pl-3 text-slate-900 whitespace-nowrap">{record.studentName}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-bold text-sm uppercase">
+                                                        <td className="border-r-2 border-black text-center font-black text-base text-slate-800 p-4 align-middle">{toBengaliNumber(record.rollNo)}</td>
+                                                        <td className="border-r-2 border-black font-black text-base pl-3 text-slate-900 whitespace-nowrap p-4 align-middle">{record.studentName}</td>
+                                                        <td className="border-r-2 border-black text-center font-bold text-sm uppercase p-4 align-middle">
                                                             {groups.find(g => g.id === record.group)?.label || record.group}
-                                                        </TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-medium text-sm text-slate-600 px-2 whitespace-nowrap">{record.centerName || '-'}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-black text-base text-primary">{toBengaliNumber(record.totalMarks)}</TableCell>
-                                                        <TableCell className={cn("border-r-2 border-black text-center font-black text-base", record.grade?.startsWith('F') ? "text-rose-600" : "text-emerald-700")}>{record.grade}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-center font-black text-base text-blue-900">{toBengaliNumber(record.gpa.toFixed(2))}</TableCell>
-                                                        <TableCell className="border-r-2 border-black text-right pr-6 no-print">
+                                                        </td>
+                                                        <td className="border-r-2 border-black text-center font-medium text-sm text-slate-600 px-2 whitespace-nowrap p-4 align-middle">{record.centerName || '-'}</td>
+                                                        <td className="border-r-2 border-black text-center font-black text-base text-primary p-4 align-middle">{toBengaliNumber(record.totalMarks)}</td>
+                                                        <td className={cn("border-r-2 border-black text-center font-black text-base p-4 align-middle", record.grade?.startsWith('F') ? "text-rose-600" : "text-emerald-700")}>{record.grade}</td>
+                                                        <td className="border-r-2 border-black text-center font-black text-base text-blue-900 p-4 align-middle">{toBengaliNumber(record.gpa.toFixed(2))}</td>
+                                                        <td className="border-r-2 border-black text-right pr-6 no-print p-4 align-middle">
                                                             <div className="flex justify-end gap-2">
                                                                 {canManage && (
                                                                     <>
@@ -677,7 +681,7 @@ export default function PublicExamRecordsPage() {
                                                                             <AlertDialogContent className="font-kalpurush">
                                                                                 <AlertDialogHeader>
                                                                                     <AlertDialogTitle className="text-rose-700 font-black flex items-center gap-2">আপনি কি নিশ্চিত?</AlertDialogTitle>
-                                                                                    <AlertDialogDescription className="font-bold text-base">এই রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription>
+                                                                                    <AlertDialogDescription className="font-bold text-base">এই রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription>
                                                                                 </AlertDialogHeader>
                                                                                 <AlertDialogFooter>
                                                                                     <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
@@ -688,12 +692,12 @@ export default function PublicExamRecordsPage() {
                                                                     </>
                                                                 )}
                                                             </div>
-                                                        </TableCell>
-                                                    </TableRow>
+                                                        </td>
+                                                    </tr>
                                                 ))
                                             )}
-                                        </TableBody>
-                                    </Table>
+                                        </tbody>
+                                    </table>
                                 </div>
 
                                 <div className="hidden print:flex justify-between items-end mt-16 px-10">
