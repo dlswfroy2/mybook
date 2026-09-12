@@ -181,13 +181,19 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
             const table = e.currentTarget.closest('table');
             if (!table) return;
             
-            const inputs = Array.from(table.querySelectorAll('tbody input[type="number"]')) as HTMLInputElement[];
+            const inputs = Array.from(table.querySelectorAll('tbody input[type="number"]:not([readonly])')) as HTMLInputElement[];
             const index = inputs.indexOf(e.currentTarget);
             
             if (index >= 0 && index < inputs.length - 1) {
                 const nextInput = inputs[index + 1];
                 nextInput.focus();
                 nextInput.select();
+            } else if (index === -1) {
+                const next = inputs.find(input => (e.currentTarget.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+                if (next) {
+                    next.focus();
+                    next.select();
+                }
             }
         }
     };
@@ -325,11 +331,14 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                                         <TableHead className="w-32 font-black">লিখিত</TableHead>
                                         <TableHead className="w-32 font-black">MCQ</TableHead>
                                         {selectedSubjectInfo?.practical && <TableHead className="w-32 font-black">ব্যবহারিক</TableHead>}
+                                        <TableHead className="w-32 font-black text-center">মোট</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {studentsForClass.map(student => {
                                         const sMarks = marks.get(student.id);
+                                        const hasAnyMark = sMarks?.written !== undefined || sMarks?.mcq !== undefined || (selectedSubjectInfo?.practical && sMarks?.practical !== undefined);
+                                        const total = (sMarks?.written || 0) + (sMarks?.mcq || 0) + (sMarks?.practical || 0);
                                         return (
                                             <TableRow key={student.id} className="hover:bg-accent/5">
                                                 <TableCell className="font-black text-center">{toBengaliNumber(student.roll)}</TableCell>
@@ -337,6 +346,20 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                                                 <TableCell><Input type="number" value={sMarks?.written ?? ''} onChange={(e) => handleMarkChange(student.id, 'written', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.written || 0) > limits.written && "border-red-600 bg-red-50 text-red-700")} /></TableCell>
                                                 <TableCell><Input type="number" value={sMarks?.mcq ?? ''} onChange={(e) => handleMarkChange(student.id, 'mcq', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.mcq || 0) > limits.mcq && "border-red-600 bg-red-50 text-red-700")} /></TableCell>
                                                 {selectedSubjectInfo?.practical && <TableCell><Input type="number" value={sMarks?.practical ?? ''} onChange={(e) => handleMarkChange(student.id, 'practical', e.target.value)} onKeyDown={handleKeyDown} className={cn(numberInputClass, (sMarks?.practical || 0) > limits.practical && "border-red-600 bg-red-50 text-red-700")} /></TableCell>}
+                                                <TableCell>
+                                                    <Input 
+                                                        type="text" 
+                                                        readOnly 
+                                                        tabIndex={-1} 
+                                                        value={hasAnyMark ? toBengaliNumber(total) : ''} 
+                                                        onKeyDown={handleKeyDown} 
+                                                        className={cn(
+                                                            numberInputClass, 
+                                                            "bg-slate-100 text-center font-black cursor-default select-none focus-visible:ring-0 focus-visible:border-black", 
+                                                            total > fullMarks && "border-red-600 bg-red-50 text-red-700"
+                                                        )} 
+                                                    />
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}
