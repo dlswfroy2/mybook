@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -66,7 +67,8 @@ import {
   ArrowLeft,
   XCircle,
   Award,
-  FileBadge
+  FileBadge,
+  HeartHandshake
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -778,6 +780,12 @@ export default function AuthPage() {
                 </Button>
               </Link>
               
+              <Link href="/parents/login">
+                <Button className="bg-[#ea580c] hover:bg-[#c2410c] text-white font-black gap-2 h-12 px-6 border-b-4 border-[#9a3412] transition-all shadow-xl">
+                  <HeartHandshake className="w-4 h-4" /> অভিভাবক পোর্টাল
+                </Button>
+              </Link>
+
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-[#dc2626] hover:bg-[#b91c1c] text-white font-black gap-2 h-12 px-10 border-b-4 border-[#7f1d1d] transition-all shadow-xl">
