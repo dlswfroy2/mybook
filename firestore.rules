@@ -44,6 +44,7 @@ service cloud.firestore {
 
     match /students/{id} {
       allow read: if true;
+      allow update: if true; // ওপেন পেমেন্ট গেটওয়ের জন্য ব্যালেন্স আপডেট অ্যালাউ করা হলো
       allow write: if hasPermission('manage:students') || hasPermission('special:edit-student') || isAdmin();
       allow delete: if isAdmin() || hasPermission('special:delete-student');
     }
@@ -73,8 +74,9 @@ service cloud.firestore {
     }
 
     match /feeCollections/{id} {
-      allow read: if isAuthed();
-      allow create, update: if hasPermission('collect:fees') || isAdmin();
+      allow read: if true; // অভিভাবকদের পেমেন্ট হিস্টোরি দেখার জন্য
+      allow create: if true; // অনলাইন পেমেন্ট গেটওয়ের জন্য
+      allow update: if hasPermission('collect:fees') || isAdmin();
       allow delete: if isAdmin() || hasPermission('special:delete-transaction');
     }
 
@@ -84,7 +86,8 @@ service cloud.firestore {
     }
 
     match /transactions/{id} {
-      allow read: if isAuthed();
+      allow read: if true; 
+      allow create: if true; // অনলাইন পেমেন্ট গেটওয়ের জন্য
       allow write, delete: if hasPermission('manage:transactions') || hasPermission('collect:fees') || isAdmin();
     }
 
