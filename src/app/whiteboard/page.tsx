@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -133,12 +132,6 @@ export default function WhiteboardPage() {
     // Initialize Canvas
     canvas.width = Math.min(window.innerWidth - 60, 2000);
     canvas.height = Math.max(window.innerHeight - 120, 1200);
-
-    function toBengaliNumber(n: number | string | undefined | null): string {
-      if (n === undefined || n === null || n === '') return '০';
-      const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-      return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
-    }
 
     function saveState() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
@@ -338,7 +331,7 @@ export default function WhiteboardPage() {
       <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onLoad={handleScriptLoad} />
       <Script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onLoad={handleScriptLoad} />
       <Script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" onLoad={handleScriptLoad} />
-      <Script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onLoad={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onLoad={handleScriptLoad} />
 
       <div id="browser-tabs-container" className="no-print">
         <div id="tabs-wrapper"></div>
@@ -420,7 +413,7 @@ export default function WhiteboardPage() {
         <button id="reset-view-btn">🎯 ভিউ রিসেট</button>
         <button id="add-sticky">📌 স্টিকি নোট</button>
         <button id="ocr-btn">📝 OCR রিড</button>
-        <button id="math-tool-btn">∑</math LaTeX</button>
+        <button id="math-tool-btn">{"∑</math LaTeX"}</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
         <button id="timer-btn">⏱️ টাইমার</button>
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
