@@ -1,10 +1,9 @@
-
 "use client";
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen, BookOpenText, Search } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Settings, BookOpen, Library, Users, NotebookPen, BookOpenText, Search, Edit3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -74,6 +73,8 @@ function BottomNavContent() {
       targetPath = '/admissions-management';
     } else if (q.includes('সেটিংস') || q.includes('নিয়ন্ত্রণ') || q.includes('সেটিং')) {
       targetPath = '/settings';
+    } else if (q.includes('বোর্ড') || q.includes('হোয়াইটবোর্ড') || q.includes('আঁকা')) {
+      targetPath = '/whiteboard';
     }
 
     if (targetPath) {
@@ -92,6 +93,7 @@ function BottomNavContent() {
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/' },
+    { label: 'হোয়াইটবোর্ড', icon: Edit3, href: '/whiteboard' },
     { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books' },
     { label: 'ডায়েরি', icon: NotebookPen, href: '/diary' },
     { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question' },
@@ -118,7 +120,7 @@ function BottomNavContent() {
               )}
             >
               <item.icon className={cn("w-5 h-5", isActive && "animate-pulse")} />
-              <span className="text-[8px] mt-0.5 font-bold whitespace-nowrap">{item.label}</span>
+              <span className="text-[8px] mt-0.5 font-black whitespace-nowrap">{item.label}</span>
               {isActive && (
                 <div className="absolute -bottom-0.5 w-1 h-1 bg-white rounded-full" />
               )}

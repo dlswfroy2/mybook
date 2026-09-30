@@ -1,0 +1,772 @@
+
+/* ===================================================
+   ১. গ্লোবাল রিসেট ও বডি স্টাইল
+   =================================================== */
+.whiteboard-body {
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #087df1;
+  transition: background-color 0.3s ease;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* ===================================================
+   ২. ভাসমান সাইডবার টগল বাটনসমূহ (বাম ও ডান)
+   =================================================== */
+.sidebar-toggle {
+  position: fixed;
+  top: 10px;
+  z-index: 10001;
+  background: #ee0707;
+  color: #06ec25;
+  border: 3px solid #1908fa;
+  padding: 1px 2px;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 3px 2px 8px rgba(252, 251, 251, 0.4);
+  transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+  background: #087bee;
+}
+
+.left-toggle {
+  left: 0px;
+  border-radius: 0 8px 8px 0;
+}
+
+.right-toggle {
+  right: 0px;
+  border-radius: 1px 0 0 8px;
+}
+
+/* ===================================================
+   ৩. সাইডবার লেআউট (বাম ও ডান উভয়)
+   =================================================== */
+.sidebar {
+  position: fixed;
+  top: 45px;
+  bottom: 10px;
+  width: 150px;
+  background: #7e71ec;
+  padding: 3px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(221, 13, 13, 0.4);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-content: start;
+  align-items: center;
+  z-index: 10000;
+  overflow-y: auto;
+  box-sizing: border-box;
+  transition: transform 0.3s ease;
+}
+
+.left-sidebar {
+  left: 10px;
+}
+
+.left-sidebar.collapsed {
+  transform: translateX(-220px);
+}
+
+.right-sidebar {
+  right: 5px;
+}
+
+.right-sidebar.collapsed {
+  transform: translateX(220px);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #f30505;
+  border-radius: 4px;
+}
+
+.sidebar label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #f7f6fa;
+  margin-top: 6px;
+}
+
+#page-controls,
+#pdf-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+#board-page-num,
+#page-num {
+  text-align: center;
+  font-weight: bold;
+  color: #f7f4f4;
+  font-size: 15px;
+  padding: 3px 0;
+}
+
+/* ===================================================
+   ৪. টুল বাটন ও বাটন গ্রুপ স্টাইল
+   =================================================== */
+.tool-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  width: 100%;
+}
+
+.tool-btn {
+  width: 100%;
+  padding: 7px 5px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #0a0a0a;
+  background: linear-gradient(to bottom, #097df1, #0878e7);
+  border: 5px solid #3ae414;
+  border-radius: 6px;
+  box-shadow: 0 4px 0 #0d0d0e, 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.tool-btn.active {
+  background: linear-gradient(to bottom, #27ae60, #2ecc71) !important;
+  box-shadow: 0 0 10px #2ecc71, 0 2px 0 #1e8449 !important;
+  border: 2px solid #ffffff !important;
+  transform: translateY(2px);
+}
+
+.bg-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.bg-btn {
+  padding: 6px 10px;
+  border: 1.5px solid #bdc3c7;
+  border-radius: 5px;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bg-btn:hover {
+  border-color: #3498db;
+  background-color: #ebf5fb;
+}
+
+.bg-btn.active {
+  border: 2px solid #2980b9;
+  background-color: #3498db;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+/* ===================================================
+   ৫. স্ট্যান্ডার্ড সাইডবার কন্ট্রোলস (বাটন, কালার, স্লাইডার)
+   =================================================== */
+.left-sidebar button,
+.left-sidebar input[type="color"],
+.left-sidebar input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  padding: 6px 2%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #ffffff;
+  border: 1px solid #f0f1f0;
+  border-radius: 6px;
+  background: linear-gradient(to bottom, #077ff7, #037efa);
+  box-shadow: 0 3px 0 #3737f1, 0 3px 5px rgba(244, 245, 247, 0.2);
+  transition: all 0.1s ease;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.sidebar input[type="color"] {
+  height: 40px;
+  padding: 3px;
+}
+
+.sidebar input[type="range"] {
+  box-shadow: none;
+  background: transparent;
+}
+
+.sidebar button:hover,
+.tool-btn:hover {
+  filter: brightness(1.1);
+}
+
+.sidebar button:active,
+.tool-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #1a252f, 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.top-plus-btn {
+  background: linear-gradient(to bottom, #f3033f, #2ecc71) !important;
+  box-shadow: 0 3px 0 #1e8449 !important;
+  font-weight: bold;
+}
+
+.right-sidebar button,
+.right-sidebar input[type="color"],
+.right-sidebar input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  padding: 6px 2%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #111111;
+  border: 1px solid #02f102;
+  border-radius: 6px;
+  background: linear-gradient(to bottom, #f3f707, #f3f707);
+  box-shadow: 0 3px 0 #3737f1, 0 3px 5px rgba(244, 245, 247, 0.2);
+  transition: all 0.1s ease;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.browser-delete-btn {
+  background: linear-gradient(to bottom, #f51c04, #f31c04) !important;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  color: white;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 20px;
+  box-shadow: 0 3px 0 #f71d04 !important;
+  flex-shrink: 0;
+}
+
+#toggle-dark {
+  background: linear-gradient(to bottom, #5c5e5d, #c6c9c8) !important;
+  box-shadow: 0 3px 0 #03eea0 !important; color: #fdfdfa;
+}
+#prev-board-page, #next-board-page, #zoom-in, #zoom-out {
+  background: linear-gradient(to bottom, #09f0b6, #1abc9c) !important;
+  box-shadow: 0 3px 0 #ee0351 !important;
+}
+
+#view-3d-btn {
+  background: linear-gradient(to bottom, #f3f7f6, #1abc9c) !important;
+  box-shadow: 0 3px 0 #117a65 !important;
+}
+
+#add-sticky {
+  background: linear-gradient(to bottom, #5705ee, #0307e9) !important;
+  box-shadow: 0 3px 0 #9a7d0a !important;
+  color: #faf9f9 !important;
+}
+
+#speech-btn {
+  background: linear-gradient(to bottom, #ec7004, #f06306) !important;
+  box-shadow: 0 3px 0 #873600 !important;
+}
+
+#record-btn {
+  background: linear-gradient(to bottom, #0ae902, #0cf004) !important;
+  box-shadow: 0 3px 0 #7b241c !important;
+}
+
+#upload-btn {
+  background: linear-gradient(to bottom, #ac05f3, #aa05eb) !important;
+  box-shadow: 0 3px 0 #a603ec !important;
+}
+
+#clear {
+  background: linear-gradient(to bottom, #f01b03, #f51a06) !important;
+  box-shadow: 0 3px 0 #f11b03 !important;
+}
+#undo-btn, #redo-btn {
+  background: linear-gradient(to bottom, #ebe5e5, #f51a06) !important;
+  box-shadow: 0 3px 0 #2bf103 !important;
+}
+
+.dark-mode .sidebar {
+  background: #222222;
+  color: #ffffff;
+}
+
+/* ===================================================
+   ৬. ক্যানভাস স্ক্রোল র‍্যাপার ও কন্টেইনার
+   =================================================== */
+#scroll-wrapper {
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  padding-left: 185px;
+  padding-right: 200px;
+  padding-top: 10px;
+  padding-bottom: 50px;
+  box-sizing: border-box;
+  transition: padding 0.3s ease;
+}
+
+#scroll-wrapper.left-expanded {
+  padding-left: 180px;
+}
+
+#scroll-wrapper.right-expanded {
+  padding-right: 20px;
+}
+
+#canvas-container {
+  position: relative;
+  margin: 20px auto;
+  display: inline-block;
+  transform-origin: center top;
+  transition: transform 0.1s ease-out;
+}
+
+canvas {
+  display: block;
+  background: #ffffff;
+  box-shadow: 0 0 0px rgba(245, 5, 5, 0.5);
+  cursor: crosshair;
+  touch-action: none;
+}
+canvas.panning-active {
+  cursor: grab !important;
+}
+canvas.panning-active:active {
+  cursor: grabbing !important;
+}
+
+/* ===================================================
+   ৭. ব্রাউজার ট্যাব এবং অ্যাক্টিভ ট্যাব স্টাইলিং
+   =================================================== */
+#browser-tabs-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 5px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10002;
+}
+
+#tabs-wrapper {
+  display: flex;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+.board-tab {
+  padding: 6px 12px;
+  background-color: #f1f1f1;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.board-tab.active {
+  background-color: #ffffff; 
+  border-bottom: 2px solid #2ecc71; 
+  color: #2ecc71;
+}
+
+/* ===================================================
+   ৮. প্রোফাইল ও স্টিকি নোটস
+   =================================================== */
+.sticky-note {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  background: #fffa75;
+  padding: 10px;
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  z-index: 80;
+  cursor: move;
+}
+
+.sticky-note textarea {
+  width: 100%;
+  height: 80%;
+  border: none;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font-size: 14px;
+}
+
+.sticky-note .close-note {
+  position: absolute;
+  top: 2px;
+  right: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #ff0000;
+}
+
+/* ===================================================
+   ৯. ক্যানভাসে টেক্সট লেখার ইনপুট ঘর
+   =================================================== */
+.canvas-text-input {
+  position: absolute;
+  border: 5px dashed #007bff;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  white-space: nowrap;
+  z-index: 60;
+}
+
+/* ===================================================
+   ১০. স্কেল/রুলার টুল
+   =================================================== */
+#ruler {
+  position: absolute;
+  top: 100px;
+  left: 100px;
+  width: 500px;
+  height: 60px;
+  background: rgba(255, 223, 0, 0.75);
+  border: 2px solid #b8860b;
+  border-radius: 4px;
+  cursor: move;
+  z-index: 50;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.ruler-marks {
+  width: 100%;
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #000 0px,
+    #000 1px,
+    transparent 1px,
+    transparent 10px
+  );
+}
+
+/* ===================================================
+   ১১. লেজার পয়েন্টার ডট
+   =================================================== */
+#laser-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: red;
+  border-radius: 50%;
+  box-shadow: 0 0 10px red, 0 0 20px red;
+  pointer-events: none;
+  z-index: 70;
+  transform: translate(-50%, -50%);
+}
+
+/* ===================================================
+   ১২. ৩ডি ভিউয়ার মোডাল
+   =================================================== */
+#modal-3d {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20000;
+}
+
+.modal-content {
+  background: #2c3e50;
+  padding: 20px;
+  border-radius: 12px;
+  width: 80vw;
+  height: 80vh;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0, 255, 200, 0.3);
+  display: flex;
+  flex-direction: column;
+  color: #ffffff;
+}
+
+#close-3d {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  font-size: 28px;
+  font-weight: bold;
+  color: #e74c3c;
+  cursor: pointer;
+}
+
+#container-3d {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #1a1a1a;
+}
+
+/* ===================================================
+   ১৩. উইজেটসমূহ (ক্যালকুলেটর, টাইমার, চ্যাট)
+   =================================================== */
+.widget {
+  position: fixed;
+  top: 80px;
+  right: 220px;
+  background: #2c3e50;
+  color: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  z-index: 15000;
+  width: 220px;
+}
+
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #555;
+  padding-bottom: 4px;
+}
+
+.close-widget {
+  cursor: pointer;
+  color: #e74c3c;
+}
+
+#calc-screen {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 8px;
+  text-align: right;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.calc-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.calc-buttons button {
+  padding: 8px;
+  cursor: pointer;
+}
+
+#timer-display {
+  font-size: 70px;
+  text-align: center;
+  font-weight: bold;
+  color: #eb0404;
+  background: #111;
+  border-radius: 10px;
+  padding: 15px;
+}
+
+/* ===================================================
+   ১৪. ইউজার প্রোফাইল ও ড্রপডাউন
+   =================================================== */
+#profile-container {
+  position: absolute;
+  right: 15px;
+}
+
+.profile-btn {
+  background: #27ae60 !important;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: 35px;
+  background: #34495e;
+  width: 200px;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+  z-index: 120;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+}
+
+.profile-header .avatar {
+  font-size: 25px;
+  background: #2c3e50;
+  padding: 5px;
+  border-radius: 50%;
+}
+.profile-menu-btn {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  background: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+.profile-menu-btn:hover {
+  background: #1abc9c;
+}
+
+.profile-menu-btn.logout {
+  background: #c0392b;
+}
+
+/* ===================================================
+   ১৫. চ্যাট উইজেট ও ফাইল মেসেজ
+   =================================================== */
+#chat-widget {
+  width: 280px;
+}
+
+.chat-messages {
+  height: 180px;
+  overflow-y: auto;
+  background: #1a252f;
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.chat-msg {
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  background: #34495e;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.chat-msg.system {
+  background: transparent;
+  color: #f1c40f;
+  text-align: center;
+  font-style: italic;
+}
+
+.chat-input-area {
+  display: flex;
+  gap: 4px;
+}
+
+#chat-input {
+  flex-grow: 1;
+  padding: 4px;
+  border-radius: 4px;
+  border: none;
+}
+
+.chat-file-btn {
+  background: #e67e22;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#send-chat-btn {
+  background: #2980b9;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ===================================================
+   ১৬. প্রেজেন্টেশন ও ক্লাউড সিঙ্ক
+   =================================================== */
+#presentation-curtain {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #2c3e50;
+  z-index: 95;
+  border-bottom: 5px solid #e74c3c;
+  transition: height 0.2s ease;
+}
+
+#curtain-handle {
+  position: absolute; bottom: -30px; left: 50%;
+  transform: translateX(-50%);
+  background: #e74c3c; color: white;
+  padding: 5px 15px; border-radius: 0 0 8px 8px;
+  cursor: ns-resize; font-weight: bold; font-size: 12px;
+}
+
+#spotlight-overlay {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 90;
+}
+
+.sync-indicator {
+  position: absolute; left: 15px;
+  font-size: 12px; color: #fff;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 12px;
+}
+
+.back-home-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10005;
+  background: #000;
+  color: white;
+  border: 2px solid white;
+  padding: 8px 15px;
+  border-radius: 50px;
+  font-weight: black;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
