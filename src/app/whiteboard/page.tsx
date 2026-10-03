@@ -74,7 +74,6 @@ export default function WhiteboardPage() {
     const calcWidget = document.getElementById('calc-widget')!;
     const timerBtn = document.getElementById('timer-btn')!;
     const timerWidget = document.getElementById('timer-widget')!;
-    const graphBtn = document.getElementById('graph-btn')!;
     const mathToolBtn = document.getElementById('math-tool-btn')!;
     const mathWidget = document.getElementById('math-widget')!;
     const mathLatexInput = document.getElementById('math-latex-input') as HTMLInputElement;
@@ -110,7 +109,6 @@ export default function WhiteboardPage() {
     let freehandPoints: {x: number, y: number}[] = [];
     let undoStack: ImageData[] = [];
     let redoStack: ImageData[] = [];
-    let drawnObjects: any[] = [];
     const MAX_HISTORY = 20;
 
     let pagesData: any[] = [{
@@ -361,6 +359,15 @@ export default function WhiteboardPage() {
         boardPageNumSpan.textContent = `পেজ: ${currentBoardPage + 1}/${pagesData.length}`;
         if (pagesData[currentBoardPage].imageData) ctx.putImageData(pagesData[currentBoardPage].imageData, 0, 0);
         else drawBackground();
+
+        // Update PDF controls visibility based on whether the current board page has an associated PDF
+        if (pagesData[currentBoardPage].pdfDoc) {
+            pdfControls.style.display = 'grid';
+            pageNumSpan.textContent = `${pagesData[currentBoardPage].pageNum} / ${pagesData[currentBoardPage].numPages}`;
+        } else {
+            pdfControls.style.display = 'none';
+        }
+
         renderTabs();
     }
 
@@ -478,6 +485,7 @@ export default function WhiteboardPage() {
                 (window as any).pdfjsLib.getDocument(typedarray).promise.then((pdf: any) => {
                     pagesData[currentBoardPage].pdfDoc = pdf;
                     pagesData[currentBoardPage].numPages = pdf.numPages;
+                    pagesData[currentBoardPage].pageNum = 1;
                     renderPdfPage(1);
                 });
             };
@@ -486,14 +494,42 @@ export default function WhiteboardPage() {
     };
 
     function renderPdfPage(num: number) {
-        pagesData[currentBoardPage].pdfDoc.getPage(num).then((page: any) => {
+        const currentBoard = pagesData[currentBoardPage];
+        if (!currentBoard.pdfDoc) return;
+
+        currentBoard.pdfDoc.getPage(num).then((page: any) => {
             const vp = page.getViewport({ scale: 1.5 });
-            canvas.width = vp.width; canvas.height = vp.height;
+            canvas.width = vp.width; 
+            canvas.height = vp.height;
+            
+            // Re-draw background after resizing canvas for PDF
+            drawBackground(); 
+
             page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
-                pageNumSpan.textContent = `${num} / ${pagesData[currentBoardPage].numPages}`;
+                pageNumSpan.textContent = `${num} / ${currentBoard.numPages}`;
+                pdfControls.style.display = 'grid';
+                currentBoard.pageNum = num;
+                // Capture image data to preserve the PDF content on board page switch
+                currentBoard.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             });
         });
     }
+
+    prevPageBtn.onclick = () => {
+        const currentBoard = pagesData[currentBoardPage];
+        if (currentBoard.pdfDoc && currentBoard.pageNum > 1) {
+            currentBoard.pageNum--;
+            renderPdfPage(currentBoard.pageNum);
+        }
+    };
+
+    nextPageBtn.onclick = () => {
+        const currentBoard = pagesData[currentBoardPage];
+        if (currentBoard.pdfDoc && currentBoard.pageNum < currentBoard.numPages) {
+            currentBoard.pageNum++;
+            renderPdfPage(currentBoard.pageNum);
+        }
+    };
 
     drawBackground();
     renderTabs();
@@ -580,7 +616,7 @@ export default function WhiteboardPage() {
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
         <button id="math-tool-btn">{"∑</math LaTeX"}</button>
-        <button id="view-3d-btn">🧊 ৩ডি ভিউ</button>
+        <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
         <button id="timer-btn">⏱️ টাইমার</button>
         <button id="spotlight-btn">🔦 স্পটলাইট</button>
@@ -588,6 +624,17 @@ export default function WhiteboardPage() {
         <button id="fullscreen-btn">📺 ফুলস্ক্রিন</button>
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
         <button id="upload-btn">📂 PDF আপলোড</button>
+        
+        {/* PDF Pagination Controls */}
+        <div id="pdf-controls" style={{ display: 'none' }}>
+          <label className="text-[10px] font-black text-white uppercase text-center mt-2">PDF পাতা</label>
+          <span id="page-num" className="text-white font-black text-xs text-center py-1">১ / ১</span>
+          <div className="grid grid-cols-2 gap-1 w-full">
+            <button id="prev-page" className="h-8 text-[10px] font-black">আগের</button>
+            <button id="next-page" className="h-8 text-[10px] font-black">পরের</button>
+          </div>
+        </div>
+
         <button id="save-img">💾 ছবি সেভ</button>
         <button id="save-pdf">📄 PDF সেভ</button>
       </div>
@@ -642,12 +689,6 @@ export default function WhiteboardPage() {
       <button className="back-home-btn no-print" onClick={() => router.push('/')}>
         <ArrowLeft className="w-4 h-4" /> পোর্টালে ফিরুন
       </button>
-
-      <div id="pdf-controls" style={{ display: 'none' }}>
-        <span id="page-num"></span>
-        <button id="prev-page">আগের</button>
-        <button id="next-page">পরের</button>
-      </div>
 
       <input type="file" id="img-upload" accept="image/*" style={{ display: 'none' }} />
       <input type="file" id="session-file" accept=".json" style={{ display: 'none' }} />
