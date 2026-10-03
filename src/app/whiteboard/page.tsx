@@ -18,7 +18,6 @@ export default function WhiteboardPage() {
   useEffect(() => {
     if (scriptsLoaded < totalScripts) return;
 
-    // --- Provided JS Logic Adapted for Next.js ---
     const canvas = document.getElementById('board') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
 
@@ -32,6 +31,7 @@ export default function WhiteboardPage() {
     const redoBtn = document.getElementById('redo-btn')!;
     const zoomInBtn = document.getElementById('zoom-in')!;
     const zoomOutBtn = document.getElementById('zoom-out')!;
+    const resetViewBtn = document.getElementById('reset-view-btn')!;
 
     const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
     const uploadBtn = document.getElementById('upload-btn')!;
@@ -41,6 +41,7 @@ export default function WhiteboardPage() {
     const pageNumSpan = document.getElementById('page-num')!;
     const saveImgBtn = document.getElementById('save-img')!;
     const savePdfBtn = document.getElementById('save-pdf')!;
+    const saveSvgBtn = document.getElementById('save-svg')!;
 
     const ruler = document.getElementById('ruler')!;
     const toggleRulerBtn = document.getElementById('toggle-ruler')!;
@@ -71,38 +72,29 @@ export default function WhiteboardPage() {
 
     const calcBtn = document.getElementById('calc-btn')!;
     const calcWidget = document.getElementById('calc-widget')!;
-    const graphBtn = document.getElementById('graph-btn')!;
     const timerBtn = document.getElementById('timer-btn')!;
     const timerWidget = document.getElementById('timer-widget')!;
-    const imgBtn = document.getElementById('img-btn')!;
-    const imgUpload = document.getElementById('img-upload') as HTMLInputElement;
-    const audioBtn = document.getElementById('audio-btn')!;
-    const saveSvgBtn = document.getElementById('save-svg')!;
-    const saveSessionBtn = document.getElementById('save-session')!;
-    const loadSessionBtn = document.getElementById('load-session')!;
-    const sessionFile = document.getElementById('session-file') as HTMLInputElement;
-
-    const profileToggleBtn = document.getElementById('profile-toggle-btn')!;
-    const profileDropdown = document.getElementById('profile-dropdown')!;
-    const chatToggleBtn = document.getElementById('chat-toggle-btn')!;
-    const chatWidget = document.getElementById('chat-widget')!;
-    const chatInput = document.getElementById('chat-input') as HTMLInputElement;
-    const sendChatBtn = document.getElementById('send-chat-btn')!;
-    const chatFileInput = document.getElementById('chat-file-input') as HTMLInputElement;
-    const chatMessages = document.getElementById('chat-messages')!;
-
-    const resetViewBtn = document.getElementById('reset-view-btn')!;
+    const graphBtn = document.getElementById('graph-btn')!;
     const mathToolBtn = document.getElementById('math-tool-btn')!;
     const mathWidget = document.getElementById('math-widget')!;
     const mathLatexInput = document.getElementById('math-latex-input') as HTMLInputElement;
     const mathPreview = document.getElementById('math-preview')!;
     const insertMathBtn = document.getElementById('insert-math-btn')!;
+    
     const spotlightBtn = document.getElementById('spotlight-btn')!;
     const curtainBtn = document.getElementById('curtain-btn')!;
     const fullscreenBtn = document.getElementById('fullscreen-btn')!;
     const presentationCurtain = document.getElementById('presentation-curtain')!;
     const curtainHandle = document.getElementById('curtain-handle')!;
     const spotlightOverlay = document.getElementById('spotlight-overlay')!;
+    
+    const imgBtn = document.getElementById('img-btn')!;
+    const imgUpload = document.getElementById('img-upload') as HTMLInputElement;
+    const audioBtn = document.getElementById('audio-btn')!;
+    
+    const saveSessionBtn = document.getElementById('save-session')!;
+    const loadSessionBtn = document.getElementById('load-session')!;
+    const sessionFile = document.getElementById('session-file') as HTMLInputElement;
     const syncText = document.getElementById('sync-text')!;
 
     let currentTool = 'pen';
@@ -115,7 +107,6 @@ export default function WhiteboardPage() {
     let isDrawing = false;
     let startX: number, startY: number;
     let snapshot: ImageData;
-    let currentBoardPage = 0;
     let freehandPoints: {x: number, y: number}[] = [];
     let undoStack: ImageData[] = [];
     let redoStack: ImageData[] = [];
@@ -128,6 +119,7 @@ export default function WhiteboardPage() {
       pageNum: 1,
       numPages: 0
     }];
+    let currentBoardPage = 0;
 
     // Initialize Canvas
     canvas.width = Math.min(window.innerWidth - 60, 2000);
@@ -160,6 +152,15 @@ export default function WhiteboardPage() {
           ctx.beginPath();
           ctx.strokeStyle = (y % 50 === 0) ? (isDark ? '#555' : '#a2c4c9') : (isDark ? '#252525' : '#e8f4f8');
           ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+      } else if (currentBgStyle === 'isometric') {
+        const side = 30;
+        const h = side * Math.sqrt(3) / 2;
+        for (let y = 0; y < canvas.height + h; y += h) {
+          for (let x = 0; x < canvas.width + side; x += side * 1.5) {
+            ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = isDark ? '#555' : '#aaa'; ctx.fill();
+          }
         }
       } else if (currentBgStyle === 'ruled') {
         for (let y = 40; y < canvas.height; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
@@ -216,7 +217,7 @@ export default function WhiteboardPage() {
       if (currentTool === 'pan' || e.button === 1) {
         isPanning = true;
         startPanX = e.clientX - panOffsetX;
-        startPanY = e.clientY - startPanY;
+        startPanY = e.clientY - panOffsetY;
         return;
       }
       if (['laser'].includes(currentTool)) return;
@@ -272,6 +273,32 @@ export default function WhiteboardPage() {
         let radius = Math.hypot(startX - currentX, startY - currentY);
         ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
         if (fillShapeCheckbox.checked) ctx.fill(); ctx.stroke();
+      } else if (currentTool === 'triangle') {
+        ctx.putImageData(snapshot, 0, 0); ctx.beginPath();
+        ctx.moveTo(startX + (currentX - startX) / 2, startY);
+        ctx.lineTo(startX, currentY); ctx.lineTo(currentX, currentY); ctx.closePath();
+        if (fillShapeCheckbox.checked) ctx.fill(); ctx.stroke();
+      } else if (currentTool === 'right-triangle') {
+        ctx.putImageData(snapshot, 0, 0); ctx.beginPath();
+        ctx.moveTo(startX, startY); ctx.lineTo(startX, currentY); ctx.lineTo(currentX, currentY); ctx.closePath();
+        if (fillShapeCheckbox.checked) ctx.fill(); ctx.stroke();
+      } else if (currentTool === 'diamond') {
+        ctx.putImageData(snapshot, 0, 0); ctx.beginPath();
+        let w = currentX - startX, h = currentY - startY;
+        ctx.moveTo(startX + w / 2, startY); ctx.lineTo(startX + w, startY + h / 2);
+        ctx.lineTo(startX + w / 2, startY + h); ctx.lineTo(startX, startY + h / 2); ctx.closePath();
+        if (fillShapeCheckbox.checked) ctx.fill(); ctx.stroke();
+      } else if (currentTool === 'star') {
+        ctx.putImageData(snapshot, 0, 0); ctx.beginPath();
+        let r = Math.hypot(startX - currentX, startY - currentY);
+        let rot = Math.PI / 2 * 3, step = Math.PI / 5;
+        ctx.moveTo(startX, startY - r);
+        for (let i = 0; i < 5; i++) {
+          ctx.lineTo(startX + Math.cos(rot) * r, startY + Math.sin(rot) * r); rot += step;
+          ctx.lineTo(startX + Math.cos(rot) * (r / 2), startY + Math.sin(rot) * (r / 2)); rot += step;
+        }
+        ctx.closePath();
+        if (fillShapeCheckbox.checked) ctx.fill(); ctx.stroke();
       }
     }
 
@@ -285,6 +312,7 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
 
+    // Sidebar Toggles
     toggleSidebarBtn.addEventListener('click', () => {
       toolbar.classList.toggle('collapsed');
       toggleSidebarBtn.textContent = toolbar.classList.contains('collapsed') ? '▶' : '◀';
@@ -294,6 +322,7 @@ export default function WhiteboardPage() {
       toggleRightSidebarBtn.textContent = rightToolbar.classList.contains('collapsed') ? '◀' : '▶';
     });
 
+    // Right Sidebar Button Listeners
     clearBtn.addEventListener('click', () => { saveState(); drawBackground(); });
     undoBtn.addEventListener('click', () => {
       if (undoStack.length > 0) {
@@ -310,10 +339,164 @@ export default function WhiteboardPage() {
     zoomInBtn.addEventListener('click', () => { currentScale += 0.1; updateCanvasTransform(); });
     zoomOutBtn.addEventListener('click', () => { if (currentScale > 0.3) { currentScale -= 0.1; updateCanvasTransform(); } });
     resetViewBtn.addEventListener('click', () => { currentScale = 1; panOffsetX = 0; panOffsetY = 0; updateCanvasTransform(); });
-
     toggleDarkBtn.addEventListener('click', () => { document.body.classList.toggle('dark-mode'); drawBackground(); });
 
+    // Page Management
+    function renderTabs() {
+      tabsWrapper.innerHTML = '';
+      pagesData.forEach((_, idx) => {
+        const tab = document.createElement('div');
+        tab.className = `board-tab ${idx === currentBoardPage ? 'active' : ''}`;
+        tab.textContent = `পেজ ${idx + 1}`;
+        tab.onclick = () => {
+            pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            currentBoardPage = idx;
+            updateUIForPage();
+        };
+        tabsWrapper.appendChild(tab);
+      });
+    }
+
+    function updateUIForPage() {
+        boardPageNumSpan.textContent = `পেজ: ${currentBoardPage + 1}/${pagesData.length}`;
+        if (pagesData[currentBoardPage].imageData) ctx.putImageData(pagesData[currentBoardPage].imageData, 0, 0);
+        else drawBackground();
+        renderTabs();
+    }
+
+    addBoardPageBtn.onclick = () => {
+        pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        pagesData.push({ imageData: null, pdfDoc: null, pageNum: 1, numPages: 0 });
+        currentBoardPage = pagesData.length - 1;
+        updateUIForPage();
+    };
+
+    deleteBoardPageBtn.onclick = () => {
+        if (pagesData.length <= 1) return;
+        pagesData.splice(currentBoardPage, 1);
+        if (currentBoardPage >= pagesData.length) currentBoardPage = pagesData.length - 1;
+        updateUIForPage();
+    };
+
+    // Sticky, OCR, Math
+    addStickyBtn.onclick = () => {
+        const note = document.createElement('div');
+        note.className = 'sticky-note';
+        note.style.left = '100px'; note.style.top = '100px';
+        note.innerHTML = `<span class="close-note">&times;</span><textarea></textarea>`;
+        canvasContainer.appendChild(note);
+        note.querySelector('.close-note')!.onclick = () => note.remove();
+    };
+
+    ocrBtn.onclick = async () => {
+        ocrBtn.textContent = '⏳...';
+        const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
+        alert(result.data.text || 'কিছু পাওয়া যায়নি');
+        ocrBtn.textContent = '📝 OCR';
+    };
+
+    mathToolBtn.onclick = () => mathWidget.classList.toggle('hidden');
+    mathLatexInput.oninput = () => {
+        mathPreview.innerHTML = `\\[${mathLatexInput.value}\\]`;
+        if ((window as any).MathJax) (window as any).MathJax.typesetPromise([mathPreview]);
+    };
+    insertMathBtn.onclick = () => {
+        const svg = mathPreview.querySelector('svg');
+        if (svg) {
+            const xml = new XMLSerializer().serializeToString(svg);
+            const img = new Image();
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+            img.onload = () => { ctx.drawImage(img, 100, 100); saveState(); };
+        }
+    };
+
+    // Calculator and Timer Widgets
+    calcBtn.onclick = () => calcWidget.classList.toggle('hidden');
+    const calcScreen = document.getElementById('calc-screen') as HTMLInputElement;
+    calcWidget.querySelectorAll('.calc-buttons button').forEach(b => {
+        b.onclick = () => {
+            const txt = b.textContent;
+            if (txt === '=') { try { calcScreen.value = eval(calcScreen.value); } catch { calcScreen.value = 'Error'; } }
+            else if (txt === 'Clear') calcScreen.value = '';
+            else calcScreen.value += txt;
+        };
+    });
+
+    timerBtn.onclick = () => timerWidget.classList.toggle('hidden');
+    let timerInt: any;
+    document.getElementById('start-timer')!.onclick = () => {
+        let sec = 0;
+        clearInterval(timerInt);
+        timerInt = setInterval(() => {
+            sec++;
+            const m = Math.floor(sec/60).toString().padStart(2,'0');
+            const s = (sec%60).toString().padStart(2,'0');
+            document.getElementById('timer-display')!.textContent = `${m}:${s}`;
+        }, 1000);
+    };
+    document.getElementById('stop-timer')!.onclick = () => clearInterval(timerInt);
+    document.getElementById('reset-timer')!.onclick = () => { clearInterval(timerInt); document.getElementById('timer-display')!.textContent = '00:00'; };
+
+    // Spotlight and Curtain
+    spotlightBtn.onclick = () => spotlightOverlay.classList.toggle('hidden');
+    canvasContainer.onmousemove = (e) => {
+        if (!spotlightOverlay.classList.contains('hidden')) {
+            const rect = canvasContainer.getBoundingClientRect();
+            spotlightOverlay.style.background = `radial-gradient(circle 120px at ${e.clientX - rect.left}px ${e.clientY - rect.top}px, transparent 100%, rgba(0,0,0,0.8) 100%)`;
+        }
+    };
+
+    curtainBtn.onclick = () => { presentationCurtain.classList.toggle('hidden'); presentationCurtain.style.height = '50%'; };
+    let curtainDragging = false;
+    curtainHandle.onmousedown = () => curtainDragging = true;
+    document.onmousemove = (e) => {
+        if (curtainDragging) {
+            const rect = canvasContainer.getBoundingClientRect();
+            let h = e.clientY - rect.top;
+            presentationCurtain.style.height = `${Math.max(0, Math.min(h, rect.height))}px`;
+        }
+    };
+    document.onmouseup = () => curtainDragging = false;
+
+    fullscreenBtn.onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+
+    // File Management
+    saveImgBtn.onclick = () => { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'board.png'; a.click(); };
+    savePdfBtn.onclick = () => {
+        const pdf = new (window as any).jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
+        pdf.addImage(canvas.toDataURL(), 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('board.pdf');
+    };
+    
+    uploadBtn.onclick = () => pdfUpload.click();
+    pdfUpload.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const typedarray = new Uint8Array(this.result as ArrayBuffer);
+                (window as any).pdfjsLib.getDocument(typedarray).promise.then((pdf: any) => {
+                    pagesData[currentBoardPage].pdfDoc = pdf;
+                    pagesData[currentBoardPage].numPages = pdf.numPages;
+                    renderPdfPage(1);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    };
+
+    function renderPdfPage(num: number) {
+        pagesData[currentBoardPage].pdfDoc.getPage(num).then((page: any) => {
+            const vp = page.getViewport({ scale: 1.5 });
+            canvas.width = vp.width; canvas.height = vp.height;
+            page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+                pageNumSpan.textContent = `${num} / ${pagesData[currentBoardPage].numPages}`;
+            });
+        });
+    }
+
     drawBackground();
+    renderTabs();
 
     return () => {
       canvas.removeEventListener('pointerdown', startDrawing);
@@ -324,7 +507,6 @@ export default function WhiteboardPage() {
 
   return (
     <div className="whiteboard-body font-kalpurush">
-      {/* External Library Scripts */}
       <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" onLoad={handleScriptLoad} />
       <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js" onLoad={handleScriptLoad} />
       <Script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onLoad={handleScriptLoad} />
@@ -335,27 +517,11 @@ export default function WhiteboardPage() {
 
       <div id="browser-tabs-container" className="no-print">
         <div id="tabs-wrapper"></div>
-        <button id="add-board-page" className="browser-plus-btn top-plus-btn" title="নতুন পেজ যোগ করুন">➕</button>
-        <button id="delete-board-page" className="browser-delete-btn" title="বর্তমান পেজ ডিলিট করুন">🗑️</button>
+        <button id="add-board-page" className="browser-plus-btn top-plus-btn" title="নতুন পেজ">➕</button>
+        <button id="delete-board-page" className="browser-delete-btn" title="ডিলিট">🗑️</button>
         <button id="clear">🗑️ মুছুন</button>
         <div id="cloud-sync-status" className="sync-indicator">
-          <span id="sync-icon">☁️</span> <span id="sync-text">অটো-সেভ চালুর অপেক্ষায়...</span>
-        </div>
-        <div id="profile-container">
-          <button id="profile-toggle-btn" className="profile-btn">👤 প্রোফাইল</button>
-          <div id="profile-dropdown" className="profile-dropdown hidden">
-            <div className="profile-header">
-              <div className="avatar">👤</div>
-              <div>
-                <strong id="user-name">ব্যবহারকারী</strong>
-                <p id="user-role">শিক্ষক / অ্যাডমিন</p>
-              </div>
-            </div>
-            <hr />
-            <button id="chat-toggle-btn" className="profile-menu-btn">💬 লাইভ চ্যাট ও ফাইল শেয়ার</button>
-            <button id="my-files-btn" className="profile-menu-btn">📁 সংরক্ষিত সেশনসমূহ</button>
-            <button id="logout-btn" className="profile-menu-btn logout">🚪 লগআউট</button>
-          </div>
+          <span id="sync-icon">☁️</span> <span id="sync-text">অটো-সেভ সক্রিয়...</span>
         </div>
       </div>
 
@@ -368,8 +534,6 @@ export default function WhiteboardPage() {
           <button type="button" className="tool-btn active" data-tool="pen">✏️ কলম</button>
           <button type="button" className="tool-btn" data-tool="highlighter">🖍️ হাইলাইটার</button>
           <button type="button" className="tool-btn" data-tool="smart-shape">✨ স্মার্ট শেপ</button>
-          <button type="button" className="tool-btn" data-tool="select">🎯 অবজেক্ট সিলেক্ট</button>
-          <button type="button" className="tool-btn" data-tool="object-eraser">💥 অবজেক্ট ইরেজার</button>
           <button type="button" className="tool-btn" data-tool="pan">✋ প্যান/সরান</button>
         </div>
         <label>মুছা ও পয়েন্টার:</label>
@@ -382,12 +546,15 @@ export default function WhiteboardPage() {
           <button type="button" className="tool-btn" data-tool="line">📏 লাইন</button>
           <button type="button" className="tool-btn" data-tool="rectangle">⬛ আয়তক্ষেত্র</button>
           <button type="button" className="tool-btn" data-tool="circle">⭕ বৃত্ত</button>
-          <button type="button" className="tool-btn" data-tool="text">🔤 টেক্সট</button>
+          <button type="button" className="tool-btn" data-tool="triangle">🔺 ত্রিভুজ</button>
+          <button type="button" className="tool-btn" data-tool="right-triangle">📐 সমকোণী</button>
+          <button type="button" className="tool-btn" data-tool="diamond">🔷 রম্বস</button>
+          <button type="button" className="tool-btn" data-tool="star">⭐ তারা</button>
         </div>
         <hr style={{ width: '100%', border: '1px solid #ffffff55' }} />
         <label>কালার:</label>
         <input type="color" id="color" defaultValue="#000000" />
-        <label>তুলির সাইজ:</label>
+        <label>সাইজ:</label>
         <input type="range" id="size" min="1" max="50" defaultValue="5" />
         <label><input type="checkbox" id="fill-shape" /> শেপ ফিল</label>
       </div>
@@ -398,24 +565,27 @@ export default function WhiteboardPage() {
           <button type="button" className="bg-btn active" data-bg="blank">⬜ খালি</button>
           <button type="button" className="bg-btn" data-bg="grid">▦ গ্রিড</button>
           <button type="button" className="bg-btn" data-bg="graph">📈 গ্রাফ</button>
+          <button type="button" className="bg-btn" data-bg="isometric">⁞ আইসো</button>
           <button type="button" className="bg-btn" data-bg="ruled">≡ রুল</button>
         </div>
         <button id="toggle-dark">🌙 ডার্ক মোড</button>
         <div id="page-controls">
           <span id="board-page-num">পেজ: ১/১</span>
-          <button id="prev-board-page">⬅️ আগে</button>
-          <button id="next-board-page">➡️ পরে</button>
         </div>
         <button id="undo-btn">↩️ আনডু</button>
         <button id="redo-btn">↪️ রিডু</button>
         <button id="zoom-in">🔍 জুম ইন</button>
         <button id="zoom-out">🔎 জুম আউট</button>
-        <button id="reset-view-btn">🎯 ভিউ রিসেট</button>
-        <button id="add-sticky">📌 স্টিকি নোট</button>
-        <button id="ocr-btn">📝 OCR রিড</button>
+        <button id="reset-view-btn">🎯 রিসেট</button>
+        <button id="add-sticky">📌 স্টিকি</button>
+        <button id="ocr-btn">📝 OCR</button>
         <button id="math-tool-btn">{"∑</math LaTeX"}</button>
+        <button id="view-3d-btn">🧊 ৩ডি ভিউ</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
         <button id="timer-btn">⏱️ টাইমার</button>
+        <button id="spotlight-btn">🔦 স্পটলাইট</button>
+        <button id="curtain-btn">🚪 পর্দা</button>
+        <button id="fullscreen-btn">📺 ফুলস্ক্রিন</button>
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
         <button id="upload-btn">📂 PDF আপলোড</button>
         <button id="save-img">💾 ছবি সেভ</button>
@@ -426,9 +596,6 @@ export default function WhiteboardPage() {
         <div id="canvas-container">
           <canvas id="board"></canvas>
           <div id="laser-dot" className="hidden"></div>
-          <div id="minimap" className="hidden">
-            <div id="minimap-viewport"></div>
-          </div>
           <div id="presentation-curtain" className="hidden">
             <div id="curtain-handle">🚪 পর্দা</div>
           </div>
@@ -451,6 +618,7 @@ export default function WhiteboardPage() {
           <button>4</button><button>5</button><button>6</button><button>*</button>
           <button>1</button><button>2</button><button>3</button><button>-</button>
           <button>0</button><button>.</button><button>=</button><button>+</button>
+          <button style={{ gridColumn: 'span 4', background: '#e74c3c', color: 'white' }}>Clear</button>
         </div>
       </div>
 
@@ -463,17 +631,23 @@ export default function WhiteboardPage() {
 
       <div id="timer-widget" className="widget hidden">
         <div className="widget-header">⏱️ টাইমার <span className="close-widget">&times;</span></div>
-        <div id="timer-display">00:00</div>
+        <div id="timer-display" style={{ fontSize: '30px', textAlign: 'center', fontWeight: 'bold' }}>00:00</div>
         <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-          <button id="start-timer">শুরু</button>
-          <button id="stop-timer">বন্ধ</button>
-          <button id="reset-timer">রিসেট</button>
+          <button id="start-timer" style={{flex: 1}}>শুরু</button>
+          <button id="stop-timer" style={{flex: 1}}>বন্ধ</button>
+          <button id="reset-timer" style={{flex: 1}}>রিসেট</button>
         </div>
       </div>
 
       <button className="back-home-btn no-print" onClick={() => router.push('/')}>
         <ArrowLeft className="w-4 h-4" /> পোর্টালে ফিরুন
       </button>
+
+      <div id="pdf-controls" style={{ display: 'none' }}>
+        <span id="page-num"></span>
+        <button id="prev-page">আগের</button>
+        <button id="next-page">পরের</button>
+      </div>
 
       <input type="file" id="img-upload" accept="image/*" style={{ display: 'none' }} />
       <input type="file" id="session-file" accept=".json" style={{ display: 'none' }} />
