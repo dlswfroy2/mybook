@@ -628,11 +628,20 @@ export default function Home() {
         if (res.error) {
             toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
         } else {
-            // Process dates
-            const detectedDates: string[] = Array.isArray(res.dates) && res.dates.length > 0 
-                ? res.dates 
+            // Process dates — merge top-level dates[] AND attendanceByDate[].date
+            const rawDates: string[] = Array.isArray(res.dates) && res.dates.length > 0
+                ? res.dates
                 : (res.date ? [res.date] : []);
-            
+
+            // Also pull any dates from attendanceByDate that may not be in dates[]
+            const extraDates: string[] = Array.isArray(res.attendanceByDate)
+                ? res.attendanceByDate.map((d: any) => d.date).filter(Boolean)
+                : [];
+
+            // Merge and deduplicate, sorted chronologically
+            const allDatesSet = new Set<string>([...rawDates, ...extraDates]);
+            const detectedDates: string[] = Array.from(allDatesSet).sort();
+
             if (detectedDates.length > 0) {
                 setSelectedAiDate(detectedDates[0]);
                 setApplyToAllDates(detectedDates.length > 1);
@@ -655,7 +664,7 @@ export default function Home() {
                 }
             }
             setSelectedAiClass(String(finalClass));
-            setAiResult({ ...res, resolvedClass: finalClass, autoResolved });
+            setAiResult({ ...res, dates: detectedDates, resolvedClass: finalClass, autoResolved });
             toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
         }
     } catch (e: any) {
@@ -671,9 +680,24 @@ export default function Home() {
       if (!aiResult) return;
       
       if (aiTask === 'attendance') {
-          const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
-          const datesToApply: string[] = (applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 0) 
-              ? aiResult.dates 
+          // Build a comprehensive list of all dates to save
+          // Priority: if user checked "apply to all" → use all merged dates; else single selected date
+          let allMergedDates: string[] = [];
+          if (Array.isArray(aiResult.dates) && aiResult.dates.length > 0) {
+              allMergedDates = [...aiResult.dates];
+          }
+          // Also include any dates from attendanceByDate that may not be in dates[]
+          if (Array.isArray(aiResult.attendanceByDate)) {
+              aiResult.attendanceByDate.forEach((d: any) => {
+                  if (d.date && !allMergedDates.includes(d.date)) {
+                      allMergedDates.push(d.date);
+                  }
+              });
+          }
+          allMergedDates = Array.from(new Set(allMergedDates)).sort();
+
+          const datesToApply: string[] = (applyToAllDates && allMergedDates.length > 0)
+              ? allMergedDates
               : [selectedAiDate || aiResult.date || format(new Date(), 'yyyy-MM-dd')];
 
           setIsSavingQuickAttendance(true);
@@ -1099,39 +1123,66 @@ export default function Home() {
                                       </div>
 
                                       {/* Detected Multiple Dates Display */}
-                                      {Array.isArray(aiResult.dates) && aiResult.dates.length > 1 && (
-                                          <div className="pt-2 border-t border-slate-100 space-y-2">
-                                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                                  <p className="text-[11px] font-black text-slate-700">শনাক্তকৃত একাধিক তারিখ ({toBengaliNumber(aiResult.dates.length)}টি):</p>
-                                                  <label className="flex items-center gap-2 text-xs font-black text-indigo-700 cursor-pointer bg-indigo-50 px-2 py-1 rounded-md">
-                                                      <input 
-                                                          type="checkbox" 
-                                                          checked={applyToAllDates} 
-                                                          onChange={e => setApplyToAllDates(e.target.checked)}
-                                                          className="rounded text-indigo-600 h-4 w-4"
-                                                      />
-                                                      সকল তারিখে একসাথে সংরক্ষণ করুন
-                                                  </label>
+                                      {Array.isArray(aiResult.dates) && aiResult.dates.length > 0 && (() => {
+                                          // Group by year-month for cleaner display
+                                          const byMonth: Record<string, string[]> = {};
+                                          aiResult.dates.forEach((dStr: string) => {
+                                              const parts = dStr.split('-');
+                                              const ym = parts.slice(0, 2).join('-'); // "YYYY-MM"
+                                              if (!byMonth[ym]) byMonth[ym] = [];
+                                              byMonth[ym].push(dStr);
+                                          });
+                                          const BENGALI_MONTH_NAMES = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+                                          return (
+                                              <div className="pt-2 border-t border-slate-100 space-y-3">
+                                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                      <p className="text-[11px] font-black text-slate-700">শনাক্তকৃত তারিখ ({toBengaliNumber(aiResult.dates.length)}টি — {toBengaliNumber(Object.keys(byMonth).length)}টি মাস):</p>
+                                                      <label className="flex items-center gap-2 text-xs font-black text-indigo-700 cursor-pointer bg-indigo-50 px-2 py-1 rounded-md">
+                                                          <input 
+                                                              type="checkbox" 
+                                                              checked={applyToAllDates} 
+                                                              onChange={e => setApplyToAllDates(e.target.checked)}
+                                                              className="rounded text-indigo-600 h-4 w-4"
+                                                          />
+                                                          সকল তারিখে একসাথে সংরক্ষণ করুন
+                                                      </label>
+                                                  </div>
+                                                  {Object.entries(byMonth).map(([ym, dates]) => {
+                                                      const [y, m] = ym.split('-');
+                                                      const mName = BENGALI_MONTH_NAMES[parseInt(m, 10) - 1] || m;
+                                                      return (
+                                                          <div key={ym}>
+                                                              <p className="text-[10px] font-black text-indigo-700 mb-1.5">{mName} {toBengaliNumber(y)}</p>
+                                                              <div className="flex flex-wrap gap-1.5">
+                                                                  {dates.map((dStr: string) => {
+                                                                      const bdEntry = Array.isArray(aiResult.attendanceByDate)
+                                                                          ? aiResult.attendanceByDate.find((d: any) => d.date === dStr)
+                                                                          : null;
+                                                                      const pCount = bdEntry?.presentRolls?.length ?? null;
+                                                                      return (
+                                                                          <button
+                                                                              key={dStr}
+                                                                              type="button"
+                                                                              onClick={() => { setSelectedAiDate(dStr); setApplyToAllDates(false); }}
+                                                                              className={cn(
+                                                                                  "px-2.5 py-1 text-xs font-black rounded-lg border transition-all",
+                                                                                  (selectedAiDate === dStr && !applyToAllDates)
+                                                                                      ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                                                                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                                                                              )}
+                                                                          >
+                                                                              {toBengaliNumber(dStr.split('-')[2])} তারিখ
+                                                                              {pCount !== null && <span className="ml-1 opacity-70">({toBengaliNumber(pCount)}জন)</span>}
+                                                                          </button>
+                                                                      );
+                                                                  })}
+                                                              </div>
+                                                          </div>
+                                                      );
+                                                  })}
                                               </div>
-                                              <div className="flex flex-wrap gap-1.5">
-                                                  {aiResult.dates.map((dStr: string) => (
-                                                      <button
-                                                          key={dStr}
-                                                          type="button"
-                                                          onClick={() => { setSelectedAiDate(dStr); setApplyToAllDates(false); }}
-                                                          className={cn(
-                                                              "px-2.5 py-1 text-xs font-black rounded-lg border transition-all",
-                                                              (selectedAiDate === dStr && !applyToAllDates)
-                                                                  ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
-                                                                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                                                          )}
-                                                      >
-                                                          {toBengaliNumber(dStr)}
-                                                      </button>
-                                                  ))}
-                                              </div>
-                                          </div>
-                                      )}
+                                          );
+                                      })()}
                                   </div>
 
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
