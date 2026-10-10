@@ -8,7 +8,7 @@ const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY ||
 
 export const ai = genkit({
   plugins: [googleAI({ apiKey })],
-  model: 'googleai/gemini-3.5-flash',
+  model: 'googleai/gemini-1.5-flash',
 });
 
 

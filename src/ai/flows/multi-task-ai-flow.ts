@@ -139,6 +139,7 @@ GENERAL RULES:
     });
 
     const response = await ai.generate({
+      model: 'googleai/gemini-1.5-flash',
       prompt: parts,
       config: {
         responseMimeType: 'application/json',
