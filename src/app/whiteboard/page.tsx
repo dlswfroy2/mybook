@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, XCircle, BrainCircuit } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -44,14 +45,10 @@ export default function WhiteboardPage() {
     const saveImgBtn = document.getElementById('save-img')!;
     const savePdfBtn = document.getElementById('save-pdf')!;
 
-    const ruler = document.getElementById('ruler')!;
-    const toggleRulerBtn = document.getElementById('toggle-ruler')!;
     const canvasContainer = document.getElementById('canvas-container')!;
     const laserDot = document.getElementById('laser-dot')!;
 
     const addStickyBtn = document.getElementById('add-sticky')!;
-    const prevBoardPageBtn = document.getElementById('prev-board-page')!;
-    const nextBoardPageBtn = document.getElementById('next-board-page')!;
     const addBoardPageBtn = document.getElementById('add-board-page')!;
     const deleteBoardPageBtn = document.getElementById('delete-board-page')!;
     const boardPageNumSpan = document.getElementById('board-page-num')!;
@@ -85,6 +82,9 @@ export default function WhiteboardPage() {
     const curtainHandle = document.getElementById('curtain-handle')!;
     const spotlightOverlay = document.getElementById('spotlight-overlay')!;
     const syncText = document.getElementById('sync-text')!;
+
+    const speechBtn = document.getElementById('speech-btn')!;
+    const recordBtn = document.getElementById('record-btn')!;
 
     let currentTool = 'pen';
     let currentBgStyle = 'blank';
@@ -177,6 +177,124 @@ export default function WhiteboardPage() {
       }, 500);
     }
 
+    function detectAndDrawSmartShape(points: {x: number, y: number}[]) {
+        if (points.length < 10) return;
+        const first = points[0];
+        const last = points[points.length - 1];
+        const dist = Math.hypot(last.x - first.x, last.y - first.y);
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        points.forEach(p => {
+          if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+        });
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        ctx.beginPath();
+        ctx.lineWidth = Number(sizePicker.value);
+        ctx.strokeStyle = colorPicker.value;
+
+        if (dist < 40) { 
+          if (Math.abs(width - height) < 20) {
+            ctx.arc(minX + width / 2, minY + height / 2, Math.max(width, height) / 2, 0, Math.PI * 2);
+          } else {
+            ctx.rect(minX, minY, width, height);
+          }
+        } else { 
+          ctx.moveTo(first.x, first.y);
+          ctx.lineTo(last.x, last.y);
+        }
+        ctx.stroke();
+    }
+
+    function drawProtractor() {
+        saveState();
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 150;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, Math.PI, 0);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 235, 59, 0.4)';
+        ctx.fill();
+        ctx.strokeStyle = '#d35400';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        for (let i = 0; i <= 180; i += 10) { 
+          const angle = (i * Math.PI) / 180;
+          const x1 = centerX - radius * Math.cos(angle);
+          const y1 = centerY - radius * Math.sin(angle);
+          const x2 = centerX - (radius - 15) * Math.cos(angle);
+          const y2 = centerY - (radius - 15) * Math.sin(angle);
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+    }
+
+    function drawCompass() {
+        saveState();
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 100;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#2980b9';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fill();
+    }
+
+    function handleDirectText(e: any) {
+        const coords = getCanvasCoordinates(e);
+        const clickX = coords.x;
+        const clickY = coords.y;
+
+        const existingInput = document.querySelector('.canvas-text-input');
+        if (existingInput) existingInput.remove();
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'canvas-text-input';
+        const fontSize = Math.max(16, Number(sizePicker.value) * 3);
+        
+        const rect = canvas.getBoundingClientRect();
+        input.style.fontSize = `${fontSize}px`;
+        input.style.color = colorPicker.value;
+        input.style.left = `${e.clientX - rect.left}px`;
+        input.style.top = `${e.clientY - rect.top - fontSize / 2}px`;
+        input.style.position = 'absolute';
+        input.style.zIndex = '1000';
+        input.style.background = 'transparent';
+        input.style.border = '2px dashed #3498db';
+        input.style.outline = 'none';
+
+        canvasContainer.appendChild(input);
+        setTimeout(() => input.focus(), 10);
+
+        const finalize = () => {
+            const text = input.value.trim();
+            if (text) {
+                saveState();
+                ctx.font = `${fontSize}px Kalpurush, sans-serif`;
+                ctx.fillStyle = input.style.color;
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, clickX, clickY);
+            }
+            input.remove();
+        };
+
+        input.addEventListener('keydown', (evt) => { if (evt.key === 'Enter') finalize(); });
+        input.addEventListener('blur', finalize);
+    }
+
     const toolBtnHandler = (e: Event) => {
         const btn = e.currentTarget as HTMLElement;
         document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -184,6 +302,9 @@ export default function WhiteboardPage() {
         currentTool = btn.getAttribute('data-tool')!;
         if (currentTool === 'pan') canvas.classList.add('panning-active');
         else canvas.classList.remove('panning-active');
+        
+        if (currentTool === 'protractor') drawProtractor();
+        if (currentTool === 'compass') drawCompass();
     };
     document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', toolBtnHandler));
 
@@ -204,7 +325,9 @@ export default function WhiteboardPage() {
         startPanY = e.clientY - panOffsetY;
         return;
       }
-      if (['laser'].includes(currentTool)) return;
+      if (['laser', 'protractor', 'compass'].includes(currentTool)) return;
+      if (currentTool === 'text') { handleDirectText(e); return; }
+
       saveState();
       isDrawing = true;
       const coords = getCanvasCoordinates(e);
@@ -289,6 +412,7 @@ export default function WhiteboardPage() {
     function stopDrawing() {
       if (isPanning) { isPanning = false; return; }
       if (!isDrawing) return;
+      if (currentTool === 'smart-shape') { ctx.putImageData(snapshot, 0, 0); detectAndDrawSmartShape(freehandPoints); }
       isDrawing = false; ctx.beginPath();
     }
 
@@ -373,9 +497,9 @@ export default function WhiteboardPage() {
         const note = document.createElement('div');
         note.className = 'sticky-note';
         note.style.left = '100px'; note.style.top = '100px';
-        note.innerHTML = `<span class="close-note">&times;</span><textarea></textarea>`;
+        note.innerHTML = `<span class="close-note" style="position:absolute;top:2px;right:5px;cursor:pointer;">&times;</span><textarea style="width:100%;height:100%;border:none;background:transparent;"></textarea>`;
         canvasContainer.appendChild(note);
-        note.querySelector('.close-note')!.onclick = () => note.remove();
+        (note.querySelector('.close-note') as HTMLElement).onclick = () => note.remove();
     };
 
     ocrBtn.onclick = async () => {
@@ -383,6 +507,45 @@ export default function WhiteboardPage() {
         const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
         alert(result.data.text || 'কিছু পাওয়া যায়নি');
         ocrBtn.textContent = '📝 OCR';
+    };
+
+    speechBtn.onclick = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) return alert('ব্রাউজার সাপোর্ট করে না');
+        const rec = new SpeechRecognition();
+        rec.lang = 'bn-BD';
+        rec.start();
+        speechBtn.textContent = '🎙️...';
+        rec.onresult = (e: any) => {
+            const txt = e.results[0][0].transcript;
+            ctx.font = '24px Kalpurush, sans-serif';
+            ctx.fillStyle = colorPicker.value;
+            ctx.fillText(txt, 200, 200);
+            saveState();
+        };
+        rec.onend = () => speechBtn.textContent = '🎙️ ভয়েস';
+    };
+
+    let mediaRecorder: any, chunks: any[] = [];
+    recordBtn.onclick = async () => {
+        if (recordBtn.classList.contains('recording')) {
+            mediaRecorder.stop();
+            recordBtn.classList.remove('recording');
+            recordBtn.textContent = '🎥 রেকর্ড';
+        } else {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            mediaRecorder = new MediaRecorder(stream);
+            chunks = [];
+            mediaRecorder.ondataavailable = (e: any) => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'recording.webm'; a.click();
+            };
+            mediaRecorder.start();
+            recordBtn.classList.add('recording');
+            recordBtn.textContent = '⏹️ থামান';
+        }
     };
 
     mathToolBtn.onclick = () => mathWidget.classList.toggle('hidden');
@@ -403,7 +566,7 @@ export default function WhiteboardPage() {
     calcBtn.onclick = () => calcWidget.classList.toggle('hidden');
     const calcScreen = document.getElementById('calc-screen') as HTMLInputElement;
     calcWidget.querySelectorAll('.calc-buttons button').forEach(b => {
-        b.onclick = () => {
+        (b as HTMLElement).onclick = () => {
             const txt = b.textContent;
             if (txt === '=') { try { calcScreen.value = eval(calcScreen.value); } catch { calcScreen.value = 'Error'; } }
             else if (txt === 'Clear') calcScreen.value = '';
@@ -509,11 +672,33 @@ export default function WhiteboardPage() {
         }
     };
 
+    // AI Math Solver Integration
+    const aiSolveBtn = document.getElementById('ai-solve-btn')!;
+    const aiModal = document.getElementById('ai-modal')!;
+    const aiBody = document.getElementById('ai-solution-body')!;
+    const closeAiBtn = document.getElementById('close-ai-modal')!;
+
+    aiSolveBtn.onclick = async () => {
+        aiSolveBtn.textContent = '⏳...';
+        try {
+            // Placeholder for AI solver logic using Tesseract + LLM
+            const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
+            const mathText = result.data.text;
+            if (!mathText.trim()) { alert('বোর্ডে কোনো লেখা নেই'); }
+            else {
+                aiModal.classList.remove('hidden');
+                aiBody.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border border-dashed"><p class="font-black text-indigo-700">শনাক্তকৃত প্রশ্ন:</p><p className="font-bold">${mathText}</p><hr className="my-4"/><p class="font-black text-emerald-700">AI সমাধান:</p><p class="text-xs">শীঘ্রই জেমিনি এআই দিয়ে পূর্ণাঙ্গ সমাধান যুক্ত করা হবে।</p></div>`;
+            }
+        } catch (e) { alert('AI এরর'); }
+        finally { aiSolveBtn.textContent = '🤖 এআই সলভ'; }
+    };
+
+    closeAiBtn.onclick = () => aiModal.classList.add('hidden');
+
     drawBackground();
     renderTabs();
     isInitialized.current = true;
 
-    // Comprehensive Cleanup
     return () => {
       canvas.removeEventListener('pointerdown', startDrawing);
       canvas.removeEventListener('pointermove', draw);
@@ -531,13 +716,13 @@ export default function WhiteboardPage() {
 
   return (
     <div className="whiteboard-body font-kalpurush">
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" onReady={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js" onReady={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onReady={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onReady={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onReady={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" onReady={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" strategy="afterInteractive" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" strategy="afterInteractive" onReady={handleScriptLoad} />
 
       <div id="browser-tabs-container" className="no-print">
         <div id="tabs-wrapper"></div>
@@ -560,7 +745,7 @@ export default function WhiteboardPage() {
           <button type="button" className="tool-btn" data-tool="smart-shape">✨ স্মার্ট শেপ</button>
           <button type="button" className="tool-btn" data-tool="pan">✋ প্যান/সরান</button>
         </div>
-        <label>মুছা ও পয়েন্টার:</label>
+        <label>মোছা ও পয়েন্টার:</label>
         <div className="tool-group">
           <button type="button" className="tool-btn" data-tool="eraser">🧹 ইরেজার</button>
           <button type="button" className="tool-btn" data-tool="laser">🔴 লেজার ডট</button>
@@ -574,6 +759,9 @@ export default function WhiteboardPage() {
           <button type="button" className="tool-btn" data-tool="right-triangle">📐 সমকোণী</button>
           <button type="button" className="tool-btn" data-tool="diamond">🔷 রম্বস</button>
           <button type="button" className="tool-btn" data-tool="star">⭐ তারা</button>
+          <button type="button" className="tool-btn" data-tool="protractor">📐 চাঁদা</button>
+          <button type="button" className="tool-btn" data-tool="compass">🧭 কম্পাস</button>
+          <button type="button" className="tool-btn" data-tool="text">🔤 টেক্সট</button>
         </div>
         <hr style={{ width: '100%', border: '1px solid #ffffff55' }} />
         <label>কালার:</label>
@@ -605,6 +793,7 @@ export default function WhiteboardPage() {
         <button id="reset-view-btn">🎯 রিসেট</button>
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
+        <button id="ai-solve-btn" className="bg-indigo-600 text-white border-none font-black shadow-lg">🤖 এআই সলভ</button>
         <button id="math-tool-btn">{"∑</math LaTeX"}</button>
         <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
@@ -612,6 +801,8 @@ export default function WhiteboardPage() {
         <button id="spotlight-btn">🔦 স্পটলাইট</button>
         <button id="curtain-btn">🚪 পর্দা</button>
         <button id="fullscreen-btn">📺 ফুলস্ক্রিন</button>
+        <button id="speech-btn">🎙️ ভয়েস</button>
+        <button id="record-btn">🎥 রেকর্ড</button>
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
         <button id="upload-btn">📂 PDF আপলোড</button>
         
@@ -646,10 +837,18 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
+      <div id="ai-modal" className="widget hidden h-[400px] flex flex-col p-0">
+          <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
+              <h4 className="font-black text-lg flex items-center gap-2"><BrainCircuit /> এআই সমাধান</h4>
+              <button id="close-ai-modal" className="text-white hover:text-red-200 transition-colors"><XCircle /></button>
+          </div>
+          <div id="ai-solution-body" className="p-6 overflow-y-auto flex-1 bg-white text-black"></div>
+      </div>
+
       <div id="calc-widget" className="widget hidden">
-        <div className="widget-header">🧮 ক্যালকুলেটর <span className="close-widget">&times;</span></div>
-        <input type="text" id="calc-screen" readOnly />
-        <div className="calc-buttons">
+        <div className="widget-header">🧮 ক্যালকুলেটর <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
+        <input type="text" id="calc-screen" readOnly style={{width:'100%', marginBottom:'10px', textAlign:'right', padding:'5px', color:'black'}} />
+        <div className="calc-buttons" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'5px'}}>
           <button>7</button><button>8</button><button>9</button><button>/</button>
           <button>4</button><button>5</button><button>6</button><button>*</button>
           <button>1</button><button>2</button><button>3</button><button>-</button>
@@ -659,19 +858,19 @@ export default function WhiteboardPage() {
       </div>
 
       <div id="math-widget" className="widget hidden">
-        <div className="widget-header">∑ ম্যাথ ইনপুট <span className="close-widget">&times;</span></div>
-        <input type="text" id="math-latex-input" placeholder="LaTeX..." style={{ width: '100%' }} />
-        <div id="math-preview" style={{ background: '#fff', color: '#000', padding: '10px', minHeight: '40px', marginTop: '5px' }}></div>
-        <button id="insert-math-btn" style={{ width: '100%', marginTop: '5px' }}>যোগ করুন</button>
+        <div className="widget-header">∑ ম্যাথ ইনপুট <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
+        <input type="text" id="math-latex-input" placeholder="LaTeX..." style={{ width: '100%', padding:'5px', color:'black' }} />
+        <div id="math-preview" style={{ background: '#fff', color: '#000', padding: '10px', minHeight: '40px', marginTop: '5px', borderRadius:'4px' }}></div>
+        <button id="insert-math-btn" style={{ width: '100%', marginTop: '5px', background:'#27ae60', color:'white', padding:'8px' }}>যোগ করুন</button>
       </div>
 
       <div id="timer-widget" className="widget hidden">
-        <div className="widget-header">⏱️ টাইমার <span className="close-widget">&times;</span></div>
+        <div className="widget-header">⏱️ টাইমার <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
         <div id="timer-display" style={{ fontSize: '30px', textAlign: 'center', fontWeight: 'bold' }}>00:00</div>
         <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-          <button id="start-timer" style={{flex: 1}}>শুরু</button>
-          <button id="stop-timer" style={{flex: 1}}>বন্ধ</button>
-          <button id="reset-timer" style={{flex: 1}}>রিসেট</button>
+          <button id="start-timer" style={{flex: 1, padding:'5px'}}>শুরু</button>
+          <button id="stop-timer" style={{flex: 1, padding:'5px'}}>বন্ধ</button>
+          <button id="reset-timer" style={{flex: 1, padding:'5px'}}>রিসেট</button>
         </div>
       </div>
 

@@ -1,8 +1,8 @@
-/* Scoped Whiteboard Styles */
+/* Scoped Whiteboard Styles to prevent portal CSS bleeding */
 .whiteboard-body {
   margin: 0;
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Kalpurush', 'Segoe UI', sans-serif;
   background-color: #087df1;
   transition: background-color 0.3s ease;
   height: 100vh;
@@ -316,6 +316,30 @@
   align-items: center;
   gap: 8px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.whiteboard-body #presentation-curtain {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #2c3e50;
+  z-index: 95;
+  border-bottom: 5px solid #e74c3c;
+  transition: height 0.2s ease;
+}
+
+.whiteboard-body #curtain-handle {
+  position: absolute; bottom: -30px; left: 50%;
+  transform: translateX(-50%);
+  background: #e74c3c; color: white;
+  padding: 5px 15px; border-radius: 0 0 8px 8px;
+  cursor: ns-resize; font-weight: bold; font-size: 12px;
+}
+
+.whiteboard-body #spotlight-overlay {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; z-index: 90;
 }
 
 .whiteboard-body .hidden {
