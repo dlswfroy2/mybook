@@ -4,7 +4,7 @@
  * Extracts data from images, PDFs, or text for attendance, results, admission, and fees.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, createAiClient, getAvailableApiKeys } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const MultiTaskAiInputSchema = z.object({
@@ -138,16 +138,51 @@ GENERAL RULES:
 - Output MUST be valid JSON only, without any markdown formatting or surrounding backticks.`
     });
 
-    const response = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
-      prompt: parts,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+    const availableKeys = getAvailableApiKeys();
+    const candidateModels = [
+      'googleai/gemini-flash-lite-latest',
+      'googleai/gemini-flash-latest',
+      'googleai/gemini-3.5-flash',
+    ];
 
-    const text = response.text?.trim() || '';
+    let lastError: any = null;
+    let text = '';
+
+    // Automatic multi-key + multi-model failover loop
+    keyLoop: for (let k = 0; k < availableKeys.length; k++) {
+      const currentKey = availableKeys[k];
+
+      for (let m = 0; m < candidateModels.length; m++) {
+        const targetModel = candidateModels[m];
+        const client = createAiClient(currentKey, targetModel);
+
+        try {
+          const response = await client.generate({
+            model: targetModel,
+            prompt: parts,
+            config: {
+              responseMimeType: 'application/json',
+            },
+          });
+
+          text = response.text?.trim() || '';
+          if (text) {
+            // Success!
+            break keyLoop;
+          }
+        } catch (err: any) {
+          lastError = err;
+          const errMsg = String(err?.message || err);
+          console.warn(`[AI Failover] Key #${k + 1} with Model ${targetModel} failed: ${errMsg}`);
+          // Continue to next model or next key
+        }
+      }
+    }
+
     if (!text) {
+      if (lastError) {
+        throw lastError;
+      }
       return { error: 'এআই থেকে কোনো তথ্য পাওয়া যায়নি।' };
     }
 
