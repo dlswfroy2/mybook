@@ -380,7 +380,7 @@ export default function Home() {
               setTotalAbsent(0);
           }
       } catch (e) {}
-  }, [db, selectedYear, studentsForYear]);
+  }, [db, selectedYear, list]);
 
   useEffect(() => {
       if (!db || !user?.uid) return;
