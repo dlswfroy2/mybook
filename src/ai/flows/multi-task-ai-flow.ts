@@ -138,8 +138,10 @@ GENERAL RULES:
 export async function runMultiTaskAi(input: MultiTaskAiInput) {
   try {
     return await multiTaskAiFlow(input);
-  } catch (error) {
+  } catch (error: any) {
     console.error("AI Error:", error);
-    throw new Error('AI প্রসেসিং ব্যর্থ হয়েছে।');
+    const msg = error?.message || 'AI প্রসেসিং ব্যর্থ হয়েছে।';
+    return { error: `AI ত্রুটি: ${msg}` };
   }
 }
+

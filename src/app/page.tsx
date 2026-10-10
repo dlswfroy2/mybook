@@ -658,8 +658,10 @@ export default function Home() {
             setAiResult({ ...res, resolvedClass: finalClass, autoResolved });
             toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
         }
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: 'এআই কাজ করতে পারছে না।' });
+    } catch (e: any) {
+        console.error("AI Action error:", e);
+        const errMsg = e?.message || 'এআই কাজ করতে পারছে না।';
+        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: errMsg });
     } finally {
         setAiProcessing(false);
     }
