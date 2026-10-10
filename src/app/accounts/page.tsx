@@ -1343,16 +1343,29 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
 }
 
 function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transaction[], selectedYear: string }) {
+    const db = useFirestore();
     const { schoolInfo } = useSchoolInfo(); 
     const { availableYears } = useAcademicYear();
     const [reportYear, setReportYear] = useState<string>(selectedYear);
     const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+    const [allTransactions, setAllTransactions] = useState<Transaction[]>(transactions);
 
     useEffect(() => {
         if (selectedYear) {
             setReportYear(selectedYear);
         }
     }, [selectedYear]);
+
+    useEffect(() => {
+        if (!db) return;
+        const q = collection(db, 'transactions');
+        const unsub = onSnapshot(q, (snap) => {
+            setAllTransactions(snap.docs.map(transactionFromDoc));
+        }, (err) => {
+            console.error("Monthly report transactions snapshot error:", err);
+        });
+        return () => unsub();
+    }, [db]);
     
     const reportData = useMemo(() => {
         const monthIndex = parseInt(selectedMonth, 10); 
@@ -1368,9 +1381,19 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
         const isBankToCash = (head: string) => 
             head === 'Bank to Cash' || head === 'ব্যাংক থেকে উত্তোলন (Bank to Cash)' || head.includes('Bank to Cash') || (head.includes('ব্যাংক') && head.includes('উত্তোলন'));
 
-        transactions.forEach(t => { 
-            const tDate = t.date instanceof Date ? t.date : (t.date ? new Date(t.date) : null);
+        const txList = allTransactions.length > 0 ? allTransactions : transactions;
+
+        txList.forEach(t => { 
+            let tDate: Date | null = null;
+            if (t.date instanceof Date) {
+                tDate = t.date;
+            } else if ((t.date as any)?.toDate && typeof (t.date as any).toDate === 'function') {
+                tDate = (t.date as any).toDate();
+            } else if (t.date) {
+                tDate = new Date(t.date);
+            }
             if (!tDate || isNaN(tDate.getTime())) return;
+
             const amount = Number(t.amount) || 0; 
             const method = t.method || 'cash';
             const head = t.accountHead || 'অন্যান্য';
@@ -1413,9 +1436,17 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
         let closingCash = openingCash; 
         let closingBank = openingBank;
 
-        transactions.forEach(t => {
-            const tDate = t.date instanceof Date ? t.date : (t.date ? new Date(t.date) : null);
+        txList.forEach(t => {
+            let tDate: Date | null = null;
+            if (t.date instanceof Date) {
+                tDate = t.date;
+            } else if ((t.date as any)?.toDate && typeof (t.date as any).toDate === 'function') {
+                tDate = (t.date as any).toDate();
+            } else if (t.date) {
+                tDate = new Date(t.date);
+            }
             if (!tDate || isNaN(tDate.getTime())) return;
+
             const txYear = tDate.getFullYear();
             const txMonth = tDate.getMonth();
 
@@ -1441,7 +1472,7 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
         });
 
         return { openingCash, openingBank, incomeHeads, expenseHeads, totalIncome, totalExpense, closingCash, closingBank };
-    }, [transactions, selectedMonth, reportYear]);
+    }, [allTransactions, transactions, selectedMonth, reportYear]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -1456,9 +1487,14 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                         padding: 0 !important;
                         background: #fff !important;
                         width: 100% !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
                         height: auto !important;
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                    }
+                    .no-print, header, nav, aside, footer, button {
+                        display: none !important;
                     }
                     body * {
                         visibility: hidden;
@@ -1467,10 +1503,11 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                         visibility: visible;
                     }
                     #monthly-report-printable {
-                        position: fixed !important;
+                        position: absolute !important;
                         left: 0 !important;
                         top: 0 !important;
                         width: 100% !important;
+                        max-width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         border: none !important;
@@ -1481,7 +1518,7 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                     .report-print-grid {
                         display: grid !important;
                         grid-template-columns: 1fr 1fr !important;
-                        gap: 1.5rem !important;
+                        gap: 1rem !important;
                     }
                 }
             `}</style>
@@ -1513,19 +1550,19 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                 </Button>
             </div>
 
-            <div id="monthly-report-printable" className="printable-area bg-white text-black p-10 font-kalpurush border-[3px] border-black shadow-2xl rounded-3xl overflow-hidden">
-                <div className="text-center mb-8 border-b-4 border-emerald-800 pb-6">
-                    <h1 className="text-4xl font-black text-emerald-950 mb-1">{schoolInfo.name}</h1>
-                    <p className="font-bold text-slate-700 text-lg">{schoolInfo.address}</p>
-                    <div className="mt-4 inline-block bg-emerald-50 px-10 py-1.5 rounded-full border-2 border-emerald-800">
-                        <h2 className="text-2xl font-black uppercase tracking-widest">
+            <div id="monthly-report-printable" className="printable-area bg-white text-black p-10 print:p-0 font-kalpurush border-[3px] border-black print:border-none shadow-2xl print:shadow-none rounded-3xl print:rounded-none overflow-hidden print:overflow-visible print:w-full print:m-0">
+                <div className="text-center mb-8 print:mb-3 border-b-4 border-emerald-800 pb-6 print:pb-2">
+                    <h1 className="text-4xl print:text-2xl font-black text-emerald-950 mb-1">{schoolInfo.name}</h1>
+                    <p className="font-bold text-slate-700 text-lg print:text-xs">{schoolInfo.address}</p>
+                    <div className="mt-4 print:mt-1.5 inline-block bg-emerald-50 px-10 print:px-5 py-1.5 print:py-0.5 rounded-full border-2 border-emerald-800">
+                        <h2 className="text-2xl print:text-base font-black uppercase tracking-widest">
                             মাসিক আয়-ব্যয় বিবরণী - {BENGALI_MONTHS[parseInt(selectedMonth)]} {toBengaliNumber(reportYear)}
                         </h2>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 report-print-grid">
-                    <div className="space-y-6">
-                        <h3 className="text-2xl font-black border-b-2 border-emerald-700 pb-2 text-emerald-800 flex items-center gap-2"><div className="h-6 w-1.5 bg-emerald-600 rounded-full" /> আয় (Incomes)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 print:gap-4 report-print-grid">
+                    <div className="space-y-6 print:space-y-3">
+                        <h3 className="text-2xl print:text-lg font-black border-b-2 border-emerald-700 pb-2 print:pb-1 text-emerald-800 flex items-center gap-2"><div className="h-6 w-1.5 bg-emerald-600 rounded-full" /> আয় (Incomes)</h3>
                         <Table className="border-2 border-black overflow-hidden rounded-lg">
                             <TableHeader className="bg-slate-100 border-b-2 border-black">
                                 <TableRow>
@@ -1534,30 +1571,30 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow className="bg-emerald-50/50 font-black text-emerald-900 h-10 border-b">
+                                <TableRow className="bg-emerald-50/50 font-black text-emerald-900 h-10 print:h-8 border-b">
                                     <TableCell>প্রারম্ভিক জের (Opening Balance)</TableCell>
                                     <TableCell className="text-right">{toBengaliNumber(reportData.openingCash + reportData.openingBank)}</TableCell>
                                 </TableRow>
                                 {Object.entries(reportData.incomeHeads).map(([head, amount]) => (
-                                    <TableRow key={head} className="h-10 border-b last:border-0 hover:bg-slate-50 transition-colors">
-                                        <TableCell className="pl-6 font-bold">{head}</TableCell>
+                                    <TableRow key={head} className="h-10 print:h-8 border-b last:border-0 hover:bg-slate-50 transition-colors">
+                                        <TableCell className="pl-6 print:pl-3 font-bold">{head}</TableCell>
                                         <TableCell className="text-right font-black">{toBengaliNumber(amount)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {Object.entries(reportData.incomeHeads).length === 0 && (
-                                    <TableRow className="h-10 border-b text-slate-400 italic">
+                                    <TableRow className="h-10 print:h-8 border-b text-slate-400 italic">
                                         <TableCell colSpan={2} className="text-center">এই মাসে কোনো আয়ের লেনদেন নেই</TableCell>
                                     </TableRow>
                                 )}
-                                <TableRow className="bg-emerald-100 font-black text-emerald-950 border-t-2 border-black h-12">
-                                    <TableCell className="text-lg">সর্বমোট আয় (জের সহ)</TableCell>
-                                    <TableCell className="text-right text-xl">{toBengaliNumber(reportData.openingCash + reportData.openingBank + reportData.totalIncome)} ৳</TableCell>
+                                <TableRow className="bg-emerald-100 font-black text-emerald-950 border-t-2 border-black h-12 print:h-9">
+                                    <TableCell className="text-lg print:text-sm">সর্বমোট আয় (জের সহ)</TableCell>
+                                    <TableCell className="text-right text-xl print:text-base">{toBengaliNumber(reportData.openingCash + reportData.openingBank + reportData.totalIncome)} ৳</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </div>
-                    <div className="space-y-6">
-                        <h3 className="text-2xl font-black border-b-2 border-rose-700 pb-2 text-rose-800 flex items-center gap-2"><div className="h-6 w-1.5 bg-rose-600 rounded-full" /> ব্যয় (Expenditures)</h3>
+                    <div className="space-y-6 print:space-y-3">
+                        <h3 className="text-2xl print:text-lg font-black border-b-2 border-rose-700 pb-2 print:pb-1 text-rose-800 flex items-center gap-2"><div className="h-6 w-1.5 bg-rose-600 rounded-full" /> ব্যয় (Expenditures)</h3>
                         <Table className="border-2 border-black overflow-hidden rounded-lg">
                             <TableHeader className="bg-slate-100 border-b-2 border-black">
                                 <TableRow>
@@ -1567,36 +1604,36 @@ function MonthlyReportTab({ transactions, selectedYear }: { transactions: Transa
                             </TableHeader>
                             <TableBody>
                                 {Object.entries(reportData.expenseHeads).map(([head, amount]) => (
-                                    <TableRow key={head} className="h-10 border-b last:border-0 hover:bg-slate-50 transition-colors">
-                                        <TableCell className="pl-6 font-bold">{head}</TableCell>
+                                    <TableRow key={head} className="h-10 print:h-8 border-b last:border-0 hover:bg-slate-50 transition-colors">
+                                        <TableCell className="pl-6 print:pl-3 font-bold">{head}</TableCell>
                                         <TableCell className="text-right font-black">{toBengaliNumber(amount)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {Object.entries(reportData.expenseHeads).length === 0 && (
-                                    <TableRow className="h-10 border-b text-slate-400 italic">
+                                    <TableRow className="h-10 print:h-8 border-b text-slate-400 italic">
                                         <TableCell colSpan={2} className="text-center">এই মাসে কোনো ব্যয়ের লেনদেন নেই</TableCell>
                                     </TableRow>
                                 )}
-                                <TableRow className="bg-rose-100 font-black text-rose-950 border-t-2 border-black h-12">
-                                    <TableCell className="text-lg">সর্বমোট ব্যয়</TableCell>
-                                    <TableCell className="text-right text-xl">{toBengaliNumber(reportData.totalExpense)} ৳</TableCell>
+                                <TableRow className="bg-rose-100 font-black text-rose-950 border-t-2 border-black h-12 print:h-9">
+                                    <TableCell className="text-lg print:text-sm">সর্বমোট ব্যয়</TableCell>
+                                    <TableCell className="text-right text-xl print:text-base">{toBengaliNumber(reportData.totalExpense)} ৳</TableCell>
                                 </TableRow>
-                                <TableRow className="bg-slate-50 font-black border-t-2 border-black h-12 text-slate-900">
-                                    <TableCell className="text-lg">সমাপনী জের (Closing):</TableCell>
-                                    <TableCell className="text-right text-xl">{toBengaliNumber(reportData.closingCash + reportData.closingBank)} ৳</TableCell>
+                                <TableRow className="bg-slate-50 font-black border-t-2 border-black h-12 print:h-9 text-slate-900">
+                                    <TableCell className="text-lg print:text-sm">সমাপনী জের (Closing):</TableCell>
+                                    <TableCell className="text-right text-xl print:text-base">{toBengaliNumber(reportData.closingCash + reportData.closingBank)} ৳</TableCell>
                                 </TableRow>
-                                <TableRow className="text-[11px] italic text-muted-foreground bg-slate-100/50">
-                                    <TableCell className="pl-8">- হাতে নগদ (Cash): {toBengaliNumber(reportData.closingCash)} ৳</TableCell>
-                                    <TableCell className="text-right pr-6">- ব্যাংকে (Bank): {toBengaliNumber(reportData.closingBank)} ৳</TableCell>
+                                <TableRow className="text-[11px] print:text-[10px] italic text-muted-foreground bg-slate-100/50">
+                                    <TableCell className="pl-8 print:pl-4">- হাতে নগদ (Cash): {toBengaliNumber(reportData.closingCash)} ৳</TableCell>
+                                    <TableCell className="text-right pr-6 print:pr-3">- ব্যাংকে (Bank): {toBengaliNumber(reportData.closingBank)} ৳</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </div>
                 </div>
-                <div className="mt-20 print:mt-16 flex justify-between px-10 print:px-4">
-                    <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">ক্যাশিয়ার / হিসাবরক্ষক</div>
-                    <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">অডিটর / কমিটির স্বাক্ষর</div>
-                    <div className="text-center w-56 border-t-2 border-black pt-1.5 font-black text-lg">প্রধান শিক্ষকের স্বাক্ষর</div>
+                <div className="mt-20 print:mt-8 flex justify-between px-10 print:px-0">
+                    <div className="text-center w-56 print:w-36 border-t-2 border-black pt-1.5 font-black text-lg print:text-xs">ক্যাশিয়ার / হিসাবরক্ষক</div>
+                    <div className="text-center w-56 print:w-36 border-t-2 border-black pt-1.5 font-black text-lg print:text-xs">অডিটর / কমিটির স্বাক্ষর</div>
+                    <div className="text-center w-56 print:w-36 border-t-2 border-black pt-1.5 font-black text-lg print:text-xs">প্রধান শিক্ষকের স্বাক্ষর</div>
                 </div>
             </div>
         </div>

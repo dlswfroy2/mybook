@@ -12,6 +12,14 @@ import { AcademicYearProvider } from '@/context/AcademicYearContext';
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
   description: 'আধুনিক শিক্ষা সহায়ক প্ল্যাটফর্ম',
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon.ico' }
+    ],
+    shortcut: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -22,6 +30,9 @@ export default function RootLayout({
   return (
     <html lang="bn">
       <head>
+        <link rel="icon" href="/icon.png" type="image/png" />
+        <link rel="shortcut icon" href="/icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />

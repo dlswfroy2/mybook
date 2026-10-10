@@ -316,6 +316,52 @@ const NoticeTicker = () => {
     return null;
 };
 
+// Smart student matcher to resolve class when not explicitly mentioned in documents
+function matchStudentsAndResolveClass(
+  extractedStudents: Array<{ roll: number; name?: string; status?: string }>,
+  allStudents: Student[]
+): { resolvedClass: string | null; matchedMap: Map<number, Student> } {
+  if (!extractedStudents || extractedStudents.length === 0) return { resolvedClass: null, matchedMap: new Map() };
+
+  const classScores: Record<string, number> = { '6': 0, '7': 0, '8': 0, '9': 0, '10': 0 };
+  const matchedMap = new Map<number, Student>();
+
+  extractedStudents.forEach(item => {
+    const candidateMatches = allStudents.filter(s => Number(s.roll) === Number(item.roll));
+    if (candidateMatches.length === 1) {
+      const s = candidateMatches[0];
+      classScores[s.className] = (classScores[s.className] || 0) + 2;
+      matchedMap.set(Number(item.roll), s);
+    } else if (candidateMatches.length > 1) {
+      const cleanedItemName = (item.name || '').replace(/[\s\.\-_]/g, '');
+      const nameMatch = candidateMatches.find(s => {
+        if (!cleanedItemName) return false;
+        const cleanedDbName = (s.studentNameBn || '').replace(/[\s\.\-_]/g, '');
+        return cleanedDbName.includes(cleanedItemName) || cleanedItemName.includes(cleanedDbName);
+      });
+      if (nameMatch) {
+        classScores[nameMatch.className] = (classScores[nameMatch.className] || 0) + 5;
+        matchedMap.set(Number(item.roll), nameMatch);
+      } else {
+        candidateMatches.forEach(s => {
+          classScores[s.className] = (classScores[s.className] || 0) + 1;
+        });
+      }
+    }
+  });
+
+  let bestClass: string | null = null;
+  let maxScore = 0;
+  Object.entries(classScores).forEach(([cls, score]) => {
+    if (score > maxScore) {
+      maxScore = score;
+      bestClass = cls;
+    }
+  });
+
+  return { resolvedClass: bestClass, matchedMap };
+}
+
 export default function Home() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -350,6 +396,9 @@ export default function Home() {
   const [aiRawText, setAiRawText] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
+  const [selectedAiDate, setSelectedAiDate] = useState<string>('');
+  const [selectedAiClass, setSelectedAiClass] = useState<string>('6');
+  const [applyToAllDates, setApplyToAllDates] = useState<boolean>(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshDashboardAttendance = useCallback(async (currentStudents?: Student[]) => {
@@ -574,16 +623,55 @@ export default function Home() {
         const res = await runMultiTaskAi({ 
             photoDataUri: aiImage || undefined, 
             rawText: aiRawText.trim() || undefined,
-            taskType: aiTask 
+            taskType: aiTask,
+            academicYear: selectedYear
         });
         if (res.error) {
             toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
         } else {
-            setAiResult(res);
+            // Process dates — merge top-level dates[] AND attendanceByDate[].date
+            const rawDates: string[] = Array.isArray(res.dates) && res.dates.length > 0
+                ? res.dates
+                : (res.date ? [res.date] : []);
+
+            // Also pull any dates from attendanceByDate that may not be in dates[]
+            const extraDates: string[] = Array.isArray(res.attendanceByDate)
+                ? res.attendanceByDate.map((d: any) => d.date).filter(Boolean)
+                : [];
+
+            // Merge and deduplicate, sorted chronologically
+            const allDatesSet = new Set<string>([...rawDates, ...extraDates]);
+            const detectedDates: string[] = Array.from(allDatesSet).sort();
+
+            if (detectedDates.length > 0) {
+                setSelectedAiDate(detectedDates[0]);
+                setApplyToAllDates(detectedDates.length > 1);
+            } else {
+                setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
+                setApplyToAllDates(false);
+            }
+
+            // Auto-resolve class by matching student names and rolls from database
+            let finalClass = res.className;
+            let autoResolved = false;
+            if (!finalClass || finalClass === 'unknown' || !['6', '7', '8', '9', '10'].includes(String(finalClass))) {
+                const studentsList = res.students || (res.presentRolls ? res.presentRolls.map((r: number) => ({ roll: r })) : []);
+                const { resolvedClass } = matchStudentsAndResolveClass(studentsList, studentsForYear);
+                if (resolvedClass) {
+                    finalClass = resolvedClass;
+                    autoResolved = true;
+                } else {
+                    finalClass = '6';
+                }
+            }
+            setSelectedAiClass(String(finalClass));
+            setAiResult({ ...res, dates: detectedDates, resolvedClass: finalClass, autoResolved });
             toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
         }
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: 'এআই কাজ করতে পারছে না।' });
+    } catch (e: any) {
+        console.error("AI Action error:", e);
+        const errMsg = e?.message || 'এআই কাজ করতে পারছে না।';
+        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: errMsg });
     } finally {
         setAiProcessing(false);
     }
@@ -593,33 +681,145 @@ export default function Home() {
       if (!aiResult) return;
       
       if (aiTask === 'attendance') {
-          // Holiday & Weekend Check for AI applied data
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const activeHoliday = await isHoliday(db!, todayStr);
-          const dayOfWeek = new Date().getDay();
-          const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-
-          if (activeHoliday || isWeekend) {
-              toast({ 
-                  variant: 'destructive', 
-                  title: 'আজ ছুটির দিন!', 
-                  description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে স্কুল বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
-              });
-              return;
+          // Build a comprehensive list of all dates to save
+          // Priority: if user checked "apply to all" → use all merged dates; else single selected date
+          let allMergedDates: string[] = [];
+          if (Array.isArray(aiResult.dates) && aiResult.dates.length > 0) {
+              allMergedDates = [...aiResult.dates];
           }
+          // Also include any dates from attendanceByDate that may not be in dates[]
+          if (Array.isArray(aiResult.attendanceByDate)) {
+              aiResult.attendanceByDate.forEach((d: any) => {
+                  if (d.date && !allMergedDates.includes(d.date)) {
+                      allMergedDates.push(d.date);
+                  }
+              });
+          }
+          allMergedDates = Array.from(new Set(allMergedDates)).sort();
 
-          if (aiResult.students) {
-              const presentRolls = aiResult.students
-                .filter((s: any) => s.status === 'present')
-                .map((s: any) => s.roll)
-                .join(', ');
-              setQuickAttendanceInput(presentRolls);
-              if (aiResult.className) setQuickAttendanceClass(aiResult.className);
-              setIsAiPortalOpen(false);
-              setIsQuickAttendanceOpen(true);
+          const datesToApply: string[] = (applyToAllDates && allMergedDates.length > 0)
+              ? allMergedDates
+              : [selectedAiDate || aiResult.date || format(new Date(), 'yyyy-MM-dd')];
+
+          setIsSavingQuickAttendance(true);
+          try {
+              let totalSavedBatches = 0;
+
+              // Check if AI extracted attendance for multiple classes
+              const classesToProcess: Array<{ className: string; presentRolls?: number[]; absentRolls?: number[]; students?: any[] }> = [];
+
+              if (Array.isArray(aiResult.classesAttendance) && aiResult.classesAttendance.length > 0) {
+                  aiResult.classesAttendance.forEach((ca: any) => {
+                      if (ca.className) {
+                          classesToProcess.push(ca);
+                      }
+                  });
+              }
+
+              // Fallback to single target class
+              if (classesToProcess.length === 0) {
+                  const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  classesToProcess.push({
+                      className: targetClass,
+                      presentRolls: aiResult.presentRolls,
+                      absentRolls: aiResult.absentRolls,
+                      students: aiResult.students
+                  });
+              }
+
+              for (const classItem of classesToProcess) {
+                  const currentClass = String(classItem.className);
+
+                  for (const targetDate of datesToApply) {
+                      // Determine target academic year for this date
+                      let dateAcademicYear = selectedYear;
+                      if (Array.isArray(aiResult.attendanceByDate)) {
+                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
+                          if (dateObj?.year) {
+                              dateAcademicYear = String(dateObj.year);
+                          }
+                      }
+                      if (!dateAcademicYear && targetDate) {
+                          const parsedYear = targetDate.split('-')[0];
+                          if (parsedYear && parsedYear.length === 4) {
+                              dateAcademicYear = parsedYear;
+                          }
+                      }
+
+                      // Fetch students for currentClass and dateAcademicYear
+                      let studentsForThisBatch = (studentsForYear || []).filter(
+                          (s: Student) => String(s.className) === currentClass && s.academicYear === dateAcademicYear
+                      );
+
+                      if (studentsForThisBatch.length === 0) {
+                          const qSnap = await getDocs(query(
+                              collection(db!, 'students'),
+                              where('className', '==', currentClass),
+                              where('academicYear', '==', dateAcademicYear)
+                          ));
+                          studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                      }
+
+                      if (studentsForThisBatch.length === 0) continue;
+
+                      let presentRollsForDate: number[] = [];
+                      if (Array.isArray(aiResult.attendanceByDate)) {
+                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
+                          if (dateObj?.presentRolls) {
+                              presentRollsForDate = dateObj.presentRolls.map(Number);
+                          }
+                      }
+                      if (presentRollsForDate.length === 0) {
+                          if (Array.isArray(classItem.presentRolls)) {
+                              presentRollsForDate = classItem.presentRolls.map(Number);
+                          } else if (Array.isArray(classItem.students)) {
+                              presentRollsForDate = classItem.students
+                                  .filter((s: any) => s.status === 'present')
+                                  .map((s: any) => Number(s.roll));
+                          }
+                      }
+
+                      const attendanceData: StudentAttendance[] = studentsForThisBatch.map((student: Student) => ({
+                          studentId: student.id,
+                          status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
+                      }));
+
+                      const dailyAttendance: DailyAttendance = {
+                          date: targetDate,
+                          academicYear: dateAcademicYear,
+                          className: currentClass,
+                          attendance: attendanceData,
+                      };
+
+                      await saveDailyAttendance(db!, dailyAttendance);
+                      totalSavedBatches++;
+                  }
+              }
+
+              if (totalSavedBatches > 0) {
+                  const classSummary = classesToProcess.map(c => `${classNamesMap[c.className] || c.className} শ্রেণি`).join(', ');
+                  toast({
+                      title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে!',
+                      description: `${classSummary} এর হাজিরা নির্দিষ্ট তারিখ অনুযায়ী ডাটাবেজে যুক্ত হয়েছে।`
+                  });
+                  refreshDashboardAttendance(studentsForYear);
+                  setIsAiPortalOpen(false);
+              } else {
+                  toast({
+                      variant: 'destructive',
+                      title: 'হাজিরা সেভ করা যায়নি',
+                      description: 'কোনো শ্রেণির শিক্ষার্থী মেলানো যায়নি।'
+                  });
+              }
+          } catch (err) {
+              console.error("Error applying AI attendance:", err);
+              toast({ variant: 'destructive', title: 'হাজিরা সংরক্ষণ করতে সমস্যা হয়েছে' });
+          } finally {
+              setIsSavingQuickAttendance(false);
           }
       } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
-          const roll = aiResult.collections[0].roll;
+          const col = aiResult.collections[0];
+          const roll = col.roll;
           setQuickSearchInput(String(roll));
           setIsAiPortalOpen(false);
           setIsQuickPaymentOpen(true);
@@ -870,17 +1070,175 @@ export default function Home() {
                               <CardHeader className="pb-2 border-b border-emerald-100">
                                   <CardTitle className="text-sm font-black text-emerald-800 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> এআই শনাক্তকৃত তথ্য</CardTitle>
                               </CardHeader>
-                              <CardContent className="pt-4 overflow-x-auto">
-                                  <div className="grid grid-cols-2 gap-4 mb-4">
-                                      {aiResult.date && <div className="p-2 bg-white rounded border"><p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p><p className="font-black text-primary">{toBengaliNumber(aiResult.date)}</p></div>}
-                                      {aiResult.className && <div className="p-2 bg-white rounded border"><p className="text-[10px] font-black text-muted-foreground uppercase">শ্রেণি</p><p className="font-black text-primary">{classNamesMap[aiResult.className] || aiResult.className} শ্রেণি</p></div>}
+                              <CardContent className="pt-4 overflow-x-auto space-y-4">
+                                  {aiResult.description && (
+                                      <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                                          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1">এআই পর্যবেক্ষণ</p>
+                                          <p className="text-sm font-bold text-slate-800">{aiResult.description}</p>
+                                      </div>
+                                  )}
+
+                                  {aiResult.actionPlan && (
+                                      <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200">
+                                          <p className="text-[10px] font-black text-indigo-800 uppercase tracking-wider mb-1">অ্যাকশন প্ল্যান (কোথায় কিভাবে কার কাছে যুক্ত হবে)</p>
+                                          <p className="text-sm font-bold text-indigo-950">{aiResult.actionPlan}</p>
+                                      </div>
+                                  )}
+
+                                  {/* Date and Class Selector Bar */}
+                                  <div className="p-3.5 bg-white rounded-xl border-2 border-emerald-200/80 shadow-sm space-y-3">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                                          <div className="space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                  <Label className="text-xs font-black text-slate-800">শ্রেণি</Label>
+                                                  {aiResult.autoResolved && (
+                                                      <Badge className="bg-emerald-600 text-[10px] py-0 px-1.5 font-bold">নাম ও রোল দিয়ে শনাক্ত</Badge>
+                                                  )}
+                                              </div>
+                                              <Select value={selectedAiClass} onValueChange={setSelectedAiClass}>
+                                                  <SelectTrigger className="h-10 font-black border-2 border-slate-200">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {Object.entries(classNamesMap).map(([k, v]) => (
+                                                          <SelectItem key={k} value={k} className="font-bold">{v} শ্রেণি</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                          </div>
+
+                                          <div className="space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                  <Label className="text-xs font-black text-slate-800">তারিখ</Label>
+                                                  {aiResult.monthName && (
+                                                      <Badge variant="outline" className="border-indigo-400 text-indigo-700 text-[10px] py-0 px-1.5 font-bold">মাস: {aiResult.monthName}</Badge>
+                                                  )}
+                                              </div>
+                                              <Input 
+                                                  type="date" 
+                                                  value={selectedAiDate} 
+                                                  onChange={e => { setSelectedAiDate(e.target.value); setApplyToAllDates(false); }}
+                                                  className="h-10 font-black border-2 border-slate-200"
+                                              />
+                                          </div>
+                                      </div>
+
+                                      {/* Detected Multiple Dates Display */}
+                                      {Array.isArray(aiResult.dates) && aiResult.dates.length > 0 && (() => {
+                                          // Group by year-month for cleaner display
+                                          const byMonth: Record<string, string[]> = {};
+                                          aiResult.dates.forEach((dStr: string) => {
+                                              const parts = dStr.split('-');
+                                              const ym = parts.slice(0, 2).join('-'); // "YYYY-MM"
+                                              if (!byMonth[ym]) byMonth[ym] = [];
+                                              byMonth[ym].push(dStr);
+                                          });
+                                          const BENGALI_MONTH_NAMES = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+                                          return (
+                                              <div className="pt-2 border-t border-slate-100 space-y-3">
+                                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                      <p className="text-[11px] font-black text-slate-700">শনাক্তকৃত তারিখ ({toBengaliNumber(aiResult.dates.length)}টি — {toBengaliNumber(Object.keys(byMonth).length)}টি মাস):</p>
+                                                      <label className="flex items-center gap-2 text-xs font-black text-indigo-700 cursor-pointer bg-indigo-50 px-2 py-1 rounded-md">
+                                                          <input 
+                                                              type="checkbox" 
+                                                              checked={applyToAllDates} 
+                                                              onChange={e => setApplyToAllDates(e.target.checked)}
+                                                              className="rounded text-indigo-600 h-4 w-4"
+                                                          />
+                                                          সকল তারিখে একসাথে সংরক্ষণ করুন
+                                                      </label>
+                                                  </div>
+                                                  {Object.entries(byMonth).map(([ym, dates]) => {
+                                                      const [y, m] = ym.split('-');
+                                                      const mName = BENGALI_MONTH_NAMES[parseInt(m, 10) - 1] || m;
+                                                      return (
+                                                          <div key={ym}>
+                                                              <p className="text-[10px] font-black text-indigo-700 mb-1.5">{mName} {toBengaliNumber(y)}</p>
+                                                              <div className="flex flex-wrap gap-1.5">
+                                                                  {dates.map((dStr: string) => {
+                                                                      const bdEntry = Array.isArray(aiResult.attendanceByDate)
+                                                                          ? aiResult.attendanceByDate.find((d: any) => d.date === dStr)
+                                                                          : null;
+                                                                      const pCount = bdEntry?.presentRolls?.length ?? null;
+                                                                      return (
+                                                                          <button
+                                                                              key={dStr}
+                                                                              type="button"
+                                                                              onClick={() => { setSelectedAiDate(dStr); setApplyToAllDates(false); }}
+                                                                              className={cn(
+                                                                                  "px-2.5 py-1 text-xs font-black rounded-lg border transition-all",
+                                                                                  (selectedAiDate === dStr && !applyToAllDates)
+                                                                                      ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                                                                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                                                                              )}
+                                                                          >
+                                                                              {toBengaliNumber(dStr.split('-')[2])} তারিখ
+                                                                              {pCount !== null && <span className="ml-1 opacity-70">({toBengaliNumber(pCount)}জন)</span>}
+                                                                          </button>
+                                                                      );
+                                                                  })}
+                                                              </div>
+                                                          </div>
+                                                      );
+                                                  })}
+                                              </div>
+                                          );
+                                      })()}
                                   </div>
-                                  <pre className="text-xs font-mono bg-white p-4 rounded-lg border shadow-inner whitespace-pre-wrap overflow-y-auto max-h-[200px]">
-                                      {JSON.stringify(aiResult, null, 2)}
-                                  </pre>
-                                  <div className="mt-6 flex justify-end">
-                                      <Button onClick={applyAiData} className="bg-emerald-600 hover:bg-emerald-700 font-black px-10 h-12 shadow-lg gap-2">
-                                          তথ্য সিস্টেমে প্রয়োগ করুন <ArrowRight className="h-5 w-5" />
+
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                      <div className="p-2.5 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-muted-foreground uppercase">নির্বাচিত শ্রেণি</p>
+                                          <p className="font-black text-primary text-base">{classNamesMap[selectedAiClass] || selectedAiClass} শ্রেণি</p>
+                                      </div>
+                                      <div className="p-2.5 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p>
+                                          <p className="font-black text-primary text-base">
+                                              {applyToAllDates && aiResult.dates?.length > 1 
+                                                  ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি` 
+                                                  : toBengaliNumber(selectedAiDate)}
+                                          </p>
+                                      </div>
+                                      {(aiResult.totalPresent !== undefined || aiResult.presentRolls?.length) && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-emerald-700 uppercase">মোট উপস্থিত</p>
+                                              <p className="font-black text-emerald-700 text-base">{toBengaliNumber(aiResult.totalPresent ?? aiResult.presentRolls?.length)} জন</p>
+                                          </div>
+                                      )}
+                                      {(aiResult.totalAbsent !== undefined || aiResult.absentRolls?.length) && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-rose-700 uppercase">মোট অনুপস্থিত</p>
+                                              <p className="font-black text-rose-700 text-base">{toBengaliNumber(aiResult.totalAbsent ?? aiResult.absentRolls?.length)} জন</p>
+                                          </div>
+                                      )}
+                                  </div>
+
+                                  {Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0 && (
+                                      <div className="p-3 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1.5">উপস্থিত রোলসমূহ ({toBengaliNumber(aiResult.presentRolls.length)} জন)</p>
+                                          <div className="flex flex-wrap gap-1.5">
+                                              {aiResult.presentRolls.map((r: any) => (
+                                                  <span key={r} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-black text-xs rounded-md">
+                                                      {toBengaliNumber(r)}
+                                                  </span>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  )}
+
+                                  <details className="text-xs font-mono bg-white p-3 rounded-lg border">
+                                      <summary className="font-black text-slate-600 cursor-pointer text-xs mb-2">বিস্তারিত র JSON ডেটা দেখুন</summary>
+                                      <pre className="whitespace-pre-wrap overflow-y-auto max-h-[160px] text-[11px] text-slate-700">
+                                          {JSON.stringify(aiResult, null, 2)}
+                                      </pre>
+                                  </details>
+
+                                  <div className="mt-4 flex justify-end">
+                                      <Button onClick={applyAiData} disabled={isSavingQuickAttendance} className="bg-emerald-600 hover:bg-emerald-700 font-black px-8 h-12 shadow-lg gap-2 text-base">
+                                          {isSavingQuickAttendance ? <Loader2 className="animate-spin h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                                          {applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 1 
+                                              ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি তারিখে প্রয়োগ করুন`
+                                              : `${toBengaliNumber(selectedAiDate)} তারিখের তথ্য সিস্টেমে প্রয়োগ করুন`}
                                       </Button>
                                   </div>
                               </CardContent>

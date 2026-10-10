@@ -152,18 +152,34 @@ const MonthlyAttendanceGrid = ({
     const isSyncing = useRef(false);
     const [tableScrollWidth, setTableScrollWidth] = useState(3000);
 
-    // Default reference date for calendar calculation
-    const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate]);
-    const monthEnd = useMemo(() => endOfMonth(viewDate), [viewDate]);
+    // Default reference date for calendar calculation - always strictly anchored to selectedYear
+    const effectiveYear = useMemo(() => parseInt(selectedYear, 10) || new Date().getFullYear(), [selectedYear]);
+
+    const monthStart = useMemo(() => {
+        const d = new Date(viewDate);
+        d.setFullYear(effectiveYear);
+        return startOfMonth(d);
+    }, [viewDate, effectiveYear]);
+
+    const monthEnd = useMemo(() => {
+        const d = new Date(viewDate);
+        d.setFullYear(effectiveYear);
+        return endOfMonth(d);
+    }, [viewDate, effectiveYear]);
+
     const daysInMonth = useMemo(() => eachDayOfInterval({ start: monthStart, end: monthEnd }), [monthStart, monthEnd]);
 
     // Highlight only the specific selected day in the current month view
     const activeDay = useMemo(() => {
-        if (selectedDate && isSameMonth(selectedDate, viewDate) && isSameYear(selectedDate, viewDate)) {
+        if (!selectedDate) return null;
+        const d1 = new Date(selectedDate);
+        const d2 = new Date(viewDate);
+        d2.setFullYear(effectiveYear);
+        if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()) {
             return getDate(selectedDate);
         }
         return null;
-    }, [selectedDate, viewDate]);
+    }, [selectedDate, viewDate, effectiveYear]);
 
     const [monthRecords, setMonthRecords] = useState<DailyAttendance[]>([]);
     const [currentStatusMap, setCurrentStatusMap] = useState<Map<string, AttendanceStatus>>(new Map());
@@ -175,32 +191,29 @@ const MonthlyAttendanceGrid = ({
 
     const inputRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-    const fetchData = useCallback(async (isBackground = false) => {
+    useEffect(() => {
         if (!db || !user) return;
-        if (!isBackground) setIsLoading(true);
-        else setIsRefreshing(true);
+        setIsLoading(true);
 
-        try {
-            const startStr = format(monthStart, 'yyyy-MM-dd');
-            const endStr = format(monthEnd, 'yyyy-MM-dd');
-            
-            const q = query(
-                collection(db, 'attendance'),
-                where('academicYear', '==', selectedYear),
-                where('className', '==', classId),
-                where('date', '>=', startStr),
-                where('date', '<=', endStr)
-            );
-            
-            const [attSnap, holidayList] = await Promise.all([
-                getDocs(q),
-                getHolidays(db)
-            ]);
+        const startStr = format(monthStart, 'yyyy-MM-dd');
+        const endStr = format(monthEnd, 'yyyy-MM-dd');
+        
+        const q = query(
+            collection(db, 'attendance'),
+            where('academicYear', '==', selectedYear),
+            where('className', '==', classId),
+            where('date', '>=', startStr),
+            where('date', '<=', endStr)
+        );
 
-            const records = attSnap.docs.map(doc => doc.data() as DailyAttendance);
-            setMonthRecords(records);
+        getHolidays(db).then(holidayList => {
             setHolidays(holidayList.map(h => h.date));
-            
+        }).catch(err => console.error("Holidays fetch error:", err));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const records = snapshot.docs.map(doc => doc.data() as DailyAttendance);
+            setMonthRecords(records);
+
             if (selectedDate) {
                 const dateStr = format(selectedDate, 'yyyy-MM-dd');
                 const todayRecord = records.find(r => r.date === dateStr);
@@ -209,22 +222,24 @@ const MonthlyAttendanceGrid = ({
                     todayRecord.attendance.forEach(a => statusMap.set(a.studentId, a.status));
                 }
                 setCurrentStatusMap(statusMap);
-
-                const holidayToday = await isHoliday(db, dateStr);
-                setActiveHoliday(holidayToday);
             }
-            
+            setIsLoading(false);
+            setIsRefreshing(false);
             isFirstLoad.current = false;
-        } catch (e) {
-            console.error("Fetch Data Error:", e);
+        }, (error) => {
+            console.error("Attendance Realtime Error:", error);
+            setIsLoading(false);
+            setIsRefreshing(false);
+        });
+
+        if (selectedDate) {
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            isHoliday(db, dateStr).then(h => setActiveHoliday(h)).catch(() => {});
         }
-        setIsLoading(false);
-        setIsRefreshing(false);
+
+        return () => unsubscribe();
     }, [db, user, classId, selectedYear, selectedDate, monthStart, monthEnd]);
 
-    useEffect(() => { 
-        fetchData(); 
-    }, [fetchData]);
 
     // Keep top scrollbar dummy inner width 100% synchronized with the actual table scrollWidth
     useEffect(() => {
@@ -306,7 +321,6 @@ const MonthlyAttendanceGrid = ({
 
             await saveDailyAttendance(db, dailyAttendance);
             toast({ title: "হাজিরা সংরক্ষিত হয়েছে", description: `${format(selectedDate, 'PPP', { locale: bn })} এর তথ্য সেভ হয়েছে।` });
-            fetchData(true); 
         } catch (e) {
             console.error(e);
         } finally {
@@ -322,7 +336,6 @@ const MonthlyAttendanceGrid = ({
         try {
             await deleteDailyAttendance(db, targetDateStr, classId, selectedYear);
             toast({ title: "সফল", description: "হাজিরা রেকর্ডটি মুছে ফেলা হয়েছে।" });
-            fetchData(true);
         } catch (e) {}
     };
 
@@ -344,7 +357,6 @@ const MonthlyAttendanceGrid = ({
             snapshot.docs.forEach(d => batch.delete(d.ref));
             await batch.commit();
             toast({ title: 'পুরো মাসের হাজিরা তথ্য মুছে ফেলা হয়েছে' });
-            fetchData();
         } catch (e) {
             console.error(e);
         }
@@ -624,7 +636,9 @@ const MonthlyAttendanceGrid = ({
                                         const isOff = isOffDay(day, holidays);
                                         
                                         if (isSelected) {
-                                            const status = currentStatusMap.get(student.id);
+                                            const existingRecord = monthRecords.find(r => r.date === recordDateStr);
+                                            const existingAtt = existingRecord?.attendance.find(a => a.studentId === student.id);
+                                            const status = currentStatusMap.get(student.id) || existingAtt?.status;
                                             return (
                                                 <TableCell key={d} className="p-0 border-r border-black/20 bg-blue-50/50">
                                                     <div className="flex gap-0 h-8 w-24">
@@ -735,12 +749,30 @@ const AttendanceSheet = ({
 
 const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents: Student[], date: Date | undefined, onDateChange: (d: Date) => void }) => {
     const { selectedYear } = useAcademicYear();
-    const [viewDate, setViewDate] = useState<Date>(new Date());
+    const effectiveYear = useMemo(() => parseInt(selectedYear, 10) || new Date().getFullYear(), [selectedYear]);
+    const [viewDate, setViewDate] = useState<Date>(() => {
+        const d = new Date();
+        d.setFullYear(effectiveYear);
+        return d;
+    });
     
+    // Sync view context if selectedYear changes
+    useEffect(() => {
+        setViewDate(prev => {
+            const next = new Date(prev);
+            next.setFullYear(effectiveYear);
+            return next;
+        });
+    }, [effectiveYear]);
+
     // Sync view context if an external date selection is made (e.g. from missed attendance list)
     useEffect(() => {
-        if (date) setViewDate(date);
-    }, [date]);
+        if (date) {
+            const next = new Date(date);
+            next.setFullYear(effectiveYear);
+            setViewDate(next);
+        }
+    }, [date, effectiveYear]);
 
     const studentsForYear = useMemo(() => {
         return allStudents.filter(student => student.academicYear === selectedYear);
@@ -769,6 +801,7 @@ const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents
                         value={currentMonthIdx.toString()} 
                         onValueChange={(val) => {
                             const nextDate = new Date(viewDate);
+                            nextDate.setFullYear(effectiveYear);
                             nextDate.setMonth(parseInt(val));
                             setViewDate(nextDate);
                         }}
