@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -21,7 +22,7 @@ export default function WhiteboardPage() {
 
     const canvas = document.getElementById('board') as HTMLCanvasElement;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
     const colorPicker = document.getElementById('color') as HTMLInputElement;
     const sizePicker = document.getElementById('size') as HTMLInputElement;
@@ -52,11 +53,6 @@ export default function WhiteboardPage() {
     const deleteBoardPageBtn = document.getElementById('delete-board-page')!;
     const boardPageNumSpan = document.getElementById('board-page-num')!;
     const ocrBtn = document.getElementById('ocr-btn')!;
-
-    const modal3D = document.getElementById('modal-3d')!;
-    const view3DBtn = document.getElementById('view-3d-btn')!;
-    const close3DBtn = document.getElementById('close-3d')!;
-    const container3D = document.getElementById('container-3d')!;
 
     const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn')!;
     const toggleRightSidebarBtn = document.getElementById('toggle-right-sidebar-btn')!;
@@ -94,6 +90,7 @@ export default function WhiteboardPage() {
     let startPanX = 0, startPanY = 0;
     let isDrawing = false;
     let startX: number, startY: number;
+    let currentX: number, currentY: number;
     let snapshot: ImageData;
     let freehandPoints: {x: number, y: number}[] = [];
     let undoStack: ImageData[] = [];
@@ -110,18 +107,6 @@ export default function WhiteboardPage() {
 
     canvas.width = Math.min(window.innerWidth - 60, 2000);
     canvas.height = Math.max(window.innerHeight - 120, 1200);
-
-    function parseSubjectTeacher(cell: string): { subject: string, teacher: string | null } {
-      if (!cell) return { subject: '', teacher: null };
-      const trimmedCell = cell.trim();
-      if (!trimmedCell.includes(' - ')) {
-        return { subject: trimmedCell, teacher: null };
-      }
-      const parts = trimmedCell.split(' - ');
-      const teacher = parts.pop()?.trim() || null;
-      const subject = parts.join(' - ').trim();
-      return { subject, teacher };
-    }
 
     function saveState() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
@@ -343,6 +328,7 @@ export default function WhiteboardPage() {
       isDrawing = true;
       const coords = getCanvasCoordinates(e);
       startX = coords.x; startY = coords.y;
+      currentX = startX; currentY = startY;
       freehandPoints = [{ x: startX, y: startY }];
       ctx.beginPath();
       ctx.lineWidth = Number(sizePicker.value);
@@ -362,7 +348,7 @@ export default function WhiteboardPage() {
         return;
       }
       const coords = getCanvasCoordinates(e);
-      const currentX = coords.x; const currentY = coords.y;
+      currentX = coords.x; currentY = coords.y;
       if (currentTool === 'laser') {
         laserDot.classList.remove('hidden');
         const rect = canvas.getBoundingClientRect();
@@ -380,6 +366,14 @@ export default function WhiteboardPage() {
         const isDark = document.body.classList.contains('dark-mode');
         ctx.strokeStyle = isDark ? '#1a1a1a' : '#ffffff';
         ctx.lineTo(currentX, currentY); ctx.stroke();
+      } else if (currentTool === 'area-eraser') {
+        ctx.putImageData(snapshot, 0, 0);
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+        ctx.setLineDash([]);
       } else if (currentTool === 'line') {
         ctx.putImageData(snapshot, 0, 0); ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(currentX, currentY); ctx.stroke();
       } else if (currentTool === 'rectangle') {
@@ -424,6 +418,12 @@ export default function WhiteboardPage() {
       if (isPanning) { isPanning = false; return; }
       if (!isDrawing) return;
       if (currentTool === 'smart-shape') { ctx.putImageData(snapshot, 0, 0); detectAndDrawSmartShape(freehandPoints); }
+      if (currentTool === 'area-eraser') {
+        ctx.putImageData(snapshot, 0, 0);
+        const isDark = document.body.classList.contains('dark-mode');
+        ctx.fillStyle = isDark ? '#1a1a1a' : '#ffffff';
+        ctx.fillRect(startX, startY, currentX - startX, currentY - startY);
+      }
       isDrawing = false; ctx.beginPath();
     }
 
@@ -757,6 +757,7 @@ export default function WhiteboardPage() {
         <label>মোছা ও পয়েন্টার:</label>
         <div className="tool-group">
           <button type="button" className="tool-btn" data-tool="eraser">🧹 ইরেজার</button>
+          <button type="button" className="tool-btn" data-tool="area-eraser">🔲 এরিয়া ইরেজার</button>
           <button type="button" className="tool-btn" data-tool="laser">🔴 লেজার ডট</button>
         </div>
         <label>জ্যামিতিক টুলস:</label>

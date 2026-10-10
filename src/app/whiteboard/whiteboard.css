@@ -145,6 +145,7 @@
 .whiteboard-body .tool-btn[data-tool="smart-shape"] { background: #9333ea; border-bottom: 5px solid #581c87; }
 .whiteboard-body .tool-btn[data-tool="pan"] { background: #0d9488; border-bottom: 5px solid #134e4a; }
 .whiteboard-body .tool-btn[data-tool="eraser"] { background: #dc2626; border-bottom: 5px solid #7f1d1d; }
+.whiteboard-body .tool-btn[data-tool="area-eraser"] { background: #f43f5e; border-bottom: 5px solid #be123c; }
 .whiteboard-body .tool-btn[data-tool="laser"] { background: #f97316; border-bottom: 5px solid #9a3412; }
 .whiteboard-body .tool-btn[data-tool="line"] { background: #16a34a; border-bottom: 5px solid #14532d; }
 .whiteboard-body .tool-btn[data-tool="rectangle"] { background: #4f46e5; border-bottom: 5px solid #312e81; }
