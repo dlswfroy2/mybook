@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import Link from 'next/link';
@@ -36,7 +36,11 @@ import {
   XCircle,
   ImageIcon,
   AlertCircle,
-  Edit3
+  Edit3,
+  Sparkles,
+  Camera,
+  FileSearch,
+  RefreshCw
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp, FirestoreError, where, getDocs, doc, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -44,7 +48,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Notice } from '@/lib/notice-data';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -67,6 +71,7 @@ import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
 import { StudentFeeDialog } from '@/components/StudentFeeDialog';
 import { useToast } from '@/hooks/use-toast';
 import { subjectNameNormalization } from '@/lib/subjects';
+import { runMultiTaskAi } from '@/ai/flows/multi-task-ai-flow';
 
 const classNamesMap: Record<string, string> = {
   '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
@@ -336,6 +341,14 @@ export default function Home() {
   const [isSavingQuickAttendance, setIsSavingQuickAttendance] = useState(false);
   const [isConfirmingQuickAttendance, setIsConfirmingQuickAttendance] = useState(false);
 
+  // AI Portal States
+  const [isAiPortalOpen, setIsAiPortalOpen] = useState(false);
+  const [aiTask, setAiTask] = useState<'attendance' | 'results' | 'admission' | 'fees'>('attendance');
+  const [aiImage, setAiImage] = useState<string | null>(null);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiResult, setAiResult] = useState<any>(null);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+
   const refreshDashboardAttendance = useCallback(async (currentStudents?: Student[]) => {
       if (!db) return;
       const list = currentStudents && currentStudents.length > 0 ? currentStudents : studentsForYear;
@@ -536,6 +549,67 @@ export default function Home() {
     }
   };
 
+  const handleAiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        setAiImage(evt.target?.result as string);
+        setAiResult(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAiAction = async () => {
+    if (!aiImage) {
+        toast({ variant: 'destructive', title: 'ছবি নির্বাচন করুন' });
+        return;
+    }
+    setAiProcessing(true);
+    setAiResult(null);
+    try {
+        const res = await runMultiTaskAi({ photoDataUri: aiImage, taskType: aiTask });
+        if (res.error) {
+            toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
+        } else {
+            setAiResult(res);
+            toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
+        }
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: 'এআই কাজ করতে পারছে না।' });
+    } finally {
+        setAiProcessing(false);
+    }
+  };
+
+  const applyAiData = () => {
+      if (!aiResult) return;
+      
+      if (aiTask === 'attendance' && aiResult.students) {
+          const presentRolls = aiResult.students
+            .filter((s: any) => s.status === 'present')
+            .map((s: any) => s.roll)
+            .join(', ');
+          setQuickAttendanceInput(presentRolls);
+          setIsAiPortalOpen(false);
+          setIsQuickAttendanceOpen(true);
+      } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
+          const roll = aiResult.collections[0].roll;
+          setQuickSearchInput(String(roll));
+          setIsAiPortalOpen(false);
+          setIsQuickPaymentOpen(true);
+      } else if (aiTask === 'results' && aiResult.results) {
+          toast({ title: 'ফলাফল ডাটা রিড করা হয়েছে', description: 'ফলাফল পাতায় গিয়ে সেভ করুন।' });
+          // Logic for results would normally auto-fill the results table
+          setIsAiPortalOpen(false);
+          router.push('/results');
+      } else if (aiTask === 'admission' && aiResult.student) {
+          toast({ title: 'ভর্তি ফরম রিড করা হয়েছে' });
+          setIsAiPortalOpen(false);
+          router.push('/add-student');
+      }
+  };
+
   const presentPercentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : "০";
   const absentPercentage = totalStudents > 0 ? ((totalAbsent / totalStudents) * 100).toFixed(1) : "০";
 
@@ -692,6 +766,95 @@ export default function Home() {
                           </Button>
                       </div>
                   </form>
+              </DialogContent>
+          </Dialog>
+
+          <Dialog open={isAiPortalOpen} onOpenChange={setIsAiPortalOpen}>
+              <DialogTrigger asChild>
+                  <Button className="h-12 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 border-b-[6px] border-indigo-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
+                      <Sparkles className="h-5 w-5" /> এআই অ্যাসিস্ট্যান্ট
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className="font-kalpurush sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl">
+                  <DialogHeader className="p-6 bg-indigo-600 text-white rounded-t-2xl">
+                      <DialogTitle className="text-2xl font-black flex items-center gap-2">
+                          <Sparkles className="h-6 w-6" /> এআই ইন্টেলিজেন্ট পোর্টাল
+                      </DialogTitle>
+                      <DialogDescription className="text-white/80 font-bold">ছবি থেকে স্বয়ংক্রিয়ভাবে তথ্য ইনপুট করুন</DialogDescription>
+                  </DialogHeader>
+                  <div className="p-8 space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label className="font-black text-slate-700">কি কাজ করতে চান?</Label>
+                          <Select value={aiTask} onValueChange={(v: any) => setAiTask(v)}>
+                            <SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger>
+                            <SelectContent className="font-kalpurush">
+                                <SelectItem value="attendance">হাজিরা গ্রহণ (Roll P/A)</SelectItem>
+                                <SelectItem value="results">ফলাফল ইনপুট (Marks)</SelectItem>
+                                <SelectItem value="admission">নতুন ভর্তি (Admission Form)</SelectItem>
+                                <SelectItem value="fees">বেতন আদায় (Payment Slip)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="font-black text-slate-700">ছবি আপলোড করুন</Label>
+                          <Button 
+                            variant="outline" 
+                            className="w-full h-12 border-2 border-dashed border-indigo-300 bg-indigo-50 hover:bg-indigo-100 font-bold gap-2"
+                            onClick={() => aiFileInputRef.current?.click()}
+                          >
+                            <Camera className="h-5 w-5" /> {aiImage ? 'ছবি পরিবর্তন করুন' : 'ছবি নির্বাচন করুন'}
+                          </Button>
+                          <input type="file" ref={aiFileInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleAiFileChange} />
+                        </div>
+                      </div>
+
+                      {aiImage && (
+                          <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-slate-200 shadow-inner group">
+                              <img src={aiImage} className="w-full h-full object-cover" alt="Preview" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <p className="text-white font-black text-sm">সিলেক্টেড ছবি</p>
+                              </div>
+                              <button className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-white" onClick={() => setAiImage(null)}><XCircle className="h-6 w-6 text-rose-500" /></button>
+                          </div>
+                      )}
+
+                      {aiProcessing ? (
+                          <div className="py-12 flex flex-col items-center justify-center gap-4 bg-slate-50 rounded-2xl border-2 border-dashed">
+                              <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+                              <p className="font-black text-indigo-700 animate-pulse text-lg">এআই প্রসেসিং হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</p>
+                          </div>
+                      ) : aiResult ? (
+                          <Card className="border-2 border-emerald-200 bg-emerald-50/30 rounded-2xl animate-in zoom-in-95 duration-500">
+                              <CardHeader className="pb-2 border-b border-emerald-100">
+                                  <CardTitle className="text-sm font-black text-emerald-800 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> এআই শনাক্তকৃত তথ্য</CardTitle>
+                              </CardHeader>
+                              <CardContent className="pt-4 overflow-x-auto">
+                                  <pre className="text-xs font-mono bg-white p-4 rounded-lg border shadow-inner whitespace-pre-wrap overflow-y-auto max-h-[200px]">
+                                      {JSON.stringify(aiResult, null, 2)}
+                                  </pre>
+                                  <div className="mt-6 flex justify-end">
+                                      <Button onClick={applyAiData} className="bg-emerald-600 hover:bg-emerald-700 font-black px-10 h-12 shadow-lg gap-2">
+                                          তথ্য সিস্টেমে প্রয়োগ করুন <ArrowRight className="h-5 w-5" />
+                                      </Button>
+                                  </div>
+                              </CardContent>
+                          </Card>
+                      ) : null}
+
+                      {!aiResult && !aiProcessing && (
+                          <Button 
+                            onClick={handleAiAction} 
+                            disabled={!aiImage}
+                            className="w-full h-14 text-xl font-black bg-indigo-600 hover:bg-indigo-700 shadow-xl gap-2"
+                          >
+                            <BrainCircuit className="h-6 w-6" /> এআই দিয়ে তথ্য বের করুন
+                          </Button>
+                      )}
+                  </div>
+                  <DialogFooter className="p-4 bg-slate-50 border-t">
+                      <DialogClose asChild><Button variant="ghost" className="font-bold">বন্ধ করুন</Button></DialogClose>
+                  </DialogFooter>
               </DialogContent>
           </Dialog>
       </div>
