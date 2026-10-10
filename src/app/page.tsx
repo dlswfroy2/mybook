@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -380,7 +381,7 @@ export default function Home() {
               setTotalAbsent(0);
           }
       } catch (e) {}
-  }, [db, selectedYear, list]);
+  }, [db, selectedYear, studentsForYear]);
 
   useEffect(() => {
       if (!db || !user?.uid) return;
