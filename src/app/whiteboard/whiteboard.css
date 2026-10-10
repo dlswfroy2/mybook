@@ -16,7 +16,7 @@
 .whiteboard-body .sidebar-toggle {
   position: fixed;
   top: 10px;
-  z-index: 10001;
+  z-index: 10005; /* Increased to stay above tabs */
   background: #ee0707;
   color: #06ec25;
   border: 3px solid #1908fa;
@@ -24,12 +24,17 @@
   font-size: 20px;
   font-weight: bold;
   cursor: pointer;
-  box-shadow: 3px 2px 8px rgba(252, 251, 251, 0.4);
+  box-shadow: 0 4px 0 #8b0000; /* 3D effect */
   transition: all 0.3s ease;
 }
 
 .whiteboard-body .sidebar-toggle:hover {
   background: #087bee;
+}
+
+.whiteboard-body .sidebar-toggle:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #8b0000;
 }
 
 .whiteboard-body .left-toggle {
@@ -39,27 +44,28 @@
 
 .whiteboard-body .right-toggle {
   right: 0px;
-  border-radius: 1px 0 0 8px;
+  border-radius: 8px 0 0 8px;
 }
 
 .whiteboard-body .sidebar {
   position: fixed;
   top: 45px;
   bottom: 10px;
-  width: 150px;
-  background: #7e71ec;
-  padding: 3px;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(221, 13, 13, 0.4);
+  width: 160px;
+  background: rgba(126, 113, 236, 0.95);
+  padding: 10px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 12px;
   align-content: start;
   align-items: center;
   z-index: 10000;
   overflow-y: auto;
   box-sizing: border-box;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .whiteboard-body .left-sidebar {
@@ -67,7 +73,7 @@
 }
 
 .whiteboard-body .left-sidebar.collapsed {
-  transform: translateX(-220px);
+  transform: translateX(-180px);
 }
 
 .whiteboard-body .right-sidebar {
@@ -75,7 +81,7 @@
 }
 
 .whiteboard-body .right-sidebar.collapsed {
-  transform: translateX(220px);
+  transform: translateX(180px);
 }
 
 .whiteboard-body .sidebar::-webkit-scrollbar {
@@ -88,110 +94,193 @@
 }
 
 .whiteboard-body .sidebar label {
-  font-size: 12px;
-  font-weight: bold;
-  color: #f7f6fa;
-  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-left: 3px solid #ffeb3b;
+  padding-left: 6px;
 }
 
 .whiteboard-body .tool-group {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 5px;
+  gap: 8px;
   width: 100%;
 }
 
-.whiteboard-body .tool-btn {
+/* 3D Button Base Style */
+.whiteboard-body .tool-btn, 
+.whiteboard-body .bg-btn,
+.whiteboard-body .sidebar button {
   width: 100%;
-  padding: 7px 5px;
-  font-size: 15px;
-  font-weight: bold;
-  color: #0a0a0a;
-  background: linear-gradient(to bottom, #097df1, #0878e7);
-  border: 5px solid #3ae414;
-  border-radius: 6px;
-  box-shadow: 0 4px 0 #0d0d0e, 0 2px 4px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  transition: all 0.1s ease;
-  box-sizing: border-box;
-  text-align: center;
-}
-
-.whiteboard-body .tool-btn.active {
-  background: linear-gradient(to bottom, #27ae60, #2ecc71) !important;
-  box-shadow: 0 0 10px #2ecc71, 0 2px 0 #1e8449 !important;
-  border: 2px solid #ffffff !important;
-  transform: translateY(2px);
-}
-
-.whiteboard-body .bg-btn-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.whiteboard-body .bg-btn {
-  padding: 6px 10px;
-  border: 1.5px solid #bdc3c7;
-  border-radius: 5px;
-  background-color: #f8f9fa;
-  color: #2c3e50;
-  font-size: 13px;
+  padding: 8px 5px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.whiteboard-body .bg-btn:hover {
-  border-color: #3498db;
-  background-color: #ebf5fb;
-}
-
-.whiteboard-body .bg-btn.active {
-  border: 2px solid #2980b9;
-  background-color: #3498db;
-  color: #ffffff;
-  font-weight: bold;
-}
-
-.whiteboard-body .sidebar button,
-.whiteboard-body .sidebar input[type="color"],
-.whiteboard-body .sidebar input[type="range"] {
-  width: 100%;
-  cursor: pointer;
-  padding: 6px 2%;
-  font-size: 12px;
-  font-weight: bold;
-  color: #ffffff;
-  border: 1px solid #f0f1f0;
-  border-radius: 6px;
-  background: linear-gradient(to bottom, #077ff7, #037efa);
-  box-shadow: 0 3px 0 #3737f1, 0 3px 5px rgba(244, 245, 247, 0.2);
-  transition: all 0.1s ease;
   box-sizing: border-box;
   text-align: center;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.whiteboard-body .sidebar input[type="color"] {
-  height: 40px;
-  padding: 3px;
+.whiteboard-body .tool-btn:active,
+.whiteboard-body .bg-btn:active,
+.whiteboard-body .sidebar button:active {
+  transform: translateY(3px);
+}
+
+/* 3D Effect & Colors for Tool Buttons */
+.whiteboard-body .tool-btn[data-tool="pen"] { background: #2563eb; border-bottom: 5px solid #1e3a8a; }
+.whiteboard-body .tool-btn[data-tool="highlighter"] { background: #eab308; border-bottom: 5px solid #a16207; }
+.whiteboard-body .tool-btn[data-tool="smart-shape"] { background: #9333ea; border-bottom: 5px solid #581c87; }
+.whiteboard-body .tool-btn[data-tool="pan"] { background: #0d9488; border-bottom: 5px solid #134e4a; }
+.whiteboard-body .tool-btn[data-tool="eraser"] { background: #dc2626; border-bottom: 5px solid #7f1d1d; }
+.whiteboard-body .tool-btn[data-tool="laser"] { background: #f97316; border-bottom: 5px solid #9a3412; }
+.whiteboard-body .tool-btn[data-tool="line"] { background: #16a34a; border-bottom: 5px solid #14532d; }
+.whiteboard-body .tool-btn[data-tool="rectangle"] { background: #4f46e5; border-bottom: 5px solid #312e81; }
+.whiteboard-body .tool-btn[data-tool="circle"] { background: #db2777; border-bottom: 5px solid #831843; }
+.whiteboard-body .tool-btn[data-tool="triangle"] { background: #0891b2; border-bottom: 5px solid #155e75; }
+.whiteboard-body .tool-btn[data-tool="right-triangle"] { background: #65a30d; border-bottom: 5px solid #365314; }
+.whiteboard-body .tool-btn[data-tool="diamond"] { background: #854d0e; border-bottom: 5px solid #451a03; }
+.whiteboard-body .tool-btn[data-tool="star"] { background: #ca8a04; border-bottom: 5px solid #713f12; }
+.whiteboard-body .tool-btn[data-tool="protractor"] { background: #ea580c; border-bottom: 5px solid #9a3412; }
+.whiteboard-body .tool-btn[data-tool="compass"] { background: #1e40af; border-bottom: 5px solid #1e3a8a; }
+.whiteboard-body .tool-btn[data-tool="text"] { background: #475569; border-bottom: 5px solid #1e293b; }
+
+.whiteboard-body .tool-btn.active {
+  filter: brightness(1.2);
+  transform: translateY(2px);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+  border: 2px solid #fff;
+}
+
+/* Right Sidebar Buttons Colors */
+.whiteboard-body #toggle-dark { background: #334155; border-bottom: 5px solid #0f172a; }
+.whiteboard-body #undo-btn { background: #64748b; border-bottom: 5px solid #334155; }
+.whiteboard-body #redo-btn { background: #64748b; border-bottom: 5px solid #334155; }
+.whiteboard-body #zoom-in { background: #0891b2; border-bottom: 5px solid #155e75; }
+.whiteboard-body #zoom-out { background: #0891b2; border-bottom: 5px solid #155e75; }
+.whiteboard-body #reset-view-btn { background: #0ea5e9; border-bottom: 5px solid #075985; }
+.whiteboard-body #add-sticky { background: #fbbf24; border-bottom: 5px solid #92400e; color: #000; }
+.whiteboard-body #ocr-btn { background: #8b5cf6; border-bottom: 5px solid #4c1d95; }
+.whiteboard-body #ai-solve-btn { background: #4f46e5; border-bottom: 5px solid #312e81; }
+.whiteboard-body #math-tool-btn { background: #06b6d4; border-bottom: 5px solid #164e63; }
+.whiteboard-body #view-3d-btn { background: #ec4899; border-bottom: 5px solid #9d174d; }
+.whiteboard-body #calc-btn { background: #10b981; border-bottom: 5px solid #064e3b; }
+.whiteboard-body #timer-btn { background: #f43f5e; border-bottom: 5px solid #9f1239; }
+.whiteboard-body #spotlight-btn { background: #6366f1; border-bottom: 5px solid #3730a3; }
+.whiteboard-body #curtain-btn { background: #6b7280; border-bottom: 5px solid #374151; }
+.whiteboard-body #fullscreen-btn { background: #2dd4bf; border-bottom: 5px solid #134e4a; }
+.whiteboard-body #speech-btn { background: #f59e0b; border-bottom: 5px solid #b45309; }
+.whiteboard-body #record-btn { background: #ef4444; border-bottom: 5px solid #b91c1c; }
+.whiteboard-body #upload-btn { background: #a855f7; border-bottom: 5px solid #7e22ce; }
+.whiteboard-body #save-img { background: #22c55e; border-bottom: 5px solid #15803d; }
+.whiteboard-body #save-pdf { background: #ef4444; border-bottom: 5px solid #b91c1c; }
+
+/* Background Buttons */
+.whiteboard-body .bg-btn {
+  padding: 6px;
+  background: #f8fafc;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-bottom: 4px solid #94a3b8;
+  font-size: 11px;
+}
+.whiteboard-body .bg-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-bottom: 4px solid #1e3a8a;
+}
+
+/* Browser Tabs Section - Row Layout */
+.whiteboard-body #browser-tabs-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 15px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-blur: 10px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10002;
+  scrollbar-width: thin;
+}
+
+.whiteboard-body #tabs-wrapper {
+  display: flex;
+  flex-direction: row !important; /* Forced Row */
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.whiteboard-body .board-tab {
+  padding: 8px 16px;
+  background-color: #334155;
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  font-size: 12px;
+  font-weight: 900;
+  color: #cbd5e1;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.whiteboard-body .board-tab.active {
+  background-color: #fff; 
+  border-bottom: 3px solid #2ecc71; 
+  color: #1e293b;
+  transform: translateY(-2px);
+}
+
+.whiteboard-body .browser-plus-btn {
+  background: #22c55e !important;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #15803d !important;
+}
+
+.whiteboard-body .browser-delete-btn {
+  background: #ef4444 !important;
+  box-shadow: 0 3px 0 #b91c1c !important;
+}
+
+.whiteboard-body #clear {
+  background: #f97316 !important;
+  box-shadow: 0 3px 0 #c2410c !important;
+  margin-left: 10px;
 }
 
 .whiteboard-body #scroll-wrapper {
   width: 100vw;
   height: 100vh;
   overflow: auto;
-  padding-left: 185px;
-  padding-right: 200px;
-  padding-top: 10px;
-  padding-bottom: 50px;
+  padding: 60px 180px 60px 180px;
   box-sizing: border-box;
-  transition: padding 0.3s ease;
+  transition: all 0.4s ease;
 }
 
 .whiteboard-body #canvas-container {
   position: relative;
-  margin: 20px auto;
+  margin: 0 auto;
   display: inline-block;
   transform-origin: center top;
   transition: transform 0.1s ease-out;
@@ -202,144 +291,37 @@
   background: #ffffff;
   cursor: crosshair;
   touch-action: none;
-}
-
-.whiteboard-body canvas.panning-active {
-  cursor: grab !important;
-}
-
-.whiteboard-body #browser-tabs-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 5px;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 10002;
-}
-
-.whiteboard-body .board-tab {
-  padding: 6px 12px;
-  background-color: #f1f1f1;
-  border: 1px solid #ccc;
-  cursor: pointer;
-  border-radius: 4px 4px 0 0;
-  font-size: 13px;
-  font-weight: bold;
-  color: #333;
-}
-
-.whiteboard-body .board-tab.active {
-  background-color: #ffffff; 
-  border-bottom: 2px solid #2ecc71; 
-  color: #2ecc71;
-}
-
-.whiteboard-body .sticky-note {
-  position: absolute;
-  width: 150px;
-  height: 150px;
-  background: #fffa75;
-  padding: 10px;
-  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-  z-index: 80;
-}
-
-.whiteboard-body #laser-dot {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: red;
-  border-radius: 50%;
-  box-shadow: 0 0 10px red, 0 0 20px red;
-  pointer-events: none;
-  z-index: 70;
-  transform: translate(-50%, -50%);
-}
-
-.whiteboard-body #modal-3d {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 20000;
-}
-
-.whiteboard-body .widget {
-  position: fixed;
-  top: 80px;
-  right: 220px;
-  background: #2c3e50;
-  color: white;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-  z-index: 15000;
-  width: 220px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
 }
 
 .whiteboard-body .sync-indicator {
-  position: absolute;
-  left: 15px;
-  font-size: 12px;
-  color: #fff;
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
   display: flex;
   align-items: center;
-  gap: 5px;
-  background: rgba(0,0,0,0.3);
-  padding: 4px 8px;
-  border-radius: 12px;
+  gap: 6px;
+  background: rgba(255,255,255,0.05);
+  padding: 4px 12px;
+  border-radius: 50px;
 }
 
 .whiteboard-body .back-home-btn {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 20px;
   z-index: 10005;
-  background: #000;
+  background: #1e293b;
   color: white;
-  border: 2px solid white;
-  padding: 8px 15px;
+  border: 2px solid rgba(255,255,255,0.2);
+  padding: 10px 20px;
   border-radius: 50px;
-  font-weight: bold;
+  font-weight: 900;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-}
-
-.whiteboard-body #presentation-curtain {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: #2c3e50;
-  z-index: 95;
-  border-bottom: 5px solid #e74c3c;
-  transition: height 0.2s ease;
-}
-
-.whiteboard-body #curtain-handle {
-  position: absolute; bottom: -30px; left: 50%;
-  transform: translateX(-50%);
-  background: #e74c3c; color: white;
-  padding: 5px 15px; border-radius: 0 0 8px 8px;
-  cursor: ns-resize; font-weight: bold; font-size: 12px;
-}
-
-.whiteboard-body #spotlight-overlay {
-  position: absolute; top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none; z-index: 90;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
 }
 
 .whiteboard-body .hidden {

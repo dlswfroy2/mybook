@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -111,6 +110,18 @@ export default function WhiteboardPage() {
 
     canvas.width = Math.min(window.innerWidth - 60, 2000);
     canvas.height = Math.max(window.innerHeight - 120, 1200);
+
+    function parseSubjectTeacher(cell: string): { subject: string, teacher: string | null } {
+      if (!cell) return { subject: '', teacher: null };
+      const trimmedCell = cell.trim();
+      if (!trimmedCell.includes(' - ')) {
+        return { subject: trimmedCell, teacher: null };
+      }
+      const parts = trimmedCell.split(' - ');
+      const teacher = parts.pop()?.trim() || null;
+      const subject = parts.join(' - ').trim();
+      return { subject, teacher };
+    }
 
     function saveState() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
@@ -672,7 +683,6 @@ export default function WhiteboardPage() {
         }
     };
 
-    // AI Math Solver Integration
     const aiSolveBtn = document.getElementById('ai-solve-btn')!;
     const aiModal = document.getElementById('ai-modal')!;
     const aiBody = document.getElementById('ai-solution-body')!;
@@ -681,7 +691,6 @@ export default function WhiteboardPage() {
     aiSolveBtn.onclick = async () => {
         aiSolveBtn.textContent = '⏳...';
         try {
-            // Placeholder for AI solver logic using Tesseract + LLM
             const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
             const mathText = result.data.text;
             if (!mathText.trim()) { alert('বোর্ডে কোনো লেখা নেই'); }
@@ -793,7 +802,7 @@ export default function WhiteboardPage() {
         <button id="reset-view-btn">🎯 রিসেট</button>
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
-        <button id="ai-solve-btn" className="bg-indigo-600 text-white border-none font-black shadow-lg">🤖 এআই সলভ</button>
+        <button id="ai-solve-btn">🤖 এআই সলভ</button>
         <button id="math-tool-btn">{"∑</math LaTeX"}</button>
         <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
