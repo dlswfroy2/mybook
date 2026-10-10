@@ -175,32 +175,29 @@ const MonthlyAttendanceGrid = ({
 
     const inputRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-    const fetchData = useCallback(async (isBackground = false) => {
+    useEffect(() => {
         if (!db || !user) return;
-        if (!isBackground) setIsLoading(true);
-        else setIsRefreshing(true);
+        setIsLoading(true);
 
-        try {
-            const startStr = format(monthStart, 'yyyy-MM-dd');
-            const endStr = format(monthEnd, 'yyyy-MM-dd');
-            
-            const q = query(
-                collection(db, 'attendance'),
-                where('academicYear', '==', selectedYear),
-                where('className', '==', classId),
-                where('date', '>=', startStr),
-                where('date', '<=', endStr)
-            );
-            
-            const [attSnap, holidayList] = await Promise.all([
-                getDocs(q),
-                getHolidays(db)
-            ]);
+        const startStr = format(monthStart, 'yyyy-MM-dd');
+        const endStr = format(monthEnd, 'yyyy-MM-dd');
+        
+        const q = query(
+            collection(db, 'attendance'),
+            where('academicYear', '==', selectedYear),
+            where('className', '==', classId),
+            where('date', '>=', startStr),
+            where('date', '<=', endStr)
+        );
 
-            const records = attSnap.docs.map(doc => doc.data() as DailyAttendance);
-            setMonthRecords(records);
+        getHolidays(db).then(holidayList => {
             setHolidays(holidayList.map(h => h.date));
-            
+        }).catch(err => console.error("Holidays fetch error:", err));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const records = snapshot.docs.map(doc => doc.data() as DailyAttendance);
+            setMonthRecords(records);
+
             if (selectedDate) {
                 const dateStr = format(selectedDate, 'yyyy-MM-dd');
                 const todayRecord = records.find(r => r.date === dateStr);
@@ -209,22 +206,24 @@ const MonthlyAttendanceGrid = ({
                     todayRecord.attendance.forEach(a => statusMap.set(a.studentId, a.status));
                 }
                 setCurrentStatusMap(statusMap);
-
-                const holidayToday = await isHoliday(db, dateStr);
-                setActiveHoliday(holidayToday);
             }
-            
+            setIsLoading(false);
+            setIsRefreshing(false);
             isFirstLoad.current = false;
-        } catch (e) {
-            console.error("Fetch Data Error:", e);
+        }, (error) => {
+            console.error("Attendance Realtime Error:", error);
+            setIsLoading(false);
+            setIsRefreshing(false);
+        });
+
+        if (selectedDate) {
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            isHoliday(db, dateStr).then(h => setActiveHoliday(h)).catch(() => {});
         }
-        setIsLoading(false);
-        setIsRefreshing(false);
+
+        return () => unsubscribe();
     }, [db, user, classId, selectedYear, selectedDate, monthStart, monthEnd]);
 
-    useEffect(() => { 
-        fetchData(); 
-    }, [fetchData]);
 
     // Keep top scrollbar dummy inner width 100% synchronized with the actual table scrollWidth
     useEffect(() => {
@@ -306,7 +305,6 @@ const MonthlyAttendanceGrid = ({
 
             await saveDailyAttendance(db, dailyAttendance);
             toast({ title: "হাজিরা সংরক্ষিত হয়েছে", description: `${format(selectedDate, 'PPP', { locale: bn })} এর তথ্য সেভ হয়েছে।` });
-            fetchData(true); 
         } catch (e) {
             console.error(e);
         } finally {
@@ -322,7 +320,6 @@ const MonthlyAttendanceGrid = ({
         try {
             await deleteDailyAttendance(db, targetDateStr, classId, selectedYear);
             toast({ title: "সফল", description: "হাজিরা রেকর্ডটি মুছে ফেলা হয়েছে।" });
-            fetchData(true);
         } catch (e) {}
     };
 
@@ -344,7 +341,6 @@ const MonthlyAttendanceGrid = ({
             snapshot.docs.forEach(d => batch.delete(d.ref));
             await batch.commit();
             toast({ title: 'পুরো মাসের হাজিরা তথ্য মুছে ফেলা হয়েছে' });
-            fetchData();
         } catch (e) {
             console.error(e);
         }
