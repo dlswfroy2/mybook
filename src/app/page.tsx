@@ -602,14 +602,14 @@ export default function Home() {
 
       <div className="flex flex-wrap gap-4 items-center justify-center sm:justify-start">
           <Link href="/add-student">
-              <Button className="h-12 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+              <Button className="h-12 px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[6px] border-green-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
                   <UserPlus className="h-5 w-5" /> কুইক ভর্তি
               </Button>
           </Link>
 
           <Dialog open={isQuickPaymentOpen} onOpenChange={setIsQuickPaymentOpen}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-teal-600 hover:bg-teal-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+                  <Button className="h-12 px-6 rounded-2xl bg-red-600 hover:bg-red-700 border-b-[6px] border-red-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
                       <Banknote className="h-5 w-5" /> কুইক পেমেন্ট
                   </Button>
               </DialogTrigger>
@@ -648,7 +648,7 @@ export default function Home() {
 
           <Dialog open={isQuickAttendanceOpen} onOpenChange={(o) => { setIsQuickAttendanceOpen(o); if(!o) setIsConfirmingQuickAttendance(false); }}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-lg font-black gap-2 transition-all active:scale-95 text-white">
+                  <Button className="h-12 px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[6px] border-green-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
                       <UserCheck className="h-5 w-5" /> কুইক হাজিরা
                   </Button>
               </DialogTrigger>
@@ -740,7 +740,7 @@ export default function Home() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
             <CardTitle className="text-sm font-bold text-red-900">মোট অনুপস্থিত</CardTitle>
             <div className="p-2 bg-white/60 rounded-full backdrop-blur-sm shadow-sm">
-              <Users className="h-4 w-4 text-red-700" />
+              <Users className="h-4 w-4 text-teal-700" />
             </div>
           </CardHeader>            
           <CardContent className="relative z-10">
