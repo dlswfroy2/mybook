@@ -10,15 +10,17 @@ export default function WhiteboardPage() {
   const router = useRouter();
   const [scriptsLoaded, setScriptsLoaded] = useState(0);
   const totalScripts = 7;
+  const isInitialized = useRef(false);
 
   const handleScriptLoad = () => {
     setScriptsLoaded((prev) => prev + 1);
   };
 
   useEffect(() => {
-    if (scriptsLoaded < totalScripts) return;
+    if (scriptsLoaded < totalScripts || isInitialized.current) return;
 
     const canvas = document.getElementById('board') as HTMLCanvasElement;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
 
     const colorPicker = document.getElementById('color') as HTMLInputElement;
@@ -41,7 +43,6 @@ export default function WhiteboardPage() {
     const pageNumSpan = document.getElementById('page-num')!;
     const saveImgBtn = document.getElementById('save-img')!;
     const savePdfBtn = document.getElementById('save-pdf')!;
-    const saveSvgBtn = document.getElementById('save-svg')!;
 
     const ruler = document.getElementById('ruler')!;
     const toggleRulerBtn = document.getElementById('toggle-ruler')!;
@@ -49,8 +50,6 @@ export default function WhiteboardPage() {
     const laserDot = document.getElementById('laser-dot')!;
 
     const addStickyBtn = document.getElementById('add-sticky')!;
-    const speechBtn = document.getElementById('speech-btn')!;
-    const recordBtn = document.getElementById('record-btn')!;
     const prevBoardPageBtn = document.getElementById('prev-board-page')!;
     const nextBoardPageBtn = document.getElementById('next-board-page')!;
     const addBoardPageBtn = document.getElementById('add-board-page')!;
@@ -67,7 +66,6 @@ export default function WhiteboardPage() {
     const toggleRightSidebarBtn = document.getElementById('toggle-right-sidebar-btn')!;
     const toolbar = document.getElementById('toolbar')!;
     const rightToolbar = document.getElementById('right-toolbar')!;
-    const scrollWrapper = document.getElementById('scroll-wrapper')!;
     const tabsWrapper = document.getElementById('tabs-wrapper')!;
 
     const calcBtn = document.getElementById('calc-btn')!;
@@ -86,14 +84,6 @@ export default function WhiteboardPage() {
     const presentationCurtain = document.getElementById('presentation-curtain')!;
     const curtainHandle = document.getElementById('curtain-handle')!;
     const spotlightOverlay = document.getElementById('spotlight-overlay')!;
-    
-    const imgBtn = document.getElementById('img-btn')!;
-    const imgUpload = document.getElementById('img-upload') as HTMLInputElement;
-    const audioBtn = document.getElementById('audio-btn')!;
-    
-    const saveSessionBtn = document.getElementById('save-session')!;
-    const loadSessionBtn = document.getElementById('load-session')!;
-    const sessionFile = document.getElementById('session-file') as HTMLInputElement;
     const syncText = document.getElementById('sync-text')!;
 
     let currentTool = 'pen';
@@ -119,7 +109,6 @@ export default function WhiteboardPage() {
     }];
     let currentBoardPage = 0;
 
-    // Initialize Canvas
     canvas.width = Math.min(window.innerWidth - 60, 2000);
     canvas.height = Math.max(window.innerHeight - 120, 1200);
 
@@ -188,28 +177,25 @@ export default function WhiteboardPage() {
       }, 500);
     }
 
-    // Tools setup
-    const toolButtons = document.querySelectorAll('.tool-btn');
-    toolButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        toolButtons.forEach(b => b.classList.remove('active'));
+    const toolBtnHandler = (e: Event) => {
+        const btn = e.currentTarget as HTMLElement;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentTool = btn.getAttribute('data-tool')!;
         if (currentTool === 'pan') canvas.classList.add('panning-active');
         else canvas.classList.remove('panning-active');
-      });
-    });
+    };
+    document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', toolBtnHandler));
 
-    const bgButtons = document.querySelectorAll('.bg-btn');
-    bgButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        bgButtons.forEach(b => b.classList.remove('active'));
+    const bgBtnHandler = (e: Event) => {
+        const btn = e.currentTarget as HTMLElement;
+        document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentBgStyle = btn.getAttribute('data-bg')!;
         saveState();
         drawBackground();
-      });
-    });
+    };
+    document.querySelectorAll('.bg-btn').forEach(btn => btn.addEventListener('click', bgBtnHandler));
 
     function startDrawing(e: any) {
       if (currentTool === 'pan' || e.button === 1) {
@@ -310,36 +296,36 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
 
-    // Sidebar Toggles
-    toggleSidebarBtn.addEventListener('click', () => {
+    const toggleSidebarHandler = () => {
       toolbar.classList.toggle('collapsed');
       toggleSidebarBtn.textContent = toolbar.classList.contains('collapsed') ? '▶' : '◀';
-    });
-    toggleRightSidebarBtn.addEventListener('click', () => {
+    };
+    toggleSidebarBtn.addEventListener('click', toggleSidebarHandler);
+
+    const toggleRightSidebarHandler = () => {
       rightToolbar.classList.toggle('collapsed');
       toggleRightSidebarBtn.textContent = rightToolbar.classList.contains('collapsed') ? '◀' : '▶';
-    });
+    };
+    toggleRightSidebarBtn.addEventListener('click', toggleRightSidebarHandler);
 
-    // Right Sidebar Button Listeners
-    clearBtn.addEventListener('click', () => { saveState(); drawBackground(); });
-    undoBtn.addEventListener('click', () => {
+    clearBtn.onclick = () => { saveState(); drawBackground(); };
+    undoBtn.onclick = () => {
       if (undoStack.length > 0) {
         redoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
         ctx.putImageData(undoStack.pop()!, 0, 0);
       }
-    });
-    redoBtn.addEventListener('click', () => {
+    };
+    redoBtn.onclick = () => {
       if (redoStack.length > 0) {
         undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
         ctx.putImageData(redoStack.pop()!, 0, 0);
       }
-    });
-    zoomInBtn.addEventListener('click', () => { currentScale += 0.1; updateCanvasTransform(); });
-    zoomOutBtn.addEventListener('click', () => { if (currentScale > 0.3) { currentScale -= 0.1; updateCanvasTransform(); } });
-    resetViewBtn.addEventListener('click', () => { currentScale = 1; panOffsetX = 0; panOffsetY = 0; updateCanvasTransform(); });
-    toggleDarkBtn.addEventListener('click', () => { document.body.classList.toggle('dark-mode'); drawBackground(); });
+    };
+    zoomInBtn.onclick = () => { currentScale += 0.1; updateCanvasTransform(); };
+    zoomOutBtn.onclick = () => { if (currentScale > 0.3) { currentScale -= 0.1; updateCanvasTransform(); } };
+    resetViewBtn.onclick = () => { currentScale = 1; panOffsetX = 0; panOffsetY = 0; updateCanvasTransform(); };
+    toggleDarkBtn.onclick = () => { document.body.classList.toggle('dark-mode'); drawBackground(); };
 
-    // Page Management
     function renderTabs() {
       tabsWrapper.innerHTML = '';
       pagesData.forEach((_, idx) => {
@@ -360,14 +346,12 @@ export default function WhiteboardPage() {
         if (pagesData[currentBoardPage].imageData) ctx.putImageData(pagesData[currentBoardPage].imageData, 0, 0);
         else drawBackground();
 
-        // Update PDF controls visibility based on whether the current board page has an associated PDF
         if (pagesData[currentBoardPage].pdfDoc) {
             pdfControls.style.display = 'grid';
             pageNumSpan.textContent = `${pagesData[currentBoardPage].pageNum} / ${pagesData[currentBoardPage].numPages}`;
         } else {
             pdfControls.style.display = 'none';
         }
-
         renderTabs();
     }
 
@@ -385,7 +369,6 @@ export default function WhiteboardPage() {
         updateUIForPage();
     };
 
-    // Sticky, OCR, Math
     addStickyBtn.onclick = () => {
         const note = document.createElement('div');
         note.className = 'sticky-note';
@@ -417,7 +400,6 @@ export default function WhiteboardPage() {
         }
     };
 
-    // Calculator and Timer Widgets
     calcBtn.onclick = () => calcWidget.classList.toggle('hidden');
     const calcScreen = document.getElementById('calc-screen') as HTMLInputElement;
     calcWidget.querySelectorAll('.calc-buttons button').forEach(b => {
@@ -444,30 +426,31 @@ export default function WhiteboardPage() {
     document.getElementById('stop-timer')!.onclick = () => clearInterval(timerInt);
     document.getElementById('reset-timer')!.onclick = () => { clearInterval(timerInt); document.getElementById('timer-display')!.textContent = '00:00'; };
 
-    // Spotlight and Curtain
     spotlightBtn.onclick = () => spotlightOverlay.classList.toggle('hidden');
-    canvasContainer.onmousemove = (e) => {
+    const spotlightMoveHandler = (e: MouseEvent) => {
         if (!spotlightOverlay.classList.contains('hidden')) {
             const rect = canvasContainer.getBoundingClientRect();
             spotlightOverlay.style.background = `radial-gradient(circle 120px at ${e.clientX - rect.left}px ${e.clientY - rect.top}px, transparent 100%, rgba(0,0,0,0.8) 100%)`;
         }
     };
+    canvasContainer.addEventListener('mousemove', spotlightMoveHandler);
 
     curtainBtn.onclick = () => { presentationCurtain.classList.toggle('hidden'); presentationCurtain.style.height = '50%'; };
     let curtainDragging = false;
     curtainHandle.onmousedown = () => curtainDragging = true;
-    document.onmousemove = (e) => {
+    const curtainMouseMoveHandler = (e: MouseEvent) => {
         if (curtainDragging) {
             const rect = canvasContainer.getBoundingClientRect();
             let h = e.clientY - rect.top;
             presentationCurtain.style.height = `${Math.max(0, Math.min(h, rect.height))}px`;
         }
     };
-    document.onmouseup = () => curtainDragging = false;
+    document.addEventListener('mousemove', curtainMouseMoveHandler);
+    const curtainMouseUpHandler = () => { curtainDragging = false; };
+    document.addEventListener('mouseup', curtainMouseUpHandler);
 
     fullscreenBtn.onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
 
-    // File Management
     saveImgBtn.onclick = () => { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'board.png'; a.click(); };
     savePdfBtn.onclick = () => {
         const pdf = new (window as any).jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
@@ -496,20 +479,15 @@ export default function WhiteboardPage() {
     function renderPdfPage(num: number) {
         const currentBoard = pagesData[currentBoardPage];
         if (!currentBoard.pdfDoc) return;
-
         currentBoard.pdfDoc.getPage(num).then((page: any) => {
             const vp = page.getViewport({ scale: 1.5 });
             canvas.width = vp.width; 
             canvas.height = vp.height;
-            
-            // Re-draw background after resizing canvas for PDF
             drawBackground(); 
-
             page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
                 pageNumSpan.textContent = `${num} / ${currentBoard.numPages}`;
                 pdfControls.style.display = 'grid';
                 currentBoard.pageNum = num;
-                // Capture image data to preserve the PDF content on board page switch
                 currentBoard.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             });
         });
@@ -533,23 +511,33 @@ export default function WhiteboardPage() {
 
     drawBackground();
     renderTabs();
+    isInitialized.current = true;
 
+    // Comprehensive Cleanup
     return () => {
       canvas.removeEventListener('pointerdown', startDrawing);
       canvas.removeEventListener('pointermove', draw);
       canvas.removeEventListener('pointerup', stopDrawing);
+      document.querySelectorAll('.tool-btn').forEach(btn => btn.removeEventListener('click', toolBtnHandler));
+      document.querySelectorAll('.bg-btn').forEach(btn => btn.removeEventListener('click', bgBtnHandler));
+      toggleSidebarBtn.removeEventListener('click', toggleSidebarHandler);
+      toggleRightSidebarBtn.removeEventListener('click', toggleRightSidebarHandler);
+      canvasContainer.removeEventListener('mousemove', spotlightMoveHandler);
+      document.removeEventListener('mousemove', curtainMouseMoveHandler);
+      document.removeEventListener('mouseup', curtainMouseUpHandler);
+      isInitialized.current = false;
     };
-  }, [scriptsLoaded]);
+  }, [scriptsLoaded, totalScripts]);
 
   return (
     <div className="whiteboard-body font-kalpurush">
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" onLoad={handleScriptLoad} />
-      <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onLoad={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onReady={handleScriptLoad} />
+      <Script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" onReady={handleScriptLoad} />
+      <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onReady={handleScriptLoad} />
 
       <div id="browser-tabs-container" className="no-print">
         <div id="tabs-wrapper"></div>
@@ -592,7 +580,9 @@ export default function WhiteboardPage() {
         <input type="color" id="color" defaultValue="#000000" />
         <label>সাইজ:</label>
         <input type="range" id="size" min="1" max="50" defaultValue="5" />
-        <label><input type="checkbox" id="fill-shape" /> শেপ ফিল</label>
+        <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="fill-shape" className="w-4 h-4" /> শেপ ফিল
+        </label>
       </div>
 
       <div id="right-toolbar" className="sidebar right-sidebar no-print">
@@ -625,7 +615,6 @@ export default function WhiteboardPage() {
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
         <button id="upload-btn">📂 PDF আপলোড</button>
         
-        {/* PDF Pagination Controls */}
         <div id="pdf-controls" style={{ display: 'none' }}>
           <label className="text-[10px] font-black text-white uppercase text-center mt-2">PDF পাতা</label>
           <span id="page-num" className="text-white font-black text-xs text-center py-1">১ / ১</span>
@@ -691,7 +680,6 @@ export default function WhiteboardPage() {
       </button>
 
       <input type="file" id="img-upload" accept="image/*" style={{ display: 'none' }} />
-      <input type="file" id="session-file" accept=".json" style={{ display: 'none' }} />
     </div>
   );
 }
