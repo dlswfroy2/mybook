@@ -31,9 +31,9 @@ export const multiTaskAiFlow = ai.defineFlow(
     const year = input.academicYear || '2026';
 
     const taskInstructions: Record<string, string> = {
-      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ)
+      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ - হস্তলিখিত ও মুদ্রিত উভয় প্রকার)
 1. DATES IDENTIFICATION (তারিখ শনাক্তকরণ - অত্যন্ত গুরুত্বপূর্ণ):
-   - Documents or images may contain ONE or MULTIPLE dates in various formats:
+   - Documents or images may contain ONE or MULTIPLE dates in various formats (হাতে লেখা বা টাইপ করা):
      * Comma/slash/dot separated: '01.02, 03' (1st and 3rd Feb), '01/02, 02/02, 03/02', '01/02/26', '01-02-26', '1, 2, 3 Feb'.
      * Bengali dates or month names: '১লা ফেব্রুয়ারি', '২রা ফেব্রুয়ারি', 'মার্চ', 'ফেব্রুয়ারি ২০২৬'.
      * Register columns: day columns (1..31) under a month name.
@@ -45,18 +45,27 @@ export const multiTaskAiFlow = ai.defineFlow(
      * attendanceByDate: If attendance is recorded per date, an array of objects:
        [{ date: "${year}-02-01", presentRolls: [1, 2, 3], absentRolls: [4] }, { date: "${year}-02-02", presentRolls: [1, 3], absentRolls: [2, 4] }]
 
-2. CLASS & STUDENTS (শ্রেণি ও শিক্ষার্থী শনাক্তকরণ):
-   - Class: Look for class name (যেমন '৬ষ্ঠ'/'ষষ্ঠ'->'6', '৭ম'/'সপ্তম'->'7', '৮ম'/'অষ্টম'->'8', '৯ম'/'নবম'->'9', '১০ম'/'দশম'->'10').
-     IF NO CLASS IS WRITTEN: Set className to null. The system will auto-match students by roll and name.
+2. MULTI-CLASS & HANDWRITING RECOGNITION (একাধিক শ্রেণি ও হাতের লেখা শনাক্তকরণ):
+   - HANDWRITING: Accurately read handwritten Bengali rolls (১, ২, ৩...), handwritten names, and attendance marks (টিক চিহ্ন ✓, P, উপস্থিত, cross ✗, A, অনুপস্থিত, বা ফাঁকা ঘর)।
+   - MULTIPLE CLASSES SUPPORT: If the document contains attendance for MORE THAN ONE CLASS (e.g. ৬ষ্ঠ ও ৭ম শ্রেণি একসাথে, বা একাধিক শ্রেণির রোল লেখা আছে):
+     * Extract attendance grouped by class in 'classesAttendance' array:
+       [
+         { className: "6", presentRolls: [1, 2, 3], absentRolls: [4], students: [{ roll: 1, name: "...", status: "present" }] },
+         { className: "7", presentRolls: [1, 5], absentRolls: [2], students: [{ roll: 1, name: "...", status: "present" }] }
+       ]
+   - IF SINGLE CLASS:
+     * Set className ('6', '7', '8', '9', '10' or null if not written).
+     * If no class is explicitly written, set className to null; the system will match student names and rolls with database.
    - For EVERY student in the document, extract:
-     * roll: integer (convert Bengali digits ১..১০ to 1..10)
-     * name: student name in Bengali
-     * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা উপস্থিতি তালিকায় নাম/রোল আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা).
+     * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
+     * name: student name in Bengali (hastily handwritten names should be interpreted to closest Bengali phonetic match)
+     * className: class if identifiable ('6', '7', '8', '9', '10') or null
+     * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা).
    - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
    - absentRolls: array of absent roll numbers (e.g. [4])
    - totalStudents, totalPresent, totalAbsent
-   - description: Bengali summary of what was extracted (e.g. 'ফেব্রুয়ারি মাসের ১, ২ ও ৩ তারিখের মোট ১৫ জন শিক্ষার্থীর হাজিরা শনাক্ত হয়েছে।')
-   - actionPlan: "নির্দিষ্ট তারিখসমূহ অনুযায়ী হাজিরা ডাটাবেজে সংরক্ষণ করা হবে।"`,
+   - description: Bengali summary of what was extracted (e.g. '৬ষ্ঠ শ্রেণির ১০ জন ও ৭ম শ্রেণির ১২ জন শিক্ষার্থীর হাজিরা শনাক্ত হয়েছে।')
+   - actionPlan: "নির্দিষ্ট শ্রেণি ও তারিখসমূহ অনুযায়ী স্বয়ংক্রিয়ভাবে ডাটাবেজে সংরক্ষণ করা হবে।"`,
 
       fees: `TASK: FEE PAYMENT EXTRACTION (বেতন আদায়)
 1. DATES & MONTH:

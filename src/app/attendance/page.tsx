@@ -620,7 +620,9 @@ const MonthlyAttendanceGrid = ({
                                         const isOff = isOffDay(day, holidays);
                                         
                                         if (isSelected) {
-                                            const status = currentStatusMap.get(student.id);
+                                            const existingRecord = monthRecords.find(r => r.date === recordDateStr);
+                                            const existingAtt = existingRecord?.attendance.find(a => a.studentId === student.id);
+                                            const status = currentStatusMap.get(student.id) || existingAtt?.status;
                                             return (
                                                 <TableCell key={d} className="p-0 border-r border-black/20 bg-blue-50/50">
                                                     <div className="flex gap-0 h-8 w-24">

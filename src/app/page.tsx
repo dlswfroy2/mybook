@@ -678,85 +678,97 @@ export default function Home() {
 
           setIsSavingQuickAttendance(true);
           try {
-              // 1. Get students for target class
-              let classStudents = (studentsForYear || []).filter(
-                  (s: Student) => String(s.className) === String(targetClass)
-              );
+              let totalSavedBatches = 0;
 
-              if (classStudents.length === 0) {
-                  const qSnap = await getDocs(query(
-                      collection(db!, 'students'),
-                      where('className', '==', targetClass),
-                      where('academicYear', '==', selectedYear)
-                  ));
-                  classStudents = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+              // Check if AI extracted attendance for multiple classes
+              const classesToProcess: Array<{ className: string; presentRolls?: number[]; absentRolls?: number[]; students?: any[] }> = [];
+
+              if (Array.isArray(aiResult.classesAttendance) && aiResult.classesAttendance.length > 0) {
+                  aiResult.classesAttendance.forEach((ca: any) => {
+                      if (ca.className) {
+                          classesToProcess.push(ca);
+                      }
+                  });
               }
 
-              if (classStudents.length === 0) {
-                  toast({ variant: 'destructive', title: 'এই শ্রেণিতে কোনো শিক্ষার্থী পাওয়া যায়নি' });
-                  setIsSavingQuickAttendance(false);
-                  return;
-              }
-
-              let savedCount = 0;
-              let holidaySkipped = 0;
-
-              for (const targetDate of datesToApply) {
-                  const activeHoliday = await isHoliday(db!, targetDate);
-                  const parsedD = new Date(targetDate);
-                  const dayOfWeek = isNaN(parsedD.getTime()) ? new Date().getDay() : parsedD.getDay();
-                  const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-
-                  if (activeHoliday || isWeekend) {
-                      holidaySkipped++;
-                      continue;
-                  }
-
-                  let presentRollsForDate: number[] = [];
-                  if (Array.isArray(aiResult.attendanceByDate)) {
-                      const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
-                      if (dateObj?.presentRolls) {
-                          presentRollsForDate = dateObj.presentRolls.map(Number);
-                      }
-                  }
-                  if (presentRollsForDate.length === 0) {
-                      if (Array.isArray(aiResult.presentRolls)) {
-                          presentRollsForDate = aiResult.presentRolls.map(Number);
-                      } else if (Array.isArray(aiResult.students)) {
-                          presentRollsForDate = aiResult.students
-                              .filter((s: any) => s.status === 'present')
-                              .map((s: any) => Number(s.roll));
-                      }
-                  }
-
-                  const attendanceData: StudentAttendance[] = classStudents.map((student: Student) => ({
-                      studentId: student.id,
-                      status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
-                  }));
-
-                  const dailyAttendance: DailyAttendance = {
-                      date: targetDate,
-                      academicYear: selectedYear,
+              // Fallback to single target class
+              if (classesToProcess.length === 0) {
+                  const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  classesToProcess.push({
                       className: targetClass,
-                      attendance: attendanceData,
-                  };
-
-                  await saveDailyAttendance(db!, dailyAttendance);
-                  savedCount++;
+                      presentRolls: aiResult.presentRolls,
+                      absentRolls: aiResult.absentRolls,
+                      students: aiResult.students
+                  });
               }
 
-              if (savedCount > 0) {
+              for (const classItem of classesToProcess) {
+                  const currentClass = String(classItem.className);
+
+                  // 1. Get students for target class
+                  let classStudents = (studentsForYear || []).filter(
+                      (s: Student) => String(s.className) === currentClass
+                  );
+
+                  if (classStudents.length === 0) {
+                      const qSnap = await getDocs(query(
+                          collection(db!, 'students'),
+                          where('className', '==', currentClass),
+                          where('academicYear', '==', selectedYear)
+                      ));
+                      classStudents = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                  }
+
+                  if (classStudents.length === 0) continue;
+
+                  for (const targetDate of datesToApply) {
+                      let presentRollsForDate: number[] = [];
+                      if (Array.isArray(aiResult.attendanceByDate)) {
+                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
+                          if (dateObj?.presentRolls) {
+                              presentRollsForDate = dateObj.presentRolls.map(Number);
+                          }
+                      }
+                      if (presentRollsForDate.length === 0) {
+                          if (Array.isArray(classItem.presentRolls)) {
+                              presentRollsForDate = classItem.presentRolls.map(Number);
+                          } else if (Array.isArray(classItem.students)) {
+                              presentRollsForDate = classItem.students
+                                  .filter((s: any) => s.status === 'present')
+                                  .map((s: any) => Number(s.roll));
+                          }
+                      }
+
+                      const attendanceData: StudentAttendance[] = classStudents.map((student: Student) => ({
+                          studentId: student.id,
+                          status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
+                      }));
+
+                      const dailyAttendance: DailyAttendance = {
+                          date: targetDate,
+                          academicYear: selectedYear,
+                          className: currentClass,
+                          attendance: attendanceData,
+                      };
+
+                      await saveDailyAttendance(db!, dailyAttendance);
+                      totalSavedBatches++;
+                  }
+              }
+
+              if (totalSavedBatches > 0) {
+                  const classSummary = classesToProcess.map(c => `${classNamesMap[c.className] || c.className} শ্রেণি`).join(', ');
                   toast({
                       title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে!',
-                      description: `${toBengaliNumber(savedCount)}টি তারিখের জন্য (${classNamesMap[targetClass] || targetClass} শ্রেণি) ডাটাবেজে হাজিরা যুক্ত হয়েছে।`
+                      description: `${classSummary} এর হাজিরা নির্দিষ্ট তারিখ অনুযায়ী ডাটাবেজে যুক্ত হয়েছে।`
                   });
                   refreshDashboardAttendance(studentsForYear);
                   setIsAiPortalOpen(false);
-              } else if (holidaySkipped > 0) {
+              } else {
                   toast({
                       variant: 'destructive',
                       title: 'হাজিরা সেভ করা যায়নি',
-                      description: 'নির্বাচিত তারিখটি সাপ্তাহিক ছুটি বা সরকারি ছুটির দিন।'
+                      description: 'কোনো শ্রেণির শিক্ষার্থী মেলানো যায়নি।'
                   });
               }
           } catch (err) {
