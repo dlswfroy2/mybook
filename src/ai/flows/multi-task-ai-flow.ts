@@ -31,25 +31,30 @@ export const multiTaskAiFlow = ai.defineFlow(
     const year = input.academicYear || '2026';
 
     const taskInstructions: Record<string, string> = {
-      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ - হস্তলিখিত ও মুদ্রিত উভয় প্রকার, একাধিক মাস ও বছর সমর্থন)
-1. DATES, MONTHS & YEARS IDENTIFICATION (একাধিক তারিখ, মাস ও বছর শনাক্তকরণ - অত্যন্ত গুরুত্বপূর্ণ):
-   - Documents or images may contain dates from SINGLE or MULTIPLE MONTHS and even DIFFERENT ACADEMIC YEARS (যেমন: জানুয়ারি, ফেব্রুয়ারি, মার্চ বা ২০২৫, ২০২৬ একসাথে)।
-   - Date formats can be varied (হাতে লেখা বা টাইপ করা):
-     * Comma/slash/dot separated: '01.02, 03' (1st and 3rd Feb), '01/02, 02/02, 03/02', '01/02/25', '01-02-26', '1, 2, 3 Feb'.
-     * Bengali dates, month names, and year: '১লা জানুয়ারি ২০২৫', '১৫ই ফেব্রুয়ারি ২০২৬', 'মার্চ ২০২৫', 'ফেব্রুয়ারি ২০২৬'।
-     * Register columns: day columns (1..31) under multiple month headers or different year sections.
+      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ - হস্তলিখিত ও মুদ্রিত উভয় প্রকার, টেবিল হেডার, একাধিক মাস ও বছর সূক্ষ্ম বিশ্লেষণ)
+1. LINE-BY-LINE & CELL-BY-CELL ANALYSIS (প্রতিটি লাইন, কলাম হেডার ও টেক্সট নির্দেশনা গভীর মনোযোগ দিয়ে পর্যবেক্ষণ করুন):
+   - টেবিল বা ছবির প্রতিটি কলামের হেডার (Header) সতর্কতার সাথে পড়ুন।
+   - TWO-LINE / HYPHENATED DAY-MONTH HEADERS (তারিখ-মাস কলাম হেডার শনাক্তকরণ):
+     * ছবিতে প্রায়ই দেখা যায় প্রতিটি কলামের মাথায় দিন এবং নিচে মাস লেখা থাকে, অথবা হাইফেন দিয়ে লেখা থাকে, যেমন:
+       - "01-10" বা "০১-১০" = ০১ অক্টোবর (Day: 01, Month: 10)
+       - "02-১০" = ০২ অক্টোবর (Day: 02, Month: 10)
+       - "03-১০" = ০৩ অক্টোবর (Day: 03, Month: 10)
+       - "04-09" বা "০৪-০৯" = ০৪ সেপ্টেম্বর (Day: 04, Month: 09)
+       - "05-09" = ০৫ সেপ্টেম্বর (Day: 05, Month: 09) ... এবং "27-09" পর্যন্ত!
+     * লক্ষ্য করুন: একই টেবিলে বিভিন্ন কলামে বিভিন্ন মাস থাকতে পারে! যেমন প্রথম ৩টি কলাম ১০ম মাস (অক্টোবর) এবং পরের কলামগুলো ৯ম মাস (সেপ্টেম্বর)! প্রতিটি কলামের দিন (DD) এবং মাস (MM) আলাদা করে পড়ে নির্ভুল YYYY-MM-DD তৈরি করতে হবে।
+   - BENGALI & ENGLISH NUMBERS:
+     * কলাম হেডারে বাংলা বা ইংরেজি যেকোনো সংখ্যা থাকতে পারে (০১, 01, ১০, 10, ০৯, 09)। উভয়টিই সঠিকভাবে ডিকোড করুন।
    - CRITICAL YEAR DETECTION:
-     * If a year (e.g. 2025 or ২০২৫, 2026 or ২০২৬) is explicitly mentioned in the document/image, use that specific year for those dates!
-     * If no year is specified for a date, default to the current academic year (${year}).
-   - For ANY format, convert every date into standard ISO 'YYYY-MM-DD' (with its detected year and month).
+     * যদি ডকুমেন্টে বা ইউজারের নির্দেশনায় কোনো বছর (যেমন: ২০২৫, 2025, ২০২৬, 2026) উল্লেখ থাকে, সেই বছর ব্যবহার করুন।
+     * উল্লেখ না থাকলে ডিফল্ট শিক্ষাবর্ষ (${year}) ব্যবহার করুন।
    - Always return:
-     * dates: Array of all detected dates in 'YYYY-MM-DD' order (e.g. ["2025-09-01", "2025-09-02", "2026-01-05"]).
-     * date: The primary date (first date or latest marked date) in 'YYYY-MM-DD'.
-     * monthName: Comma-separated or primary Bengali month name (e.g. 'সেপ্টেম্বর', 'অক্টোবর', 'জানুয়ারি')।
-     * detectedYears: Array of academic years found (e.g. ["2025"], ["2026"], or ["2025", "2026"]).
-     * attendanceByDate: If attendance is recorded per date or across different dates/months/years, return an array of objects:
+     * dates: Array of ALL detected dates in ISO 'YYYY-MM-DD' format, in the EXACT order they appear in the columns (e.g. ["${year}-10-01", "${year}-10-02", "${year}-10-03", "${year}-09-04", "${year}-09-05", ...]).
+     * date: The primary date (first date) in 'YYYY-MM-DD'.
+     * monthName: All detected months in Bengali (e.g. "অক্টোবর, সেপ্টেম্বর").
+     * detectedYears: Array of academic years found (e.g. ["${year}"]).
+     * attendanceByDate: Array of objects for EACH date column:
        [
-         { date: "YYYY-MM-DD", year: "YYYY", month: "MM", className?: string, presentRolls: [1, 2, 3], absentRolls: [4] }
+         { date: "YYYY-MM-DD", year: "YYYY", month: "MM", presentRolls: [1, 2, ...], absentRolls: [...] }
        ]
 
 2. MULTI-CLASS & HANDWRITING RECOGNITION (একাধিক শ্রেণি ও হাতের লেখা শনাক্তকরণ):
