@@ -380,7 +380,7 @@ export default function Home() {
               setTotalAbsent(0);
           }
       } catch (e) {}
-  }, [db, selectedYear, list]);
+  }, [db, selectedYear, studentsForYear]);
 
   useEffect(() => {
       if (!db || !user?.uid) return;
@@ -607,15 +607,21 @@ export default function Home() {
               return;
           }
 
-          if (aiResult.students) {
-              const presentRolls = aiResult.students
+          let presentRollsStr = '';
+          if (Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0) {
+              presentRollsStr = aiResult.presentRolls.join(', ');
+          } else if (aiResult.students) {
+              presentRollsStr = aiResult.students
                 .filter((s: any) => s.status === 'present')
                 .map((s: any) => s.roll)
                 .join(', ');
-              setQuickAttendanceInput(presentRolls);
+          }
+          if (presentRollsStr || aiResult.className) {
+              setQuickAttendanceInput(presentRollsStr);
               if (aiResult.className) setQuickAttendanceClass(aiResult.className);
               setIsAiPortalOpen(false);
               setIsQuickAttendanceOpen(true);
+              toast({ title: 'হাজিরা তথ্য শনাক্ত হয়েছে', description: `উপস্থিত রোল: ${presentRollsStr}` });
           }
       } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
           const roll = aiResult.collections[0].roll;
@@ -869,16 +875,70 @@ export default function Home() {
                               <CardHeader className="pb-2 border-b border-emerald-100">
                                   <CardTitle className="text-sm font-black text-emerald-800 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> এআই শনাক্তকৃত তথ্য</CardTitle>
                               </CardHeader>
-                              <CardContent className="pt-4 overflow-x-auto">
-                                  <div className="grid grid-cols-2 gap-4 mb-4">
-                                      {aiResult.date && <div className="p-2 bg-white rounded border"><p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p><p className="font-black text-primary">{toBengaliNumber(aiResult.date)}</p></div>}
-                                      {aiResult.className && <div className="p-2 bg-white rounded border"><p className="text-[10px] font-black text-muted-foreground uppercase">শ্রেণি</p><p className="font-black text-primary">{classNamesMap[aiResult.className] || aiResult.className} শ্রেণি</p></div>}
+                              <CardContent className="pt-4 overflow-x-auto space-y-4">
+                                  {aiResult.description && (
+                                      <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                                          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1">এআই পর্যবেক্ষণ</p>
+                                          <p className="text-sm font-bold text-slate-800">{aiResult.description}</p>
+                                      </div>
+                                  )}
+
+                                  {aiResult.actionPlan && (
+                                      <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200">
+                                          <p className="text-[10px] font-black text-indigo-800 uppercase tracking-wider mb-1">অ্যাকশন প্ল্যান (কোথায় কিভাবে কার কাছে যুক্ত হবে)</p>
+                                          <p className="text-sm font-bold text-indigo-950">{aiResult.actionPlan}</p>
+                                      </div>
+                                  )}
+
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                      {aiResult.className && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-muted-foreground uppercase">শ্রেণি</p>
+                                              <p className="font-black text-primary text-base">{classNamesMap[aiResult.className] || aiResult.className} শ্রেণি</p>
+                                          </div>
+                                      )}
+                                      {aiResult.date && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p>
+                                              <p className="font-black text-primary text-base">{toBengaliNumber(aiResult.date)}</p>
+                                          </div>
+                                      )}
+                                      {(aiResult.totalPresent !== undefined || aiResult.presentRolls?.length) && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-emerald-700 uppercase">মোট উপস্থিত</p>
+                                              <p className="font-black text-emerald-700 text-base">{toBengaliNumber(aiResult.totalPresent ?? aiResult.presentRolls?.length)} জন</p>
+                                          </div>
+                                      )}
+                                      {(aiResult.totalAbsent !== undefined || aiResult.absentRolls?.length) && (
+                                          <div className="p-2.5 bg-white rounded-xl border">
+                                              <p className="text-[10px] font-black text-rose-700 uppercase">মোট অনুপস্থিত</p>
+                                              <p className="font-black text-rose-700 text-base">{toBengaliNumber(aiResult.totalAbsent ?? aiResult.absentRolls?.length)} জন</p>
+                                          </div>
+                                      )}
                                   </div>
-                                  <pre className="text-xs font-mono bg-white p-4 rounded-lg border shadow-inner whitespace-pre-wrap overflow-y-auto max-h-[200px]">
-                                      {JSON.stringify(aiResult, null, 2)}
-                                  </pre>
-                                  <div className="mt-6 flex justify-end">
-                                      <Button onClick={applyAiData} className="bg-emerald-600 hover:bg-emerald-700 font-black px-10 h-12 shadow-lg gap-2">
+
+                                  {Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0 && (
+                                      <div className="p-3 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1.5">উপস্থিত রোলসমূহ ({toBengaliNumber(aiResult.presentRolls.length)} জন)</p>
+                                          <div className="flex flex-wrap gap-1.5">
+                                              {aiResult.presentRolls.map((r: any) => (
+                                                  <span key={r} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-black text-xs rounded-md">
+                                                      {toBengaliNumber(r)}
+                                                  </span>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  )}
+
+                                  <details className="text-xs font-mono bg-white p-3 rounded-lg border">
+                                      <summary className="font-black text-slate-600 cursor-pointer text-xs mb-2">বিস্তারিত র JSON ডেটা দেখুন</summary>
+                                      <pre className="whitespace-pre-wrap overflow-y-auto max-h-[160px] text-[11px] text-slate-700">
+                                          {JSON.stringify(aiResult, null, 2)}
+                                      </pre>
+                                  </details>
+
+                                  <div className="mt-4 flex justify-end">
+                                      <Button onClick={applyAiData} className="bg-emerald-600 hover:bg-emerald-700 font-black px-10 h-12 shadow-lg gap-2 text-base">
                                           তথ্য সিস্টেমে প্রয়োগ করুন <ArrowRight className="h-5 w-5" />
                                       </Button>
                                   </div>
