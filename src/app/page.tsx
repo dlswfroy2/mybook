@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import Link from 'next/link';
+import Link from 'link';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { 
@@ -65,7 +64,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { useAcademicYear } from '@/context/AcademicYearContext';
-import { Student, studentFromDoc } from '@/lib/student-data';
+import { Student, studentFromDoc, sanitizePhotoUrl, getStudentPlaceholderImage } from '@/lib/student-data';
 import { getAttendanceForDate, saveDailyAttendance, StudentAttendance, DailyAttendance, getAttendanceForClassAndDate } from '@/lib/attendance-data';
 import { isHoliday } from '@/lib/holiday-data';
 import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
@@ -589,18 +588,35 @@ export default function Home() {
     }
   };
 
-  const applyAiData = () => {
+  const applyAiData = async () => {
       if (!aiResult) return;
       
-      if (aiTask === 'attendance' && aiResult.students) {
-          const presentRolls = aiResult.students
-            .filter((s: any) => s.status === 'present')
-            .map((s: any) => s.roll)
-            .join(', ');
-          setQuickAttendanceInput(presentRolls);
-          if (aiResult.className) setQuickAttendanceClass(aiResult.className);
-          setIsAiPortalOpen(false);
-          setIsQuickAttendanceOpen(true);
+      if (aiTask === 'attendance') {
+          // Holiday & Weekend Check for AI applied data
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const activeHoliday = await isHoliday(db!, todayStr);
+          const dayOfWeek = new Date().getDay();
+          const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+
+          if (activeHoliday || isWeekend) {
+              toast({ 
+                  variant: 'destructive', 
+                  title: 'আজ ছুটির দিন!', 
+                  description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে স্কুল বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
+              });
+              return;
+          }
+
+          if (aiResult.students) {
+              const presentRolls = aiResult.students
+                .filter((s: any) => s.status === 'present')
+                .map((s: any) => s.roll)
+                .join(', ');
+              setQuickAttendanceInput(presentRolls);
+              if (aiResult.className) setQuickAttendanceClass(aiResult.className);
+              setIsAiPortalOpen(false);
+              setIsQuickAttendanceOpen(true);
+          }
       } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
           const roll = aiResult.collections[0].roll;
           setQuickSearchInput(String(roll));

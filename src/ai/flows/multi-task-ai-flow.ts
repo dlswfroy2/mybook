@@ -56,7 +56,11 @@ export const multiTaskAiFlow = ai.defineFlow(
     if (!text) return { error: "AI failed to parse input" };
     
     try {
-      const cleanJson = text.replace(/```json|```/g, '').trim();
+      // Find the JSON block even if AI includes preamble or conversational text
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { error: "Could not find valid JSON in AI response", raw: text };
+      
+      const cleanJson = jsonMatch[0].trim();
       return JSON.parse(cleanJson);
     } catch (e) {
       return { error: "Invalid JSON format from AI", raw: text };
