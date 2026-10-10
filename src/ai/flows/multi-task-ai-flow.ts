@@ -31,27 +31,45 @@ export const multiTaskAiFlow = ai.defineFlow(
     const year = input.academicYear || '2026';
 
     const taskInstructions: Record<string, string> = {
-      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ - হস্তলিখিত ও মুদ্রিত উভয় প্রকার)
-1. DATES IDENTIFICATION (তারিখ শনাক্তকরণ - অত্যন্ত গুরুত্বপূর্ণ):
-   - Documents or images may contain ONE or MULTIPLE dates in various formats (হাতে লেখা বা টাইপ করা):
-     * Comma/slash/dot separated: '01.02, 03' (1st and 3rd Feb), '01/02, 02/02, 03/02', '01/02/26', '01-02-26', '1, 2, 3 Feb'.
-     * Bengali dates or month names: '১লা ফেব্রুয়ারি', '২রা ফেব্রুয়ারি', 'মার্চ', 'ফেব্রুয়ারি ২০২৬'.
-     * Register columns: day columns (1..31) under a month name.
-   - For ANY format, convert every date into standard ISO 'YYYY-MM-DD' (using academic year ${year}).
+      attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ - হস্তলিখিত ও মুদ্রিত উভয় প্রকার, একাধিক মাস ও বছর সমর্থন)
+1. DATES, MONTHS & YEARS IDENTIFICATION (একাধিক তারিখ, মাস ও বছর শনাক্তকরণ - অত্যন্ত গুরুত্বপূর্ণ):
+   - Documents or images may contain dates from SINGLE or MULTIPLE MONTHS and even DIFFERENT ACADEMIC YEARS (যেমন: জানুয়ারি, ফেব্রুয়ারি, মার্চ বা ২০২৫, ২০২৬ একসাথে)।
+   - Date formats can be varied (হাতে লেখা বা টাইপ করা):
+     * Comma/slash/dot separated: '01.02, 03' (1st and 3rd Feb), '01/02, 02/02, 03/02', '01/02/25', '01-02-26', '1, 2, 3 Feb'.
+     * Bengali dates, month names, and year: '১লা জানুয়ারি ২০২৫', '১৫ই ফেব্রুয়ারি ২০২৬', 'মার্চ ২০২৫', 'ফেব্রুয়ারি ২০২৬'।
+     * Register columns: day columns (1..31) under multiple month headers or different year sections.
+   - CRITICAL YEAR DETECTION:
+     * If a year (e.g. 2025 or ২০২৫, 2026 or ২০২৬) is explicitly mentioned in the document/image, use that specific year for those dates!
+     * If no year is specified for a date, default to the current academic year (${year}).
+   - For ANY format, convert every date into standard ISO 'YYYY-MM-DD' (with its detected year and month).
    - Always return:
-     * dates: Array of all detected dates in 'YYYY-MM-DD' order (e.g. ["${year}-02-01", "${year}-02-02", "${year}-02-03"]).
+     * dates: Array of all detected dates in 'YYYY-MM-DD' order (e.g. ["2025-09-01", "2025-09-02", "2026-01-05"]).
      * date: The primary date (first date or latest marked date) in 'YYYY-MM-DD'.
-     * monthName: Bengali month name if mentioned or implied (e.g. 'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', ইত্যাদি).
-     * attendanceByDate: If attendance is recorded per date, an array of objects:
-       [{ date: "${year}-02-01", presentRolls: [1, 2, 3], absentRolls: [4] }, { date: "${year}-02-02", presentRolls: [1, 3], absentRolls: [2, 4] }]
+     * monthName: Comma-separated or primary Bengali month name (e.g. 'সেপ্টেম্বর', 'অক্টোবর', 'জানুয়ারি')।
+     * detectedYears: Array of academic years found (e.g. ["2025"], ["2026"], or ["2025", "2026"]).
+     * attendanceByDate: If attendance is recorded per date or across different dates/months/years, return an array of objects:
+       [
+         { date: "YYYY-MM-DD", year: "YYYY", month: "MM", className?: string, presentRolls: [1, 2, 3], absentRolls: [4] }
+       ]
 
 2. MULTI-CLASS & HANDWRITING RECOGNITION (একাধিক শ্রেণি ও হাতের লেখা শনাক্তকরণ):
    - HANDWRITING: Accurately read handwritten Bengali rolls (১, ২, ৩...), handwritten names, and attendance marks (টিক চিহ্ন ✓, P, উপস্থিত, cross ✗, A, অনুপস্থিত, বা ফাঁকা ঘর)।
    - MULTIPLE CLASSES SUPPORT: If the document contains attendance for MORE THAN ONE CLASS (e.g. ৬ষ্ঠ ও ৭ম শ্রেণি একসাথে, বা একাধিক শ্রেণির রোল লেখা আছে):
      * Extract attendance grouped by class in 'classesAttendance' array:
        [
-         { className: "6", presentRolls: [1, 2, 3], absentRolls: [4], students: [{ roll: 1, name: "...", status: "present" }] },
-         { className: "7", presentRolls: [1, 5], absentRolls: [2], students: [{ roll: 1, name: "...", status: "present" }] }
+         { 
+           className: "6", 
+           presentRolls: [1, 2, 3], 
+           absentRolls: [4], 
+           students: [{ roll: 1, name: "...", status: "present" }],
+           attendanceByDate?: [{ date: "YYYY-MM-DD", presentRolls: [1, 2], absentRolls: [3] }]
+         },
+         { 
+           className: "7", 
+           presentRolls: [1, 5], 
+           absentRolls: [2], 
+           students: [{ roll: 1, name: "...", status: "present" }] 
+         }
        ]
    - IF SINGLE CLASS:
      * Set className ('6', '7', '8', '9', '10' or null if not written).
@@ -64,8 +82,8 @@ export const multiTaskAiFlow = ai.defineFlow(
    - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
    - absentRolls: array of absent roll numbers (e.g. [4])
    - totalStudents, totalPresent, totalAbsent
-   - description: Bengali summary of what was extracted (e.g. '৬ষ্ঠ শ্রেণির ১০ জন ও ৭ম শ্রেণির ১২ জন শিক্ষার্থীর হাজিরা শনাক্ত হয়েছে।')
-   - actionPlan: "নির্দিষ্ট শ্রেণি ও তারিখসমূহ অনুযায়ী স্বয়ংক্রিয়ভাবে ডাটাবেজে সংরক্ষণ করা হবে।"`,
+   - description: Bengali summary of what was extracted (e.g. '২০২৫ সালের সেপ্টেম্বর মাসের ৬ষ্ঠ শ্রেণির এবং ২০২৬ সালের ৭ম শ্রেণির হাজিরা শনাক্ত হয়েছে।')
+   - actionPlan: "নির্দিষ্ট শিক্ষাবর্ষ, শ্রেণি ও তারিখসমূহ অনুযায়ী নির্ভুলভাবে ডাটাবেজে সংরক্ষণ করা হবে।"`,
 
       fees: `TASK: FEE PAYMENT EXTRACTION (বেতন আদায়)
 1. DATES & MONTH:

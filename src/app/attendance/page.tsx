@@ -152,18 +152,34 @@ const MonthlyAttendanceGrid = ({
     const isSyncing = useRef(false);
     const [tableScrollWidth, setTableScrollWidth] = useState(3000);
 
-    // Default reference date for calendar calculation
-    const monthStart = useMemo(() => startOfMonth(viewDate), [viewDate]);
-    const monthEnd = useMemo(() => endOfMonth(viewDate), [viewDate]);
+    // Default reference date for calendar calculation - always strictly anchored to selectedYear
+    const effectiveYear = useMemo(() => parseInt(selectedYear, 10) || new Date().getFullYear(), [selectedYear]);
+
+    const monthStart = useMemo(() => {
+        const d = new Date(viewDate);
+        d.setFullYear(effectiveYear);
+        return startOfMonth(d);
+    }, [viewDate, effectiveYear]);
+
+    const monthEnd = useMemo(() => {
+        const d = new Date(viewDate);
+        d.setFullYear(effectiveYear);
+        return endOfMonth(d);
+    }, [viewDate, effectiveYear]);
+
     const daysInMonth = useMemo(() => eachDayOfInterval({ start: monthStart, end: monthEnd }), [monthStart, monthEnd]);
 
     // Highlight only the specific selected day in the current month view
     const activeDay = useMemo(() => {
-        if (selectedDate && isSameMonth(selectedDate, viewDate) && isSameYear(selectedDate, viewDate)) {
+        if (!selectedDate) return null;
+        const d1 = new Date(selectedDate);
+        const d2 = new Date(viewDate);
+        d2.setFullYear(effectiveYear);
+        if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()) {
             return getDate(selectedDate);
         }
         return null;
-    }, [selectedDate, viewDate]);
+    }, [selectedDate, viewDate, effectiveYear]);
 
     const [monthRecords, setMonthRecords] = useState<DailyAttendance[]>([]);
     const [currentStatusMap, setCurrentStatusMap] = useState<Map<string, AttendanceStatus>>(new Map());
@@ -733,12 +749,30 @@ const AttendanceSheet = ({
 
 const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents: Student[], date: Date | undefined, onDateChange: (d: Date) => void }) => {
     const { selectedYear } = useAcademicYear();
-    const [viewDate, setViewDate] = useState<Date>(new Date());
+    const effectiveYear = useMemo(() => parseInt(selectedYear, 10) || new Date().getFullYear(), [selectedYear]);
+    const [viewDate, setViewDate] = useState<Date>(() => {
+        const d = new Date();
+        d.setFullYear(effectiveYear);
+        return d;
+    });
     
+    // Sync view context if selectedYear changes
+    useEffect(() => {
+        setViewDate(prev => {
+            const next = new Date(prev);
+            next.setFullYear(effectiveYear);
+            return next;
+        });
+    }, [effectiveYear]);
+
     // Sync view context if an external date selection is made (e.g. from missed attendance list)
     useEffect(() => {
-        if (date) setViewDate(date);
-    }, [date]);
+        if (date) {
+            const next = new Date(date);
+            next.setFullYear(effectiveYear);
+            setViewDate(next);
+        }
+    }, [date, effectiveYear]);
 
     const studentsForYear = useMemo(() => {
         return allStudents.filter(student => student.academicYear === selectedYear);
@@ -767,6 +801,7 @@ const DigitalAttendanceTab = ({ allStudents, date, onDateChange }: { allStudents
                         value={currentMonthIdx.toString()} 
                         onValueChange={(val) => {
                             const nextDate = new Date(viewDate);
+                            nextDate.setFullYear(effectiveYear);
                             nextDate.setMonth(parseInt(val));
                             setViewDate(nextDate);
                         }}

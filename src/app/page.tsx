@@ -705,23 +705,38 @@ export default function Home() {
               for (const classItem of classesToProcess) {
                   const currentClass = String(classItem.className);
 
-                  // 1. Get students for target class
-                  let classStudents = (studentsForYear || []).filter(
-                      (s: Student) => String(s.className) === currentClass
-                  );
-
-                  if (classStudents.length === 0) {
-                      const qSnap = await getDocs(query(
-                          collection(db!, 'students'),
-                          where('className', '==', currentClass),
-                          where('academicYear', '==', selectedYear)
-                      ));
-                      classStudents = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
-                  }
-
-                  if (classStudents.length === 0) continue;
-
                   for (const targetDate of datesToApply) {
+                      // Determine target academic year for this date
+                      let dateAcademicYear = selectedYear;
+                      if (Array.isArray(aiResult.attendanceByDate)) {
+                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
+                          if (dateObj?.year) {
+                              dateAcademicYear = String(dateObj.year);
+                          }
+                      }
+                      if (!dateAcademicYear && targetDate) {
+                          const parsedYear = targetDate.split('-')[0];
+                          if (parsedYear && parsedYear.length === 4) {
+                              dateAcademicYear = parsedYear;
+                          }
+                      }
+
+                      // Fetch students for currentClass and dateAcademicYear
+                      let studentsForThisBatch = (studentsForYear || []).filter(
+                          (s: Student) => String(s.className) === currentClass && s.academicYear === dateAcademicYear
+                      );
+
+                      if (studentsForThisBatch.length === 0) {
+                          const qSnap = await getDocs(query(
+                              collection(db!, 'students'),
+                              where('className', '==', currentClass),
+                              where('academicYear', '==', dateAcademicYear)
+                          ));
+                          studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                      }
+
+                      if (studentsForThisBatch.length === 0) continue;
+
                       let presentRollsForDate: number[] = [];
                       if (Array.isArray(aiResult.attendanceByDate)) {
                           const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
@@ -739,14 +754,14 @@ export default function Home() {
                           }
                       }
 
-                      const attendanceData: StudentAttendance[] = classStudents.map((student: Student) => ({
+                      const attendanceData: StudentAttendance[] = studentsForThisBatch.map((student: Student) => ({
                           studentId: student.id,
                           status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
                       }));
 
                       const dailyAttendance: DailyAttendance = {
                           date: targetDate,
-                          academicYear: selectedYear,
+                          academicYear: dateAcademicYear,
                           className: currentClass,
                           attendance: attendanceData,
                       };
