@@ -315,6 +315,52 @@ const NoticeTicker = () => {
     return null;
 };
 
+// Smart student matcher to resolve class when not explicitly mentioned in documents
+function matchStudentsAndResolveClass(
+  extractedStudents: Array<{ roll: number; name?: string; status?: string }>,
+  allStudents: Student[]
+): { resolvedClass: string | null; matchedMap: Map<number, Student> } {
+  if (!extractedStudents || extractedStudents.length === 0) return { resolvedClass: null, matchedMap: new Map() };
+
+  const classScores: Record<string, number> = { '6': 0, '7': 0, '8': 0, '9': 0, '10': 0 };
+  const matchedMap = new Map<number, Student>();
+
+  extractedStudents.forEach(item => {
+    const candidateMatches = allStudents.filter(s => Number(s.roll) === Number(item.roll));
+    if (candidateMatches.length === 1) {
+      const s = candidateMatches[0];
+      classScores[s.className] = (classScores[s.className] || 0) + 2;
+      matchedMap.set(Number(item.roll), s);
+    } else if (candidateMatches.length > 1) {
+      const cleanedItemName = (item.name || '').replace(/[\s\.\-_]/g, '');
+      const nameMatch = candidateMatches.find(s => {
+        if (!cleanedItemName) return false;
+        const cleanedDbName = (s.studentNameBn || '').replace(/[\s\.\-_]/g, '');
+        return cleanedDbName.includes(cleanedItemName) || cleanedItemName.includes(cleanedDbName);
+      });
+      if (nameMatch) {
+        classScores[nameMatch.className] = (classScores[nameMatch.className] || 0) + 5;
+        matchedMap.set(Number(item.roll), nameMatch);
+      } else {
+        candidateMatches.forEach(s => {
+          classScores[s.className] = (classScores[s.className] || 0) + 1;
+        });
+      }
+    }
+  });
+
+  let bestClass: string | null = null;
+  let maxScore = 0;
+  Object.entries(classScores).forEach(([cls, score]) => {
+    if (score > maxScore) {
+      maxScore = score;
+      bestClass = cls;
+    }
+  });
+
+  return { resolvedClass: bestClass, matchedMap };
+}
+
 export default function Home() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -349,6 +395,9 @@ export default function Home() {
   const [aiRawText, setAiRawText] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
+  const [selectedAiDate, setSelectedAiDate] = useState<string>('');
+  const [selectedAiClass, setSelectedAiClass] = useState<string>('6');
+  const [applyToAllDates, setApplyToAllDates] = useState<boolean>(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshDashboardAttendance = useCallback(async (currentStudents?: Student[]) => {
@@ -573,12 +622,40 @@ export default function Home() {
         const res = await runMultiTaskAi({ 
             photoDataUri: aiImage || undefined, 
             rawText: aiRawText.trim() || undefined,
-            taskType: aiTask 
+            taskType: aiTask,
+            academicYear: selectedYear
         });
         if (res.error) {
             toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
         } else {
-            setAiResult(res);
+            // Process dates
+            const detectedDates: string[] = Array.isArray(res.dates) && res.dates.length > 0 
+                ? res.dates 
+                : (res.date ? [res.date] : []);
+            
+            if (detectedDates.length > 0) {
+                setSelectedAiDate(detectedDates[0]);
+                setApplyToAllDates(detectedDates.length > 1);
+            } else {
+                setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
+                setApplyToAllDates(false);
+            }
+
+            // Auto-resolve class by matching student names and rolls from database
+            let finalClass = res.className;
+            let autoResolved = false;
+            if (!finalClass || finalClass === 'unknown' || !['6', '7', '8', '9', '10'].includes(String(finalClass))) {
+                const studentsList = res.students || (res.presentRolls ? res.presentRolls.map((r: number) => ({ roll: r })) : []);
+                const { resolvedClass } = matchStudentsAndResolveClass(studentsList, studentsForYear);
+                if (resolvedClass) {
+                    finalClass = resolvedClass;
+                    autoResolved = true;
+                } else {
+                    finalClass = '6';
+                }
+            }
+            setSelectedAiClass(String(finalClass));
+            setAiResult({ ...res, resolvedClass: finalClass, autoResolved });
             toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
         }
     } catch (e) {
@@ -592,39 +669,103 @@ export default function Home() {
       if (!aiResult) return;
       
       if (aiTask === 'attendance') {
-          // Holiday & Weekend Check for AI applied data
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const activeHoliday = await isHoliday(db!, todayStr);
-          const dayOfWeek = new Date().getDay();
-          const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+          const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+          const datesToApply: string[] = (applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 0) 
+              ? aiResult.dates 
+              : [selectedAiDate || aiResult.date || format(new Date(), 'yyyy-MM-dd')];
 
-          if (activeHoliday || isWeekend) {
-              toast({ 
-                  variant: 'destructive', 
-                  title: 'আজ ছুটির দিন!', 
-                  description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে স্কুল বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
-              });
-              return;
-          }
+          setIsSavingQuickAttendance(true);
+          try {
+              // 1. Get students for target class
+              let classStudents = (studentsForYear || []).filter(
+                  (s: Student) => String(s.className) === String(targetClass)
+              );
 
-          let presentRollsStr = '';
-          if (Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0) {
-              presentRollsStr = aiResult.presentRolls.join(', ');
-          } else if (aiResult.students) {
-              presentRollsStr = aiResult.students
-                .filter((s: any) => s.status === 'present')
-                .map((s: any) => s.roll)
-                .join(', ');
-          }
-          if (presentRollsStr || aiResult.className) {
-              setQuickAttendanceInput(presentRollsStr);
-              if (aiResult.className) setQuickAttendanceClass(aiResult.className);
-              setIsAiPortalOpen(false);
-              setIsQuickAttendanceOpen(true);
-              toast({ title: 'হাজিরা তথ্য শনাক্ত হয়েছে', description: `উপস্থিত রোল: ${presentRollsStr}` });
+              if (classStudents.length === 0) {
+                  const qSnap = await getDocs(query(
+                      collection(db!, 'students'),
+                      where('className', '==', targetClass),
+                      where('academicYear', '==', selectedYear)
+                  ));
+                  classStudents = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+              }
+
+              if (classStudents.length === 0) {
+                  toast({ variant: 'destructive', title: 'এই শ্রেণিতে কোনো শিক্ষার্থী পাওয়া যায়নি' });
+                  setIsSavingQuickAttendance(false);
+                  return;
+              }
+
+              let savedCount = 0;
+              let holidaySkipped = 0;
+
+              for (const targetDate of datesToApply) {
+                  const activeHoliday = await isHoliday(db!, targetDate);
+                  const parsedD = new Date(targetDate);
+                  const dayOfWeek = isNaN(parsedD.getTime()) ? new Date().getDay() : parsedD.getDay();
+                  const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+
+                  if (activeHoliday || isWeekend) {
+                      holidaySkipped++;
+                      continue;
+                  }
+
+                  let presentRollsForDate: number[] = [];
+                  if (Array.isArray(aiResult.attendanceByDate)) {
+                      const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
+                      if (dateObj?.presentRolls) {
+                          presentRollsForDate = dateObj.presentRolls.map(Number);
+                      }
+                  }
+                  if (presentRollsForDate.length === 0) {
+                      if (Array.isArray(aiResult.presentRolls)) {
+                          presentRollsForDate = aiResult.presentRolls.map(Number);
+                      } else if (Array.isArray(aiResult.students)) {
+                          presentRollsForDate = aiResult.students
+                              .filter((s: any) => s.status === 'present')
+                              .map((s: any) => Number(s.roll));
+                      }
+                  }
+
+                  const attendanceData: StudentAttendance[] = classStudents.map((student: Student) => ({
+                      studentId: student.id,
+                      status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
+                  }));
+
+                  const dailyAttendance: DailyAttendance = {
+                      date: targetDate,
+                      academicYear: selectedYear,
+                      className: targetClass,
+                      attendance: attendanceData,
+                  };
+
+                  await saveDailyAttendance(db!, dailyAttendance);
+                  savedCount++;
+              }
+
+              if (savedCount > 0) {
+                  toast({
+                      title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে!',
+                      description: `${toBengaliNumber(savedCount)}টি তারিখের জন্য (${classNamesMap[targetClass] || targetClass} শ্রেণি) ডাটাবেজে হাজিরা যুক্ত হয়েছে।`
+                  });
+                  refreshDashboardAttendance(studentsForYear);
+                  setIsAiPortalOpen(false);
+              } else if (holidaySkipped > 0) {
+                  toast({
+                      variant: 'destructive',
+                      title: 'হাজিরা সেভ করা যায়নি',
+                      description: 'নির্বাচিত তারিখটি সাপ্তাহিক ছুটি বা সরকারি ছুটির দিন।'
+                  });
+              }
+          } catch (err) {
+              console.error("Error applying AI attendance:", err);
+              toast({ variant: 'destructive', title: 'হাজিরা সংরক্ষণ করতে সমস্যা হয়েছে' });
+          } finally {
+              setIsSavingQuickAttendance(false);
           }
       } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
-          const roll = aiResult.collections[0].roll;
+          const col = aiResult.collections[0];
+          const roll = col.roll;
           setQuickSearchInput(String(roll));
           setIsAiPortalOpen(false);
           setIsQuickPaymentOpen(true);
@@ -890,19 +1031,93 @@ export default function Home() {
                                       </div>
                                   )}
 
+                                  {/* Date and Class Selector Bar */}
+                                  <div className="p-3.5 bg-white rounded-xl border-2 border-emerald-200/80 shadow-sm space-y-3">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                                          <div className="space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                  <Label className="text-xs font-black text-slate-800">শ্রেণি</Label>
+                                                  {aiResult.autoResolved && (
+                                                      <Badge className="bg-emerald-600 text-[10px] py-0 px-1.5 font-bold">নাম ও রোল দিয়ে শনাক্ত</Badge>
+                                                  )}
+                                              </div>
+                                              <Select value={selectedAiClass} onValueChange={setSelectedAiClass}>
+                                                  <SelectTrigger className="h-10 font-black border-2 border-slate-200">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {Object.entries(classNamesMap).map(([k, v]) => (
+                                                          <SelectItem key={k} value={k} className="font-bold">{v} শ্রেণি</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                          </div>
+
+                                          <div className="space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                  <Label className="text-xs font-black text-slate-800">তারিখ</Label>
+                                                  {aiResult.monthName && (
+                                                      <Badge variant="outline" className="border-indigo-400 text-indigo-700 text-[10px] py-0 px-1.5 font-bold">মাস: {aiResult.monthName}</Badge>
+                                                  )}
+                                              </div>
+                                              <Input 
+                                                  type="date" 
+                                                  value={selectedAiDate} 
+                                                  onChange={e => { setSelectedAiDate(e.target.value); setApplyToAllDates(false); }}
+                                                  className="h-10 font-black border-2 border-slate-200"
+                                              />
+                                          </div>
+                                      </div>
+
+                                      {/* Detected Multiple Dates Display */}
+                                      {Array.isArray(aiResult.dates) && aiResult.dates.length > 1 && (
+                                          <div className="pt-2 border-t border-slate-100 space-y-2">
+                                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                  <p className="text-[11px] font-black text-slate-700">শনাক্তকৃত একাধিক তারিখ ({toBengaliNumber(aiResult.dates.length)}টি):</p>
+                                                  <label className="flex items-center gap-2 text-xs font-black text-indigo-700 cursor-pointer bg-indigo-50 px-2 py-1 rounded-md">
+                                                      <input 
+                                                          type="checkbox" 
+                                                          checked={applyToAllDates} 
+                                                          onChange={e => setApplyToAllDates(e.target.checked)}
+                                                          className="rounded text-indigo-600 h-4 w-4"
+                                                      />
+                                                      সকল তারিখে একসাথে সংরক্ষণ করুন
+                                                  </label>
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                  {aiResult.dates.map((dStr: string) => (
+                                                      <button
+                                                          key={dStr}
+                                                          type="button"
+                                                          onClick={() => { setSelectedAiDate(dStr); setApplyToAllDates(false); }}
+                                                          className={cn(
+                                                              "px-2.5 py-1 text-xs font-black rounded-lg border transition-all",
+                                                              (selectedAiDate === dStr && !applyToAllDates)
+                                                                  ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                                                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                                                          )}
+                                                      >
+                                                          {toBengaliNumber(dStr)}
+                                                      </button>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      )}
+                                  </div>
+
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                      {aiResult.className && (
-                                          <div className="p-2.5 bg-white rounded-xl border">
-                                              <p className="text-[10px] font-black text-muted-foreground uppercase">শ্রেণি</p>
-                                              <p className="font-black text-primary text-base">{classNamesMap[aiResult.className] || aiResult.className} শ্রেণি</p>
-                                          </div>
-                                      )}
-                                      {aiResult.date && (
-                                          <div className="p-2.5 bg-white rounded-xl border">
-                                              <p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p>
-                                              <p className="font-black text-primary text-base">{toBengaliNumber(aiResult.date)}</p>
-                                          </div>
-                                      )}
+                                      <div className="p-2.5 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-muted-foreground uppercase">নির্বাচিত শ্রেণি</p>
+                                          <p className="font-black text-primary text-base">{classNamesMap[selectedAiClass] || selectedAiClass} শ্রেণি</p>
+                                      </div>
+                                      <div className="p-2.5 bg-white rounded-xl border">
+                                          <p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p>
+                                          <p className="font-black text-primary text-base">
+                                              {applyToAllDates && aiResult.dates?.length > 1 
+                                                  ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি` 
+                                                  : toBengaliNumber(selectedAiDate)}
+                                          </p>
+                                      </div>
                                       {(aiResult.totalPresent !== undefined || aiResult.presentRolls?.length) && (
                                           <div className="p-2.5 bg-white rounded-xl border">
                                               <p className="text-[10px] font-black text-emerald-700 uppercase">মোট উপস্থিত</p>
@@ -938,8 +1153,11 @@ export default function Home() {
                                   </details>
 
                                   <div className="mt-4 flex justify-end">
-                                      <Button onClick={applyAiData} className="bg-emerald-600 hover:bg-emerald-700 font-black px-10 h-12 shadow-lg gap-2 text-base">
-                                          তথ্য সিস্টেমে প্রয়োগ করুন <ArrowRight className="h-5 w-5" />
+                                      <Button onClick={applyAiData} disabled={isSavingQuickAttendance} className="bg-emerald-600 hover:bg-emerald-700 font-black px-8 h-12 shadow-lg gap-2 text-base">
+                                          {isSavingQuickAttendance ? <Loader2 className="animate-spin h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                                          {applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 1 
+                                              ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি তারিখে প্রয়োগ করুন`
+                                              : `${toBengaliNumber(selectedAiDate)} তারিখের তথ্য সিস্টেমে প্রয়োগ করুন`}
                                       </Button>
                                   </div>
                               </CardContent>

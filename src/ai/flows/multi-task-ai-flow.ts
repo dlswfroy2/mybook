@@ -11,6 +11,7 @@ const MultiTaskAiInputSchema = z.object({
   photoDataUri: z.string().optional().describe("Image or PDF as data URI (base64)"),
   rawText: z.string().optional().describe("Manual text instructions or raw data to process"),
   taskType: z.enum(['attendance', 'results', 'admission', 'fees']).describe("The administrative task to perform"),
+  academicYear: z.string().optional().describe("Current academic year (e.g. 2026)"),
 });
 
 export type MultiTaskAiInput = z.infer<typeof MultiTaskAiInputSchema>;
@@ -27,52 +28,65 @@ export const multiTaskAiFlow = ai.defineFlow(
       parts.push({ media: { url: input.photoDataUri } });
     }
 
+    const year = input.academicYear || '2026';
+
     const taskInstructions: Record<string, string> = {
       attendance: `TASK: ATTENDANCE EXTRACTION (হাজিরা গ্রহণ)
-1. WHERE (কোথায়):
-   - Identify the Class (শ্রেণি: '6', '7', '8', '9', '10') from document header/text. If uncertain, leave as '6'.
-   - Identify Date (YYYY-MM-DD) or Month (e.g. March/মার্চ) or Day column (1..31). If the image is a monthly register table with day columns, pick the latest marked day column or today's day number.
-2. TO WHOM (কার কাছে):
-   - For EVERY student in the image/text, extract:
-     * roll: integer number (convert Bengali digits ১..১০ to 1..10)
+1. DATES IDENTIFICATION (তারিখ শনাক্তকরণ - অত্যন্ত গুরুত্বপূর্ণ):
+   - Documents or images may contain ONE or MULTIPLE dates in various formats:
+     * Comma/slash/dot separated: '01.02, 03' (1st and 3rd Feb), '01/02, 02/02, 03/02', '01/02/26', '01-02-26', '1, 2, 3 Feb'.
+     * Bengali dates or month names: '১লা ফেব্রুয়ারি', '২রা ফেব্রুয়ারি', 'মার্চ', 'ফেব্রুয়ারি ২০২৬'.
+     * Register columns: day columns (1..31) under a month name.
+   - For ANY format, convert every date into standard ISO 'YYYY-MM-DD' (using academic year ${year}).
+   - Always return:
+     * dates: Array of all detected dates in 'YYYY-MM-DD' order (e.g. ["${year}-02-01", "${year}-02-02", "${year}-02-03"]).
+     * date: The primary date (first date or latest marked date) in 'YYYY-MM-DD'.
+     * monthName: Bengali month name if mentioned or implied (e.g. 'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', ইত্যাদি).
+     * attendanceByDate: If attendance is recorded per date, an array of objects:
+       [{ date: "${year}-02-01", presentRolls: [1, 2, 3], absentRolls: [4] }, { date: "${year}-02-02", presentRolls: [1, 3], absentRolls: [2, 4] }]
+
+2. CLASS & STUDENTS (শ্রেণি ও শিক্ষার্থী শনাক্তকরণ):
+   - Class: Look for class name (যেমন '৬ষ্ঠ'/'ষষ্ঠ'->'6', '৭ম'/'সপ্তম'->'7', '৮ম'/'অষ্টম'->'8', '৯ম'/'নবম'->'9', '১০ম'/'দশম'->'10').
+     IF NO CLASS IS WRITTEN: Set className to null. The system will auto-match students by roll and name.
+   - For EVERY student in the document, extract:
+     * roll: integer (convert Bengali digits ১..১০ to 1..10)
      * name: student name in Bengali
-     * status: 'present' if marked 'P' / 'উপস্থিত' / '✓'; 'absent' if marked 'A' / 'অনুপস্থিত' / '✗' / blank.
-3. HOW (কিভাবে):
-   - presentRolls: array of present roll numbers (e.g. [1, 3, 4])
-   - absentRolls: array of absent roll numbers (e.g. [2])
+     * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা উপস্থিতি তালিকায় নাম/রোল আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা).
+   - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
+   - absentRolls: array of absent roll numbers (e.g. [4])
    - totalStudents, totalPresent, totalAbsent
-   - description: Bengali natural language explanation of what was extracted from the image.
-   - actionPlan: "শ্রেণি অনুযায়ী হাজিরা সিস্টেমে স্বয়ংক্রিয়ভাবে ইনপুট দেওয়া হবে।"`,
+   - description: Bengali summary of what was extracted (e.g. 'ফেব্রুয়ারি মাসের ১, ২ ও ৩ তারিখের মোট ১৫ জন শিক্ষার্থীর হাজিরা শনাক্ত হয়েছে।')
+   - actionPlan: "নির্দিষ্ট তারিখসমূহ অনুযায়ী হাজিরা ডাটাবেজে সংরক্ষণ করা হবে।"`,
 
       fees: `TASK: FEE PAYMENT EXTRACTION (বেতন আদায়)
-1. WHERE (কোথায়):
-   - Target: হিসাব শাখা (Accounts / Fee Collection)
-   - Date: Payment date (YYYY-MM-DD)
-2. TO WHOM (কার কাছে):
-   - Identify student by roll, name, and className (6-10).
-3. HOW (কিভাবে):
-   - collections: array of [{ roll: number, name: string, className: string, amount: number, feeHead: string (যেমন মাসিক বেতন, ভর্তি ফি), month: string }]
+1. DATES & MONTH:
+   - Identify payment date (YYYY-MM-DD). If day/month notation (01.02, 01/02), format as ${year}-MM-DD.
+   - dates: Array of all payment dates found.
+   - date: Primary payment date.
+   - monthName: Bengali fee month name (যেমন 'জানুয়ারি', 'ফেব্রুয়ারি').
+2. CLASS & STUDENTS:
+   - Identify student roll, name, className ('6'..'10' or null if missing).
+3. HOW:
+   - collections: array of [{ roll: number, name: string, className: string | null, amount: number, feeHead: string, month: string, date: string }]
    - totalAmount: sum of amounts
-   - description: Bengali summary of payment details.
+   - description: Bengali summary of payment records.
    - actionPlan: "শিক্ষার্থীর বেতন আদায় ভাউচারে ডাটা যুক্ত হবে।"`,
 
       results: `TASK: EXAM RESULTS EXTRACTION (ফলাফল ইনপুট)
-1. WHERE (কোথায়):
-   - Class (6-10), Exam Name (যেমন অর্ধবার্ষিক, বার্ষিক, প্রাক-নির্বাচনী), Subject (বিষয়).
-2. TO WHOM (কার কাছে):
-   - List of students with roll and name.
-3. HOW (কিভাবে):
+1. DATES & EXAM:
+   - Exam Name (অর্ধবার্ষিক, বার্ষিক, প্রাক-নির্বাচনী, নির্বাচনী), Subject (বিষয়), Date (YYYY-MM-DD if present).
+   - dates: Array of dates found.
+2. CLASS & STUDENTS:
+   - Class ('6'..'10' or null if missing).
    - results: [{ roll: number, name: string, written: number, mcq: number, practical: number, total: number }]
    - description: Bengali summary of marks detected.
    - actionPlan: "পরীক্ষার ফলাফল এন্ট্রি টেবিলে ডাটা যুক্ত হবে।"`,
 
       admission: `TASK: ADMISSION FORM EXTRACTION (নতুন ভর্তি)
-1. WHERE (কোথায়):
-   - Class for admission (6-10), academicYear.
-2. TO WHOM (কার কাছে):
+1. DETAILS:
+   - Class ('6'..'10'), academicYear ('${year}').
    - student: { studentNameBn: string, fatherNameBn: string, motherNameBn: string, roll: number, phone: string, className: string, address: string }
-3. HOW (কিভাবে):
-   - description: Bengali summary of student details.
+   - description: Bengali summary of student admission form.
    - actionPlan: "শিক্ষার্থী ভর্তি রেজিস্টারে নতুন প্রোফাইল তৈরি হবে।"`,
     };
 
@@ -80,6 +94,8 @@ export const multiTaskAiFlow = ai.defineFlow(
 
     parts.push({
       text: `You are an expert school administrative AI assistant in Bangladesh.
+Academic Year: ${year}.
+
 Your mission is to analyze this document (image, PDF, or text) and determine WHERE, HOW, and TO WHOM the data should be assigned.
 
 ${taskPrompt}
@@ -88,9 +104,10 @@ ADDITIONAL USER INSTRUCTIONS:
 ${input.rawText || 'None provided'}
 
 GENERAL RULES:
-- Convert all Bengali numbers (০-৯) to standard numbers (0-9).
+- Convert all Bengali numbers (০-৯) to standard integers (0-9).
 - Accurately read handwritten or printed Bengali names and rolls.
-- If a table has multiple day columns, extract the latest marked day column or specified day.
+- MULTI-DATE SUPPORT: If multiple dates appear (e.g. '01.02, 03' -> ['${year}-02-01', '${year}-02-03']), include all in 'dates' array.
+- BENGALI MONTHS: If Bengali month names are written (জানুয়ারি=01, ফেব্রুয়ারি=02, মার্চ=03, এপ্রিল=04, মে=05, জুন=06, জুলাই=07, আগস্ট=08, সেপ্টেম্বর=09, অক্টোবর=10, নভেম্বর=11, ডিসেম্বর=12), map them accurately.
 - Output MUST be valid JSON only, without any markdown formatting or surrounding backticks.`
     });
 
