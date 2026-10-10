@@ -109,7 +109,7 @@ function getChapterSortValue(name: string): number {
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
-    return (subjectNameNormalization[trimmed] || trimmed);
+    return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
 };
 
 type ViewMode = 'classes' | 'subjects' | 'chapters' | 'content';
@@ -403,7 +403,14 @@ function MyLibraryContent() {
     });
 
     chapterPdfSheets.forEach(p => {
-        const cat = p.category === 'lecture_sheet' ? 'lectureSheet' : p.category;
+        const mapping: Record<string, string> = {
+            'lecture_sheet': 'lectureSheet',
+            'creative': 'creative',
+            'mcq': 'mcq',
+            'model_test': 'modelTest',
+            'answer_key': 'answerKey'
+        };
+        const cat = mapping[p.category] || p.category;
         if (stats[cat]) {
             const type = getFileType(p);
             stats[cat].total++;

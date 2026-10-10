@@ -555,9 +555,6 @@ export default function Home() {
       if (!classData[cid]) return;
       
       let targetSub = normalize(sub);
-      const lowerSub = sub.toLowerCase();
-      if (lowerSub.includes('ইসলাম') || lowerSub.includes('islam')) targetSub = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
-      else if (lowerSub.includes('হিন্দু') || lowerSub.includes('hindu')) targetSub = 'হিন্দু ধর্ম ও নৈতিক শিক্ষা';
 
       if (!classData[cid][targetSub]) classData[cid][targetSub] = {};
       const key = getNormalizedKey(chRaw);
@@ -793,7 +790,7 @@ export default function Home() {
         </Link>
 
         <Link href="/create-lecture-sheet" className="block w-full">
-          <div className="bg-[#059669] hover:bg-[#047857] border-b-[6px] border-[#064e3b] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-1 w-full">
+          <div className="bg-[#059669] hover:bg-[#046c4e] border-b-[6px] border-[#03543f] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-1 w-full">
             <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform drop-shadow-md" />
             <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">লেকচার শিট</span>
           </div>
@@ -903,7 +900,6 @@ export default function Home() {
         </div>
         
         <div className="space-y-10">
-          {/* ... Content Board Logic ... */}
           {CLASSES.filter(c => c.id === selectedDashboardClass).map((cls) => {
             const allSubjects = getSubjectsForClass(cls.id).flatMap(s => {
               if (s === 'ধর্ম ও নৈতিক শিক্ষা') {
@@ -914,9 +910,6 @@ export default function Home() {
             const selectedSubjectRaw = selectedSubjects[cls.id] || allSubjects[0];
             
             let selectedSubjectNormalized = normalize(selectedSubjectRaw);
-            const lowerRaw = selectedSubjectRaw.toLowerCase();
-            if (lowerRaw.includes('ইসলাম') || lowerRaw.includes('islam')) selectedSubjectNormalized = 'ইসলাম ধর্ম ও নৈতিক শিক্ষা';
-            else if (lowerRaw.includes('হিন্দু') || lowerRaw.includes('hindu')) selectedSubjectNormalized = 'হিন্দু ধর্ম ও নৈতিক শিক্ষা';
 
             const classChaptersStats = stats.classData[cls.id]?.[selectedSubjectNormalized] || {};
             const predefined = getChaptersForSubject(cls.id, selectedSubjectRaw);
