@@ -650,17 +650,19 @@ export default function Home() {
                 setApplyToAllDates(false);
             }
 
-            // Auto-resolve class by matching student names and rolls from database
-            let finalClass = res.className;
+            // Auto-resolve class by checking res.className first, normalizing, then matching students
+            let rawClass = res.className ? getNormalizedKey(String(res.className)) : null;
+            let finalClass = (rawClass && ['6', '7', '8', '9', '10'].includes(rawClass)) ? rawClass : null;
             let autoResolved = false;
-            if (!finalClass || finalClass === 'unknown' || !['6', '7', '8', '9', '10'].includes(String(finalClass))) {
+
+            if (!finalClass) {
                 const studentsList = res.students || (res.presentRolls ? res.presentRolls.map((r: number) => ({ roll: r })) : []);
                 const { resolvedClass } = matchStudentsAndResolveClass(studentsList, studentsForYear);
                 if (resolvedClass) {
                     finalClass = resolvedClass;
                     autoResolved = true;
                 } else {
-                    finalClass = '6';
+                    finalClass = selectedAiClass || '6';
                 }
             }
             setSelectedAiClass(String(finalClass));
@@ -717,7 +719,9 @@ export default function Home() {
 
               // Fallback to single target class
               if (classesToProcess.length === 0) {
-                  const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  const rawTarget = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  const normalizedTarget = getNormalizedKey(String(rawTarget));
+                  const targetClass = ['6', '7', '8', '9', '10'].includes(normalizedTarget) ? normalizedTarget : '6';
                   classesToProcess.push({
                       className: targetClass,
                       presentRolls: aiResult.presentRolls,
@@ -727,7 +731,8 @@ export default function Home() {
               }
 
               for (const classItem of classesToProcess) {
-                  const currentClass = String(classItem.className);
+                  const rawClass = getNormalizedKey(String(classItem.className));
+                  const currentClass = ['6', '7', '8', '9', '10'].includes(rawClass) ? rawClass : String(classItem.className);
 
                   for (const targetDate of datesToApply) {
                       // Determine target academic year for this date
