@@ -66,8 +66,6 @@ export function GlobalCommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (!user) return null;
-
   const handleSelectPath = (path: string) => {
     setOpen(false);
     setQueryText('');
@@ -114,6 +112,9 @@ export function GlobalCommandPalette() {
       )
       .slice(0, 4);
   }, [staff, queryText]);
+
+  // Security: Only render command palette for authenticated users
+  if (!user) return null;
 
   return (
     <>
