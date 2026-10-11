@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Bot, 
   Sparkles, 
@@ -19,7 +19,13 @@ import {
   MicOff, 
   Printer,
   Compass,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Search,
+  UserCircle2,
+  Phone,
+  BookOpen,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +42,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { runUniversalAi, ChatMessage, UniversalAiOutput, LiveSchoolContext } from '@/ai/flows/universal-ai-flow';
 import { useToast } from '@/hooks/use-toast';
 
+const CHAT_HISTORY_KEY = 'mybook_ai_chat_history_v2';
+const MAX_SAVED_MESSAGES = 40;
+
 // Master Section Routing Map for instant navigation to ALL parts of the application
 export const ALL_SYSTEM_SECTIONS: Array<{ label: string; path: string; keywords: string[] }> = [
   { label: 'প্রধান ড্যাশবোর্ড', path: '/', keywords: ['হোম', 'হোমপেজ', 'মূল পেজ', 'ড্যাশবোর্ড', 'dashboard', 'home', 'main'] },
@@ -45,47 +54,148 @@ export const ALL_SYSTEM_SECTIONS: Array<{ label: string; path: string; keywords:
   { label: 'ভর্তি আবেদন ব্যবস্থাপনা', path: '/admissions-management', keywords: ['ভর্তি আবেদন', 'অনলাইন আবেদন', 'আবেদন তালিকা', 'admissions-management', 'আবেদন'] },
   { label: 'দৈনিক হাজিরা শাখা', path: '/attendance', keywords: ['হাজিরা', 'উপস্থিতি', 'উপস্থিতি শাখা', 'attendance', 'হাজিরা খাতা', 'দৈনিক হাজিরা'] },
   { label: 'ফলাফল ও মার্কশিট শাখা', path: '/results', keywords: ['ফলাফল', 'রেজাল্ট', 'মার্কশিট', 'পরীক্ষার ফলাফল', 'গ্রেড', 'results', 'মেধা তালিকা'] },
-  { label: 'হিসাব শাখা ও ফি', path: '/accounts', keywords: ['হিসাব', 'হিসাব শাখা', 'ফি', 'বেতন', 'আদায়', 'বকেয়া', 'টাকা', 'খরচ', 'ভাউচার', 'accounts'] },
+  { label: 'হিসাব শাখা ও ফি', path: '/accounts', keywords: ['হিসাব', 'হিসাব শাখা', 'ফি', 'বেতন', 'আদায়', 'বকেয়া', 'টাকা', 'খরচ', 'ভাউচার', 'accounts'] },
   { label: 'নোটিশ বোর্ড', path: '/notices-management', keywords: ['নোটিশ', 'নোটিশ বোর্ড', 'ঘোষণা', 'notices', 'বিজ্ঞপ্তি'] },
   { label: 'মেসেজ শাখা (SMS)', path: '/messaging', keywords: ['মেসেজ', 'এসএমএস', 'বার্তা', 'messaging', 'sms', 'অভিভাবক বার্তা'] },
   { label: 'স্টাফ ও শিক্ষক পোর্টাল', path: '/staff', keywords: ['শিক্ষক', 'স্টাফ', 'টিচার', 'কর্মচারী', 'staff', 'teachers', 'শিক্ষক তালিকা'] },
   { label: 'নতুন শিক্ষক যোগ', path: '/add-staff', keywords: ['নতুন শিক্ষক', 'নতুন স্টাফ', 'শিক্ষক যোগ', 'add staff'] },
-  { label: 'ক্লাস রুটিন শাখা', path: '/routines', keywords: ['রুটিন', 'ক্লাস রুটিন', 'সময়সূচী', 'পিরিয়ড', 'routines', 'প্রক্সি'] },
+  { label: 'ক্লাস রুটিন শাখা', path: '/routines', keywords: ['রুটিন', 'ক্লাস রুটিন', 'সময়সূচী', 'পিরিয়ড', 'routines', 'প্রক্সি'] },
   { label: 'ডকুমেন্ট পোর্টাল', path: '/documents', keywords: ['ডকুমেন্ট', 'দলিল', 'কাগজপত্র', 'documents', 'সনদ'] },
   { label: 'ডিজিটাল আর্কাইভ (নথিপত্র)', path: '/documents/archive', keywords: ['আর্কাইভ', 'নথিপত্র', 'ফাইল সংরক্ষণ', 'archive'] },
-  { label: 'আইডি কার্ড তৈরি', path: '/documents/id-card', keywords: ['আইডি কার্ড', 'পরিচয়পত্র', 'id card'] },
+  { label: 'আইডি কার্ড তৈরি', path: '/documents/id-card', keywords: ['আইডি কার্ড', 'পরিচয়পত্র', 'id card'] },
   { label: 'প্রবেশ পত্র (Admit Card)', path: '/documents/admit-card', keywords: ['প্রবেশপত্র', 'প্রবেশ পত্র', 'admit card'] },
   { label: 'একাডেমিক মার্কশিট প্রিন্ট', path: '/documents/marksheet', keywords: ['মার্কশিট প্রিন্ট', 'নম্বরপত্র', 'marksheet print'] },
   { label: 'আসন বিন্যাস (Seat Plan)', path: '/documents/seat-plan', keywords: ['আসন বিন্যাস', 'সিট প্ল্যান', 'seat plan'] },
-  { label: 'প্রত্যয়ন পত্র', path: '/documents/testimonial', keywords: ['প্রত্যয়ন', 'প্রত্যয়ন পত্র', 'testimonial'] },
+  { label: 'প্রত্যয়ন পত্র', path: '/documents/testimonial', keywords: ['প্রত্যয়ন', 'প্রত্যয়ন পত্র', 'testimonial'] },
   { label: 'প্রশংসাপত্র', path: '/documents/appreciation', keywords: ['প্রশংসাপত্র', 'চারিত্রিক সনদ', 'appreciation'] },
-  { label: 'ছাড়পত্র (TC)', path: '/documents/tc', keywords: ['ছাড়পত্র', 'টিসি', 'tc', 'ট্রান্সফার'] },
+  { label: 'ছাড়পত্র (TC)', path: '/documents/tc', keywords: ['ছাড়পত্র', 'টিসি', 'tc', 'ট্রান্সফার'] },
   { label: 'প্রতিষ্ঠানের প্যাড', path: '/documents/custom-pad', keywords: ['প্যাড', 'লেটারহেড', 'custom pad'] },
   { label: 'পাবলিক পরীক্ষার রেকর্ড', path: '/public-exam-records', keywords: ['পাবলিক পরীক্ষা', 'এসএসসি রেকর্ড', 'জেএসসি রেকর্ড', 'বোর্ড পরীক্ষা', 'public exam'] },
   { label: 'পাবলিক রেজাল্ট পোর্টাল', path: '/public-results', keywords: ['পাবলিক রেজাল্ট', 'অনলাইন রেজাল্ট', 'public results'] },
-  { label: 'টিচার্স ডায়েরি', path: '/diary', keywords: ['ডায়েরি', 'টিচার্স ডায়েরি', 'পাঠ পরিকল্পনা', 'diary'] },
-  { label: 'ডিজিটাল হোয়াইটবোর্ড', path: '/whiteboard', keywords: ['হোয়াইটবোর্ড', 'বোর্ড', 'আঁকাআঁকি', 'whiteboard', 'স্মার্ট বোর্ড'] },
+  { label: 'টিচার্স ডায়েরি', path: '/diary', keywords: ['ডায়েরি', 'টিচার্স ডায়েরি', 'পাঠ পরিকল্পনা', 'diary'] },
+  { label: 'ডিজিটাল হোয়াইটবোর্ড', path: '/whiteboard', keywords: ['হোয়াইটবোর্ড', 'বোর্ড', 'আঁকাআঁকি', 'whiteboard', 'স্মার্ট বোর্ড'] },
   { label: 'বোর্ড বই সংগ্রহ', path: '/board-books', keywords: ['বোর্ড বই', 'পাঠ্যবই', 'বই', 'board books'] },
   { label: 'প্রশ্ন ব্যাংক ও প্রশ্ন তৈরি', path: '/create-question', keywords: ['প্রশ্ন', 'প্রশ্ন তৈরি', 'প্রশ্ন ব্যাংক', 'question bank', 'পরীক্ষার প্রশ্ন'] },
   { label: 'লেকচার শিট তৈরি', path: '/create-lecture-sheet', keywords: ['শিট তৈরি', 'লেকচার শিট', 'হ্যান্ডআউট', 'lecture sheet'] },
   { label: 'আমার লাইব্রেরি', path: '/my-questions', keywords: ['লাইব্রেরি', 'আমার লাইব্রেরি', 'সংরক্ষিত প্রশ্ন', 'my library'] },
-  { label: 'সিস্টেম সেটিংস', path: '/settings', keywords: ['সেটিংস', 'কনফিগ', 'নিয়ন্ত্রণ', 'settings', 'ব্যবস্থাপনা'] },
+  { label: 'সিস্টেম সেটিংস', path: '/settings', keywords: ['সেটিংস', 'কনফিগ', 'নিয়ন্ত্রণ', 'settings', 'ব্যবস্থাপনা'] },
 ];
+
+// Detect student search intent from query text
+function detectStudentSearch(text: string): { type: 'name' | 'roll' | 'class'; value: string } | null {
+  const clean = text.trim();
+  // Roll number search: "রোল ১২", "roll 5", "রোল নম্বর ৩"
+  const rollMatch = clean.match(/(?:রোল|roll)\s*(?:নম্বর|number|no)?\s*[:#]?\s*(\d+)/i);
+  if (rollMatch) return { type: 'roll', value: rollMatch[1] };
+  // Class search: "৭ম শ্রেণির ছাত্র", "class 8 students"
+  const classMatch = clean.match(/(?:(?:৬ষ্ঠ|৭ম|৮ম|৯ম|১০ম|class|শ্রেণি)\s*(?:শ্রেণি|class)?\s*(?:র|এর|এ|ছাত্র|তালিকা|শিক্ষার্থী)?)/i);
+  const classNumMatch = clean.match(/(?:class|শ্রেণ)\s*[:#]?\s*([৬৭৮৯1-9][০-৯0-9]?)/i);
+  if (classNumMatch) return { type: 'class', value: classNumMatch[1].replace(/[৬৭৮৯]/g, (c) => String('৬৭৮৯'.indexOf(c) + 6) ) };
+  // Name search: "রাহিম কোথায়", "সাকিবকে খোঁজো"
+  const nameKeywords = ['কোথায়', 'কে খোঁজো', 'কোন ক্লাসে', 'খুঁজে বের কর', 'তথ্য দাও', 'কে পড়ে', 'সম্পর্কে'];
+  const hasNameIntent = nameKeywords.some(kw => clean.includes(kw));
+  if (hasNameIntent) {
+    // Extract a potential name (2-4 Bengali words before keyword)
+    const nameMatch = clean.match(/^(.{2,20}?)\s*(?:কোথায়|কে খোঁজো|কোন ক্লাসে|খুঁজে বের কর|তথ্য দাও|কে পড়ে|সম্পর্কে)/);
+    if (nameMatch && nameMatch[1]) return { type: 'name', value: nameMatch[1].trim() };
+  }
+  return null;
+}
+
+// Search students from cache  
+function searchStudents(students: Student[], query: { type: 'name' | 'roll' | 'class'; value: string }): Student[] {
+  if (query.type === 'roll') {
+    return students.filter(s => String(s.roll) === query.value);
+  }
+  if (query.type === 'class') {
+    return students.filter(s => String(s.className) === query.value).slice(0, 20);
+  }
+  if (query.type === 'name') {
+    const q = query.value.toLowerCase();
+    return students.filter(s => 
+      (s.studentNameBn || '').toLowerCase().includes(q) ||
+      (s.studentNameEn || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+  }
+  return [];
+}
+
+// Bengali class name helper
+function bengaliClass(cls: string): string {
+  const map: Record<string, string> = { '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম' };
+  return map[cls] || `${cls}`;
+}
+
+interface StudentResultCardProps {
+  students: Student[];
+  onNavigate: (path: string) => void;
+}
+
+function StudentResultCard({ students, onNavigate }: StudentResultCardProps) {
+  if (students.length === 0) return null;
+  return (
+    <div className="space-y-2 mt-1">
+      {students.slice(0, 5).map((s, i) => (
+        <div key={i} className="bg-indigo-50 border border-indigo-200 rounded-xl p-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
+              <UserCircle2 className="h-5 w-5 text-indigo-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-black text-xs text-indigo-900 truncate">{s.studentNameBn || s.studentNameEn}</p>
+              <p className="text-[10px] text-slate-500 font-bold">
+                {bengaliClass(String(s.className))} শ্রেণি • রোল: {s.roll}
+                {s.group ? ` • ${s.group}` : ''}
+              </p>
+              {(s.guardianMobile || s.studentMobile) && (
+                <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                  <Phone className="h-2.5 w-2.5" />
+                  {s.guardianMobile || s.studentMobile}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate(`/student-profile?id=${s.id || s.roll}`)}
+            className="text-[10px] font-black text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-300 rounded-lg px-2 py-1 shrink-0 transition-all"
+          >
+            প্রোফাইল
+          </button>
+        </div>
+      ))}
+      {students.length > 5 && (
+        <p className="text-center text-[10px] text-slate-500 font-bold">... আরো {students.length - 5} জন পাওয়া গেছে</p>
+      )}
+    </div>
+  );
+}
 
 export function GlobalAiAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [inputQuery, setInputQuery] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: 'ai',
-      text: 'আসসালামু আলাইকুম! আমি প্রতিষ্ঠানের কেন্দ্রীয় AI সহকারী। আপনি যে কোনো প্রশ্ন করতে পারেন, যে কোনো সেকশনে যাওয়ার নির্দেশ দিতে পারেন কিংবা নোটিশ, উপস্থিতি, ছাত্র ও পরীক্ষার হিসাব নিতে পারেন।'
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    // Load from localStorage on first render
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(CHAT_HISTORY_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as ChatMessage[];
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
     }
-  ]);
+    return [{
+      role: 'ai',
+      text: 'আসসালামু আলাইকুম! আমি প্রতিষ্ঠানের কেন্দ্রীয় AI সহকারী। যেকোনো প্রশ্ন করুন, যেকোনো সেকশনে যান, শিক্ষার্থী খুঁজুন বা নোটিশ তৈরি করুন।'
+    }];
+  });
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [lastAction, setLastAction] = useState<UniversalAiOutput['actionData'] | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
+  const [foundStudents, setFoundStudents] = useState<Student[]>([]);
 
   // Live database caches for intelligent real-time answers
   const [cachedStudents, setCachedStudents] = useState<Student[]>([]);
@@ -103,7 +213,16 @@ export function GlobalAiAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  const institutionName = schoolInfo?.name || 'টপ গ্রেড টিউটোরিয়ালস';
+  const institutionName = schoolInfo?.name || 'টপ গ্রেড টিউটোরিয়ালস';
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const toSave = messages.slice(-MAX_SAVED_MESSAGES);
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
+    } catch {}
+  }, [messages]);
 
   // Preload students, staff and holidays in background for fast contextual replies
   useEffect(() => {
@@ -118,7 +237,7 @@ export function GlobalAiAssistant() {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isOpen, loading]);
+  }, [messages, isOpen, loading, isTyping]);
 
   // Speech Recognition (Web Speech API) setup for Bengali Voice Input
   useEffect(() => {
@@ -128,29 +247,19 @@ export function GlobalAiAssistant() {
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = 'bn-BD'; // Bengali (Bangladesh)
+        recognition.lang = 'bn-BD';
 
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           if (transcript) {
             setInputQuery(prev => (prev ? `${prev} ${transcript}` : transcript));
-            toast({
-              title: 'ভয়েস শনাক্ত হয়েছে 🎙️',
-              description: `"${transcript}"`,
-            });
+            toast({ title: 'ভয়েস শনাক্ত হয়েছে 🎙️', description: `"${transcript}"` });
           }
           setIsListening(false);
         };
 
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event.error);
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
+        recognition.onerror = () => setIsListening(false);
+        recognition.onend = () => setIsListening(false);
         recognitionRef.current = recognition;
       }
     }
@@ -158,14 +267,9 @@ export function GlobalAiAssistant() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      toast({
-        variant: 'destructive',
-        title: 'ভয়েস সাপোর্ট নেই',
-        description: 'আপনার ব্রাউজারটি বাংলা ভয়েস ইনপুট সমর্থন করে না। অনুগ্রহ করে Chrome ব্যবহার করুন।',
-      });
+      toast({ variant: 'destructive', title: 'ভয়েস সাপোর্ট নেই', description: 'Chrome ব্যবহার করুন।' });
       return;
     }
-
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -173,16 +277,27 @@ export function GlobalAiAssistant() {
       try {
         recognitionRef.current.start();
         setIsListening(true);
-        toast({
-          title: 'শুনছি... 🎙️',
-          description: 'স্পষ্ট করে বাংলায় বলুন...',
-        });
-      } catch (err) {
-        console.error('Recognition start error:', err);
+        toast({ title: 'শুনছি... 🎙️', description: 'স্পষ্ট করে বাংলায় বলুন...' });
+      } catch {
         setIsListening(false);
       }
     }
   };
+
+  const handleClearChat = useCallback(() => {
+    const initialMsg: ChatMessage = {
+      role: 'ai',
+      text: 'চ্যাট ইতিহাস মুছে ফেলা হয়েছে। নতুন কোনো প্রশ্ন করুন!'
+    };
+    setMessages([initialMsg]);
+    setLastAction(null);
+    setLastActionType(null);
+    setFoundStudents([]);
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem(CHAT_HISTORY_KEY); } catch {}
+    }
+    toast({ title: '✅ চ্যাট পরিষ্কার করা হয়েছে' });
+  }, [toast]);
 
   if (typeof window !== 'undefined' && pathname === '/login') {
     return null;
@@ -193,7 +308,7 @@ export function GlobalAiAssistant() {
     const clean = text.toLowerCase().trim();
     for (const sec of ALL_SYSTEM_SECTIONS) {
       for (const kw of sec.keywords) {
-        if (clean === kw || (clean.startsWith('যাও') && clean.includes(kw)) || (clean.includes(kw) && (clean.includes('যাও') || clean.includes('নিয়ে চল') || clean.includes('খোল') || clean.includes('ওপেন')))) {
+        if (clean === kw || (clean.startsWith('যাও') && clean.includes(kw)) || (clean.includes(kw) && (clean.includes('যাও') || clean.includes('নিয়ে চল') || clean.includes('খোল') || clean.includes('ওপেন')))) {
           return { label: sec.label, path: sec.path };
         }
       }
@@ -209,26 +324,43 @@ export function GlobalAiAssistant() {
     setMessages(prev => [...prev, userMsg]);
     if (!customPrompt) setInputQuery('');
     setLoading(true);
+    setIsTyping(true);
     setLastAction(null);
     setLastActionType(null);
+    setFoundStudents([]);
 
-    // 1. Check for instant direct navigation match
+    // 1. Instant student search (client-side, zero latency)
+    const studentQuery = detectStudentSearch(queryToSend);
+    if (studentQuery) {
+      const yearStudentsAll = cachedStudents.filter(s => !s.academicYear || s.academicYear === selectedYear);
+      const results = searchStudents(yearStudentsAll, studentQuery);
+      if (results.length > 0) {
+        setFoundStudents(results);
+        const summary = results.length === 1
+          ? `✅ **${results[0].studentNameBn || results[0].studentNameEn}** পাওয়া গেছে! ${bengaliClass(String(results[0].className))} শ্রেণি, রোল: ${results[0].roll}।`
+          : `✅ মোট **${results.length} জন** শিক্ষার্থী পাওয়া গেছে।`;
+        setMessages(prev => [...prev, { role: 'ai', text: summary }]);
+        setLoading(false);
+        setIsTyping(false);
+        return;
+      }
+    }
+
+    // 2. Check for instant direct navigation match
     const directDest = findDestinationPath(queryToSend);
     if (directDest && !queryToSend.includes('কতটি') && !queryToSend.includes('কী কী')) {
       setMessages(prev => [
         ...prev, 
-        { role: 'ai', text: `আপনাকে "${directDest.label}"-এ নিয়ে যাওয়া হচ্ছে...` }
+        { role: 'ai', text: `আপনাকে "${directDest.label}"-এ নিয়ে যাওয়া হচ্ছে...` }
       ]);
       setLoading(false);
+      setIsTyping(false);
       router.push(directDest.path);
-      toast({
-        title: 'পেজ পরিবর্তন করা হচ্ছে...',
-        description: directDest.label,
-      });
+      toast({ title: 'পেজ পরিবর্তন করা হচ্ছে...', description: directDest.label });
       return;
     }
 
-    // 2. Compute exact class breakdowns from active year cached students
+    // 3. Compute exact class breakdowns from active year cached students
     const yearStudents = cachedStudents.filter(s => !s.academicYear || s.academicYear === selectedYear);
     const classCounts: Record<string, number> = { '6': 0, '7': 0, '8': 0, '9': 0, '10': 0 };
     yearStudents.forEach(s => {
@@ -286,10 +418,7 @@ export function GlobalAiAssistant() {
       // Handle direct page navigation if requested by AI
       if (result.actionType === 'NAVIGATE' && result.actionData?.path) {
         router.push(result.actionData.path);
-        toast({
-          title: 'পেজ পরিবর্তন করা হচ্ছে...',
-          description: result.actionData.path,
-        });
+        toast({ title: 'পেজ পরিবর্তন করা হচ্ছে...', description: result.actionData.path });
       }
     } catch (err: any) {
       console.error('Universal AI Error:', err);
@@ -299,6 +428,7 @@ export function GlobalAiAssistant() {
       ]);
     } finally {
       setLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -312,22 +442,15 @@ export function GlobalAiAssistant() {
         senderName: user.displayName || user.email || 'প্রধান শিক্ষক',
         isScrolling: true,
       });
-      toast({
-        title: 'নোটিশ প্রকাশিত হয়েছে! ✅',
-        description: 'নোটিশ বোর্ডে স্বয়ংক্রিয়ভাবে যুক্ত হয়েছে।',
-      });
+      toast({ title: 'নোটিশ প্রকাশিত হয়েছে! ✅', description: 'নোটিশ বোর্ডে স্বয়ংক্রিয়ভাবে যুক্ত হয়েছে।' });
       setLastAction(null);
       setLastActionType(null);
       setMessages(prev => [
         ...prev,
-        { role: 'ai', text: '✅ আপনার নোটিশটি সফলভাবে নোটিশ বোর্ডে প্রকাশ করা হয়েছে।' }
+        { role: 'ai', text: '✅ আপনার নোটিশটি সফলভাবে নোটিশ বোর্ডে প্রকাশ করা হয়েছে। নোটিশ বোর্ডে গিয়ে দেখতে পাবেন।' }
       ]);
-    } catch (e) {
-      toast({
-        variant: 'destructive',
-        title: 'ত্রুটি',
-        description: 'নোটিশ সংরক্ষণ করা যায়নি।',
-      });
+    } catch {
+      toast({ variant: 'destructive', title: 'ত্রুটি', description: 'নোটিশ সংরক্ষণ করা যায়নি।' });
     }
   };
 
@@ -349,9 +472,7 @@ export function GlobalAiAssistant() {
           <h2>${institutionName}</h2>
           <div class="date">তারিখ: ${new Date().toLocaleDateString('bn-BD')} | শিক্ষাবর্ষ: ${selectedYear}</div>
           <div class="content">${textToPrint}</div>
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
+          <script>window.onload = function() { window.print(); window.close(); }<\/script>
         </body>
       </html>
     `);
@@ -360,12 +481,15 @@ export function GlobalAiAssistant() {
 
   const quickPrompts = [
     { label: 'সকল সেকশন', query: 'এখানে মোট কতটি সেকশন আছে বিস্তারিত বলো', icon: Compass },
-    { label: 'নোটিশ ড্রাফট', query: 'জরুরি ছুটির নোটিশের একটি ড্রাফট তৈরি করো', icon: FileText },
-    { label: 'উপস্থিতি তথ্য', query: 'আজকের ক্লাসের হাজিরা অবস্থা কেমন?', icon: UserCheck },
+    { label: 'নোটিশ ড্রাফট', query: 'আগামীকাল প্রতিষ্ঠান বন্ধের জন্য একটি জরুরি নোটিশ তৈরি করো', icon: FileText },
+    { label: 'উপস্থিতি', query: 'আজকের ক্লাসের হাজিরা অবস্থা কেমন?', icon: UserCheck },
     { label: 'বকেয়া ফি', query: 'ফি আদায় ও বকেয়ার সারাংশ দাও', icon: CreditCard },
     { label: 'ছুটির তালিকা', query: 'এই শিক্ষাবর্ষের পরবর্তী ছুটিগুলো কবে?', icon: Calendar },
     { label: 'শ্রেণিভিত্তিক ছাত্র', query: '৬ষ্ঠ থেকে ১০ম শ্রেণিতে মোট কতজন শিক্ষার্থী আছে?', icon: Users },
+    { label: 'শিক্ষার্থী খোঁজ', query: '', icon: Search, isSearchMode: true },
   ];
+
+  const [searchMode, setSearchMode] = useState(false);
 
   return (
     <>
@@ -384,9 +508,7 @@ export function GlobalAiAssistant() {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
             </div>
-            <span className="font-kalpurush font-black text-sm tracking-wide pr-1">
-              AI সহকারী
-            </span>
+            <span className="font-kalpurush font-black text-sm tracking-wide pr-1">AI সহকারী</span>
             <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
           </button>
         )}
@@ -397,7 +519,7 @@ export function GlobalAiAssistant() {
             className={`flex flex-col bg-white rounded-2xl shadow-2xl border border-indigo-200 overflow-hidden font-kalpurush transition-all duration-300 ${
               isExpanded 
                 ? 'w-[95vw] md:w-[760px] h-[88vh] max-h-[850px]' 
-                : 'w-[92vw] sm:w-[460px] h-[620px] max-h-[88vh]'
+                : 'w-[92vw] sm:w-[460px] h-[640px] max-h-[88vh]'
             }`}
           >
             {/* Header */}
@@ -419,6 +541,21 @@ export function GlobalAiAssistant() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {/* History badge showing saved count */}
+                {messages.length > 1 && (
+                  <Badge variant="outline" className="text-[9px] bg-white/10 text-white/70 border-white/20 px-1.5 h-5 gap-1 hidden sm:flex">
+                    <History className="h-2.5 w-2.5" /> {messages.length} বার্তা
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClearChat}
+                  className="h-8 w-8 text-white/70 hover:text-white hover:bg-red-500/30 rounded-lg"
+                  title="চ্যাট মুছে দিন"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -444,10 +581,18 @@ export function GlobalAiAssistant() {
             <div className="bg-indigo-50/70 border-b border-indigo-100 p-2 overflow-x-auto flex gap-1.5 scrollbar-none">
               {quickPrompts.map((item, idx) => {
                 const Icon = item.icon;
+                const isSearch = (item as any).isSearchMode;
                 return (
                   <button
                     key={idx}
-                    onClick={() => handleSend(item.query)}
+                    onClick={() => {
+                      if (isSearch) {
+                        setSearchMode(true);
+                        setInputQuery('রোল ');
+                      } else {
+                        handleSend(item.query);
+                      }
+                    }}
                     disabled={loading}
                     className="flex items-center gap-1.5 text-[11px] font-black bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200 px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm transition-all"
                   >
@@ -489,6 +634,17 @@ export function GlobalAiAssistant() {
                 </div>
               ))}
 
+              {/* Student Search Results Card */}
+              {foundStudents.length > 0 && (
+                <StudentResultCard
+                  students={foundStudents}
+                  onNavigate={(path) => {
+                    router.push(path);
+                    toast({ title: 'প্রোফাইল পেজে নিয়ে যাওয়া হচ্ছে...' });
+                  }}
+                />
+              )}
+
               {/* Action Preview Card (For Notice Draft) */}
               {lastActionType === 'NOTICE_DRAFT' && lastAction && (
                 <div className="p-3.5 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-2.5 shadow-sm animate-in fade-in">
@@ -504,7 +660,15 @@ export function GlobalAiAssistant() {
                     <h4 className="font-black text-sm text-slate-900">{lastAction.title}</h4>
                     <p className="text-xs text-slate-600 line-clamp-3 whitespace-pre-wrap">{lastAction.content}</p>
                   </div>
-                  <div className="flex justify-end gap-2 pt-1">
+                  <div className="flex justify-between gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrintOrExport(`${lastAction.title}\n\n${lastAction.content}`)}
+                      className="text-xs h-8 px-3 font-bold border-amber-300 text-amber-800 hover:bg-amber-50"
+                    >
+                      <Printer className="h-3 w-3 mr-1" /> প্রিন্ট
+                    </Button>
                     <Button
                       size="sm"
                       onClick={handlePublishNotice}
@@ -520,7 +684,7 @@ export function GlobalAiAssistant() {
               {lastActionType === 'NAVIGATE' && lastAction?.path && (
                 <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between shadow-sm">
                   <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
-                    <ArrowRight className="h-4 w-4 text-indigo-600" /> সংশ্লিষ্ট সেকশনে যান: {lastAction.path}
+                    <ArrowRight className="h-4 w-4 text-indigo-600" /> সংশ্লিষ্ট সেকশন: {lastAction.path}
                   </span>
                   <Button
                     size="sm"
@@ -532,11 +696,16 @@ export function GlobalAiAssistant() {
                 </div>
               )}
 
-              {loading && (
+              {/* Typing Indicator */}
+              {isTyping && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-indigo-100 rounded-2xl rounded-bl-none p-3.5 shadow-sm flex items-center gap-2 text-indigo-700 font-bold text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
-                    <span>AI ডাটাবেজ বিশ্লেষণ ও নির্ভুল উত্তর তৈরি করছে...</span>
+                    <div className="flex gap-1 items-center">
+                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span>AI বিশ্লেষণ করছে...</span>
                   </div>
                 </div>
               )}
@@ -549,7 +718,7 @@ export function GlobalAiAssistant() {
               <span className="text-slate-500 font-bold flex items-center gap-1">
                 <Compass className="h-3 w-3 text-indigo-600" /> কুইক জাম্প:
               </span>
-              <div className="flex gap-1 overflow-x-auto scrollbar-none max-w-[70%]">
+              <div className="flex gap-1 overflow-x-auto scrollbar-none max-w-[75%]">
                 {[
                   { label: 'হোম', path: '/' },
                   { label: 'ছাত্র', path: '/student-list' },
@@ -559,13 +728,13 @@ export function GlobalAiAssistant() {
                   { label: 'রুটিন', path: '/routines' },
                   { label: 'নোটিশ', path: '/notices-management' },
                   { label: 'স্টাফ', path: '/staff' },
-                  { label: 'হোয়াইটবোর্ড', path: '/whiteboard' },
+                  { label: 'প্রশ্ন', path: '/create-question' },
                 ].map((s, idx) => (
                   <button
                     key={idx}
                     onClick={() => {
                       router.push(s.path);
-                      toast({ title: `${s.label} পেজে নিয়ে যাওয়া হচ্ছে...` });
+                      toast({ title: `${s.label} পেজে নিয়ে যাওয়া হচ্ছে...` });
                     }}
                     className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 hover:text-indigo-600 hover:border-indigo-400 font-bold whitespace-nowrap text-[10px]"
                   >
@@ -585,15 +754,21 @@ export function GlobalAiAssistant() {
                 className={`h-10 w-10 shrink-0 transition-all ${
                   isListening ? 'animate-pulse ring-2 ring-rose-500' : 'border-indigo-200 hover:bg-indigo-50 text-indigo-700'
                 }`}
-                title={isListening ? 'রেকর্ডিং বন্ধ করুন' : 'মুখে বাংলায় বলুন (ভয়েস ইনপুট)'}
+                title={isListening ? 'রেকর্ডিং বন্ধ করুন' : 'মুখে বাংলায় বলুন (ভয়েস ইনপুট)'}
               >
                 {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
 
               <Input
-                placeholder={isListening ? 'শুনছি... মুখে বলুন...' : 'বাংলায় যেকোনো প্রশ্ন লিখুন বা বলুন...'}
+                placeholder={
+                  isListening 
+                    ? 'শুনছি... মুখে বলুন...' 
+                    : searchMode 
+                      ? 'রোল নম্বর বা নাম লিখুন...'
+                      : 'বাংলায় যেকোনো প্রশ্ন লিখুন বা বলুন...'
+                }
                 value={inputQuery}
-                onChange={e => setInputQuery(e.target.value)}
+                onChange={e => { setInputQuery(e.target.value); if (searchMode && e.target.value === '') setSearchMode(false); }}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                 disabled={loading}
                 className="flex-1 font-medium text-xs md:text-sm h-10 border-indigo-200 focus-visible:ring-indigo-600"
