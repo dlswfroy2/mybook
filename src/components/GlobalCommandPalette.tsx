@@ -7,6 +7,7 @@ import { getStudents, Student } from '@/lib/student-data';
 import { getStaff, Staff } from '@/lib/staff-data';
 import { ALL_SYSTEM_SECTIONS } from '@/components/GlobalAiAssistant';
 import { useAcademicYear } from '@/context/AcademicYearContext';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   Dialog, 
   DialogContent 
@@ -40,13 +41,14 @@ export function GlobalCommandPalette() {
   const router = useRouter();
   const db = useFirestore();
   const { selectedYear } = useAcademicYear();
+  const { user } = useAuth();
 
-  // Preload students & staff
+  // Preload students & staff only for authenticated users
   useEffect(() => {
-    if (!db) return;
+    if (!db || !user?.uid) return;
     getStudents(db).then(setStudents).catch(() => {});
     getStaff(db).then(setStaff).catch(() => {});
-  }, [db]);
+  }, [db, user?.uid]);
 
   // Global Ctrl+K / Cmd+K key listener
   useEffect(() => {
@@ -63,6 +65,8 @@ export function GlobalCommandPalette() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  if (!user) return null;
 
   const handleSelectPath = (path: string) => {
     setOpen(false);

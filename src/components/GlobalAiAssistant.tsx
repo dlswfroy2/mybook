@@ -226,13 +226,13 @@ export function GlobalAiAssistant() {
     } catch {}
   }, [messages]);
 
-  // Preload students, staff and holidays in background for fast contextual replies
+  // Preload students, staff and holidays in background only for authenticated users
   useEffect(() => {
-    if (!db) return;
+    if (!db || !user?.uid) return;
     getStudents(db).then(setCachedStudents).catch(() => {});
     getHolidays(db).then(setCachedHolidays).catch(() => {});
     getStaff(db).then(setCachedStaff).catch(() => {});
-  }, [db]);
+  }, [db, user?.uid]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -301,8 +301,11 @@ export function GlobalAiAssistant() {
     toast({ title: '✅ চ্যাট পরিষ্কার করা হয়েছে' });
   }, [toast]);
 
-  if (typeof window !== 'undefined' && pathname === '/login') {
-    return null;
+  // Security: Only display AI Assistant to authenticated logged-in users and never on public/login pages
+  if (typeof window !== 'undefined') {
+    if (!user || pathname === '/login' || pathname.startsWith('/parents/login')) {
+      return null;
+    }
   }
 
   // Quick navigation finder based on direct keywords
