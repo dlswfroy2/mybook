@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import Link from 'next/link';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
     if (!str && str !== 0) return '';
@@ -37,6 +38,7 @@ const toBengaliNumber = (str: string | number | undefined | null) => {
 export default function NoticeManagementPage() {
     const db = useFirestore();
     const { user, loading: authLoading } = useUser();
+    const { selectedYear } = useAcademicYear();
     const router = useRouter();
     
     const softwareDocRef = useMemo(() => db ? doc(db, 'config', 'software') : null, [db]);
@@ -86,21 +88,29 @@ export default function NoticeManagementPage() {
         return () => unsubscribe();
     }, [db, user, isClient, authLoading]);
 
-    const handleAiGenerate = async () => {
-      if (!aiTopic.trim()) {
-        toast({ variant: 'destructive', title: 'বিষয় লিখুন', description: 'AI দিয়ে ড্রাফট করতে একটি বিষয় লিখুন।' });
+    const handleAiGenerate = async (customTopic?: string) => {
+      const topicToUse = (typeof customTopic === 'string' && customTopic.trim()) ? customTopic : aiTopic;
+      if (!topicToUse.trim()) {
+        toast({ variant: 'destructive', title: 'বিষয় লিখুন', description: 'AI দিয়ে ড্রাফট করতে একটি বিষয় লিখুন বা নিচের বাটন চাপুন।' });
         return;
       }
 
       setIsAiLoading(true);
       try {
-        const result = await generateNotice({ topic: aiTopic });
+        const result = await generateNotice({ 
+            topic: topicToUse,
+            academicYear: selectedYear,
+            institutionName: institutionName,
+        });
         setNewNotice(prev => ({
           ...prev,
           title: result.title,
           content: result.content
         }));
-        toast({ title: 'AI ড্রাফট তৈরি হয়েছে' });
+        toast({ 
+            title: 'AI ড্রাফট তৈরি হয়েছে', 
+            description: `${toBengaliNumber(selectedYear)} শিক্ষাবর্ষ অনুযায়ী নোটিশ তৈরি হয়েছে।` 
+        });
         setAiTopic('');
       } catch (error) {
         toast({ variant: 'destructive', title: 'AI ত্রুটি', description: 'AI দিয়ে নোটিশ তৈরি করা সম্ভব হয়নি।' });
@@ -215,13 +225,19 @@ export default function NoticeManagementPage() {
                         </DialogHeader>
 
                         {/* AI Generator Helper Bar */}
-                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl space-y-2">
-                            <Label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-indigo-600" /> AI দিয়ে দ্রুত নোটিশ তৈরি করুন
-                            </Label>
+                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                                    <Sparkles className="h-3.5 w-3.5 text-indigo-600" /> AI দিয়ে দ্রুত নোটিশ তৈরি করুন
+                                </Label>
+                                <Badge variant="outline" className="bg-white text-indigo-800 border-indigo-300 font-black text-[10px] px-2 py-0.5">
+                                    সেশন: {toBengaliNumber(selectedYear)} শিক্ষাবর্ষ
+                                </Badge>
+                            </div>
+
                             <div className="flex gap-2">
                                 <Input 
-                                    placeholder="বিষয় লিখুন (যেমন: রমজানের ছুটির নোটিশ)..." 
+                                    placeholder={`বিষয় লিখুন (যেমন: ${selectedYear} সেশনের ছুটির নোটিশ)...`} 
                                     value={aiTopic}
                                     onChange={(e) => setAiTopic(e.target.value)}
                                     className="bg-white text-xs h-9"
@@ -230,11 +246,56 @@ export default function NoticeManagementPage() {
                                 />
                                 <Button 
                                     type="button"
-                                    onClick={handleAiGenerate}
+                                    onClick={() => handleAiGenerate()}
                                     disabled={isAiLoading}
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 font-black text-xs h-9 px-3"
                                 >
                                     {isAiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'AI ড্রাফট'}
+                                </Button>
+                            </div>
+
+                            {/* One-Click Quick Session Notice Chips */}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                <span className="text-[10px] font-bold text-muted-foreground self-center mr-1">দ্রুত টেমপ্লেট:</span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isAiLoading}
+                                    onClick={() => handleAiGenerate(`${selectedYear} শিক্ষাবর্ষের সেশনের অবকাশকালীন ছুটির নোটিশ`)}
+                                    className="h-6 text-[10px] font-black px-2 bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-900 rounded-md"
+                                >
+                                    🏖️ {toBengaliNumber(selectedYear)} সেশনের ছুটি
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isAiLoading}
+                                    onClick={() => handleAiGenerate(`${selectedYear} শিক্ষাবর্ষের পবিত্র রমজান ও ঈদুল ফিতরের ছুটির নোটিশ`)}
+                                    className="h-6 text-[10px] font-black px-2 bg-white hover:bg-emerald-50 border-emerald-200 text-emerald-900 rounded-md"
+                                >
+                                    🌙 রমজান ও ঈদের ছুটি
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isAiLoading}
+                                    onClick={() => handleAiGenerate(`${selectedYear} শিক্ষাবর্ষের গ্রীষ্মকালীন ও বর্ষাকালীন অবকাশের নোটিশ`)}
+                                    className="h-6 text-[10px] font-black px-2 bg-white hover:bg-amber-50 border-amber-200 text-amber-900 rounded-md"
+                                >
+                                    ☀️ গ্রীষ্মকালীন ছুটি
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isAiLoading}
+                                    onClick={() => handleAiGenerate(`${selectedYear} শিক্ষাবর্ষের শীতকালীন অবকাশের নোটিশ`)}
+                                    className="h-6 text-[10px] font-black px-2 bg-white hover:bg-cyan-50 border-cyan-200 text-cyan-900 rounded-md"
+                                >
+                                    ❄️ শীতকালীন ছুটি
                                 </Button>
                             </div>
                         </div>
