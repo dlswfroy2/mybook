@@ -1,66 +1,150 @@
-
 'use server';
+
 /**
- * @fileOverview A Genkit flow for generating structured board-style questions (Written and MCQ).
+ * @fileOverview Genkit/Gemini failover flow for generating structured NCTB board-style questions.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
 
-const QuestionSchema = z.object({
-  type: z.enum(['creative', 'short', 'mcq']),
-  // Written fields
-  stimulus: z.string().optional().describe('উদ্দীপক (সৃজনশীল প্রশ্নের জন্য)'),
-  qA: z.string().optional().describe('জ্ঞানমূলক প্রশ্ন (ক)'),
-  qB: z.string().optional().describe('অনুধাবনমূলক প্রশ্ন (খ)'),
-  qC: z.string().optional().describe('প্রয়োগমূলক প্রশ্ন (গ)'),
-  qD: z.string().optional().describe('উচ্চতর দক্ষতামূলক প্রশ্ন (ঘ)'),
-  shortText: z.string().optional().describe('সংক্ষিপ্ত প্রশ্ন'),
-  // MCQ fields
-  mcqQuestion: z.string().optional().describe('বহুনির্বাচনি প্রশ্ন'),
-  optA: z.string().optional().describe('অপশন ক'),
-  optB: z.string().optional().describe('অপশন খ'),
-  optC: z.string().optional().describe('অপশন গ'),
-  optD: z.string().optional().describe('অপশন ঘ'),
-  correctOpt: z.string().optional().describe('সঠিক উত্তর (ক/খ/গ/ঘ)'),
-});
+export interface GeneratedQuestionItem {
+  type: 'creative' | 'short' | 'mcq';
+  stimulus?: string;
+  qA?: string;
+  qB?: string;
+  qC?: string;
+  qD?: string;
+  shortText?: string;
+  mcqQuestion?: string;
+  optA?: string;
+  optB?: string;
+  optC?: string;
+  optD?: string;
+  correctOpt?: string;
+  formattedText: string;
+}
 
-const GeneratePracticeQuestionsInputSchema = z.object({
-  classId: z.string(),
-  subject: z.string(),
-  type: z.enum(['creative', 'short', 'mcq', 'mixed']).default('mixed'),
-  count: z.number().optional().default(3),
-});
-export type GeneratePracticeQuestionsInput = z.infer<typeof GeneratePracticeQuestionsInputSchema>;
+export interface GeneratePracticeQuestionsInput {
+  classId: string;
+  subject: string;
+  chapter?: string;
+  type: 'creative' | 'short' | 'mcq' | 'mixed';
+  count: number;
+  institutionName?: string;
+}
 
-const GeneratePracticeQuestionsOutputSchema = z.object({
-  questions: z.array(QuestionSchema),
-});
-export type GeneratePracticeQuestionsOutput = z.infer<typeof GeneratePracticeQuestionsOutputSchema>;
+export interface GeneratePracticeQuestionsOutput {
+  questions: GeneratedQuestionItem[];
+}
 
-const generateQuestionsPrompt = ai.definePrompt({
-  name: 'generateQuestionsPrompt',
-  input: {schema: GeneratePracticeQuestionsInputSchema},
-  output: {schema: GeneratePracticeQuestionsOutputSchema},
-  prompt: `You are an expert Bangladeshi board examiner for NCTB curriculum.
-Generate {{count}} board-standard questions for Class {{classId}} in "{{subject}}".
-The question type should be {{type}}.
+export async function generatePracticeQuestions(
+  input: GeneratePracticeQuestionsInput
+): Promise<GeneratePracticeQuestionsOutput> {
+  const chapterText = input.chapter ? `অধ্যায়: "${input.chapter}"` : '';
+  const typeText =
+    input.type === 'creative'
+      ? 'সৃজনশীল প্রশ্ন (উদ্দীপক + ক, খ, গ, ঘ)'
+      : input.type === 'mcq'
+      ? 'বহুনির্বাচনি প্রশ্ন (প্রশ্ন + ৪টি অপশন ক, খ, গ, ঘ এবং সঠিক উত্তর)'
+      : input.type === 'short'
+      ? 'সংক্ষিপ্ত ও জ্ঞানমূলক প্রশ্ন'
+      : 'সৃজনশীল ও বহুনির্বাচনি মিশ্রিত প্রশ্ন';
 
-RULES:
-1. For creative (সৃজনশীল) questions:
-   - Provide a high-quality stimulus (উদ্দীপক).
-   - Provide 4 sub-questions (ক, খ, গ, ঘ).
-2. For short (সংক্ষিপ্ত) questions:
-   - Provide only the question text in shortText field.
-3. For mcq (বহুনির্বাচনি) questions:
-   - Provide the question in mcqQuestion.
-   - Provide 4 distinct options (optA, optB, optC, optD).
-   - Indicate the correct option (correctOpt) as 'ক', 'খ', 'গ', or 'ঘ'.
-4. Ensure proper use of mathematical/scientific symbols (e.g., H₂O, √x, x², ±, θ) where applicable.
-5. ALWAYS output in Bengali language. Ensure the quality matches board standards.`,
-});
+  const prompt = `তুমি বাংলাদেশের জাতীয় শিক্ষাক্রম (NCTB)-এর একজন অভিজ্ঞ প্রশ্নপ্রণেতা ও বোর্ড পরীক্ষক।
+প্রতিষ্ঠান: "${input.institutionName || 'টপ গ্রেড টিউটোরিয়ালস'}"
+শ্রেণি: ${input.classId} শ্রেণি
+বিষয়: ${input.subject}
+${chapterText}
+প্রশ্নের ধরণ: ${typeText}
+মোট প্রশ্নের সংখ্যা: ${input.count} টি
 
-export async function generatePracticeQuestions(input: GeneratePracticeQuestionsInput): Promise<GeneratePracticeQuestionsOutput> {
-  const {output} = await generateQuestionsPrompt(input);
-  return output!;
+কঠোর নিয়মাবলী:
+১. প্রতিটি সৃজনশীল প্রশ্নের ক্ষেত্রে একটি মানসম্পন্ন উদ্দীপক (stimulus) এবং ৪টি ধারাবাহিক উপ-প্রশ্ন থাকবে:
+   - ক (জ্ঞানমূলক - ১ নম্বর)
+   - খ (অনুধাবনমূলক - ২ নম্বর)
+   - গ (প্রয়োগমূলক - ৩ নম্বর)
+   - ঘ (উচ্চতর দক্ষতামূলক - ৪ নম্বর)
+২. বহুনির্বাচনির ক্ষেত্রে ৪টি স্পষ্ট অপশন (ক, খ, গ, ঘ) এবং সঠিক উত্তর উল্লেখ থাকবে।
+৩. গাণিতিক/বিজ্ঞান বিষয়ের চিহ্নের সঠিক রূপ থাকবে।
+৪. ভাষা হবে শতভাগ নির্ভুল ও প্রমিত বাংলা।
+
+Output strictly in JSON format (no markdown backticks):
+{
+  "questions": [
+    {
+      "type": "creative",
+      "stimulus": "উদ্দীপক...",
+      "qA": "ক. প্রশ্ন...",
+      "qB": "খ. প্রশ্ন...",
+      "qC": "গ. প্রশ্ন...",
+      "qD": "ঘ. প্রশ্ন...",
+      "formattedText": "উদ্দীপক...\\nক. ...\\nখ. ...\\nগ. ...\\nঘ. ..."
+    },
+    {
+      "type": "mcq",
+      "mcqQuestion": "প্রশ্ন...",
+      "optA": "ক) অপশন...",
+      "optB": "খ) অপশন...",
+      "optC": "গ) অপশন...",
+      "optD": "ঘ) অপশন...",
+      "correctOpt": "ক",
+      "formattedText": "প্রশ্ন...\\n(ক) ...  (খ) ...\\n(গ) ...  (ঘ) ...\\n[সঠিক উত্তর: ক]"
+    }
+  ]
+}`;
+
+  const availableKeys = getAvailableApiKeys();
+  const candidateModels = [
+    'googleai/gemini-flash-lite-latest',
+    'googleai/gemini-flash-latest',
+    'googleai/gemini-3.5-flash',
+  ];
+
+  let rawText = '';
+
+  for (const key of availableKeys) {
+    for (const model of candidateModels) {
+      try {
+        const client = createAiClient(key, model);
+        const resp = await client.generate({
+          model,
+          prompt,
+          config: { responseMimeType: 'application/json' },
+        });
+        rawText = resp.text?.trim() || '';
+        if (rawText) break;
+      } catch (err) {}
+    }
+    if (rawText) break;
+  }
+
+  if (!rawText) {
+    throw new Error('প্রশ্ন তৈরি করা সম্ভব হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
+  }
+
+  try {
+    const clean = rawText.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      questions: (parsed.questions || []).map((q: any) => ({
+        ...q,
+        formattedText:
+          q.formattedText ||
+          (q.type === 'creative'
+            ? `${q.stimulus || ''}\nক. ${q.qA || ''}\nখ. ${q.qB || ''}\nগ. ${q.qC || ''}\nঘ. ${q.qD || ''}`.trim()
+            : q.type === 'mcq'
+            ? `${q.mcqQuestion || ''}\n(ক) ${q.optA || ''} (খ) ${q.optB || ''}\n(গ) ${q.optC || ''} (ঘ) ${q.optD || ''}`.trim()
+            : q.shortText || ''),
+      })),
+    };
+  } catch {
+    return {
+      questions: [
+        {
+          type: 'short',
+          shortText: rawText,
+          formattedText: rawText,
+        },
+      ],
+    };
+  }
 }

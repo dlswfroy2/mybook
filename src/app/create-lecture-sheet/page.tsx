@@ -10,6 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { 
   Printer, 
   Save, 
   FileText, 
@@ -38,9 +45,12 @@ import {
   CheckCircle2, 
   Camera,
   FileUp,
-  FileType
+  FileType,
+  BrainCircuit,
+  Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { useFirestore, useUser, useDoc, useStorage } from '@/firebase';
 import { collection, setDoc, doc, getDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -162,6 +172,88 @@ function CreateLectureSheetContent() {
     content: '',
     type: 'lecture_sheet'
   });
+
+  // AI Lecture Sheet Generation States
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiChapter, setAiChapter] = useState('');
+  const [aiCustomTopic, setAiCustomTopic] = useState('');
+
+  const handleGenerateAiSheet = async () => {
+    if (!data.classId || !data.subject || !aiChapter.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'অসম্পূর্ণ তথ্য',
+        description: 'শ্রেণি, বিষয় এবং অধ্যায়ের নাম লিখুন।',
+      });
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const result = await generateLectureSheet({
+        className: data.classId,
+        subject: data.subject,
+        chapter: aiChapter.trim(),
+        topic: aiCustomTopic.trim(),
+        institutionName: data.institution,
+      });
+
+      // Construct a beautifully formatted lecture sheet
+      let generatedDoc = `<h3><strong>${result.title || `${data.subject} - ${aiChapter}`}</strong></h3>\n\n`;
+      if (result.summary) {
+        generatedDoc += `<p><strong>পাঠের সারসংক্ষেপ:</strong> ${result.summary}</p>\n\n`;
+      }
+      if (result.keyConcepts && result.keyConcepts.length > 0) {
+        generatedDoc += `<h4><strong>মূল আলোচ্য বিষয় ও সংজ্ঞাসমূহ:</strong></h4>\n`;
+        result.keyConcepts.forEach((c) => {
+          generatedDoc += `<p>• <strong>${c.heading}:</strong> ${c.details}</p>\n`;
+        });
+        generatedDoc += `\n`;
+      }
+      if (result.formulasOrRules && result.formulasOrRules.length > 0) {
+        generatedDoc += `<h4><strong>প্রয়োজনীয় সূত্র ও নিয়মাবলী:</strong></h4>\n`;
+        result.formulasOrRules.forEach((f) => {
+          generatedDoc += `<p>✓ ${f}</p>\n`;
+        });
+        generatedDoc += `\n`;
+      }
+      if (result.solvedExamples && result.solvedExamples.length > 0) {
+        generatedDoc += `<h4><strong>নমুনা সমস্যা ও সমাধান:</strong></h4>\n`;
+        result.solvedExamples.forEach((ex, i) => {
+          generatedDoc += `<p><strong>উদাহরণ ${toBengaliNumber(i + 1)}:</strong> ${ex.question}<br/><em>সমাধান:</em> ${ex.solution}</p>\n`;
+        });
+        generatedDoc += `\n`;
+      }
+      if (result.practiceTasks && result.practiceTasks.length > 0) {
+        generatedDoc += `<h4><strong>অনুশীলন কাজ ও বাড়ির পড়া:</strong></h4>\n`;
+        result.practiceTasks.forEach((t, i) => {
+          generatedDoc += `<p>${toBengaliNumber(i + 1)}. ${t}</p>\n`;
+        });
+      }
+
+      setData((prev) => ({
+        ...prev,
+        topic: aiChapter.trim(),
+        content: generatedDoc.trim(),
+      }));
+
+      setAiModalOpen(false);
+      toast({
+        title: 'লেকচার শিট তৈরি সফল! 🎉',
+        description: 'এনসিটিবি স্ট্যান্ডার্ড অনুযায়ী লেকচার শিট তৈরি হয়েছে।',
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'ব্যর্থ হয়েছে',
+        description: err.message || 'লেকচার শিট তৈরি করা যায়নি।',
+      });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const [printSettings, setPrintSettings] = useState<any>({
     marginTop: 0.5, marginBottom: 0.5, marginLeft: 0.5, marginRight: 0.5,
@@ -529,7 +621,85 @@ function CreateLectureSheetContent() {
               <CardHeader className="bg-primary/5 border-b py-3">
                 <CardTitle className="text-base flex items-center gap-2 font-bold text-primary"><FileText className="w-4 h-4" /> শিট সংক্রান্ত তথ্য</CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 space-y-5">
+              <CardContent className="pt-4 space-y-4">
+                <Button
+                  type="button"
+                  onClick={() => setAiModalOpen(true)}
+                  className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 hover:from-emerald-700 hover:to-indigo-800 text-white font-black text-xs h-10 shadow-md"
+                >
+                  <BrainCircuit className="w-4 h-4 mr-2 text-amber-300 animate-pulse" /> AI দিয়ে লেকচার শিট তৈরি করুন
+                </Button>
+
+                {/* AI Lecture Sheet Dialog */}
+                <Dialog open={aiModalOpen} onOpenChange={setAiModalOpen}>
+                  <DialogContent className="font-kalpurush max-w-md bg-white border-2 border-emerald-200">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-black flex items-center gap-2 text-emerald-950">
+                        <BrainCircuit className="h-5 w-5 text-emerald-600" /> AI লেকচার শিট জেনারেটর
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      <p className="text-xs text-slate-600 font-bold">
+                        এনসিটিবি বোর্ড সিলেবাস অনুযায়ী সংজ্ঞা, সূত্র, নমুনা সমাধান ও বাড়ির কাজ সহ তৈরি হবে।
+                      </p>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">শ্রেণি</label>
+                        <Select onValueChange={v => setData(prev => ({...prev, classId: v}))} value={data.classId}>
+                          <SelectTrigger className="h-9 font-bold text-xs"><SelectValue placeholder="শ্রেণি নির্বাচন করুন" /></SelectTrigger>
+                          <SelectContent>
+                            {CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">বিষয়</label>
+                        <Input
+                          placeholder="যেমন: পদার্থবিজ্ঞান, গণিত, রসায়ন..."
+                          value={data.subject}
+                          onChange={(e) => setData(prev => ({ ...prev, subject: e.target.value }))}
+                          className="h-9 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">অধ্যায় বা পাঠের নাম *</label>
+                        <Input
+                          placeholder="যেমন: বল ও গতি, সালোকসংশ্লেষণ, জৈব যৌগ..."
+                          value={aiChapter}
+                          onChange={(e) => setAiChapter(e.target.value)}
+                          className="h-9 text-xs font-black border-emerald-300"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">নির্দিষ্ট টপিক (ঐচ্ছিক)</label>
+                        <Input
+                          placeholder="যেমন: নিউটনের গতির সূত্রাবলী..."
+                          value={aiCustomTopic}
+                          onChange={(e) => setAiCustomTopic(e.target.value)}
+                          className="h-9 text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button variant="outline" size="sm" onClick={() => setAiModalOpen(false)}>
+                        বাতিল
+                      </Button>
+                      <Button
+                        onClick={handleGenerateAiSheet}
+                        disabled={aiGenerating || !data.classId || !data.subject || !aiChapter.trim()}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs"
+                      >
+                        {aiGenerating ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> তৈরি হচ্ছে...
+                          </>
+                        ) : (
+                          'তৈরি করুন'
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">শিটের ধরণ</label>
                   <Select onValueChange={v => setData(prev => ({...prev, type: v}))} value={data.type}>
