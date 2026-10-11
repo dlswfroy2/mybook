@@ -747,16 +747,30 @@ export default function Home() {
 
                       // Fetch students for currentClass and dateAcademicYear
                       let studentsForThisBatch = (studentsForYear || []).filter(
-                          (s: Student) => String(s.className) === currentClass && s.academicYear === dateAcademicYear
+                          (s: Student) => String(s.className) === currentClass && (!dateAcademicYear || s.academicYear === dateAcademicYear)
                       );
 
                       if (studentsForThisBatch.length === 0) {
+                          // Try querying database for currentClass and dateAcademicYear
                           const qSnap = await getDocs(query(
                               collection(db!, 'students'),
                               where('className', '==', currentClass),
                               where('academicYear', '==', dateAcademicYear)
                           ));
                           studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                      }
+
+                      // Fallback: If still not found (e.g. students were registered under 2025 or selectedYear), query ANY students in this class
+                      if (studentsForThisBatch.length === 0) {
+                          const fallbackSnap = await getDocs(query(
+                              collection(db!, 'students'),
+                              where('className', '==', currentClass)
+                          ));
+                          studentsForThisBatch = fallbackSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                          // If we find students in the fallback, inherit their actual academicYear if our date didn't have a specific year
+                          if (studentsForThisBatch.length > 0 && studentsForThisBatch[0].academicYear) {
+                              dateAcademicYear = studentsForThisBatch[0].academicYear;
+                          }
                       }
 
                       if (studentsForThisBatch.length === 0) continue;
