@@ -208,12 +208,27 @@ export default function NoticeManagementPage() {
                     </p>
                 </div>
                 
-                <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="font-black h-11 px-6 shadow-md text-sm bg-primary hover:bg-primary/90 text-white rounded-xl">
-                            <Plus className="mr-1.5 h-5 w-5" /> নতুন নোটিশ প্রকাশ
-                        </Button>
-                    </DialogTrigger>
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <Button 
+                        type="button"
+                        onClick={() => {
+                            setIsAddOpen(true);
+                            setTimeout(() => {
+                                const aiInput = document.getElementById('ai-notice-input');
+                                if (aiInput) aiInput.focus();
+                            }, 200);
+                        }}
+                        className="font-black h-11 px-5 shadow-lg text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl border-b-[4px] border-indigo-900 gap-2 transition-all active:translate-y-0.5"
+                    >
+                        <Sparkles className="h-5 w-5" /> এআই নোটিশ তৈরি
+                    </Button>
+
+                    <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="font-black h-11 px-6 shadow-md text-sm bg-primary hover:bg-primary/90 text-white rounded-xl border-b-[4px] border-primary/40">
+                                <Plus className="mr-1.5 h-5 w-5" /> নতুন নোটিশ প্রকাশ
+                            </Button>
+                        </DialogTrigger>
                     <DialogContent className="sm:max-w-[650px] font-kalpurush">
                         <DialogHeader>
                             <DialogTitle className="text-xl font-black text-primary flex items-center gap-2">
@@ -237,6 +252,7 @@ export default function NoticeManagementPage() {
 
                             <div className="flex gap-2">
                                 <Input 
+                                    id="ai-notice-input"
                                     placeholder={`বিষয় লিখুন (যেমন: ${selectedYear} সেশনের ছুটির নোটিশ)...`} 
                                     value={aiTopic}
                                     onChange={(e) => setAiTopic(e.target.value)}
@@ -376,6 +392,7 @@ export default function NoticeManagementPage() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+                </div>
             </div>
 
             {/* List of notices */}
