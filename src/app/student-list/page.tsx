@@ -571,6 +571,11 @@ function StudentListContent() {
                                             <FileUp className="mr-2 h-4 w-4" /> Excel আপলোড
                                         </Button>
                                     )}
+                                    <Link href="/student-promotion">
+                                        <Button variant="outline" className="font-black border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50">
+                                            <GraduationCap className="mr-2 h-4 w-4 text-emerald-600" /> বার্ষিক প্রমোশন
+                                        </Button>
+                                    </Link>
                                 </>
                             )}
                             {activeSection === 'print' && (

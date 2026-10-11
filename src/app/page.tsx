@@ -73,6 +73,7 @@ import { useToast } from '@/hooks/use-toast';
 import { subjectNameNormalization } from '@/lib/subjects';
 import { runMultiTaskAi } from '@/ai/flows/multi-task-ai-flow';
 import { Textarea } from '@/components/ui/textarea';
+import { DashboardAnalyticsCharts } from '@/components/dashboard/DashboardAnalyticsCharts';
 
 const classNamesMap: Record<string, string> = {
   '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
@@ -1351,6 +1352,12 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modern Interactive Analytics Charts */}
+      <DashboardAnalyticsCharts 
+        students={studentsForYear} 
+        academicYear={selectedYear} 
+      />
 
       <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5 md:gap-2">
         <Link href="/create-question" className="block w-full">

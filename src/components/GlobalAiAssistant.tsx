@@ -79,6 +79,8 @@ export const ALL_SYSTEM_SECTIONS: Array<{ label: string; path: string; keywords:
   { label: 'লেকচার শিট তৈরি', path: '/create-lecture-sheet', keywords: ['শিট তৈরি', 'লেকচার শিট', 'হ্যান্ডআউট', 'lecture sheet'] },
   { label: 'আমার লাইব্রেরি', path: '/my-questions', keywords: ['লাইব্রেরি', 'আমার লাইব্রেরি', 'সংরক্ষিত প্রশ্ন', 'my library'] },
   { label: 'সিস্টেম সেটিংস', path: '/settings', keywords: ['সেটিংস', 'কনফিগ', 'নিয়ন্ত্রণ', 'settings', 'ব্যবস্থাপনা'] },
+  { label: 'বার্ষিক প্রমোশন ও শ্রেণি উন্নীতি', path: '/student-promotion', keywords: ['প্রমোশন', 'শ্রেণি উন্নীতি', 'পরবর্তী ক্লাস', 'ক্লাস প্রমোশন', 'উন্নীত', 'student promotion'] },
+  { label: 'কেন্দ্রীয় ফি বকেয়া ও আদায় রিপোর্ট', path: '/fee-due-report', keywords: ['বকেয়া রিপোর্ট', 'ফি রিপোর্ট', 'বকেয়া তালিকা', 'কার কত বাকি', 'ফি সারাংশ', 'fee due'] },
 ];
 
 // Detect student search intent from query text

@@ -9,6 +9,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { SchoolInfoProvider } from '@/context/SchoolInfoContext';
 import { AcademicYearProvider } from '@/context/AcademicYearContext';
 import { GlobalAiAssistant } from '@/components/GlobalAiAssistant';
+import { GlobalCommandPalette } from '@/components/GlobalCommandPalette';
 
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
@@ -34,6 +35,11 @@ export default function RootLayout({
         <link rel="icon" href="/icon.png" type="image/png" />
         <link rel="shortcut icon" href="/icon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icon.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#4338ca" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="টপ গ্রেড" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -51,6 +57,7 @@ export default function RootLayout({
                 <Footer />
                 <BottomNav />
                 <GlobalAiAssistant />
+                <GlobalCommandPalette />
                 <Toaster />
               </AcademicYearProvider>
             </SchoolInfoProvider>
