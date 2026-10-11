@@ -56,7 +56,7 @@ import { collection, setDoc, doc, getDoc, serverTimestamp, addDoc } from 'fireba
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
-import Tesseract from 'tesseract.js';
+import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
@@ -591,10 +591,46 @@ function CreateLectureSheetContent() {
   }, [handleSave, handleFormatting, activeEditIdx, pageStyles, globalFontSize, updatePageStyle]);
 
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return; setIsScanning(true);
-    try { const result = await Tesseract.recognize(file, 'ben+eng'); if (result?.data?.text) { setData(prev => ({ ...prev, content: prev.content ? prev.content + '\n\n' + result.data.text : result.data.text })); toast({ title: "সফল!", description: "টেক্সট এক্সট্রাক্ট করা হয়েছে।" }); } }
-    catch (error) { toast({ variant: "destructive", title: "স্ক্যান ব্যর্থ হয়েছে" }); }
-    finally { setIsScanning(false); if (ocrInputRef.current) ocrInputRef.current.value = ''; }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsScanning(true);
+    toast({ title: 'AI স্ক্যান শুরু হয়েছে...', description: file.name + ' — Gemini Vision প্রসেস করছে।' });
+    try {
+      let fileDataUri = '';
+      const mimeType = file.type || 'image/png';
+      if (file.type === 'application/pdf') {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@' + pdfjsLib.version + '/build/pdf.worker.min.mjs';
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        toast({ title: 'PDF লোড হয়েছে', description: 'মোট ' + pdf.numPages + 'টি পৃষ্ঠা স্ক্যান হচ্ছে...' });
+        const pageUris = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) continue;
+          await page.render({ canvasContext: ctx as any, canvas, viewport } as any).promise;
+          pageUris.push(canvas.toDataURL('image/png'));
+        }
+        fileDataUri = pageUris.join('|||');
+      } else {
+        fileDataUri = await fileToBase64(file);
+      }
+      const result = await performAiOcr({ fileDataUri, mimeType });
+      if (result?.text) {
+        setData(prev => ({ ...prev, content: prev.content ? prev.content + '\n\n' + result.text : result.text }));
+        toast({ title: 'AI স্ক্যান সম্পন্ন!', description: (result.pageCount || 1) + 'টি পৃষ্ঠা থেকে সম্পূর্ণ টেক্সট উদ্ধার হয়েছে।' });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'স্ক্যান ব্যর্থ হয়েছে', description: (error && (error as any).message) ? (error as any).message : 'পুনরায় চেষ্টা করুন।' });
+    } finally {
+      setIsScanning(false);
+      if (ocrInputRef.current) ocrInputRef.current.value = '';
+    }
   };
 
   const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -763,7 +799,7 @@ function CreateLectureSheetContent() {
                       </Button>
                       <Button
                         onClick={handleGenerateAiSheet}
-                        disabled={aiGenerating || !data.classId || !data.subject || !aiChapter.trim()}
+                        disabled={aiGenerating || !aiClassId || !aiSubject || !aiChapter.trim()}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs"
                       >
                         {aiGenerating ? (
@@ -875,7 +911,7 @@ function CreateLectureSheetContent() {
                         </button>
                       </div>
 
-                      <input type="file" ref={ocrInputRef} className="hidden" accept="image/*" onChange={handleOCR} />
+                      <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
                       <Button onClick={() => ocrInputRef.current?.click()} disabled={isScanning} variant="outline" size="sm" className="h-8 gap-1.5 border-indigo-600 text-indigo-700 font-bold">
                         {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />} এআই স্ক্যান
                       </Button>
@@ -1064,7 +1100,7 @@ function CreateLectureSheetContent() {
                         <div className="flex justify-center gap-8 text-[10pt] font-bold mt-1"><span>শ্রেণি: {CLASSES.find(c => c.id === data.classId)?.label || ''} শ্রেণি</span><span>বিষয়: {data.subject}</span></div>
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
-                      <div contentEditable={activeEditIdx === idx} onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }} onFocus={() => setActiveEditIdx(idx)} className={cn("content-area flex-1 font-kalpurush outline-none", activeEditIdx === idx && "bg-blue-50/20 p-1 rounded border border-dashed border-blue-300")} style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any }} dangerouslySetInnerHTML={{ __html: manualPages[idx] || pageHtml }} />
+                      <div contentEditable={activeEditIdx === idx} onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }} onFocus={() => setActiveEditIdx(idx)} className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/20 p-1 rounded border border-dashed border-blue-300")} style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%' }} dangerouslySetInnerHTML={{ __html: manualPages[idx] || pageHtml }} />
                       <footer className="mt-auto pt-4 flex justify-between text-[9pt] font-bold border-t border-slate-200"><span>পাতা: {toBengaliNumber(idx + 1)} / {toBengaliNumber(paginatedPages.length)}</span><span>{softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস'}</span></footer>
                     </div>
                  </div>
@@ -1086,7 +1122,8 @@ function CreateLectureSheetContent() {
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
-          .paper { color: black !important; overflow: hidden; }
+          .paper { color: black !important; overflow: hidden; display: flex; flex-direction: column; }
+          .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           .no-arrows { -moz-appearance: textfield; }
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
