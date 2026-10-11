@@ -198,6 +198,7 @@ export function GlobalAiAssistant() {
   const [lastAction, setLastAction] = useState<UniversalAiOutput['actionData'] | null>(null);
   const [lastActionType, setLastActionType] = useState<string | null>(null);
   const [foundStudents, setFoundStudents] = useState<Student[]>([]);
+  const [searchMode, setSearchMode] = useState(false);
 
   // Live database caches for intelligent real-time answers
   const [cachedStudents, setCachedStudents] = useState<Student[]>([]);
@@ -300,13 +301,6 @@ export function GlobalAiAssistant() {
     }
     toast({ title: '✅ চ্যাট পরিষ্কার করা হয়েছে' });
   }, [toast]);
-
-  // Security: Only display AI Assistant to authenticated logged-in users and never on public/login pages
-  if (typeof window !== 'undefined') {
-    if (!user || pathname === '/login' || pathname.startsWith('/parents/login')) {
-      return null;
-    }
-  }
 
   // Quick navigation finder based on direct keywords
   const findDestinationPath = (text: string): { label: string; path: string } | null => {
@@ -494,7 +488,12 @@ export function GlobalAiAssistant() {
     { label: 'শিক্ষার্থী খোঁজ', query: '', icon: Search, isSearchMode: true },
   ];
 
-  const [searchMode, setSearchMode] = useState(false);
+  // Security: Only display AI Assistant to authenticated logged-in users and never on public/login pages
+  if (typeof window !== 'undefined') {
+    if (!user || pathname === '/login' || pathname.startsWith('/parents/login')) {
+      return null;
+    }
+  }
 
   return (
     <>
