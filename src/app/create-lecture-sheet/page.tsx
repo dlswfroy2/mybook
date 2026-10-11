@@ -176,15 +176,19 @@ function CreateLectureSheetContent() {
   // AI Lecture Sheet Generation States
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiClassId, setAiClassId] = useState<string>('9');
+  const [aiSubject, setAiSubject] = useState<string>('পদার্থ');
   const [aiChapter, setAiChapter] = useState('');
+  const [aiSheetType, setAiSheetType] = useState<'lecture_sheet' | 'creative' | 'model_test' | 'mcq' | 'answer_key'>('lecture_sheet');
   const [aiCustomTopic, setAiCustomTopic] = useState('');
+  const [editorViewMode, setEditorViewMode] = useState<'visual' | 'code'>('visual');
 
   const handleGenerateAiSheet = async () => {
-    if (!data.classId || !data.subject || !aiChapter.trim()) {
+    if (!aiClassId || !aiSubject || !aiChapter.trim()) {
       toast({
         variant: 'destructive',
         title: 'অসম্পূর্ণ তথ্য',
-        description: 'শ্রেণি, বিষয় এবং অধ্যায়ের নাম লিখুন।',
+        description: 'শ্রেণি, বিষয় এবং অধ্যায়ের নাম নির্বাচন করুন।',
       });
       return;
     }
@@ -192,15 +196,16 @@ function CreateLectureSheetContent() {
     setAiGenerating(true);
     try {
       const result = await generateLectureSheet({
-        className: data.classId,
-        subject: data.subject,
+        className: aiClassId,
+        subject: aiSubject,
         chapter: aiChapter.trim(),
+        sheetType: aiSheetType,
         topic: aiCustomTopic.trim(),
         institutionName: data.institution,
       });
 
       // Construct a beautifully formatted lecture sheet
-      let generatedDoc = `<h3><strong>${result.title || `${data.subject} - ${aiChapter}`}</strong></h3>\n\n`;
+      let generatedDoc = `<h3><strong>${result.title || `${aiSubject} - ${aiChapter}`}</strong></h3>\n\n`;
       if (result.summary) {
         generatedDoc += `<p><strong>পাঠের সারসংক্ষেপ:</strong> ${result.summary}</p>\n\n`;
       }
@@ -234,6 +239,9 @@ function CreateLectureSheetContent() {
 
       setData((prev) => ({
         ...prev,
+        classId: aiClassId,
+        subject: aiSubject,
+        type: aiSheetType,
         topic: aiChapter.trim(),
         content: generatedDoc.trim(),
       }));
@@ -640,39 +648,109 @@ function CreateLectureSheetContent() {
                     </DialogHeader>
                     <div className="space-y-3 py-2">
                       <p className="text-xs text-slate-600 font-bold">
-                        এনসিটিবি বোর্ড সিলেবাস অনুযায়ী সংজ্ঞা, সূত্র, নমুনা সমাধান ও বাড়ির কাজ সহ তৈরি হবে।
+                        সার্ভারের নির্ধারিত বিষয় ও অধ্যায় সিলেক্ট করে এক ক্লিকে সম্পূর্ণ শিট তৈরি করুন।
                       </p>
+
+                      {/* 1. Sheet Type Dropdown */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">শ্রেণি</label>
-                        <Select onValueChange={v => setData(prev => ({...prev, classId: v}))} value={data.classId}>
-                          <SelectTrigger className="h-9 font-bold text-xs"><SelectValue placeholder="শ্রেণি নির্বাচন করুন" /></SelectTrigger>
+                        <label className="text-xs font-bold text-slate-700">শিটের ধরণ</label>
+                        <Select value={aiSheetType} onValueChange={(v: any) => setAiSheetType(v)}>
+                          <SelectTrigger className="h-9 font-black text-xs bg-slate-50 border-emerald-300">
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent>
-                            {CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}
+                            <SelectItem value="lecture_sheet" className="font-bold text-xs">📖 লেকচার শিট (হ্যান্ডআউট)</SelectItem>
+                            <SelectItem value="creative" className="font-bold text-xs">📝 সৃজনশীল প্রশ্নপত্র</SelectItem>
+                            <SelectItem value="model_test" className="font-bold text-xs">🏆 মডেল টেস্ট প্রশ্নপত্র</SelectItem>
+                            <SelectItem value="mcq" className="font-bold text-xs">🔘 বহুনির্বাচনী প্রশ্ন (MCQ)</SelectItem>
+                            <SelectItem value="answer_key" className="font-bold text-xs">✅ উত্তরমালা ও সমাধান</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* 2. Class Dropdown */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">শ্রেণি</label>
+                        <Select 
+                          value={aiClassId} 
+                          onValueChange={(v) => {
+                            setAiClassId(v);
+                            const availableSubs = getSubjectsForClass(v);
+                            if (availableSubs.length > 0) {
+                              setAiSubject(availableSubs[0]);
+                              const chaps = getChaptersForSubject(v, availableSubs[0]);
+                              if (chaps.length > 0) setAiChapter(chaps[0]);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 font-bold text-xs">
+                            <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CLASSES.map((c) => (
+                              <SelectItem key={c.id} value={c.id} className="font-bold text-xs">
+                                {c.label} শ্রেণি
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 3. Subject Dropdown */}
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-700">বিষয়</label>
-                        <Input
-                          placeholder="যেমন: পদার্থবিজ্ঞান, গণিত, রসায়ন..."
-                          value={data.subject}
-                          onChange={(e) => setData(prev => ({ ...prev, subject: e.target.value }))}
-                          className="h-9 text-xs font-bold"
-                        />
+                        <Select 
+                          value={aiSubject} 
+                          onValueChange={(v) => {
+                            setAiSubject(v);
+                            const chaps = getChaptersForSubject(aiClassId, v);
+                            if (chaps.length > 0) setAiChapter(chaps[0]);
+                          }}
+                        >
+                          <SelectTrigger className="h-9 font-bold text-xs">
+                            <SelectValue placeholder="বিষয় নির্বাচন করুন" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getSubjectsForClass(aiClassId).map((s) => (
+                              <SelectItem key={s} value={s} className="font-bold text-xs">
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+
+                      {/* 4. Chapter Dropdown from Server Constants */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">অধ্যায় বা পাঠের নাম *</label>
-                        <Input
-                          placeholder="যেমন: বল ও গতি, সালোকসংশ্লেষণ, জৈব যৌগ..."
-                          value={aiChapter}
-                          onChange={(e) => setAiChapter(e.target.value)}
-                          className="h-9 text-xs font-black border-emerald-300"
-                        />
+                        <label className="text-xs font-bold text-slate-700">অধ্যায় নির্বাচন *</label>
+                        {getChaptersForSubject(aiClassId, aiSubject).length > 0 ? (
+                          <Select value={aiChapter} onValueChange={setAiChapter}>
+                            <SelectTrigger className="h-9 font-black text-xs border-emerald-400 bg-emerald-50/50">
+                              <SelectValue placeholder="অধ্যায় বেছে নিন" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-64">
+                              {getChaptersForSubject(aiClassId, aiSubject).map((ch) => (
+                                <SelectItem key={ch} value={ch} className="font-bold text-xs">
+                                  {ch}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder="যেমন: ১ম অধ্যায়, ২য় অধ্যায়..."
+                            value={aiChapter}
+                            onChange={(e) => setAiChapter(e.target.value)}
+                            className="h-9 text-xs font-bold border-emerald-300"
+                          />
+                        )}
                       </div>
+
+                      {/* 5. Specific Topic / Subtopic (Optional) */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">নির্দিষ্ট টপিক (ঐচ্ছিক)</label>
+                        <label className="text-xs font-bold text-slate-700">নির্দিষ্ট টপিক বা ফোকাস (ঐচ্ছিক)</label>
                         <Input
-                          placeholder="যেমন: নিউটনের গতির সূত্রাবলী..."
+                          placeholder="যেমন: নিউটনের ৩য় সূত্র ও ভরবেগের নিত্যতা..."
                           value={aiCustomTopic}
                           onChange={(e) => setAiCustomTopic(e.target.value)}
                           className="h-9 text-xs font-bold"
@@ -765,18 +843,73 @@ function CreateLectureSheetContent() {
               </TabsList>
 
               <TabsContent value="text" className="animate-in fade-in duration-300">
-                <Card className="shadow-sm border-primary/5">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between mb-4 border-b pb-2">
-                      <label className="text-sm font-bold text-primary flex items-center gap-2"><BookOpen className="w-4 h-4" /> কন্টেন্ট এডিটর</label>
-                      <div className="flex gap-2">
-                        <input type="file" ref={ocrInputRef} className="hidden" accept="image/*" onChange={handleOCR} />
-                        <Button onClick={() => ocrInputRef.current?.click()} disabled={isScanning} variant="outline" size="sm" className="h-8 gap-2 border-indigo-600 text-indigo-700 font-bold">
-                          {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />} এআই স্ক্যান
-                        </Button>
-                      </div>
+                <Card className="shadow-md border-2 border-indigo-100 overflow-hidden">
+                  <CardHeader className="bg-slate-50 border-b p-3 px-5 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-black text-slate-800">কন্টেন্ট এডিটর (প্রিন্ট লেআউট ভিউ)</span>
                     </div>
-                    <Textarea placeholder="এখানে আপনার লেকচার নোট লিখুন..." value={data.content || ''} onChange={e => setData(prev => ({...prev, content: e.target.value}))} className="min-h-[600px] text-base leading-relaxed font-bold border-none focus-visible:ring-0 shadow-none px-0" />
+
+                    <div className="flex items-center gap-2">
+                      {/* View Mode Toggle: Visual vs Code */}
+                      <div className="flex bg-slate-200 p-0.5 rounded-lg text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setEditorViewMode('visual')}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md transition-all',
+                            editorViewMode === 'visual' ? 'bg-white shadow-sm text-indigo-700 font-black' : 'text-slate-600 hover:text-slate-900'
+                          )}
+                        >
+                          ভিজ্যুয়াল ফরম্যাট
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorViewMode('code')}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md transition-all',
+                            editorViewMode === 'code' ? 'bg-white shadow-sm text-indigo-700 font-black' : 'text-slate-600 hover:text-slate-900'
+                          )}
+                        >
+                          সোর্স কোড (HTML)
+                        </button>
+                      </div>
+
+                      <input type="file" ref={ocrInputRef} className="hidden" accept="image/*" onChange={handleOCR} />
+                      <Button onClick={() => ocrInputRef.current?.click()} disabled={isScanning} variant="outline" size="sm" className="h-8 gap-1.5 border-indigo-600 text-indigo-700 font-bold">
+                        {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />} এআই স্ক্যান
+                      </Button>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="p-4 sm:p-6 bg-slate-100/50 min-h-[650px]">
+                    {editorViewMode === 'visual' ? (
+                      /* 1. Live Visual Print-Style Layout Editor */
+                      <div className="bg-white rounded-xl border-2 border-slate-200 shadow-lg p-6 sm:p-10 font-kalpurush min-h-[600px] text-slate-900 leading-relaxed">
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={(e) => {
+                            const newHtml = e.currentTarget.innerHTML;
+                            setData((prev) => ({ ...prev, content: newHtml }));
+                          }}
+                          className="outline-none focus:ring-2 focus:ring-indigo-300 rounded-lg p-2 min-h-[550px] space-y-3 prose max-w-none text-base"
+                          dangerouslySetInnerHTML={{
+                            __html: formatMath(data.content || '<p class="text-slate-400 font-bold italic">এখানে লেকচার শিটের বিষয়বস্তু লিখুন বা বামপাশ থেকে "AI দিয়ে লেকচার শিট তৈরি করুন" বাটনে চাপ দিন...</p>')
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      /* 2. Raw HTML / Source Code Editor */
+                      <div className="bg-slate-900 rounded-xl p-4 shadow-inner">
+                        <Textarea 
+                          placeholder="HTML বা টেক্সট লিখুন..." 
+                          value={data.content || ''} 
+                          onChange={e => setData(prev => ({ ...prev, content: e.target.value }))} 
+                          className="min-h-[580px] font-mono text-sm leading-relaxed text-emerald-400 bg-transparent border-none focus-visible:ring-0 shadow-none p-0 resize-y" 
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
