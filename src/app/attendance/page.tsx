@@ -188,6 +188,7 @@ const MonthlyAttendanceGrid = ({
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [activeHoliday, setActiveHoliday] = useState<Holiday | undefined>(undefined);
     const [holidays, setHolidays] = useState<string[]>([]);
+    const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
 
     const inputRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -206,11 +207,47 @@ const MonthlyAttendanceGrid = ({
             where('date', '<=', endStr)
         );
 
-        getHolidays(db).then(holidayList => {
-            setHolidays(holidayList.map(h => h.date));
-        }).catch(err => console.error("Holidays fetch error:", err));
+        // Realtime listener for holidays directly from server/Firestore
+        const holidaysQuery = query(
+            collection(db, 'holidays'),
+            where('date', '>=', startStr),
+            where('date', '<=', endStr)
+        );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribeHolidays = onSnapshot(holidaysQuery, (snapshot) => {
+            const hDates: string[] = [];
+            const hMap = new Map<string, string>();
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.date) {
+                    hDates.push(data.date);
+                    hMap.set(data.date, data.description || 'ছুটি');
+                }
+            });
+            setHolidays(hDates);
+            setHolidayMap(hMap);
+
+            if (selectedDate) {
+                const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                const desc = hMap.get(dateStr);
+                if (desc) {
+                    setActiveHoliday({ id: dateStr, date: dateStr, description: desc });
+                } else {
+                    setActiveHoliday(undefined);
+                }
+            }
+        }, (err) => {
+            console.error("Holidays realtime fetch error:", err);
+            // Fallback to getHolidays
+            getHolidays(db).then(holidayList => {
+                setHolidays(holidayList.map(h => h.date));
+                const hMap = new Map<string, string>();
+                holidayList.forEach(h => hMap.set(h.date, h.description));
+                setHolidayMap(hMap);
+            }).catch(e => console.error(e));
+        });
+
+        const unsubscribeAttendance = onSnapshot(q, (snapshot) => {
             const records = snapshot.docs.map(doc => doc.data() as DailyAttendance);
             setMonthRecords(records);
 
@@ -232,12 +269,10 @@ const MonthlyAttendanceGrid = ({
             setIsRefreshing(false);
         });
 
-        if (selectedDate) {
-            const dateStr = format(selectedDate, 'yyyy-MM-dd');
-            isHoliday(db, dateStr).then(h => setActiveHoliday(h)).catch(() => {});
-        }
-
-        return () => unsubscribe();
+        return () => {
+            unsubscribeHolidays();
+            unsubscribeAttendance();
+        };
     }, [db, user, classId, selectedYear, selectedDate, monthStart, monthEnd]);
 
 
@@ -517,6 +552,23 @@ const MonthlyAttendanceGrid = ({
                 </div>
             </div>
 
+            {/* সার্ভার থেকে লোড হওয়া ছুটির নোটিশ ব্যানার */}
+            {activeHoliday && (
+                <div className="bg-rose-50 border-2 border-rose-300 text-rose-800 p-3 rounded-xl flex items-center gap-3 no-print animate-in fade-in">
+                    <div className="p-2 bg-rose-100 rounded-lg shrink-0">
+                        <CalendarX className="h-5 w-5 text-rose-600" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-black text-rose-900">
+                            সার্ভার অনুযায়ী এই দিন ছুটি: <span className="underline">{activeHoliday.description}</span>
+                        </p>
+                        <p className="text-[10px] font-bold text-rose-700">
+                            ছুটির দিনে হাজিরা নেওয়া বন্ধ থাকে। প্রয়োজন হলে অন্য তারিখ নির্বাচন করুন।
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="relative group">
             {/* টেবিল ডানে-বামে সরানোর কন্ট্রোলার ও উপরের স্পষ্ট স্ক্রোলবার */}
             <div className="bg-slate-100/90 border-2 border-slate-300 rounded-xl p-2 mb-2 no-print shadow-sm flex items-center gap-2">
@@ -566,17 +618,24 @@ const MonthlyAttendanceGrid = ({
                                 {daysInMonth.map(day => {
                                     const d = getDate(day);
                                     const isSelected = d === activeDay;
+                                    const ds = format(day, 'yyyy-MM-dd');
+                                    const holidayReason = holidayMap.get(ds);
                                     const isOff = isOffDay(day, holidays);
                                     
                                     return (
                                         <TableHead key={d} className={cn(
                                             "w-24 text-center border-r border-black/20 p-0 group/header relative",
                                             isSelected ? "bg-blue-600 text-white z-20" : "bg-slate-100 text-black",
-                                            isOff && !isSelected && "bg-rose-50 text-rose-400"
-                                        )}>
+                                            isOff && !isSelected && "bg-rose-50 text-rose-500"
+                                        )} title={holidayReason ? `ছুটি: ${holidayReason}` : undefined}>
                                             <div className="flex flex-col items-center justify-center h-full py-1">
                                                 <span className="text-base font-black leading-none">{toBengaliNumber(d)}</span>
                                                 <span className="text-[9px] font-bold opacity-70 mt-0.5 uppercase">{format(day, 'EEEE', { locale: bn })}</span>
+                                                {holidayReason && (
+                                                    <span className="text-[8px] font-black bg-rose-100 text-rose-800 px-1 py-0.2 rounded mt-0.5 max-w-[90px] truncate" title={holidayReason}>
+                                                        {holidayReason}
+                                                    </span>
+                                                )}
                                                 
                                                 <div className="flex justify-center items-center gap-1.5 mt-1 transition-opacity no-print">
                                                     {canManageAttendance && (

@@ -8,6 +8,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthProvider } from '@/context/AuthContext';
 import { SchoolInfoProvider } from '@/context/SchoolInfoContext';
 import { AcademicYearProvider } from '@/context/AcademicYearContext';
+import { GlobalAiAssistant } from '@/components/GlobalAiAssistant';
 
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
@@ -49,6 +50,7 @@ export default function RootLayout({
                 </main>
                 <Footer />
                 <BottomNav />
+                <GlobalAiAssistant />
                 <Toaster />
               </AcademicYearProvider>
             </SchoolInfoProvider>

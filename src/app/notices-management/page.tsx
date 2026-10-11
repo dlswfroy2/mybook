@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { addNotice, deleteNotice, updateNoticeScrolling, Notice } from '@/lib/notice-data';
+import { getHolidays, Holiday } from '@/lib/holiday-data';
 import { generateNotice } from '@/ai/flows/generate-notice-flow';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -53,12 +54,19 @@ export default function NoticeManagementPage() {
     const [aiTopic, setAiTopic] = useState('');
     const [isClient, setIsClient] = useState(false);
 
+    const [systemHolidays, setSystemHolidays] = useState<Holiday[]>([]);
     const [newNotice, setNewNotice] = useState({ title: '', content: '', priority: 'normal' as Notice['priority'], pdfUrl: '', isScrolling: true });
     const [printingNotice, setPrintingNotice] = useState<Notice | null>(null);
 
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    // Load server holidays for AI notice generation
+    useEffect(() => {
+        if (!db) return;
+        getHolidays(db).then(setSystemHolidays).catch(() => {});
+    }, [db]);
 
     // Reactive listener for real-time notice list
     useEffect(() => {
@@ -101,6 +109,7 @@ export default function NoticeManagementPage() {
             topic: topicToUse,
             academicYear: selectedYear,
             institutionName: institutionName,
+            holidays: systemHolidays.map(h => ({ date: h.date, description: h.description })),
         });
         setNewNotice(prev => ({
           ...prev,
