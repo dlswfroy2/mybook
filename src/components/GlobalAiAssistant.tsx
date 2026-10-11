@@ -17,7 +17,9 @@ import {
   CheckCircle2, 
   Mic, 
   MicOff, 
-  Printer, 
+  Printer,
+  Compass,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +31,46 @@ import { useFirestore } from '@/firebase';
 import { addNotice } from '@/lib/notice-data';
 import { getStudents, Student } from '@/lib/student-data';
 import { getHolidays, Holiday } from '@/lib/holiday-data';
+import { getStaff, Staff } from '@/lib/staff-data';
 import { usePathname, useRouter } from 'next/navigation';
 import { runUniversalAi, ChatMessage, UniversalAiOutput, LiveSchoolContext } from '@/ai/flows/universal-ai-flow';
 import { useToast } from '@/hooks/use-toast';
+
+// Master Section Routing Map for instant navigation to ALL parts of the application
+export const ALL_SYSTEM_SECTIONS: Array<{ label: string; path: string; keywords: string[] }> = [
+  { label: 'প্রধান ড্যাশবোর্ড', path: '/', keywords: ['হোম', 'হোমপেজ', 'মূল পেজ', 'ড্যাশবোর্ড', 'dashboard', 'home', 'main'] },
+  { label: 'শিক্ষার্থী তালিকা', path: '/student-list', keywords: ['ছাত্র তালিকা', 'শিক্ষার্থী তালিকা', 'ছাত্রদের লিস্ট', 'স্টুডেন্ট লিস্ট', 'student-list', 'esif', 'শিক্ষার্থী মডিউল'] },
+  { label: 'শিক্ষার্থী প্রোফাইল', path: '/student-profile', keywords: ['শিক্ষার্থী তথ্য', 'ছাত্র প্রোফাইল', 'শিক্ষার্থী প্রোফাইল', 'ব্যক্তিগত তথ্য', 'student profile'] },
+  { label: 'নতুন শিক্ষার্থী ভর্তি', path: '/add-student', keywords: ['ভর্তি', 'নতুন ভর্তি', 'নতুন ছাত্র', 'ছাত্র ভর্তি', 'ভর্তি ফরম', 'add student'] },
+  { label: 'ভর্তি আবেদন ব্যবস্থাপনা', path: '/admissions-management', keywords: ['ভর্তি আবেদন', 'অনলাইন আবেদন', 'আবেদন তালিকা', 'admissions-management', 'আবেদন'] },
+  { label: 'দৈনিক হাজিরা শাখা', path: '/attendance', keywords: ['হাজিরা', 'উপস্থিতি', 'উপস্থিতি শাখা', 'attendance', 'হাজিরা খাতা', 'দৈনিক হাজিরা'] },
+  { label: 'ফলাফল ও মার্কশিট শাখা', path: '/results', keywords: ['ফলাফল', 'রেজাল্ট', 'মার্কশিট', 'পরীক্ষার ফলাফল', 'গ্রেড', 'results', 'মেধা তালিকা'] },
+  { label: 'হিসাব শাখা ও ফি', path: '/accounts', keywords: ['হিসাব', 'হিসাব শাখা', 'ফি', 'বেতন', 'আদায়', 'বকেয়া', 'টাকা', 'খরচ', 'ভাউচার', 'accounts'] },
+  { label: 'নোটিশ বোর্ড', path: '/notices-management', keywords: ['নোটিশ', 'নোটিশ বোর্ড', 'ঘোষণা', 'notices', 'বিজ্ঞপ্তি'] },
+  { label: 'মেসেজ শাখা (SMS)', path: '/messaging', keywords: ['মেসেজ', 'এসএমএস', 'বার্তা', 'messaging', 'sms', 'অভিভাবক বার্তা'] },
+  { label: 'স্টাফ ও শিক্ষক পোর্টাল', path: '/staff', keywords: ['শিক্ষক', 'স্টাফ', 'টিচার', 'কর্মচারী', 'staff', 'teachers', 'শিক্ষক তালিকা'] },
+  { label: 'নতুন শিক্ষক যোগ', path: '/add-staff', keywords: ['নতুন শিক্ষক', 'নতুন স্টাফ', 'শিক্ষক যোগ', 'add staff'] },
+  { label: 'ক্লাস রুটিন শাখা', path: '/routines', keywords: ['রুটিন', 'ক্লাস রুটিন', 'সময়সূচী', 'পিরিয়ড', 'routines', 'প্রক্সি'] },
+  { label: 'ডকুমেন্ট পোর্টাল', path: '/documents', keywords: ['ডকুমেন্ট', 'দলিল', 'কাগজপত্র', 'documents', 'সনদ'] },
+  { label: 'ডিজিটাল আর্কাইভ (নথিপত্র)', path: '/documents/archive', keywords: ['আর্কাইভ', 'নথিপত্র', 'ফাইল সংরক্ষণ', 'archive'] },
+  { label: 'আইডি কার্ড তৈরি', path: '/documents/id-card', keywords: ['আইডি কার্ড', 'পরিচয়পত্র', 'id card'] },
+  { label: 'প্রবেশ পত্র (Admit Card)', path: '/documents/admit-card', keywords: ['প্রবেশপত্র', 'প্রবেশ পত্র', 'admit card'] },
+  { label: 'একাডেমিক মার্কশিট প্রিন্ট', path: '/documents/marksheet', keywords: ['মার্কশিট প্রিন্ট', 'নম্বরপত্র', 'marksheet print'] },
+  { label: 'আসন বিন্যাস (Seat Plan)', path: '/documents/seat-plan', keywords: ['আসন বিন্যাস', 'সিট প্ল্যান', 'seat plan'] },
+  { label: 'প্রত্যয়ন পত্র', path: '/documents/testimonial', keywords: ['প্রত্যয়ন', 'প্রত্যয়ন পত্র', 'testimonial'] },
+  { label: 'প্রশংসাপত্র', path: '/documents/appreciation', keywords: ['প্রশংসাপত্র', 'চারিত্রিক সনদ', 'appreciation'] },
+  { label: 'ছাড়পত্র (TC)', path: '/documents/tc', keywords: ['ছাড়পত্র', 'টিসি', 'tc', 'ট্রান্সফার'] },
+  { label: 'প্রতিষ্ঠানের প্যাড', path: '/documents/custom-pad', keywords: ['প্যাড', 'লেটারহেড', 'custom pad'] },
+  { label: 'পাবলিক পরীক্ষার রেকর্ড', path: '/public-exam-records', keywords: ['পাবলিক পরীক্ষা', 'এসএসসি রেকর্ড', 'জেএসসি রেকর্ড', 'বোর্ড পরীক্ষা', 'public exam'] },
+  { label: 'পাবলিক রেজাল্ট পোর্টাল', path: '/public-results', keywords: ['পাবলিক রেজাল্ট', 'অনলাইন রেজাল্ট', 'public results'] },
+  { label: 'টিচার্স ডায়েরি', path: '/diary', keywords: ['ডায়েরি', 'টিচার্স ডায়েরি', 'পাঠ পরিকল্পনা', 'diary'] },
+  { label: 'ডিজিটাল হোয়াইটবোর্ড', path: '/whiteboard', keywords: ['হোয়াইটবোর্ড', 'বোর্ড', 'আঁকাআঁকি', 'whiteboard', 'স্মার্ট বোর্ড'] },
+  { label: 'বোর্ড বই সংগ্রহ', path: '/board-books', keywords: ['বোর্ড বই', 'পাঠ্যবই', 'বই', 'board books'] },
+  { label: 'প্রশ্ন ব্যাংক ও প্রশ্ন তৈরি', path: '/create-question', keywords: ['প্রশ্ন', 'প্রশ্ন তৈরি', 'প্রশ্ন ব্যাংক', 'question bank', 'পরীক্ষার প্রশ্ন'] },
+  { label: 'লেকচার শিট তৈরি', path: '/create-lecture-sheet', keywords: ['শিট তৈরি', 'লেকচার শিট', 'হ্যান্ডআউট', 'lecture sheet'] },
+  { label: 'আমার লাইব্রেরি', path: '/my-questions', keywords: ['লাইব্রেরি', 'আমার লাইব্রেরি', 'সংরক্ষিত প্রশ্ন', 'my library'] },
+  { label: 'সিস্টেম সেটিংস', path: '/settings', keywords: ['সেটিংস', 'কনফিগ', 'নিয়ন্ত্রণ', 'settings', 'ব্যবস্থাপনা'] },
+];
 
 export function GlobalAiAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +79,7 @@ export function GlobalAiAssistant() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'ai',
-      text: 'আসসালামু আলাইকুম! আমি প্রতিষ্ঠানের কেন্দ্রীয় AI সহকারী। আপনি ভয়েস বা লিখে যে কোনো সেকশনের কাজ সম্পন্ন করতে পারেন—যেমন নোটিশ তৈরি, উপস্থিতি, ফি, ছাত্র অনুসন্ধান ইত্যাদি।'
+      text: 'আসসালামু আলাইকুম! আমি প্রতিষ্ঠানের কেন্দ্রীয় AI সহকারী। আপনি যে কোনো প্রশ্ন করতে পারেন, যে কোনো সেকশনে যাওয়ার নির্দেশ দিতে পারেন কিংবা নোটিশ, উপস্থিতি, ছাত্র ও পরীক্ষার হিসাব নিতে পারেন।'
     }
   ]);
   const [loading, setLoading] = useState(false);
@@ -51,6 +90,7 @@ export function GlobalAiAssistant() {
   // Live database caches for intelligent real-time answers
   const [cachedStudents, setCachedStudents] = useState<Student[]>([]);
   const [cachedHolidays, setCachedHolidays] = useState<Holiday[]>([]);
+  const [cachedStaff, setCachedStaff] = useState<Staff[]>([]);
 
   const { selectedYear } = useAcademicYear();
   const { schoolInfo } = useSchoolInfo();
@@ -65,11 +105,12 @@ export function GlobalAiAssistant() {
 
   const institutionName = schoolInfo?.name || 'টপ গ্রেড টিউটোরিয়ালস';
 
-  // Preload students and holidays in background for fast contextual replies
+  // Preload students, staff and holidays in background for fast contextual replies
   useEffect(() => {
     if (!db) return;
     getStudents(db).then(setCachedStudents).catch(() => {});
     getHolidays(db).then(setCachedHolidays).catch(() => {});
+    getStaff(db).then(setCachedStaff).catch(() => {});
   }, [db]);
 
   // Auto scroll to bottom
@@ -147,6 +188,19 @@ export function GlobalAiAssistant() {
     return null;
   }
 
+  // Quick navigation finder based on direct keywords
+  const findDestinationPath = (text: string): { label: string; path: string } | null => {
+    const clean = text.toLowerCase().trim();
+    for (const sec of ALL_SYSTEM_SECTIONS) {
+      for (const kw of sec.keywords) {
+        if (clean === kw || (clean.startsWith('যাও') && clean.includes(kw)) || (clean.includes(kw) && (clean.includes('যাও') || clean.includes('নিয়ে চল') || clean.includes('খোল') || clean.includes('ওপেন')))) {
+          return { label: sec.label, path: sec.path };
+        }
+      }
+    }
+    return null;
+  };
+
   const handleSend = async (customPrompt?: string) => {
     const queryToSend = customPrompt || inputQuery;
     if (!queryToSend.trim() || loading) return;
@@ -158,55 +212,52 @@ export function GlobalAiAssistant() {
     setLastAction(null);
     setLastActionType(null);
 
-    const lowerQuery = queryToSend.trim().toLowerCase();
-    
-    // Quick local navigation fallback for instant zero-latency redirect
-    const quickNavMap: Record<string, string> = {
-      'হোম পেজ': '/',
-      'হোমপেজ': '/',
-      'হোম': '/',
-      'home': '/',
-      'ড্যাশবোর্ড': '/',
-      'নোটিশ বোর্ড': '/notices-management',
-      'নোটিশ': '/notices-management',
-      'হিসাব': '/accounts',
-      'ফি': '/accounts',
-      'ফি সংগ্রহ': '/collect-fee',
-      'হাজিরা': '/attendance',
-      'উপস্থিতি': '/attendance',
-      'উপস্থিতি রিপোর্ট': '/attendance-report',
-      'ছাত্র তালিকা': '/student-list',
-      'রেজাল্ট': '/results',
-      'ফলাফল': '/results',
-      'শিক্ষক': '/staff',
-      'রুটিন': '/routines',
-      'ডকুমেন্টস': '/documents',
-      'বার্তা': '/messaging',
-    };
-
-    if (quickNavMap[lowerQuery]) {
-      const targetPath = quickNavMap[lowerQuery];
+    // 1. Check for instant direct navigation match
+    const directDest = findDestinationPath(queryToSend);
+    if (directDest && !queryToSend.includes('কতটি') && !queryToSend.includes('কী কী')) {
       setMessages(prev => [
         ...prev, 
-        { role: 'ai', text: `আপনাকে সংশ্লিষ্ট পেজে নিয়ে যাওয়া হচ্ছে...` }
+        { role: 'ai', text: `আপনাকে "${directDest.label}"-এ নিয়ে যাওয়া হচ্ছে...` }
       ]);
       setLoading(false);
-      router.push(targetPath);
+      router.push(directDest.path);
       toast({
         title: 'পেজ পরিবর্তন করা হচ্ছে...',
-        description: targetPath,
+        description: directDest.label,
       });
       return;
     }
 
-    // Build live school context snapshot from cached Firestore data
+    // 2. Compute exact class breakdowns from active year cached students
+    const yearStudents = cachedStudents.filter(s => !s.academicYear || s.academicYear === selectedYear);
+    const classCounts: Record<string, number> = { '6': 0, '7': 0, '8': 0, '9': 0, '10': 0 };
+    yearStudents.forEach(s => {
+      const cls = String(s.className || '').trim();
+      if (classCounts[cls] !== undefined) {
+        classCounts[cls]++;
+      } else {
+        classCounts[cls] = (classCounts[cls] || 0) + 1;
+      }
+    });
+
+    // Build rich live school context snapshot from cached Firestore data
     const liveContext: LiveSchoolContext = {
-      totalStudents: cachedStudents.length,
-      studentsSample: cachedStudents.slice(0, 20).map(s => ({
+      totalStudents: yearStudents.length,
+      classCounts,
+      totalStaff: cachedStaff.length,
+      staffSample: cachedStaff.slice(0, 15).map(st => ({
+        name: st.nameBn,
+        designation: st.designation,
+        subject: st.subject,
+        mobile: st.mobile,
+      })),
+      studentsSample: yearStudents.slice(0, 25).map(s => ({
         roll: s.roll,
         className: s.className,
         name: s.studentNameBn,
         mobile: s.guardianMobile || s.studentMobile,
+        gender: s.gender,
+        group: s.group,
       })),
       upcomingHolidays: cachedHolidays.slice(0, 10).map(h => ({
         date: h.date,
@@ -232,7 +283,7 @@ export function GlobalAiAssistant() {
         setLastAction(result.actionData || null);
       }
 
-      // Handle direct page navigation if requested
+      // Handle direct page navigation if requested by AI
       if (result.actionType === 'NAVIGATE' && result.actionData?.path) {
         router.push(result.actionData.path);
         toast({
@@ -244,7 +295,7 @@ export function GlobalAiAssistant() {
       console.error('Universal AI Error:', err);
       setMessages(prev => [
         ...prev, 
-        { role: 'ai', text: 'দুঃখিত, সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।' }
+        { role: 'ai', text: 'দুঃখিত, এআই সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।' }
       ]);
     } finally {
       setLoading(false);
@@ -308,11 +359,12 @@ export function GlobalAiAssistant() {
   };
 
   const quickPrompts = [
-    { label: 'নোটিশ ড্রাফট', query: 'আজকের একটি জরুরি নোটিশের খসড়া তৈরি করো', icon: FileText },
-    { label: 'উপস্থিতি তথ্য', query: 'আজকের শ্রেণিভিত্তিক হাজিরা অবস্থা কেমন?', icon: UserCheck },
+    { label: 'সকল সেকশন', query: 'এখানে মোট কতটি সেকশন আছে বিস্তারিত বলো', icon: Compass },
+    { label: 'নোটিশ ড্রাফট', query: 'জরুরি ছুটির নোটিশের একটি ড্রাফট তৈরি করো', icon: FileText },
+    { label: 'উপস্থিতি তথ্য', query: 'আজকের ক্লাসের হাজিরা অবস্থা কেমন?', icon: UserCheck },
     { label: 'বকেয়া ফি', query: 'ফি আদায় ও বকেয়ার সারাংশ দাও', icon: CreditCard },
     { label: 'ছুটির তালিকা', query: 'এই শিক্ষাবর্ষের পরবর্তী ছুটিগুলো কবে?', icon: Calendar },
-    { label: 'ছাত্র তথ্য', query: 'প্রতিষ্ঠানের মোট কতজন শিক্ষার্থী আছে তাদের তালিকা বা সারসংক্ষেপ দাও', icon: Users },
+    { label: 'শ্রেণিভিত্তিক ছাত্র', query: '৬ষ্ঠ থেকে ১০ম শ্রেণিতে মোট কতজন শিক্ষার্থী আছে?', icon: Users },
   ];
 
   return (
@@ -345,7 +397,7 @@ export function GlobalAiAssistant() {
             className={`flex flex-col bg-white rounded-2xl shadow-2xl border border-indigo-200 overflow-hidden font-kalpurush transition-all duration-300 ${
               isExpanded 
                 ? 'w-[95vw] md:w-[760px] h-[88vh] max-h-[850px]' 
-                : 'w-[92vw] sm:w-[440px] h-[600px] max-h-[86vh]'
+                : 'w-[92vw] sm:w-[460px] h-[620px] max-h-[88vh]'
             }`}
           >
             {/* Header */}
@@ -464,16 +516,63 @@ export function GlobalAiAssistant() {
                 </div>
               )}
 
+              {/* Action Preview Card (For Navigation Action) */}
+              {lastActionType === 'NAVIGATE' && lastAction?.path && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between shadow-sm">
+                  <span className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                    <ArrowRight className="h-4 w-4 text-indigo-600" /> সংশ্লিষ্ট সেকশনে যান: {lastAction.path}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(lastAction.path!)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-7 px-3 font-bold"
+                  >
+                    ওপেন করুন
+                  </Button>
+                </div>
+              )}
+
               {loading && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-indigo-100 rounded-2xl rounded-bl-none p-3.5 shadow-sm flex items-center gap-2 text-indigo-700 font-bold text-xs">
                     <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
-                    <span>AI ডাটাবেজ বিশ্লেষণ ও উত্তর তৈরি করছে...</span>
+                    <span>AI ডাটাবেজ বিশ্লেষণ ও নির্ভুল উত্তর তৈরি করছে...</span>
                   </div>
                 </div>
               )}
 
               <div ref={messagesEndRef} />
+            </div>
+
+            {/* Quick Section Navigator Dropdown Bar */}
+            <div className="px-3 py-1.5 bg-slate-100/80 border-t border-slate-200 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-bold flex items-center gap-1">
+                <Compass className="h-3 w-3 text-indigo-600" /> কুইক জাম্প:
+              </span>
+              <div className="flex gap-1 overflow-x-auto scrollbar-none max-w-[70%]">
+                {[
+                  { label: 'হোম', path: '/' },
+                  { label: 'ছাত্র', path: '/student-list' },
+                  { label: 'হাজিরা', path: '/attendance' },
+                  { label: 'হিসাব', path: '/accounts' },
+                  { label: 'ফলাফল', path: '/results' },
+                  { label: 'রুটিন', path: '/routines' },
+                  { label: 'নোটিশ', path: '/notices-management' },
+                  { label: 'স্টাফ', path: '/staff' },
+                  { label: 'হোয়াইটবোর্ড', path: '/whiteboard' },
+                ].map((s, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      router.push(s.path);
+                      toast({ title: `${s.label} পেজে নিয়ে যাওয়া হচ্ছে...` });
+                    }}
+                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-slate-700 hover:text-indigo-600 hover:border-indigo-400 font-bold whitespace-nowrap text-[10px]"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Input Bar with Bengali Voice Support */}
@@ -492,7 +591,7 @@ export function GlobalAiAssistant() {
               </Button>
 
               <Input
-                placeholder={isListening ? 'শুনছি... মুখে বলুন...' : 'বাংলায় লিখুন বা মুখে বলুন...'}
+                placeholder={isListening ? 'শুনছি... মুখে বলুন...' : 'বাংলায় যেকোনো প্রশ্ন লিখুন বা বলুন...'}
                 value={inputQuery}
                 onChange={e => setInputQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
