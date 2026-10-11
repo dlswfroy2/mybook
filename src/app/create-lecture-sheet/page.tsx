@@ -1059,7 +1059,7 @@ function CreateLectureSheetContent() {
                    ) : (
                      <div className="space-y-2">
                        <label className="text-[10px] font-bold">লোগো আপলোড</label>
-                       <input type="file" min-h-0 ref={watermarkInputRef} className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
+                       <input type="file" ref={watermarkInputRef} className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
                        <Button variant="outline" size="sm" className="w-full h-8 gap-2 border-primary text-primary font-bold text-[10px]" onClick={() => watermarkInputRef.current?.click()}>
                          <Camera className="w-3 h-3" /> ছবি নির্বাচন করুন
                        </Button>
