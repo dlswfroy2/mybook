@@ -55,6 +55,8 @@ import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { subjectNameNormalization } from '@/lib/subjects';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const SUBJECT_ORDER = [
   'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
@@ -833,14 +835,70 @@ function MyLibraryContent() {
             <div><h2 className="text-2xl font-bold">আমার লাইব্রেরি</h2><p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p></div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-secondary/20 p-3 rounded-xl border-2 border-black">
-          <div className="flex items-center gap-2 text-xs font-bold overflow-x-auto whitespace-nowrap pb-1 text-muted-foreground scrollbar-hide">
-            <span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'classes' && "text-primary")} onClick={() => { setViewMode('classes'); setSelectedClass(null); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>লাইব্রেরি</span>
-            {selectedClass && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'subjects' && "text-primary")} onClick={() => { setViewMode('subjects'); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>{CLASSES.find(c => c.id === selectedClass)?.label} শ্রেণি</span></>)}
-            {selectedSubject && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'subjects' && "text-primary")} onClick={() => { setViewMode('subjects'); setSelectedSubject(null); setSelectedChapter(null); setIsSelecting(false); setActiveCategory('all'); setActiveFileType('all'); }}>{selectedSubject}</span></>)}
-            {selectedChapter && (<><ChevronRight className="w-3 h-3 shrink-0" /><span className={cn("cursor-pointer hover:text-primary transition-colors px-1", viewMode === 'content' && "text-primary")} onClick={() => { setViewMode('content'); }}>{selectedChapter}</span></>)}
+        
+        {/* Hierarchical Filter Navigation Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-secondary/20 p-3 rounded-xl border-2 border-black">
+          <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">শ্রেণি:</Label>
+                  <Select 
+                      value={selectedClass || ''} 
+                      onValueChange={(val) => {
+                          setSelectedClass(val);
+                          setViewMode('subjects');
+                          setSelectedSubject(null);
+                          setSelectedChapter(null);
+                          setIsSelecting(false);
+                          setActiveCategory('all');
+                          setActiveFileType('all');
+                      }}
+                  >
+                      <SelectTrigger className="w-32 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
+                      <SelectContent className="font-kalpurush border-2 border-black">
+                          {CLASSES.map(c => <SelectItem key={c.id} value={c.id} className="font-bold">{c.label} শ্রেণি</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">বিষয়:</Label>
+                  <Select 
+                      value={selectedSubject || ''} 
+                      onValueChange={(val) => {
+                          setSelectedSubject(val);
+                          setViewMode('chapters');
+                          setSelectedChapter(null);
+                          setIsSelecting(false);
+                          setActiveCategory('all');
+                          setActiveFileType('all');
+                      }}
+                      disabled={!selectedClass}
+                  >
+                      <SelectTrigger className="w-40 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger>
+                      <SelectContent className="font-kalpurush border-2 border-black">
+                          {currentSubjects.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">অধ্যায়:</Label>
+                  <Select 
+                      value={selectedChapter || ''} 
+                      onValueChange={(val) => {
+                          setSelectedChapter(val);
+                          setViewMode('content');
+                      }}
+                      disabled={!selectedSubject}
+                  >
+                      <SelectTrigger className="w-48 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="অধ্যায় নির্বাচন" /></SelectTrigger>
+                      <SelectContent className="font-kalpurush border-2 border-black">
+                          {currentChapters.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
           </div>
-          <Button variant="outline" size="sm" onClick={handleBack} className="gap-2 font-bold border-black text-primary h-8 self-end sm:self-center bg-white shadow-sm hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-3.5 h-3.5" /> ফিরে যান</Button>
+          <Button variant="outline" size="sm" onClick={handleBack} className="gap-2 font-bold border-black text-primary h-8 shrink-0 bg-white shadow-sm hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-3.5 h-3.5" /> ফিরে যান</Button>
         </div>
       </header>
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">{viewMode === 'classes' && renderClasses()}{viewMode === 'subjects' && renderSubjects()}{viewMode === 'chapters' && renderChapters()}{viewMode === 'content' && renderSubjectContent()}</div>
