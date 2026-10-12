@@ -5,8 +5,6 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import Link from 'next/link';
-import Image from 'next/image';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -1091,7 +1089,7 @@ export default function Home() {
                         <div className="space-y-2">
                             <Label className="font-bold">শ্রেণি</Label>
                             <Select value={quickUploadMeta.classId} onValueChange={(v) => {
-                                setQuickUploadMeta({...quickUploadMeta, classId: v, subject: ''});
+                                setQuickUploadMeta({...quickUploadMeta, classId: v, subject: '', chapter: ''});
                             }}>
                                 <SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -1103,7 +1101,7 @@ export default function Home() {
                         </div>
                         <div className="space-y-2">
                             <Label className="font-bold">বিষয়</Label>
-                            <Select value={quickUploadMeta.subject} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, subject: v})} disabled={!quickUploadMeta.classId}>
+                            <Select value={quickUploadMeta.subject} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, subject: v, chapter: ''})} disabled={!quickUploadMeta.classId}>
                                 <SelectTrigger className="h-11 border-2"><SelectValue placeholder="বিষয়" /></SelectTrigger>
                                 <SelectContent>
                                     {getSubjectsForClass(quickUploadMeta.classId).map(s => (
@@ -1115,12 +1113,23 @@ export default function Home() {
                       </div>
                       <div className="space-y-2">
                           <Label className="font-bold">অধ্যায় (Chapter)</Label>
-                          <Input 
-                            value={quickUploadMeta.chapter} 
-                            onChange={e => setQuickUploadMeta({...quickUploadMeta, chapter: e.target.value})} 
-                            placeholder="যেমন: ৩য় অধ্যায়" 
-                            className="h-11 border-2" 
-                          />
+                          {quickUploadMeta.classId && quickUploadMeta.subject && getChaptersForSubject(quickUploadMeta.classId, quickUploadMeta.subject).length > 0 ? (
+                            <Select value={quickUploadMeta.chapter} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, chapter: v})}>
+                                <SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger>
+                                <SelectContent className="font-kalpurush border-2 border-black">
+                                    {getChaptersForSubject(quickUploadMeta.classId, quickUploadMeta.subject).map(ch => (
+                                        <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input 
+                                value={quickUploadMeta.chapter} 
+                                onChange={e => setQuickUploadMeta({...quickUploadMeta, chapter: e.target.value})} 
+                                placeholder="যেমন: ৩য় অধ্যায়" 
+                                className="h-11 border-2 font-bold" 
+                            />
+                          )}
                       </div>
                       <div className="space-y-2">
                           <Label className="font-bold">ফাইল নির্বাচন করুন (PDF/Word)</Label>
