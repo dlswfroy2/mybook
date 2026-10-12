@@ -44,7 +44,7 @@ import {
   Save
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -459,9 +459,11 @@ export default function Home() {
   const [quickUploadFile, setQuickUploadFile] = useState<File | null>(null);
   const [isQuickUploading, setIsQuickUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
+  const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [quickUploadMeta, setQuickUploadMeta] = useState({
     category: 'lecture_sheet',
-    classId: '6',
+    classId: '',
     subject: '',
     chapter: ''
   });
@@ -667,25 +669,120 @@ export default function Home() {
     }
   };
 
-  const handleQuickPdfUpload = async (e: React.FormEvent) => {
+  // Smart Parsing Logic for Filenames
+  const parseMetadataFromFilename = (filename: string) => {
+    const meta = { ...quickUploadMeta };
+    const name = filename.toLowerCase();
+
+    // 1. Detect Class
+    const classMap: Record<string, string> = {
+        'ষষ্ঠ': '6', 'সপ্তম': '7', 'অষ্টম': '8', 'নবম': '9', 'দশম': '10',
+        '৬ষ্ঠ': '6', '৭ম': '7', '৮ম': '8', '৯ম': '9', '১০ম': '10',
+        '6': '6', '7': '7', '8': '8', '9': '9', '10': '10'
+    };
+    for (const [k, v] of Object.entries(classMap)) {
+        if (name.includes(k)) { meta.classId = v; break; }
+    }
+
+    // 2. Detect Subject
+    const targetClass = meta.classId || '6';
+    const currentSubs = getSubjectsForClass(targetClass);
+    const subjectSynonyms: Record<string, string> = {
+        'পদাথ': 'পদার্থ', 'ভূগোল': 'ভূগোল ও পরিবেশ', 'রসায়ন': 'রসায়ন', 'গণিত': 'গণিত', 'ইংরেজি': 'ইংরেজি প্রথম'
+    };
+    
+    for (const sub of currentSubs) {
+        const norm = (subjectNameNormalization[sub] || sub).toLowerCase();
+        if (name.includes(norm) || name.includes(sub.toLowerCase())) {
+            meta.subject = sub;
+            break;
+        }
+    }
+    if (!meta.subject) {
+        for (const [syn, real] of Object.entries(subjectSynonyms)) {
+            if (name.includes(syn)) { meta.subject = real; break; }
+        }
+    }
+
+    // 3. Detect Category
+    const catMap: Record<string, string> = {
+        'উত্তরমালা': 'answer_key', 'সমাধান': 'answer_key', 'সৃজনশীল': 'creative',
+        'বহুনির্বাচনী': 'mcq', 'mcq': 'mcq', 'মডেল': 'model_test', 'লেকচার': 'lecture_sheet'
+    };
+    for (const [k, v] of Object.entries(catMap)) {
+        if (name.includes(k)) { meta.category = v; break; }
+    }
+
+    // 4. Detect Chapter
+    if (meta.subject) {
+        const chaps = getChaptersForSubject(targetClass, meta.subject);
+        for (const ch of chaps) {
+            if (name.includes(ch.toLowerCase()) || name.includes(getNormalizedKey(ch))) {
+                meta.chapter = ch;
+                break;
+            }
+        }
+        if (!meta.chapter) {
+            const ordinalMap: Record<string, string> = { 'প্রথম': '১ম', 'দ্বিতীয়': '২য়', 'তৃতীয়': '৩য়', 'চতুথ': '৪র্থ', 'চতুর্থ': '৪র্থ' };
+            for (const [k, v] of Object.entries(ordinalMap)) {
+                if (name.includes(k)) { meta.chapter = `${v} অধ্যায়`; break; }
+            }
+        }
+    }
+
+    return meta;
+  };
+
+  const handleQuickPdfUpload = async (e: React.FormEvent, isConfirmed = false) => {
     e.preventDefault();
-    if (!db || !user || !quickUploadFile || !quickUploadMeta.classId || !quickUploadMeta.subject) {
-        toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'শ্রেণি, বিষয় ও ফাইল নিশ্চিত করুন।' });
+    if (!db || !user || !quickUploadFile) {
+        toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'ফাইল নিশ্চিত করুন।' });
         return;
+    }
+
+    let finalMeta = { ...quickUploadMeta };
+    if (!finalMeta.classId || !finalMeta.subject) {
+        finalMeta = parseMetadataFromFilename(quickUploadFile.name);
+    }
+
+    if (!finalMeta.classId || !finalMeta.subject) {
+        toast({ variant: 'destructive', title: 'অসম্পূর্ণ সিলেকশন', description: 'সিস্টেম শ্রেণি বা বিষয় শনাক্ত করতে পারেনি। অনুগ্রহ করে ম্যানুয়ালি সিলেক্ট করুন।' });
+        return;
+    }
+
+    // Duplicate Check
+    if (!isConfirmed) {
+        const q = query(
+            collection(db, 'pdf-sheets'),
+            where('fileName', '==', quickUploadFile.name),
+            where('classId', '==', finalMeta.classId),
+            where('subject', '==', finalMeta.subject)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            setIsConfirmingReplace(true);
+            setDuplicateId(snap.docs[0].id);
+            toast({ variant: 'destructive', title: 'ফাইলটি ইতিমধ্যে আছে', description: 'রিপ্লেস করতে এন্টার (Enter) চাপুন।' });
+            return;
+        }
     }
 
     setIsQuickUploading(true);
     setUploadProgress(10);
 
     try {
+        if (isConfirmed && duplicateId) {
+            await deleteDoc(doc(db, 'pdf-sheets', duplicateId));
+        }
+
         const base64String = await fileToBase64(quickUploadFile);
         setUploadProgress(60);
 
         const sheetData = {
-            category: quickUploadMeta.category,
-            classId: quickUploadMeta.classId,
-            subject: quickUploadMeta.subject,
-            chapterName: quickUploadMeta.chapter || 'সাধারণ',
+            category: finalMeta.category,
+            classId: finalMeta.classId,
+            subject: finalMeta.subject,
+            chapterName: finalMeta.chapter || 'সাধারণ',
             fileName: quickUploadFile.name,
             pdfUrl: base64String, 
             uploadedAt: serverTimestamp(),
@@ -697,7 +794,8 @@ export default function Home() {
         toast({ title: "সফল", description: "ফাইলটি সফলভাবে লাইব্রেরিতে সংরক্ষিত হয়েছে।" });
         setIsQuickUploadOpen(false);
         setQuickUploadFile(null);
-        setQuickUploadMeta({ category: 'lecture_sheet', classId: '6', subject: '', chapter: '' });
+        setIsConfirmingReplace(false);
+        setDuplicateId(null);
     } catch (e: any) {
         toast({ variant: "destructive", title: "ত্রুটি", description: e.message });
     } finally {
@@ -705,241 +803,10 @@ export default function Home() {
     }
   };
 
-  const handleAiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-        setAiImage(evt.target?.result as string);
-        setAiResult(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAiAction = async () => {
-    if (!aiImage && !aiRawText.trim()) {
-        toast({ variant: 'destructive', title: 'তথ্য দিন', description: 'ছবি, PDF বা টেক্সট নির্দেশনা দিন।' });
-        return;
+  const handleKeyDownInUpload = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && isConfirmingReplace) {
+        handleQuickPdfUpload(e as any, true);
     }
-    setAiProcessing(true);
-    setAiResult(null);
-    try {
-        const res = await runMultiTaskAi({ 
-            photoDataUri: aiImage || undefined, 
-            rawText: aiRawText.trim() || undefined,
-            taskType: aiTask,
-            academicYear: selectedYear
-        });
-        if (res.error) {
-            toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
-        } else {
-            const rawDates: string[] = Array.isArray(res.dates) && res.dates.length > 0
-                ? res.dates
-                : (res.date ? [res.date] : []);
-
-            const extraDates: string[] = Array.isArray(res.attendanceByDate)
-                ? res.attendanceByDate.map((d: any) => d.date).filter(Boolean)
-                : [];
-
-            const allDatesSet = new Set<string>([...rawDates, ...extraDates]);
-            const detectedDates: string[] = Array.from(allDatesSet).sort();
-
-            if (detectedDates.length > 0) {
-                setSelectedAiDate(detectedDates[0]);
-                setApplyToAllDates(detectedDates.length > 1);
-            } else {
-                setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
-                setApplyToAllDates(false);
-            }
-
-            let rawClass = res.className ? getNormalizedKey(String(res.className)) : null;
-            let finalClass = (rawClass && ['6', '7', '8', '9', '10'].includes(rawClass)) ? rawClass : null;
-            let autoResolved = false;
-
-            if (!finalClass) {
-                const studentsList = res.students || (res.presentRolls ? res.presentRolls.map((r: number) => ({ roll: r })) : []);
-                const { resolvedClass } = matchStudentsAndResolveClass(studentsList, studentsForYear);
-                if (resolvedClass) {
-                    finalClass = resolvedClass;
-                    autoResolved = true;
-                } else {
-                    finalClass = selectedAiClass || '6';
-                }
-            }
-            setSelectedAiClass(String(finalClass));
-            setAiResult({ ...res, dates: detectedDates, resolvedClass: finalClass, autoResolved });
-            toast({ title: 'প্রসেসিং সম্পন্ন হয়েছে' });
-        }
-    } catch (e: any) {
-        console.error("AI Action error:", e);
-        const errMsg = e?.message || 'এআই কাজ করতে পারছে না।';
-        toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি', description: errMsg });
-    } finally {
-        setAiProcessing(false);
-    }
-  };
-
-  const applyAiData = async () => {
-      if (!aiResult) return;
-      
-      if (aiTask === 'attendance') {
-          let allMergedDates: string[] = [];
-          if (Array.isArray(aiResult.dates) && aiResult.dates.length > 0) {
-              allMergedDates = [...aiResult.dates];
-          }
-          if (Array.isArray(aiResult.attendanceByDate)) {
-              aiResult.attendanceByDate.forEach((d: any) => {
-                  if (d.date && !allMergedDates.includes(d.date)) {
-                      allMergedDates.push(d.date);
-                  }
-              });
-          }
-          allMergedDates = Array.from(new Set(allMergedDates)).sort();
-
-          const datesToApply: string[] = (applyToAllDates && allMergedDates.length > 0)
-              ? allMergedDates
-              : [selectedAiDate || aiResult.date || format(new Date(), 'yyyy-MM-dd')];
-
-          setIsSavingQuickAttendance(true);
-          try {
-              let totalSavedBatches = 0;
-              const classesToProcess: Array<{ className: string; presentRolls?: number[]; absentRolls?: number[]; students?: any[] }> = [];
-
-              if (Array.isArray(aiResult.classesAttendance) && aiResult.classesAttendance.length > 0) {
-                  aiResult.classesAttendance.forEach((ca: any) => {
-                      if (ca.className) {
-                          classesToProcess.push(ca);
-                      }
-                  });
-              }
-
-              if (classesToProcess.length === 0) {
-                  const rawTarget = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
-                  const normalizedTarget = getNormalizedKey(String(rawTarget));
-                  const targetClass = ['6', '7', '8', '9', '10'].includes(normalizedTarget) ? normalizedTarget : '6';
-                  classesToProcess.push({
-                      className: targetClass,
-                      presentRolls: aiResult.presentRolls,
-                      absentRolls: aiResult.absentRolls,
-                      students: aiResult.students
-                  });
-              }
-
-              for (const classItem of classesToProcess) {
-                  const rawClass = getNormalizedKey(String(classItem.className));
-                  const currentClass = ['6', '7', '8', '9', '10'].includes(rawClass) ? rawClass : String(classItem.className);
-
-                  for (const targetDate of datesToApply) {
-                      let dateAcademicYear = selectedYear;
-                      if (Array.isArray(aiResult.attendanceByDate)) {
-                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
-                          if (dateObj?.year) {
-                              dateAcademicYear = String(dateObj.year);
-                          }
-                      }
-                      if (!dateAcademicYear && targetDate) {
-                          const parsedYear = targetDate.split('-')[0];
-                          if (parsedYear && parsedYear.length === 4) {
-                              dateAcademicYear = parsedYear;
-                          }
-                      }
-
-                      let studentsForThisBatch = (studentsForYear || []).filter(
-                          (s: Student) => String(s.className) === currentClass && (!dateAcademicYear || s.academicYear === dateAcademicYear)
-                      );
-
-                      if (studentsForThisBatch.length === 0) {
-                          const qSnap = await getDocs(query(
-                              collection(db!, 'students'),
-                              where('className', '==', currentClass),
-                              where('academicYear', '==', dateAcademicYear)
-                          ));
-                          studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
-                      }
-
-                      if (studentsForThisBatch.length === 0) {
-                          const fallbackSnap = await getDocs(query(
-                              collection(db!, 'students'),
-                              where('className', '==', currentClass)
-                          ));
-                          studentsForThisBatch = fallbackSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
-                          if (studentsForThisBatch.length > 0 && studentsForThisBatch[0].academicYear) {
-                              dateAcademicYear = studentsForThisBatch[0].academicYear;
-                          }
-                      }
-
-                      if (studentsForThisBatch.length === 0) continue;
-
-                      let presentRollsForDate: number[] = [];
-                      if (Array.isArray(aiResult.attendanceByDate)) {
-                          const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
-                          if (dateObj?.presentRolls) {
-                              presentRollsForDate = dateObj.presentRolls.map(Number);
-                          }
-                      }
-                      if (presentRollsForDate.length === 0) {
-                          if (Array.isArray(classItem.presentRolls)) {
-                              presentRollsForDate = classItem.presentRolls.map(Number);
-                          } else if (Array.isArray(classItem.students)) {
-                              presentRollsForDate = classItem.students
-                                  .filter((s: any) => s.status === 'present')
-                                  .map((s: any) => Number(s.roll));
-                          }
-                      }
-
-                      const attendanceData: StudentAttendance[] = studentsForThisBatch.map((student: Student) => ({
-                          studentId: student.id,
-                          status: (student.roll !== undefined && presentRollsForDate.includes(Number(student.roll))) ? 'present' : 'absent'
-                      }));
-
-                      const dailyAttendance: DailyAttendance = {
-                          date: targetDate,
-                          academicYear: dateAcademicYear,
-                          className: currentClass,
-                          attendance: attendanceData,
-                      };
-
-                      await saveDailyAttendance(db!, dailyAttendance);
-                      totalSavedBatches++;
-                  }
-              }
-
-              if (totalSavedBatches > 0) {
-                  const classSummary = classesToProcess.map(c => `${classNamesMap[c.className] || c.className} শ্রেণি`).join(', ');
-                  toast({
-                      title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে!',
-                      description: `${classSummary} এর হাজিরা নির্দিষ্ট তারিখ অনুযায়ী ডাটাবেজে যুক্ত হয়েছে।`
-                  });
-                  refreshDashboardAttendance(studentsForYear);
-                  setIsAiPortalOpen(false);
-              } else {
-                  toast({
-                      variant: 'destructive',
-                      title: 'হাজিরা সেভ করা যায়নি',
-                      description: 'কোনো শ্রেণির শিক্ষার্থী মেলানো যায়নি।'
-                  });
-              }
-          } catch (err) {
-              console.error("Error applying AI attendance:", err);
-              toast({ variant: 'destructive', title: 'হাজিরা সংরক্ষণ করতে সমস্যা হয়েছে' });
-          } finally {
-              setIsSavingQuickAttendance(false);
-          }
-      } else if (aiTask === 'fees' && aiResult.collections?.[0]) {
-          const col = aiResult.collections[0];
-          const roll = col.roll;
-          setQuickSearchInput(String(roll));
-          setIsAiPortalOpen(false);
-          setIsQuickPaymentOpen(true);
-      } else if (aiTask === 'results' && aiResult.results) {
-          toast({ title: 'ফলাফল ডাটা শনাক্ত হয়েছে', description: 'ফলাফল পাতায় গিয়ে সেভ করুন।' });
-          setIsAiPortalOpen(false);
-          router.push('/results');
-      } else if (aiTask === 'admission' && aiResult.student) {
-          toast({ title: 'ভর্তি ফরম শনাক্ত হয়েছে' });
-          setIsAiPortalOpen(false);
-          router.push('/add-student');
-      }
   };
 
   const presentPercentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : "০";
@@ -977,11 +844,6 @@ export default function Home() {
                    item.category === 'answer_key' ? 'answerKey' :
                    item.category === 'model_test' ? 'modelTest' : null;
       if (type) aggregate(item.classId, item.subject, item.chapterName || '', type);
-    });
-
-    allQuestions?.forEach(item => {
-      const type = item.examType === 'model_test' ? 'modelTest' : (item.isMcq ? 'mcq' : 'creative');
-      aggregate(item.classId, item.subject, item.chapter || '', type);
     });
 
     allQuestions?.forEach(item => {
@@ -1106,20 +968,23 @@ export default function Home() {
               </DialogContent>
           </Dialog>
 
-          <Dialog open={isQuickUploadOpen} onOpenChange={setIsQuickUploadOpen}>
+          <Dialog open={isQuickUploadOpen} onOpenChange={(o) => { setIsQuickUploadOpen(o); if(!o) setIsConfirmingReplace(false); }}>
               <DialogTrigger asChild>
                   <Button className="h-12 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[6px] border-orange-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
                       <FileUp className="h-5 w-5" /> কুইক আপলোড
                   </Button>
               </DialogTrigger>
-              <DialogContent className="font-kalpurush sm:max-w-md">
+              <DialogContent className={cn("font-kalpurush sm:max-w-md", isConfirmingReplace && "border-rose-500 ring-4 ring-rose-100")} onKeyDown={handleKeyDownInUpload}>
                   <DialogHeader>
-                      <DialogTitle className="text-xl font-black text-orange-700 flex items-center gap-2">
-                          <FileUp /> কুইক আপলোড (PDF/Word)
+                      <DialogTitle className={cn("text-xl font-black flex items-center gap-2", isConfirmingReplace ? "text-rose-700" : "text-orange-700")}>
+                          {isConfirmingReplace ? <AlertCircle /> : <FileUp />}
+                          {isConfirmingReplace ? "ফাইল রিপ্লেস নিশ্চিত করুন" : "কুইক আপলোড (PDF/Word)"}
                       </DialogTitle>
-                      <DialogDescription className="font-bold">লাইব্রেরিতে সরাসরি PDF বা Word ফাইল আপলোড করুন</DialogDescription>
+                      <DialogDescription className={cn("font-bold", isConfirmingReplace && "text-rose-600")}>
+                          {isConfirmingReplace ? "এই নামে একটি ফাইল অলরেডি আছে। রিপ্লেস করতে এন্টার চাপুন।" : "লাইব্রেরিতে সরাসরি PDF বা Word ফাইল আপলোড করুন"}
+                      </DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleQuickPdfUpload} className="space-y-4 py-4">
+                  <form onSubmit={(e) => handleQuickPdfUpload(e)} className="space-y-4 py-4">
                       <div className="space-y-2">
                           <Label className="font-bold">ক্যাটাগরি</Label>
                           <Select value={quickUploadMeta.category} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, category: v})}>
@@ -1139,7 +1004,7 @@ export default function Home() {
                             <Select value={quickUploadMeta.classId} onValueChange={(v) => {
                                 setQuickUploadMeta({...quickUploadMeta, classId: v, subject: '', chapter: ''});
                             }}>
-                                <SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-11 border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
                                 <SelectContent>
                                     {Object.entries(classNamesMap).map(([id, label]) => (
                                         <SelectItem key={id} value={id}>{label} শ্রেণি</SelectItem>
@@ -1152,7 +1017,7 @@ export default function Home() {
                             <Select value={quickUploadMeta.subject} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, subject: v, chapter: ''})} disabled={!quickUploadMeta.classId}>
                                 <SelectTrigger className="h-11 border-2"><SelectValue placeholder="বিষয়" /></SelectTrigger>
                                 <SelectContent>
-                                    {getSubjectsForClass(quickUploadMeta.classId).map(s => (
+                                    {getSubjectsForClass(quickUploadMeta.classId || '6').map(s => (
                                         <SelectItem key={s} value={s}>{s}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -1194,7 +1059,7 @@ export default function Home() {
                                 </>
                             )}
                           </div>
-                          <input type="file" ref={quickUploadInputRef} className="hidden" accept=".pdf,.doc,.docx" onChange={e => setQuickUploadFile(e.target.files?.[0] || null)} />
+                          <input type="file" ref={quickUploadInputRef} className="hidden" accept=".pdf,.doc,.docx" onChange={e => { setQuickUploadFile(e.target.files?.[0] || null); setIsConfirmingReplace(false); }} />
                       </div>
                       {isQuickUploading && (
                         <div className="space-y-1">
@@ -1202,8 +1067,9 @@ export default function Home() {
                             <p className="text-[10px] text-right font-black text-orange-600">{toBengaliNumber(uploadProgress)}%</p>
                         </div>
                       )}
-                      <Button type="submit" disabled={isQuickUploading || !quickUploadFile} className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black text-lg shadow-lg">
-                        {isQuickUploading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} সেভ করুন
+                      <Button type="submit" disabled={isQuickUploading || !quickUploadFile} className={cn("w-full h-12 text-white font-black text-lg shadow-lg", isConfirmingReplace ? "bg-rose-600 hover:bg-rose-700" : "bg-orange-600 hover:bg-orange-700")}>
+                        {isQuickUploading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} 
+                        {isConfirmingReplace ? 'হ্যাঁ, রিপ্লেস করুন' : 'সেভ করুন'}
                       </Button>
                   </form>
               </DialogContent>
@@ -1916,4 +1782,3 @@ export default function Home() {
     </div>
   );
 }
-
