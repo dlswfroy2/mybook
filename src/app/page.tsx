@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -101,6 +102,47 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.onerror = error => reject(error);
   });
 };
+
+async function processImage(file: File): Promise<string> {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('ফাইল সাইজ ৫ মেগাবাইটের বেশি হতে পারবে না।');
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxSide = 400;
+
+        if (width > height) {
+          if (width > maxSide) {
+            height *= maxSide / width;
+            width = maxSide;
+          }
+        } else {
+          if (height > maxSide) {
+            width *= maxSide / height;
+            height = maxSide;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => reject(new Error('ছবি লোড করা সম্ভব হয়নি।'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('ফাইল পড়া সম্ভব হয়নি।'));
+    reader.readAsDataURL(file);
+  });
+}
 
 const GalleryCard = () => {
     const db = useFirestore();
@@ -341,7 +383,7 @@ function matchStudentsAndResolveClass(
     const candidateMatches = allStudents.filter(s => Number(s.roll) === Number(item.roll));
     if (candidateMatches.length === 1) {
       const s = candidateMatches[0];
-      classScores[s.className] = (classCounts[s.className] || 0) + 2;
+      classScores[s.className] = (classScores[s.className] || 0) + 2;
       matchedMap.set(Number(item.roll), s);
     } else if (candidateMatches.length > 1) {
       const cleanedItemName = (item.name || '').replace(/[\s\.\-_]/g, '');
@@ -935,6 +977,11 @@ export default function Home() {
                    item.category === 'answer_key' ? 'answerKey' :
                    item.category === 'model_test' ? 'modelTest' : null;
       if (type) aggregate(item.classId, item.subject, item.chapterName || '', type);
+    });
+
+    allQuestions?.forEach(item => {
+      const type = item.examType === 'model_test' ? 'modelTest' : (item.isMcq ? 'mcq' : 'creative');
+      aggregate(item.classId, item.subject, item.chapter || '', type);
     });
 
     allQuestions?.forEach(item => {
@@ -1869,3 +1916,4 @@ export default function Home() {
     </div>
   );
 }
+
