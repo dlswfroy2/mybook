@@ -1013,6 +1013,12 @@ export default function Home() {
               </DialogContent>
           </Dialog>
 
+          <Link href="/results">
+              <Button className="h-12 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[6px] border-orange-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
+                  <FileUp className="h-5 w-5" /> কুইক আপলোড
+              </Button>
+          </Link>
+
           <Dialog open={isAiPortalOpen} onOpenChange={setIsAiPortalOpen}>
               <DialogTrigger asChild>
                   <Button className="h-12 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 border-b-[6px] border-indigo-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
@@ -1100,7 +1106,7 @@ export default function Home() {
 
                                   {aiResult.actionPlan && (
                                       <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200">
-                                          <p className="text-[10px] font-black text-indigo-800 uppercase tracking-wider mb-1">অ্যাকশন প্ল্যান (কোথায় কিভাবে কার কাছে যুক্ত হবে)</p>
+                                          <p className="text-[10px] font-black text-indigo-800 uppercase tracking-wider mb-1">অ্যাকশন প্ল্যান (কোথায় কীভাবে কার কাছে যুক্ত হবে)</p>
                                           <p className="text-sm font-bold text-indigo-950">{aiResult.actionPlan}</p>
                                       </div>
                                   )}
