@@ -610,21 +610,27 @@ function MyLibraryContent() {
     <div className="space-y-10">
       <section className="space-y-4">
         <h3 className="text-sm font-black text-primary flex items-center gap-2 border-b-2 border-black pb-2 uppercase tracking-wider"><PlusCircle className="w-4 h-4" /> নতুন তৈরি করুন ({selectedChapter})</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex flex-wrap gap-3">
           <Link href={`/create-lecture-sheet?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&topic=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}`}>
-            <Card className="hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-t-2 border-r-2 border-black cursor-pointer bg-orange-50/30">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center text-white group-hover:scale-110 transition-transform"><FilePlus className="w-6 h-6" /></div>
-                <div><h4 className="font-black text-orange-700">লেকচার শিট</h4><p className="text-[10px] font-bold text-muted-foreground">এই অধ্যায়ের নোট তৈরি করুন</p></div>
+            <Card className="w-fit hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-2 border-black border-b-[6px] border-b-orange-800 active:translate-y-1 cursor-pointer bg-orange-50/30 rounded-2xl">
+              <CardContent className="p-2.5 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-white group-hover:scale-105 transition-transform"><FilePlus className="w-4 h-4" /></div>
+                <div className="pr-4">
+                  <p className="font-black text-orange-700 text-xs">লেকচার শিট</p>
+                  <p className="text-[9px] font-bold text-muted-foreground">এই অধ্যায়ের নোট তৈরি করুন</p>
+                </div>
               </CardContent>
             </Card>
           </Link>
           <Dialog>
             <DialogTrigger asChild>
-              <Card className="hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-t-2 border-r-2 border-black cursor-pointer bg-blue-50/30">
-                <CardContent className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-white group-hover:scale-110 transition-transform"><BrainCircuit className="w-6 h-6" /></div>
-                  <div><h4 className="font-black text-primary">প্রশ্নপত্র</h4><p className="text-[10px] font-bold text-muted-foreground">এই অধ্যায়ের প্রশ্ন তৈরি করুন</p></div>
+              <Card className="w-fit hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-2 border-black border-b-[6px] border-b-primary/40 active:translate-y-1 cursor-pointer bg-blue-50/30 rounded-2xl">
+                <CardContent className="p-2.5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white group-hover:scale-105 transition-transform"><BrainCircuit className="w-4 h-4" /></div>
+                  <div className="pr-4">
+                    <p className="font-black text-primary text-xs">প্রশ্নপত্র</p>
+                    <p className="text-[9px] font-bold text-muted-foreground">এই অধ্যায়ের প্রশ্ন তৈরি করুন</p>
+                  </div>
                 </CardContent>
               </Card>
             </DialogTrigger>
