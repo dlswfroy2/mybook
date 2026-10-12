@@ -413,7 +413,7 @@ export default function Home() {
   const [applyToAllDates, setApplyToAllDates] = useState<boolean>(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Quick PDF Upload States
+  // Quick PDF/Word Upload States
   const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
   const [quickUploadFile, setQuickUploadFile] = useState<File | null>(null);
   const [isQuickUploading, setIsQuickUploading] = useState(false);
@@ -653,7 +653,7 @@ export default function Home() {
 
         await addDoc(collection(db, 'pdf-sheets'), sheetData);
         setUploadProgress(100);
-        toast({ title: "সফল", description: "পিডিএফ ফাইলটি সফলভাবে লাইব্রেরিতে সংরক্ষিত হয়েছে।" });
+        toast({ title: "সফল", description: "ফাইলটি সফলভাবে লাইব্রেরিতে সংরক্ষিত হয়েছে।" });
         setIsQuickUploadOpen(false);
         setQuickUploadFile(null);
         setQuickUploadMeta({ category: 'lecture_sheet', classId: '6', subject: '', chapter: '' });
@@ -1069,9 +1069,9 @@ export default function Home() {
               <DialogContent className="font-kalpurush sm:max-w-md">
                   <DialogHeader>
                       <DialogTitle className="text-xl font-black text-orange-700 flex items-center gap-2">
-                          <FileUp /> কুইক পিডিএফ আপলোড
+                          <FileUp /> কুইক আপলোড (PDF/Word)
                       </DialogTitle>
-                      <DialogDescription className="font-bold">লাইব্রেরিতে সরাসরি PDF ফাইল আপলোড করুন</DialogDescription>
+                      <DialogDescription className="font-bold">লাইব্রেরিতে সরাসরি PDF বা Word ফাইল আপলোড করুন</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleQuickPdfUpload} className="space-y-4 py-4">
                       <div className="space-y-2">
@@ -1123,7 +1123,7 @@ export default function Home() {
                           />
                       </div>
                       <div className="space-y-2">
-                          <Label className="font-bold">ফাইল নির্বাচন করুন (PDF Only)</Label>
+                          <Label className="font-bold">ফাইল নির্বাচন করুন (PDF/Word)</Label>
                           <div 
                             onClick={() => !isQuickUploading && quickUploadInputRef.current?.click()}
                             className="h-24 border-2 border-dashed border-orange-300 rounded-xl bg-orange-50/30 flex flex-col items-center justify-center cursor-pointer hover:bg-orange-50 transition-all"
@@ -1133,11 +1133,11 @@ export default function Home() {
                             ) : (
                                 <>
                                     <FileType className="h-6 w-6 text-orange-400 mb-1" />
-                                    <span className="text-[10px] font-bold text-orange-700">ক্লিক করে PDF ফাইল বেছে নিন</span>
+                                    <span className="text-[10px] font-bold text-orange-700">ক্লিক করে PDF বা Word ফাইল বেছে নিন</span>
                                 </>
                             )}
                           </div>
-                          <input type="file" ref={quickUploadInputRef} className="hidden" accept=".pdf" onChange={e => setQuickUploadFile(e.target.files?.[0] || null)} />
+                          <input type="file" ref={quickUploadInputRef} className="hidden" accept=".pdf,.doc,.docx" onChange={e => setQuickUploadFile(e.target.files?.[0] || null)} />
                       </div>
                       {isQuickUploading && (
                         <div className="space-y-1">
@@ -1859,4 +1859,3 @@ export default function Home() {
     </div>
   );
 }
-
