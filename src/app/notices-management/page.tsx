@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-    Trash2, Plus, Loader2, Bell, Printer, FileText, ExternalLink, Sparkles, AlertCircle, RefreshCw, CheckCircle2, ArrowLeft
+    Trash2, Plus, Loader2, Bell, Printer, FileText, ExternalLink, Sparkles, AlertCircle, RefreshCw, CheckCircle2, ArrowLeft, FilePen
 } from 'lucide-react';
 import { format } from "date-fns";
 import { bn } from 'date-fns/locale';
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore, useUser, useDoc } from '@/firebase';
 import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc } from 'firebase/firestore';
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { addNotice, deleteNotice, updateNoticeScrolling, Notice } from '@/lib/notice-data';
+import { addNotice, deleteNotice, updateNoticeScrolling, updateNotice, Notice } from '@/lib/notice-data';
 import { getHolidays, Holiday } from '@/lib/holiday-data';
 import { generateNotice } from '@/ai/flows/generate-notice-flow';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,7 @@ export default function NoticeManagementPage() {
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiTopic, setAiTopic] = useState('');
     const [isClient, setIsClient] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const [systemHolidays, setSystemHolidays] = useState<Holiday[]>([]);
     const [newNotice, setNewNotice] = useState({ title: '', content: '', priority: 'normal' as Notice['priority'], pdfUrl: '', isScrolling: true });
@@ -99,6 +100,7 @@ export default function NoticeManagementPage() {
     const handleAiGenerate = async (customTopic?: string) => {
       const topicToUse = (typeof customTopic === 'string' && customTopic.trim()) ? customTopic : aiTopic;
       if (!topicToUse.trim()) {
+        const { toast } = await import("@/hooks/use-toast");
         toast({ variant: 'destructive', title: 'বিষয় লিখুন', description: 'AI দিয়ে ড্রাফট করতে একটি বিষয় লিখুন বা নিচের বাটন চাপুন।' });
         return;
       }
@@ -116,20 +118,23 @@ export default function NoticeManagementPage() {
           title: result.title,
           content: result.content
         }));
+        const { toast } = await import("@/hooks/use-toast");
         toast({ 
             title: 'AI ড্রাফট তৈরি হয়েছে', 
             description: `${toBengaliNumber(selectedYear)} শিক্ষাবর্ষ অনুযায়ী নোটিশ তৈরি হয়েছে।` 
         });
         setAiTopic('');
       } catch (error) {
+        const { toast } = await import("@/hooks/use-toast");
         toast({ variant: 'destructive', title: 'AI ত্রুটি', description: 'AI দিয়ে নোটিশ তৈরি করা সম্ভব হয়নি।' });
       } finally {
         setIsAiLoading(false);
       }
     };
 
-    const handleAddNotice = () => {
+    const handleAddNotice = async () => {
         if (!db || !user) return;
+        const { toast } = await import("@/hooks/use-toast");
         if (!newNotice.title.trim() || !newNotice.content.trim()) {
             toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'শিরোনাম এবং বিষয়বস্তু উভয়ই লিখুন।' });
             return;
@@ -138,17 +143,29 @@ export default function NoticeManagementPage() {
         const senderName = user.displayName || user.email || 'কর্তৃপক্ষ';
 
         try {
-            addNotice(db, {
-                title: newNotice.title,
-                content: newNotice.content,
-                priority: newNotice.priority,
-                senderName: senderName,
-                pdfUrl: newNotice.pdfUrl.trim() || undefined,
-                isScrolling: !!newNotice.isScrolling
-            });
+            if (editingId) {
+                await updateNotice(db, editingId, {
+                    title: newNotice.title,
+                    content: newNotice.content,
+                    priority: newNotice.priority,
+                    pdfUrl: newNotice.pdfUrl.trim() || undefined,
+                    isScrolling: !!newNotice.isScrolling
+                });
+                toast({ title: 'নোটিশ আপডেট হয়েছে' });
+            } else {
+                await addNotice(db, {
+                    title: newNotice.title,
+                    content: newNotice.content,
+                    priority: newNotice.priority,
+                    senderName: senderName,
+                    pdfUrl: newNotice.pdfUrl.trim() || undefined,
+                    isScrolling: !!newNotice.isScrolling
+                });
+                toast({ title: 'নোটিশ প্রকাশিত হয়েছে' });
+            }
             
-            toast({ title: 'নোটিশ প্রকাশিত হয়েছে' });
             setIsAddOpen(false);
+            setEditingId(null);
             setNewNotice({ title: '', content: '', priority: 'normal', pdfUrl: '', isScrolling: true });
         } catch (e: any) {
             console.error("Notice Submit Error:", e);
@@ -156,16 +173,32 @@ export default function NoticeManagementPage() {
         }
     };
 
+    const handleEdit = (notice: Notice) => {
+        setEditingId(notice.id);
+        setNewNotice({
+            title: notice.title,
+            content: notice.content,
+            priority: notice.priority,
+            pdfUrl: notice.pdfUrl || '',
+            isScrolling: !!notice.isScrolling
+        });
+        setIsAddOpen(true);
+    };
+
     const handleToggleScrolling = (id: string, currentStatus: boolean) => {
         if (!db) return;
         updateNoticeScrolling(db, id, !currentStatus);
-        toast({ title: 'স্ক্রল স্ট্যাটাস পরিবর্তন হয়েছে' });
+        const { toast } = import("@/hooks/use-toast").then(({ toast }) => {
+            toast({ title: 'স্ক্রল স্ট্যাটাস পরিবর্তন হয়েছে' });
+        });
     };
 
     const handleDelete = (id: string) => {
         if (!db) return;
         deleteNotice(db, id);
-        toast({ title: 'নোটিশ মুছে ফেলা হয়েছে' });
+        const { toast } = import("@/hooks/use-toast").then(({ toast }) => {
+            toast({ title: 'নোটিশ মুছে ফেলা হয়েছে' });
+        });
     };
 
     const handlePrint = (notice: Notice) => {
@@ -221,6 +254,8 @@ export default function NoticeManagementPage() {
                     <Button 
                         type="button"
                         onClick={() => {
+                            setEditingId(null);
+                            setNewNotice({ title: '', content: '', priority: 'normal', pdfUrl: '', isScrolling: true });
                             setIsAddOpen(true);
                             setTimeout(() => {
                                 const aiInput = document.getElementById('ai-notice-input');
@@ -232,7 +267,13 @@ export default function NoticeManagementPage() {
                         <Sparkles className="h-5 w-5" /> এআই নোটিশ তৈরি
                     </Button>
 
-                    <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                    <Dialog open={isAddOpen} onOpenChange={(open) => {
+                        setIsAddOpen(open);
+                        if (!open) {
+                            setEditingId(null);
+                            setNewNotice({ title: '', content: '', priority: 'normal', pdfUrl: '', isScrolling: true });
+                        }
+                    }}>
                         <DialogTrigger asChild>
                             <Button className="font-black h-11 px-6 shadow-md text-sm bg-primary hover:bg-primary/90 text-white rounded-xl border-b-[4px] border-primary/40">
                                 <Plus className="mr-1.5 h-5 w-5" /> নতুন নোটিশ প্রকাশ
@@ -241,7 +282,7 @@ export default function NoticeManagementPage() {
                     <DialogContent className="sm:max-w-[650px] font-kalpurush">
                         <DialogHeader>
                             <DialogTitle className="text-xl font-black text-primary flex items-center gap-2">
-                                <Bell className="h-5 w-5" /> নতুন নোটিশ তৈরি করুন
+                                <Bell className="h-5 w-5" /> {editingId ? 'নোটিশ সংশোধন করুন' : 'নতুন নোটিশ তৈরি করুন'}
                             </DialogTitle>
                             <DialogDescription className="text-xs font-bold text-muted-foreground">
                                 প্রয়োজনীয় তথ্য পূরণ করে নোটিশ প্রকাশ করুন অথবা AI-এর সহায়তা নিন।
@@ -396,7 +437,7 @@ export default function NoticeManagementPage() {
                                 <Button variant="outline" className="font-bold text-xs">বাতিল</Button>
                             </DialogClose>
                             <Button onClick={handleAddNotice} className="bg-primary hover:bg-primary/90 font-black text-xs">
-                                <CheckCircle2 className="w-4 h-4 mr-1" /> নোটিশ প্রকাশ করুন
+                                <CheckCircle2 className="w-4 h-4 mr-1" /> {editingId ? 'আপডেট করুন' : 'নোটিশ প্রকাশ করুন'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -433,7 +474,7 @@ export default function NoticeManagementPage() {
                                         <TableHead className="w-[90px]">গুরুত্ব</TableHead>
                                         <TableHead>শিরোনাম ও বিবরণ</TableHead>
                                         <TableHead className="w-[110px] text-center">স্ক্রলিং</TableHead>
-                                        <TableHead className="w-[140px] text-right">অ্যাকশন</TableHead>
+                                        <TableHead className="w-[180px] text-right">অ্যাকশন</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -475,10 +516,20 @@ export default function NoticeManagementPage() {
                                                         variant="outline" 
                                                         size="sm" 
                                                         onClick={() => handlePrint(n)}
-                                                        className="h-8 px-2.5 font-bold text-xs text-slate-700 hover:bg-slate-100"
+                                                        className="h-8 px-2.5 bg-white border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs"
                                                         title="প্রিন্ট করুন"
                                                     >
                                                         <Printer className="h-3.5 w-3.5 mr-1" /> প্রিন্ট
+                                                    </Button>
+
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={() => handleEdit(n)}
+                                                        className="h-8 px-2.5 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-xs"
+                                                        title="এডিট করুন"
+                                                    >
+                                                        <FilePen className="h-3.5 w-3.5 mr-1" /> এডিট
                                                     </Button>
 
                                                     <AlertDialog>

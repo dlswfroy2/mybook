@@ -91,6 +91,29 @@ export const addNotice = (db: Firestore, noticeData: NewNoticeData) => {
     });
 };
 
+/**
+ * Updates an existing notice.
+ */
+export const updateNotice = (db: Firestore, id: string, noticeData: Partial<NewNoticeData>) => {
+  const docRef = doc(db, NOTICES_COLLECTION, id);
+  const dataToUpdate = {
+    ...noticeData,
+    updatedAt: serverTimestamp(),
+  };
+  
+  return updateDoc(docRef, dataToUpdate)
+    .catch(async (serverError: any) => {
+      if (serverError.code === 'permission-denied') {
+          const permissionError = new FirestorePermissionError({
+              path: docRef.path,
+              operation: 'update',
+              requestResourceData: dataToUpdate,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
+      }
+    });
+};
+
 export const updateNoticeScrolling = (db: Firestore, id: string, isScrolling: boolean) => {
   const docRef = doc(db, NOTICES_COLLECTION, id);
   const dataToUpdate = { isScrolling, updatedAt: serverTimestamp() };
