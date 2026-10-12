@@ -74,6 +74,7 @@ import { useToast } from '@/hooks/use-toast';
 import { subjectNameNormalization } from '@/lib/subjects';
 import { runMultiTaskAi } from '@/ai/flows/multi-task-ai-flow';
 import { Textarea } from '@/components/ui/textarea';
+import { DashboardAnalyticsCharts } from '@/components/dashboard/DashboardAnalyticsCharts';
 
 const classNamesMap: Record<string, string> = {
   '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
@@ -651,17 +652,19 @@ export default function Home() {
                 setApplyToAllDates(false);
             }
 
-            // Auto-resolve class by matching student names and rolls from database
-            let finalClass = res.className;
+            // Auto-resolve class by checking res.className first, normalizing, then matching students
+            let rawClass = res.className ? getNormalizedKey(String(res.className)) : null;
+            let finalClass = (rawClass && ['6', '7', '8', '9', '10'].includes(rawClass)) ? rawClass : null;
             let autoResolved = false;
-            if (!finalClass || finalClass === 'unknown' || !['6', '7', '8', '9', '10'].includes(String(finalClass))) {
+
+            if (!finalClass) {
                 const studentsList = res.students || (res.presentRolls ? res.presentRolls.map((r: number) => ({ roll: r })) : []);
                 const { resolvedClass } = matchStudentsAndResolveClass(studentsList, studentsForYear);
                 if (resolvedClass) {
                     finalClass = resolvedClass;
                     autoResolved = true;
                 } else {
-                    finalClass = '6';
+                    finalClass = selectedAiClass || '6';
                 }
             }
             setSelectedAiClass(String(finalClass));
@@ -718,7 +721,9 @@ export default function Home() {
 
               // Fallback to single target class
               if (classesToProcess.length === 0) {
-                  const targetClass = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  const rawTarget = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
+                  const normalizedTarget = getNormalizedKey(String(rawTarget));
+                  const targetClass = ['6', '7', '8', '9', '10'].includes(normalizedTarget) ? normalizedTarget : '6';
                   classesToProcess.push({
                       className: targetClass,
                       presentRolls: aiResult.presentRolls,
@@ -728,7 +733,8 @@ export default function Home() {
               }
 
               for (const classItem of classesToProcess) {
-                  const currentClass = String(classItem.className);
+                  const rawClass = getNormalizedKey(String(classItem.className));
+                  const currentClass = ['6', '7', '8', '9', '10'].includes(rawClass) ? rawClass : String(classItem.className);
 
                   for (const targetDate of datesToApply) {
                       // Determine target academic year for this date
@@ -748,16 +754,30 @@ export default function Home() {
 
                       // Fetch students for currentClass and dateAcademicYear
                       let studentsForThisBatch = (studentsForYear || []).filter(
-                          (s: Student) => String(s.className) === currentClass && s.academicYear === dateAcademicYear
+                          (s: Student) => String(s.className) === currentClass && (!dateAcademicYear || s.academicYear === dateAcademicYear)
                       );
 
                       if (studentsForThisBatch.length === 0) {
+                          // Try querying database for currentClass and dateAcademicYear
                           const qSnap = await getDocs(query(
                               collection(db!, 'students'),
                               where('className', '==', currentClass),
                               where('academicYear', '==', dateAcademicYear)
                           ));
                           studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                      }
+
+                      // Fallback: If still not found (e.g. students were registered under 2025 or selectedYear), query ANY students in this class
+                      if (studentsForThisBatch.length === 0) {
+                          const fallbackSnap = await getDocs(query(
+                              collection(db!, 'students'),
+                              where('className', '==', currentClass)
+                          ));
+                          studentsForThisBatch = fallbackSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
+                          // If we find students in the fallback, inherit their actual academicYear if our date didn't have a specific year
+                          if (studentsForThisBatch.length > 0 && studentsForThisBatch[0].academicYear) {
+                              dateAcademicYear = studentsForThisBatch[0].academicYear;
+                          }
                       }
 
                       if (studentsForThisBatch.length === 0) continue;
@@ -1333,6 +1353,12 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modern Interactive Analytics Charts */}
+      <DashboardAnalyticsCharts 
+        students={studentsForYear} 
+        academicYear={selectedYear} 
+      />
 
       <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5 md:gap-2">
         <Link href="/create-question" className="block w-full">

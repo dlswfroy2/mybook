@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import Tesseract from 'tesseract.js';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
+import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
 
 type Question = {
   id: string;
@@ -132,6 +133,65 @@ function CreateQuestionContent() {
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const ocrInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Question Generation States
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiType, setAiType] = useState<'creative' | 'short' | 'mcq' | 'mixed'>('creative');
+  const [aiCount, setAiCount] = useState<number>(3);
+  const [aiTopic, setAiTopic] = useState('');
+
+  const handleGenerateAiQuestions = async () => {
+    if (!meta.classId || !meta.subject) {
+      toast({
+        variant: 'destructive',
+        title: 'অসম্পূর্ণ তথ্য',
+        description: 'দয়া করে শ্রেণি এবং বিষয় নির্বাচন করুন।',
+      });
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const result = await generatePracticeQuestions({
+        classId: meta.classId,
+        subject: meta.subject,
+        chapter: meta.chapter ? `${meta.chapter}${aiTopic ? ` - ${aiTopic}` : ''}` : aiTopic,
+        type: aiType,
+        count: aiCount,
+        institutionName: meta.institution,
+      });
+
+      if (!result.questions || result.questions.length === 0) {
+        throw new Error('কোনো প্রশ্ন জেনারেট হয়নি।');
+      }
+
+      const newGeneratedList: Question[] = result.questions.map((q) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        type: q.type,
+        content: q.formattedText,
+        imageUrl: '',
+        isFromBank: false,
+        section: meta.currentSection,
+      }));
+
+      setQuestions((prev) => [...prev, ...newGeneratedList]);
+      setAiModalOpen(false);
+      toast({
+        title: 'প্রশ্নপত্র প্রস্তুত! 🎉',
+        description: `সফলভাবে ${result.questions.length}টি প্রশ্ন বোর্ডে যুক্ত করা হয়েছে।`,
+      });
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'ব্যর্থ হয়েছে',
+        description: err.message || 'প্রশ্ন তৈরি করা যায়নি। পুনরায় চেষ্টা করুন।',
+      });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   useEffect(() => {
     if (!editId && source !== 'merge') {
@@ -244,8 +304,101 @@ function CreateQuestionContent() {
             </Card>
           </TabsContent>
         </Tabs>
+
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b pb-2"><h3 className="text-lg font-bold">প্রশ্নসমূহ ({toBengaliNumber(questions.length)})</h3><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleAddQuestion('creative')} className="border-primary text-primary font-bold"><Plus className="w-3 h-3" /> সৃজনশীল</Button><Button variant="outline" size="sm" onClick={() => handleAddQuestion('short')} className="border-accent text-accent font-bold"><Plus className="w-3 h-3" /> সংক্ষিপ্ত</Button><Button variant="outline" size="sm" onClick={() => handleAddQuestion('mcq')} className="border-orange-500 text-orange-600 font-bold"><Plus className="w-3 h-3" /> বহুনির্বাচনি</Button></div></div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-3 gap-3">
+            <h3 className="text-lg font-bold">প্রশ্নসমূহ ({toBengaliNumber(questions.length)})</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => setAiModalOpen(true)}
+                className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs h-9 shadow-md"
+              >
+                <BrainCircuit className="w-4 h-4 mr-1.5 text-amber-300 animate-pulse" /> AI দিয়ে প্রশ্ন তৈরি করুন
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleAddQuestion('creative')} className="border-primary text-primary font-bold">
+                <Plus className="w-3 h-3 mr-1" /> সৃজনশীল
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleAddQuestion('short')} className="border-accent text-accent font-bold">
+                <Plus className="w-3 h-3 mr-1" /> সংক্ষিপ্ত
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleAddQuestion('mcq')} className="border-orange-500 text-orange-600 font-bold">
+                <Plus className="w-3 h-3 mr-1" /> বহুনির্বাচনি
+              </Button>
+            </div>
+          </div>
+
+          {/* AI Question Generator Dialog */}
+          <Dialog open={aiModalOpen} onOpenChange={setAiModalOpen}>
+            <DialogContent className="font-kalpurush max-w-md bg-white border-2 border-indigo-200">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-900">
+                  <BrainCircuit className="h-5 w-5 text-indigo-600" /> AI প্রশ্নপত্র জেনারেটর
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-xs text-slate-600 font-bold">
+                  বোর্ড পরীক্ষার সিলেবাস অনুযায়ী স্বয়ংক্রিয়ভাবে মানসম্পন্ন প্রশ্ন তৈরি হবে।
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">প্রশ্নের ধরণ</label>
+                  <Select value={aiType} onValueChange={(v: any) => setAiType(v)}>
+                    <SelectTrigger className="h-9 font-bold text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="creative">সৃজনশীল প্রশ্ন (উদ্দীপক + ক, খ, গ, ঘ)</SelectItem>
+                      <SelectItem value="mcq">বহুনির্বাচনি (MCQ + ৪টি অপশন)</SelectItem>
+                      <SelectItem value="short">সংক্ষিপ্ত ও জ্ঞানমূলক প্রশ্ন</SelectItem>
+                      <SelectItem value="mixed">মিশ্রিত প্রশ্ন (সৃজনশীল ও MCQ)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">প্রশ্নের সংখ্যা</label>
+                  <Select value={String(aiCount)} onValueChange={(v) => setAiCount(Number(v))}>
+                    <SelectTrigger className="h-9 font-bold text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">১টি প্রশ্ন</SelectItem>
+                      <SelectItem value="2">২টি প্রশ্ন</SelectItem>
+                      <SelectItem value="3">৩টি প্রশ্ন (স্ট্যান্ডার্ড)</SelectItem>
+                      <SelectItem value="5">৫টি প্রশ্ন</SelectItem>
+                      <SelectItem value="10">১০টি প্রশ্ন</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">নির্দিষ্ট টপিক বা বিষয়বস্তু (ঐচ্ছিক)</label>
+                  <Input
+                    placeholder="যেমন: বল ও গতির সমীকরণ, সালোকসংশ্লেষণ..."
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    className="h-9 text-xs font-bold"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" size="sm" onClick={() => setAiModalOpen(false)}>
+                  বাতিল
+                </Button>
+                <Button
+                  onClick={handleGenerateAiQuestions}
+                  disabled={aiGenerating}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs"
+                >
+                  {aiGenerating ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> তৈরি হচ্ছে...
+                    </>
+                  ) : (
+                    'প্রশ্ন তৈরি করুন'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {questions.map((q, idx) => (
             <Card key={q.id} className={cn("relative border-l-4 animate-in slide-in-from-right-2 duration-300", q.type === 'mcq' ? 'border-l-orange-500' : q.type === 'short' ? 'border-l-accent' : 'border-l-primary')}>
               <div className="absolute top-2 right-2 no-print flex gap-1"><Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => setQuestions(prev => prev.filter(item => item.id !== q.id))}><Trash2 className="w-4 h-4" /></Button></div>
