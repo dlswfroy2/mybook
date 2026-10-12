@@ -41,10 +41,11 @@ import {
   Camera,
   FileSearch,
   RefreshCw,
-  FileType
+  FileType,
+  Save
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,16 +75,32 @@ import { useToast } from '@/hooks/use-toast';
 import { subjectNameNormalization } from '@/lib/subjects';
 import { runMultiTaskAi } from '@/ai/flows/multi-task-ai-flow';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import { DashboardAnalyticsCharts } from '@/components/dashboard/DashboardAnalyticsCharts';
 
 const classNamesMap: Record<string, string> = {
   '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
 };
 
+const toBengaliNumber = (n: number | string | undefined | null): string => {
+  if (n === undefined || n === null || n === '') return '০';
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
+};
+
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
     return (subjectNameNormalization[trimmed] || trimmed).toLowerCase();
+};
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
 };
 
 const GalleryCard = () => {
@@ -164,12 +181,6 @@ const GalleryCard = () => {
         </Card>
     );
 };
-
-function toBengaliNumber(n: number | string | undefined | null): string {
-  if (n === undefined || n === null || n === '') return '০';
-  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
-}
 
 function chunkArray<T>(array: T[], size: number): T[][] {
   if (array.length === 0) return [];
@@ -402,6 +413,19 @@ export default function Home() {
   const [applyToAllDates, setApplyToAllDates] = useState<boolean>(false);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Quick PDF Upload States
+  const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
+  const [quickUploadFile, setQuickUploadFile] = useState<File | null>(null);
+  const [isQuickUploading, setIsQuickUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [quickUploadMeta, setQuickUploadMeta] = useState({
+    category: 'lecture_sheet',
+    classId: '6',
+    subject: '',
+    chapter: ''
+  });
+  const quickUploadInputRef = useRef<HTMLInputElement>(null);
+
   const refreshDashboardAttendance = useCallback(async (currentStudents?: Student[]) => {
       if (!db) return;
       const list = currentStudents && currentStudents.length > 0 ? currentStudents : studentsForYear;
@@ -602,6 +626,44 @@ export default function Home() {
     }
   };
 
+  const handleQuickPdfUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!db || !user || !quickUploadFile || !quickUploadMeta.classId || !quickUploadMeta.subject) {
+        toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'শ্রেণি, বিষয় ও ফাইল নিশ্চিত করুন।' });
+        return;
+    }
+
+    setIsQuickUploading(true);
+    setUploadProgress(10);
+
+    try {
+        const base64String = await fileToBase64(quickUploadFile);
+        setUploadProgress(60);
+
+        const sheetData = {
+            category: quickUploadMeta.category,
+            classId: quickUploadMeta.classId,
+            subject: quickUploadMeta.subject,
+            chapterName: quickUploadMeta.chapter || 'সাধারণ',
+            fileName: quickUploadFile.name,
+            pdfUrl: base64String, 
+            uploadedAt: serverTimestamp(),
+            userId: user.uid
+        };
+
+        await addDoc(collection(db, 'pdf-sheets'), sheetData);
+        setUploadProgress(100);
+        toast({ title: "সফল", description: "পিডিএফ ফাইলটি সফলভাবে লাইব্রেরিতে সংরক্ষিত হয়েছে।" });
+        setIsQuickUploadOpen(false);
+        setQuickUploadFile(null);
+        setQuickUploadMeta({ category: 'lecture_sheet', classId: '6', subject: '', chapter: '' });
+    } catch (e: any) {
+        toast({ variant: "destructive", title: "ত্রুটি", description: e.message });
+    } finally {
+        setIsQuickUploading(false);
+    }
+  };
+
   const handleAiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -630,17 +692,14 @@ export default function Home() {
         if (res.error) {
             toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: res.error });
         } else {
-            // Process dates — merge top-level dates[] AND attendanceByDate[].date
             const rawDates: string[] = Array.isArray(res.dates) && res.dates.length > 0
                 ? res.dates
                 : (res.date ? [res.date] : []);
 
-            // Also pull any dates from attendanceByDate that may not be in dates[]
             const extraDates: string[] = Array.isArray(res.attendanceByDate)
                 ? res.attendanceByDate.map((d: any) => d.date).filter(Boolean)
                 : [];
 
-            // Merge and deduplicate, sorted chronologically
             const allDatesSet = new Set<string>([...rawDates, ...extraDates]);
             const detectedDates: string[] = Array.from(allDatesSet).sort();
 
@@ -652,7 +711,6 @@ export default function Home() {
                 setApplyToAllDates(false);
             }
 
-            // Auto-resolve class by checking res.className first, normalizing, then matching students
             let rawClass = res.className ? getNormalizedKey(String(res.className)) : null;
             let finalClass = (rawClass && ['6', '7', '8', '9', '10'].includes(rawClass)) ? rawClass : null;
             let autoResolved = false;
@@ -684,13 +742,10 @@ export default function Home() {
       if (!aiResult) return;
       
       if (aiTask === 'attendance') {
-          // Build a comprehensive list of all dates to save
-          // Priority: if user checked "apply to all" → use all merged dates; else single selected date
           let allMergedDates: string[] = [];
           if (Array.isArray(aiResult.dates) && aiResult.dates.length > 0) {
               allMergedDates = [...aiResult.dates];
           }
-          // Also include any dates from attendanceByDate that may not be in dates[]
           if (Array.isArray(aiResult.attendanceByDate)) {
               aiResult.attendanceByDate.forEach((d: any) => {
                   if (d.date && !allMergedDates.includes(d.date)) {
@@ -707,8 +762,6 @@ export default function Home() {
           setIsSavingQuickAttendance(true);
           try {
               let totalSavedBatches = 0;
-
-              // Check if AI extracted attendance for multiple classes
               const classesToProcess: Array<{ className: string; presentRolls?: number[]; absentRolls?: number[]; students?: any[] }> = [];
 
               if (Array.isArray(aiResult.classesAttendance) && aiResult.classesAttendance.length > 0) {
@@ -719,7 +772,6 @@ export default function Home() {
                   });
               }
 
-              // Fallback to single target class
               if (classesToProcess.length === 0) {
                   const rawTarget = selectedAiClass || aiResult.resolvedClass || aiResult.className || '6';
                   const normalizedTarget = getNormalizedKey(String(rawTarget));
@@ -737,7 +789,6 @@ export default function Home() {
                   const currentClass = ['6', '7', '8', '9', '10'].includes(rawClass) ? rawClass : String(classItem.className);
 
                   for (const targetDate of datesToApply) {
-                      // Determine target academic year for this date
                       let dateAcademicYear = selectedYear;
                       if (Array.isArray(aiResult.attendanceByDate)) {
                           const dateObj = aiResult.attendanceByDate.find((d: any) => d.date === targetDate);
@@ -752,13 +803,11 @@ export default function Home() {
                           }
                       }
 
-                      // Fetch students for currentClass and dateAcademicYear
                       let studentsForThisBatch = (studentsForYear || []).filter(
                           (s: Student) => String(s.className) === currentClass && (!dateAcademicYear || s.academicYear === dateAcademicYear)
                       );
 
                       if (studentsForThisBatch.length === 0) {
-                          // Try querying database for currentClass and dateAcademicYear
                           const qSnap = await getDocs(query(
                               collection(db!, 'students'),
                               where('className', '==', currentClass),
@@ -767,14 +816,12 @@ export default function Home() {
                           studentsForThisBatch = qSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
                       }
 
-                      // Fallback: If still not found (e.g. students were registered under 2025 or selectedYear), query ANY students in this class
                       if (studentsForThisBatch.length === 0) {
                           const fallbackSnap = await getDocs(query(
                               collection(db!, 'students'),
                               where('className', '==', currentClass)
                           ));
                           studentsForThisBatch = fallbackSnap.docs.map((docSnap: QueryDocumentSnapshot) => ({ id: docSnap.id, ...docSnap.data() } as Student));
-                          // If we find students in the fallback, inherit their actual academicYear if our date didn't have a specific year
                           if (studentsForThisBatch.length > 0 && studentsForThisBatch[0].academicYear) {
                               dateAcademicYear = studentsForThisBatch[0].academicYear;
                           }
@@ -1013,11 +1060,97 @@ export default function Home() {
               </DialogContent>
           </Dialog>
 
-          <Link href="/results">
-              <Button className="h-12 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[6px] border-orange-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                  <FileUp className="h-5 w-5" /> কুইক আপলোড
-              </Button>
-          </Link>
+          <Dialog open={isQuickUploadOpen} onOpenChange={setIsQuickUploadOpen}>
+              <DialogTrigger asChild>
+                  <Button className="h-12 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[6px] border-orange-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
+                      <FileUp className="h-5 w-5" /> কুইক আপলোড
+                  </Button>
+              </DialogTrigger>
+              <DialogContent className="font-kalpurush sm:max-w-md">
+                  <DialogHeader>
+                      <DialogTitle className="text-xl font-black text-orange-700 flex items-center gap-2">
+                          <FileUp /> কুইক পিডিএফ আপলোড
+                      </DialogTitle>
+                      <DialogDescription className="font-bold">লাইব্রেরিতে সরাসরি PDF ফাইল আপলোড করুন</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleQuickPdfUpload} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                          <Label className="font-bold">ক্যাটাগরি</Label>
+                          <Select value={quickUploadMeta.category} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, category: v})}>
+                            <SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger>
+                            <SelectContent className="font-kalpurush">
+                                <SelectItem value="lecture_sheet">লেকচার শিট</SelectItem>
+                                <SelectItem value="creative">সৃজনশীল প্রশ্ন</SelectItem>
+                                <SelectItem value="mcq">বহুনির্বাচনী প্রশ্ন</SelectItem>
+                                <SelectItem value="model_test">মডেল টেস্ট</SelectItem>
+                                <SelectItem value="answer_key">উত্তরমালা</SelectItem>
+                            </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label className="font-bold">শ্রেণি</Label>
+                            <Select value={quickUploadMeta.classId} onValueChange={(v) => {
+                                setQuickUploadMeta({...quickUploadMeta, classId: v, subject: ''});
+                            }}>
+                                <SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(classNamesMap).map(([id, label]) => (
+                                        <SelectItem key={id} value={id}>{label} শ্রেণি</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="font-bold">বিষয়</Label>
+                            <Select value={quickUploadMeta.subject} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, subject: v})} disabled={!quickUploadMeta.classId}>
+                                <SelectTrigger className="h-11 border-2"><SelectValue placeholder="বিষয়" /></SelectTrigger>
+                                <SelectContent>
+                                    {getSubjectsForClass(quickUploadMeta.classId).map(s => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="font-bold">অধ্যায় (Chapter)</Label>
+                          <Input 
+                            value={quickUploadMeta.chapter} 
+                            onChange={e => setQuickUploadMeta({...quickUploadMeta, chapter: e.target.value})} 
+                            placeholder="যেমন: ৩য় অধ্যায়" 
+                            className="h-11 border-2" 
+                          />
+                      </div>
+                      <div className="space-y-2">
+                          <Label className="font-bold">ফাইল নির্বাচন করুন (PDF Only)</Label>
+                          <div 
+                            onClick={() => !isQuickUploading && quickUploadInputRef.current?.click()}
+                            className="h-24 border-2 border-dashed border-orange-300 rounded-xl bg-orange-50/30 flex flex-col items-center justify-center cursor-pointer hover:bg-orange-50 transition-all"
+                          >
+                            {quickUploadFile ? (
+                                <p className="text-xs font-black text-orange-800 px-4 text-center truncate w-full">{quickUploadFile.name}</p>
+                            ) : (
+                                <>
+                                    <FileType className="h-6 w-6 text-orange-400 mb-1" />
+                                    <span className="text-[10px] font-bold text-orange-700">ক্লিক করে PDF ফাইল বেছে নিন</span>
+                                </>
+                            )}
+                          </div>
+                          <input type="file" ref={quickUploadInputRef} className="hidden" accept=".pdf" onChange={e => setQuickUploadFile(e.target.files?.[0] || null)} />
+                      </div>
+                      {isQuickUploading && (
+                        <div className="space-y-1">
+                            <Progress value={uploadProgress} className="h-1.5" />
+                            <p className="text-[10px] text-right font-black text-orange-600">{toBengaliNumber(uploadProgress)}%</p>
+                        </div>
+                      )}
+                      <Button type="submit" disabled={isQuickUploading || !quickUploadFile} className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-black text-lg shadow-lg">
+                        {isQuickUploading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} সেভ করুন
+                      </Button>
+                  </form>
+              </DialogContent>
+          </Dialog>
 
           <Dialog open={isAiPortalOpen} onOpenChange={setIsAiPortalOpen}>
               <DialogTrigger asChild>
@@ -1111,7 +1244,6 @@ export default function Home() {
                                       </div>
                                   )}
 
-                                  {/* Date and Class Selector Bar */}
                                   <div className="p-3.5 bg-white rounded-xl border-2 border-emerald-200/80 shadow-sm space-y-3">
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                                           <div className="space-y-1">
@@ -1149,13 +1281,11 @@ export default function Home() {
                                           </div>
                                       </div>
 
-                                      {/* Detected Multiple Dates Display */}
                                       {Array.isArray(aiResult.dates) && aiResult.dates.length > 0 && (() => {
-                                          // Group by year-month for cleaner display
                                           const byMonth: Record<string, string[]> = {};
                                           aiResult.dates.forEach((dStr: string) => {
                                               const parts = dStr.split('-');
-                                              const ym = parts.slice(0, 2).join('-'); // "YYYY-MM"
+                                              const ym = parts.slice(0, 2).join('-'); 
                                               if (!byMonth[ym]) byMonth[ym] = [];
                                               byMonth[ym].push(dStr);
                                           });
@@ -1251,13 +1381,6 @@ export default function Home() {
                                           </div>
                                       </div>
                                   )}
-
-                                  <details className="text-xs font-mono bg-white p-3 rounded-lg border">
-                                      <summary className="font-black text-slate-600 cursor-pointer text-xs mb-2">বিস্তারিত র JSON ডেটা দেখুন</summary>
-                                      <pre className="whitespace-pre-wrap overflow-y-auto max-h-[160px] text-[11px] text-slate-700">
-                                          {JSON.stringify(aiResult, null, 2)}
-                                      </pre>
-                                  </details>
 
                                   <div className="mt-4 flex justify-end">
                                       <Button onClick={applyAiData} disabled={isSavingQuickAttendance} className="bg-emerald-600 hover:bg-emerald-700 font-black px-8 h-12 shadow-lg gap-2 text-base">
@@ -1360,7 +1483,6 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Modern Interactive Analytics Charts */}
       <DashboardAnalyticsCharts 
         students={studentsForYear} 
         academicYear={selectedYear} 
@@ -1737,3 +1859,4 @@ export default function Home() {
     </div>
   );
 }
+
