@@ -48,6 +48,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Notice } from '@/lib/notice-data';
@@ -340,7 +341,7 @@ function matchStudentsAndResolveClass(
     const candidateMatches = allStudents.filter(s => Number(s.roll) === Number(item.roll));
     if (candidateMatches.length === 1) {
       const s = candidateMatches[0];
-      classScores[s.className] = (classScores[s.className] || 0) + 2;
+      classScores[s.className] = (classCounts[s.className] || 0) + 2;
       matchedMap.set(Number(item.roll), s);
     } else if (candidateMatches.length > 1) {
       const cleanedItemName = (item.name || '').replace(/[\s\.\-_]/g, '');

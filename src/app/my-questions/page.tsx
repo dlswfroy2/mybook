@@ -57,6 +57,8 @@ import { cn } from '@/lib/utils';
 import { subjectNameNormalization } from '@/lib/subjects';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 
 const SUBJECT_ORDER = [
   'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
@@ -334,14 +336,19 @@ function MyLibraryContent() {
 
   const combinedItems = useMemo(() => {
     const all = [
-      ...currentItemsRaw.sheets.map(i => ({ 
-        ...i, 
-        source: 'lecture-sheets' as const, 
-        displayTitle: i.topic || 'শিরোনামহীন শিট',
-        saveName: i.topic || '-',
-        fileType: 'EDITOR' as const 
-      })),
+      ...currentItemsRaw.sheets.map(i => {
+        const date = i.updatedAt?.toDate?.() || new Date(0);
+        return { 
+          ...i, 
+          source: 'lecture-sheets' as const, 
+          displayTitle: i.topic || 'শিরোনামহীন শিট',
+          saveName: (i.topic || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
+          fileType: 'EDITOR' as const,
+          date
+        };
+      }),
       ...currentItemsRaw.pdfSheets.map(i => {
+        const date = i.uploadedAt?.toDate?.() || new Date(0);
         const url = (i.pdfUrl || '').toLowerCase();
         const fName = (i.fileName || '').toLowerCase();
         const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
@@ -350,22 +357,25 @@ function MyLibraryContent() {
           ...i, 
           source: 'pdf-sheets' as const, 
           displayTitle: `${i.chapterName} - ${i.subject}`,
-          saveName: i.fileName || '-',
-          fileType: ft
+          saveName: (i.fileName || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
+          fileType: ft,
+          date
         };
       }),
-      ...currentItemsRaw.questions.map(i => ({ 
-        ...i, 
-        source: 'questions' as const, 
-        displayTitle: `${i.exam || 'পরীক্ষা'} - ${i.chapter || 'অধ্যায় নেই'}`,
-        saveName: i.exam || '-',
-        fileType: 'EDITOR' as const 
-      }))
+      ...currentItemsRaw.questions.map(i => {
+        const date = i.updatedAt?.toDate?.() || new Date(0);
+        return { 
+          ...i, 
+          source: 'questions' as const, 
+          displayTitle: `${i.exam || 'পরীক্ষা'} - ${i.chapter || 'অধ্যায় নেই'}`,
+          saveName: (i.exam || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
+          fileType: 'EDITOR' as const,
+          date
+        };
+      })
     ];
     return all.sort((a: any, b: any) => {
-      const dateA = a.updatedAt?.toDate?.() || new Date(0);
-      const dateB = b.updatedAt?.toDate?.() || new Date(0);
-      return dateB.getTime() - dateA.getTime();
+      return b.date.getTime() - a.date.getTime();
     });
   }, [currentItemsRaw]);
 
@@ -682,7 +692,7 @@ function MyLibraryContent() {
               <TableRow className="bg-blue-100 border-b-2 border-black h-12">
                 <TableHead className="w-24 text-center font-black border-r-2 border-black text-black">ক্রমিক নং</TableHead>
                 <TableHead className="font-black border-r-2 border-black text-black">শিরোনাম</TableHead>
-                <TableHead className="font-black border-r-2 border-black text-black">সেভ নাম</TableHead>
+                <TableHead className="font-black border-r-2 border-black text-black">সেভ নাম (আপলোডের তারিখ ও সময়)</TableHead>
                 <TableHead className="text-center font-black border-r-2 border-black text-black w-32">ধরন</TableHead>
                 <TableHead className="text-center font-black text-black w-[200px]">একশন</TableHead>
               </TableRow>
@@ -804,7 +814,6 @@ function MyLibraryContent() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p>
                 
-                {/* Moved Creation Buttons to Header - 70% Small & 3D Style */}
                 {selectedClass && selectedSubject && selectedChapter && (
                   <div className="flex flex-wrap gap-2 animate-in fade-in zoom-in-95">
                     <Link href={`/create-lecture-sheet?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&topic=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}`}>
@@ -849,7 +858,6 @@ function MyLibraryContent() {
           </div>
         </div>
         
-        {/* Hierarchical Filter Navigation Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-secondary/20 p-3 rounded-xl border-2 border-black">
           <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
