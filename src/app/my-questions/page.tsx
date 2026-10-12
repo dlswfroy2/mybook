@@ -608,45 +608,6 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-10">
-      <section className="space-y-4">
-        <h3 className="text-sm font-black text-primary flex items-center gap-2 border-b-2 border-black pb-2 uppercase tracking-wider"><PlusCircle className="w-4 h-4" /> নতুন তৈরি করুন ({selectedChapter})</h3>
-        <div className="flex flex-wrap gap-3">
-          <Link href={`/create-lecture-sheet?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&topic=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}`}>
-            <Card className="w-fit hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-2 border-black border-b-[6px] border-b-orange-800 active:translate-y-1 cursor-pointer bg-orange-50/30 rounded-2xl">
-              <CardContent className="p-2.5 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-white group-hover:scale-105 transition-transform"><FilePlus className="w-4 h-4" /></div>
-                <div className="pr-4">
-                  <p className="font-black text-orange-700 text-xs">লেকচার শিট</p>
-                  <p className="text-[9px] font-bold text-muted-foreground">এই অধ্যায়ের নোট তৈরি করুন</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Card className="w-fit hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-2 border-black border-b-[6px] border-b-primary/40 active:translate-y-1 cursor-pointer bg-blue-50/30 rounded-2xl">
-                <CardContent className="p-2.5 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white group-hover:scale-105 transition-transform"><BrainCircuit className="w-4 h-4" /></div>
-                  <div className="pr-4">
-                    <p className="font-black text-primary text-xs">প্রশ্নপত্র</p>
-                    <p className="text-[9px] font-bold text-muted-foreground">এই অধ্যায়ের প্রশ্ন তৈরি করুন</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </DialogTrigger>
-            <DialogContent className="font-kalpurush border-2 border-black">
-              <DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-1 gap-3 py-4">
-                <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=creative`)}>
-                  <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center"><FileText className="w-4 h-4" /></div>সৃজনশীল প্রশ্নপত্র</Button>
-                <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=mcq`)}>
-                  <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center"><BrainCircuit className="w-4 h-4" /></div>বহুনির্বাচনি (MCQ) প্রশ্নপত্র</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </section>
-
       <section className="space-y-6">
         <div className="flex flex-col gap-4 border-b-2 border-black pb-4">
           <div className="flex items-center justify-between">
@@ -838,7 +799,53 @@ function MyLibraryContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm border border-white/20"><Library className="w-7 h-7" /></div>
-            <div><h2 className="text-2xl font-bold">আমার লাইব্রেরি</h2><p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p></div>
+            <div>
+              <h2 className="text-2xl font-bold">আমার লাইব্রেরি</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p>
+                
+                {/* Moved Creation Buttons to Header - 70% Small & 3D Style */}
+                {selectedClass && selectedSubject && selectedChapter && (
+                  <div className="flex flex-wrap gap-2 animate-in fade-in zoom-in-95">
+                    <Link href={`/create-lecture-sheet?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&topic=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}`}>
+                      <Card className="w-fit hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-2 border-black border-b-[6px] border-b-orange-800 active:translate-y-1 cursor-pointer bg-orange-50/30 rounded-2xl">
+                        <CardContent className="p-2 flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                            <FilePlus className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="pr-2">
+                            <p className="font-black text-orange-700 text-[10px]">লেকচার শিট</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Card className="w-fit hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-2 border-black border-b-[6px] border-b-primary/40 active:translate-y-1 cursor-pointer bg-blue-50/30 rounded-2xl">
+                          <CardContent className="p-2 flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                              <BrainCircuit className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="pr-2">
+                              <p className="font-black text-primary text-[10px]">প্রশ্নপত্র</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </DialogTrigger>
+                      <DialogContent className="font-kalpurush border-2 border-black">
+                        <DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader>
+                        <div className="grid grid-cols-1 gap-3 py-4">
+                          <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=creative`)}>
+                            <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center"><FileText className="w-4 h-4" /></div>সৃজনশীল প্রশ্নপত্র</Button>
+                          <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=mcq`)}>
+                            <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center"><BrainCircuit className="w-4 h-4" /></div>বহুনির্বাচনি (MCQ) প্রশ্নপত্র</Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         
