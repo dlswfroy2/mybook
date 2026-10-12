@@ -44,7 +44,7 @@ import {
   Save
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp, doc, getDocs, where, QueryDocumentSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -669,6 +669,134 @@ export default function Home() {
     }
   };
 
+  const handleAiFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.type === 'application/pdf') {
+        const base64 = await fileToBase64(file);
+        setAiImage(base64);
+      } else {
+        const base64 = await processImage(file);
+        setAiImage(base64);
+      }
+      toast({ title: 'ফাইল লোড হয়েছে' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message });
+    }
+  };
+
+  const handleAiAction = async () => {
+    if (!aiImage && !aiRawText.trim()) return;
+    setAiProcessing(true);
+    setAiResult(null);
+    try {
+      const result = await runMultiTaskAi({
+        photoDataUri: aiImage || undefined,
+        rawText: aiRawText,
+        taskType: aiTask,
+        academicYear: selectedYear
+      });
+
+      if (result.error) throw new Error(result.error);
+      
+      setAiResult(result);
+      
+      if (result.date) setSelectedAiDate(result.date);
+      else setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
+
+      if (result.className) {
+        setSelectedAiClass(result.className);
+      } else if (aiTask === 'attendance') {
+        const rollsToMatch = result.presentRolls || (Array.isArray(result.attendanceByDate) ? result.attendanceByDate[0]?.presentRolls : []);
+        if (rollsToMatch && rollsToMatch.length > 0) {
+          const { resolvedClass } = matchStudentsAndResolveClass(
+            rollsToMatch.map((r: number) => ({ roll: r })), 
+            studentsForYear
+          );
+          if (resolvedClass) {
+            setSelectedAiClass(resolvedClass);
+            setAiResult((prev: any) => ({ ...prev, autoResolved: true }));
+          }
+        }
+      }
+
+      toast({ title: 'তথ্য শনাক্তকরণ সফল' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: err.message });
+    } finally {
+      setAiProcessing(false);
+    }
+  };
+
+  const applyAiData = async () => {
+    if (!db || !aiResult) return;
+    setIsSavingQuickAttendance(true);
+    try {
+      if (aiTask === 'attendance') {
+        const datesToProcess = (applyToAllDates && Array.isArray(aiResult.dates)) ? aiResult.dates : [selectedAiDate];
+        const batch = writeBatch(db);
+        let holidayFound = false;
+        
+        for (const dStr of datesToProcess) {
+          // Holiday Protection Logic
+          const activeHoliday = await isHoliday(db, dStr);
+          const dateObj = new Date(dStr);
+          const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
+
+          if (activeHoliday || isWeekend) {
+            holidayFound = true;
+            continue; 
+          }
+
+          const specificDayResult = Array.isArray(aiResult.attendanceByDate) 
+            ? aiResult.attendanceByDate.find((d: any) => d.date === dStr)
+            : aiResult;
+          
+          const presentRolls = specificDayResult?.presentRolls || aiResult.presentRolls || [];
+          const classStudents = studentsForYear.filter(s => s.className === selectedAiClass);
+          
+          if (classStudents.length === 0) continue;
+
+          const attendanceData: StudentAttendance[] = classStudents.map(student => ({
+            studentId: student.id,
+            status: (student.roll !== undefined && presentRolls.includes(student.roll)) ? 'present' : 'absent'
+          }));
+
+          const docId = `${dStr}_${selectedAiClass}_${selectedYear}`;
+          const docRef = doc(db, 'attendance', docId);
+          batch.set(docRef, {
+            date: dStr,
+            academicYear: selectedYear,
+            className: selectedAiClass,
+            attendance: attendanceData,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+
+        if (holidayFound && !applyToAllDates) {
+          toast({ variant: 'destructive', title: 'আজ ছুটির দিন!', description: 'ছুটির দিনে হাজিরা সেভ করা সম্ভব নয়।' });
+          setIsSavingQuickAttendance(false);
+          return;
+        }
+
+        await batch.commit();
+        toast({ title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে', description: holidayFound ? 'ছুটির দিনগুলো স্বয়ংক্রিয়ভাবে বাদ দেওয়া হয়েছে।' : '' });
+        refreshDashboardAttendance(studentsForYear);
+      } else {
+        toast({ title: 'ধন্যবাদ', description: 'অন্যান্য টাস্কের ডাটা সেভিং ফিচার শীঘ্রই যুক্ত হবে।' });
+      }
+      setIsAiPortalOpen(false);
+      setAiResult(null);
+      setAiImage(null);
+      setAiRawText('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingQuickAttendance(false);
+    }
+  };
+
   // Smart Parsing Logic for Filenames
   const parseMetadataFromFilename = (filename: string) => {
     const meta = { ...quickUploadMeta };
@@ -851,9 +979,23 @@ export default function Home() {
       aggregate(item.classId, item.subject, item.chapter || '', type);
     });
 
-    allLectureSheets?.forEach(item => {
-      aggregate(item.classId, item.subject, item.topic || '', 'lectureSheet');
-    });
+    allPdfSheets?.forEach(item => {
+        const type = item.category === 'creative' ? 'creative' : 
+                     item.category === 'lecture_sheet' ? 'lectureSheet' :
+                     item.category === 'mcq' ? 'mcq' :
+                     item.category === 'answer_key' ? 'answerKey' :
+                     item.category === 'model_test' ? 'modelTest' : null;
+        if (type) aggregate(item.classId, item.subject, item.chapterName || '', type);
+      });
+  
+      allQuestions?.forEach(item => {
+        const type = item.examType === 'model_test' ? 'modelTest' : (item.isMcq ? 'mcq' : 'creative');
+        aggregate(item.classId, item.subject, item.chapter || '', type);
+      });
+  
+      allLectureSheets?.forEach(item => {
+        aggregate(item.classId, item.subject, item.topic || '', 'lectureSheet');
+      });
 
     return { classData };
   }, [allQuestions, allPdfSheets, allLectureSheets]);
@@ -1068,7 +1210,7 @@ export default function Home() {
                         </div>
                       )}
                       <Button type="submit" disabled={isQuickUploading || !quickUploadFile} className={cn("w-full h-12 text-white font-black text-lg shadow-lg", isConfirmingReplace ? "bg-rose-600 hover:bg-rose-700" : "bg-orange-600 hover:bg-orange-700")}>
-                        {isQuickUploading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} 
+                        {isQuickUploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2" />} 
                         {isConfirmingReplace ? 'হ্যাঁ, রিপ্লেস করুন' : 'সেভ করুন'}
                       </Button>
                   </form>
