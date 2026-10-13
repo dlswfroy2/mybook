@@ -82,11 +82,9 @@ function getNormalizedKey(name: string): string {
   if (!name) return 'general';
   let n = name.toString().toLowerCase().trim();
   
-  // Handle Bengali digits to English
   const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
   n = n.replace(/[০-৯]/g, m => bnToEn[m]);
   
-  // Handle Roman Numerals (Common in schools I-X)
   const romanMap: Record<string, string> = {
     'viii': '8', 'vii': '7', 'iii': '3', 'ii': '2', 'iv': '4', 'vi': '6', 'ix': '9', 'v': '5', 'x': '10', 'i': '1'
   };
@@ -98,7 +96,6 @@ function getNormalizedKey(name: string): string {
     }
   }
 
-  // Handle Bengali ordinal/word map including common typos
   const wordMap: Record<string, string> = {
     'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
     'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
