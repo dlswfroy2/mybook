@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, query, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   FileText, 
@@ -28,7 +28,9 @@ import {
   Library,
   ExternalLink,
   ChevronRight,
-  GraduationCap
+  GraduationCap,
+  Filter,
+  ListTodo
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -491,7 +493,7 @@ function MyLibraryContent() {
   };
 
   const renderClasses = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
       {CLASSES.map(cls => {
         const colors: Record<string, string> = {
           '6': 'bg-blue-600 hover:bg-blue-700 border-blue-800',
@@ -617,63 +619,7 @@ function MyLibraryContent() {
   );
 
   const renderSubjectContent = () => (
-    <div className="space-y-10">
-      <section className="space-y-6">
-        <div className="flex flex-col gap-4 border-b-2 border-black pb-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-foreground flex items-center gap-2 uppercase tracking-wider"><LayoutGrid className="w-4 h-4" /> আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
-            {currentItemsRaw.questions.length > 0 && (
-              <Button variant={isSelecting ? "destructive" : "outline"} size="sm" onClick={() => { setIsSelecting(!isSelecting); setSelectedDocIds([]); }} className="h-8 gap-2 font-bold text-xs border-black">
-                {isSelecting ? <X className="w-3.5 h-3.5" /> : <BrainCircuit className="w-3.5 h-3.5" />}{isSelecting ? "বাতিল" : "প্রশ্ন বাছাই করুন"}</Button>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'all', label: 'সকলগুলো', icon: LayoutGrid },
-                { id: 'sheet', label: 'লেকচার শিট', icon: BookOpen },
-                { id: 'creative', label: 'সৃজনশীল প্রশ্ন', icon: FileText },
-                { id: 'mcq', label: 'বহুনির্বাচনী প্রশ্ন', icon: BrainCircuit },
-                { id: 'model', label: 'মডেল টেস্ট', icon: BrainCircuit },
-                { id: 'answer', label: 'উত্তরমালা', icon: CheckCircle2 }
-              ].map((cat) => (
-                <Button 
-                  key={cat.id} 
-                  variant={activeCategory === cat.id ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveCategory(cat.id as any)}
-                  className={cn("h-9 gap-2 font-bold text-xs rounded-full border-black", activeCategory === cat.id ? "bg-primary text-white" : "text-muted-foreground")}
-                >
-                  <cat.icon className="w-3.5 h-3.5" />
-                  {cat.label}
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-black/5">
-              {[
-                { id: 'all', label: 'সব ফরম্যাট', icon: LayoutGrid },
-                { id: 'pdf', label: 'পিডিএফ ফাইল', icon: FileText },
-                { id: 'word', label: 'ওয়ার্ড ফাইল', icon: FileType },
-                { id: 'editor', label: 'কন্টেন্ট এডিটর', icon: Edit }
-              ].map((type) => (
-                <Button 
-                  key={type.id} 
-                  variant={activeFileType === type.id ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setActiveFileType(type.id as any)}
-                  className={cn("h-7 gap-1.5 font-bold text-[10px] rounded-full border border-transparent", 
-                    activeFileType === type.id ? "bg-black text-white" : "text-muted-foreground hover:border-black/10")}
-                >
-                  <type.icon className="w-3 h-3" />
-                  {type.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-
+    <div className="space-y-4">
         <div 
           ref={topScrollRef}
           onScroll={() => handleScrollSync('top')}
@@ -797,133 +743,210 @@ function MyLibraryContent() {
             </TableBody>
           </Table>
         </div>
-      </section>
     </div>
   );
 
-  if (userLoading || questionsLoading || sheetsLoading || pdfSheetsLoading) return <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]"><Loader2 className="w-10 h-10 animate-spin text-primary" /><p className="mt-4 text-muted-foreground font-bold">লাইব্রেরি লোড হচ্ছে...</p></div>;
-
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6 animate-fade-in pb-16 font-kalpurush">
-      <header className="flex flex-col gap-4 border-b-2 border-black pb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm border border-white/20"><Library className="w-7 h-7" /></div>
-            <div>
-              <h2 className="text-2xl font-bold">আমার লাইব্রেরি</h2>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <p className="text-xs text-muted-foreground font-bold">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p>
-                
-                {selectedClass && selectedSubject && selectedChapter && (
-                  <div className="flex flex-wrap gap-2 animate-in fade-in zoom-in-95">
+    <div className="max-w-[1400px] mx-auto space-y-6 animate-fade-in pb-16 font-kalpurush">
+      
+      <main className="flex flex-col md:flex-row h-full w-full gap-8">
+        
+        {/* Sidebar Menubar */}
+        <aside className="w-full md:w-72 shrink-0 space-y-6 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+            <h2 className="text-2xl font-black mb-4 px-4 hidden md:block text-slate-900 tracking-tight">লাইব্রেরি অপশন</h2>
+            
+            {/* 1. Selectors Section */}
+            <Card className="border-2 border-black rounded-2xl overflow-hidden shadow-sm bg-white">
+                <CardHeader className="bg-primary/5 p-3 border-b">
+                    <CardTitle className="text-xs font-black uppercase text-primary flex items-center gap-2"><Filter className="w-3.5 h-3.5" /> শ্রেণি ও বিষয় নির্বাচন</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">শ্রেণি:</Label>
+                        <Select 
+                            value={selectedClass || ''} 
+                            onValueChange={(val) => {
+                                setSelectedClass(val);
+                                setViewMode('subjects');
+                                setSelectedSubject(null);
+                                setSelectedChapter(null);
+                                setIsSelecting(false);
+                            }}
+                        >
+                            <SelectTrigger className="h-10 font-bold border-2 border-black"><SelectValue placeholder="শ্রেণি" /></SelectTrigger>
+                            <SelectContent className="font-kalpurush">{CLASSES.map(c => <SelectItem key={c.id} value={c.id} className="font-bold">{c.label} শ্রেণি</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">বিষয়:</Label>
+                        <Select 
+                            value={selectedSubject || ''} 
+                            onValueChange={(val) => {
+                                setSelectedSubject(val);
+                                setViewMode('chapters');
+                                setSelectedChapter(null);
+                                setIsSelecting(false);
+                            }}
+                            disabled={!selectedClass}
+                        >
+                            <SelectTrigger className="h-10 font-bold border-2 border-black"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger>
+                            <SelectContent className="font-kalpurush">{currentSubjects.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">অধ্যায়:</Label>
+                        <Select 
+                            value={selectedChapter || ''} 
+                            onValueChange={(val) => {
+                                setSelectedChapter(val);
+                                setViewMode('content');
+                            }}
+                            disabled={!selectedSubject}
+                        >
+                            <SelectTrigger className="h-10 font-bold border-2 border-black"><SelectValue placeholder="অধ্যায় নির্বাচন" /></SelectTrigger>
+                            <SelectContent className="font-kalpurush">{currentChapters.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* 2. Quick Create Section */}
+            {selectedClass && selectedSubject && selectedChapter && (
+                <div className="space-y-3 animate-in fade-in zoom-in-95">
+                    <p className="text-[10px] font-black uppercase text-slate-500 ml-2">নতুন ফাইল তৈরি</p>
                     <Link href={`/create-lecture-sheet?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&topic=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}`}>
-                      <Card className="w-fit hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-2 border-black border-b-[6px] border-b-orange-800 active:translate-y-1 cursor-pointer bg-orange-50/30 rounded-2xl">
-                        <CardContent className="p-2 flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                            <FilePlus className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="pr-2">
-                            <p className="font-black text-orange-700 text-[10px]">লেকচার শিট</p>
-                          </div>
-                        </CardContent>
-                      </Card>
+                        <Card className="w-full hover:border-orange-500 hover:shadow-lg transition-all group border-l-4 border-l-orange-500 border-2 border-black border-b-[6px] border-b-orange-800 active:translate-y-1 cursor-pointer bg-orange-50/30 rounded-2xl mb-2">
+                            <CardContent className="p-3 flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-orange-500 text-white group-hover:scale-110 transition-transform">
+                                    <FilePlus className="w-5 h-5" />
+                                </div>
+                                <span className="font-black text-orange-900 text-sm">লেকচার শিট</span>
+                            </CardContent>
+                        </Card>
                     </Link>
                     <Dialog>
-                      <DialogTrigger asChild>
-                        <Card className="w-fit hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-2 border-black border-b-[6px] border-b-primary/40 active:translate-y-1 cursor-pointer bg-blue-50/30 rounded-2xl">
-                          <CardContent className="p-2 flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                              <BrainCircuit className="w-3.5 h-3.5" />
+                        <DialogTrigger asChild>
+                            <Card className="w-full hover:border-primary hover:shadow-lg transition-all group border-l-4 border-l-primary border-2 border-black border-b-[6px] border-b-primary/40 active:translate-y-1 cursor-pointer bg-blue-50/30 rounded-2xl">
+                                <CardContent className="p-3 flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-primary text-white group-hover:scale-110 transition-transform">
+                                        <BrainCircuit className="w-5 h-5" />
+                                    </div>
+                                    <span className="font-black text-primary text-sm">প্রশ্নপত্র</span>
+                                </CardContent>
+                            </Card>
+                        </DialogTrigger>
+                        <DialogContent className="font-kalpurush border-2 border-black">
+                            <DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader>
+                            <div className="grid grid-cols-1 gap-3 py-4">
+                                <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=creative`)}>
+                                    <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center"><FileText className="w-4 h-4" /></div>সৃজনশীল প্রশ্নপত্র</Button>
+                                <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=mcq`)}>
+                                    <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center"><BrainCircuit className="w-4 h-4" /></div>বহুনির্বাচনি (MCQ) প্রশ্নপত্র</Button>
                             </div>
-                            <div className="pr-2">
-                              <p className="font-black text-primary text-[10px]">প্রশ্নপত্র</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </DialogTrigger>
-                      <DialogContent className="font-kalpurush border-2 border-black">
-                        <DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader>
-                        <div className="grid grid-cols-1 gap-3 py-4">
-                          <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=creative`)}>
-                            <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center"><FileText className="w-4 h-4" /></div>সৃজনশীল প্রশ্নপত্র</Button>
-                          <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=mcq`)}>
-                            <div className="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center"><BrainCircuit className="w-4 h-4" /></div>বহুনির্বাচনি (MCQ) প্রশ্নপত্র</Button>
-                        </div>
-                      </DialogContent>
+                        </DialogContent>
                     </Dialog>
-                  </div>
-                )}
-              </div>
+                </div>
+            )}
+
+            {/* 3. My Collection Filters */}
+            {viewMode === 'content' && (
+                <Card className="border-2 border-black rounded-2xl overflow-hidden shadow-sm bg-white">
+                    <CardHeader className="bg-primary/5 p-3 border-b">
+                        <CardTitle className="text-xs font-black uppercase text-primary flex items-center gap-2"><LayoutGrid className="w-3.5 h-3.5" /> আমার সংগ্রহ ফিল্টার</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-6">
+                        <div className="space-y-2">
+                            <Label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">ক্যাটাগরি</Label>
+                            <div className="flex flex-col gap-1.5">
+                                {[
+                                    { id: 'all', label: 'সকলগুলো', icon: LayoutGrid },
+                                    { id: 'sheet', label: 'লেকচার শিট', icon: BookOpen },
+                                    { id: 'creative', label: 'সৃজনশীল', icon: FileText },
+                                    { id: 'mcq', label: 'বহুনির্বাচনী', icon: BrainCircuit },
+                                    { id: 'model', label: 'মডেল টেস্ট', icon: BrainCircuit },
+                                    { id: 'answer', label: 'উত্তরমালা', icon: CheckCircle2 }
+                                ].map((cat) => (
+                                    <button 
+                                        key={cat.id} 
+                                        onClick={() => setActiveCategory(cat.id as any)}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all font-bold text-xs border-2 text-left",
+                                            activeCategory === cat.id ? "bg-primary text-white border-primary shadow-md" : "bg-slate-50 border-black/5 text-muted-foreground hover:bg-slate-100"
+                                        )}
+                                    >
+                                        <cat.icon className="w-3.5 h-3.5" />
+                                        <span>{cat.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 border-t pt-4">
+                            <Label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">ফাইল ফরম্যাট</Label>
+                            <div className="flex flex-col gap-1.5">
+                                {[
+                                    { id: 'all', label: 'সব ফরম্যাট', icon: LayoutGrid },
+                                    { id: 'pdf', label: 'পিডিএফ ফাইল', icon: FileText },
+                                    { id: 'word', label: 'ওয়ার্ড ফাইল', icon: FileType },
+                                    { id: 'editor', label: 'এডিটর', icon: Edit }
+                                ].map((type) => (
+                                    <button 
+                                        key={type.id} 
+                                        onClick={() => setActiveFileType(type.id as any)}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all font-bold text-[11px] border-2 text-left",
+                                            activeFileType === type.id ? "bg-slate-800 text-white border-slate-900 shadow-md" : "bg-slate-50 border-black/5 text-muted-foreground hover:bg-slate-100"
+                                        )}
+                                    >
+                                        <type.icon className="w-3.5 h-3.5" />
+                                        <span>{type.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Button variant="outline" size="sm" onClick={handleBack} className="w-full gap-2 font-bold border-black text-primary h-11 shrink-0 bg-white shadow-md hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button>
+        </aside>
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 space-y-6">
+            <header className="mb-4">
+              <h2 className="text-2xl font-black text-foreground">
+                {viewMode === 'classes' ? 'শ্রেণি নির্বাচন করুন' : 
+                 viewMode === 'subjects' ? `${classNamesMap[selectedClass || '']} শ্রেণির বিষয়সমূহ` :
+                 viewMode === 'chapters' ? `${selectedSubject} - অধ্যায়সমূহ` :
+                 `${selectedSubject} - ${selectedChapter}`}
+              </h2>
+              <p className="text-sm font-bold text-muted-foreground mt-1">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p>
+            </header>
+
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {viewMode === 'classes' && renderClasses()}
+                {viewMode === 'subjects' && renderSubjects()}
+                {viewMode === 'chapters' && renderChapters()}
+                {viewMode === 'content' && renderSubjectContent()}
             </div>
-          </div>
-        </div>
-        
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-secondary/20 p-3 rounded-xl border-2 border-black">
-          <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">শ্রেণি:</Label>
-                  <Select 
-                      value={selectedClass || ''} 
-                      onValueChange={(val) => {
-                          setSelectedClass(val);
-                          setViewMode('subjects');
-                          setSelectedSubject(null);
-                          setSelectedChapter(null);
-                          setIsSelecting(false);
-                          setActiveCategory('all');
-                          setActiveFileType('all');
-                      }}
-                  >
-                      <SelectTrigger className="w-32 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
-                      <SelectContent className="font-kalpurush border-2 border-black">
-                          {CLASSES.map(c => <SelectItem key={c.id} value={c.id} className="font-bold">{c.label} শ্রেণি</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-              </div>
 
-              <div className="flex items-center gap-2">
-                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">বিষয়:</Label>
-                  <Select 
-                      value={selectedSubject || ''} 
-                      onValueChange={(val) => {
-                          setSelectedSubject(val);
-                          setViewMode('chapters');
-                          setSelectedChapter(null);
-                          setIsSelecting(false);
-                          setActiveCategory('all');
-                          setActiveFileType('all');
-                      }}
-                      disabled={!selectedClass}
-                  >
-                      <SelectTrigger className="w-40 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger>
-                      <SelectContent className="font-kalpurush border-2 border-black">
-                          {currentSubjects.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                  <Label className="font-black text-[10px] uppercase text-muted-foreground whitespace-nowrap">অধ্যায়:</Label>
-                  <Select 
-                      value={selectedChapter || ''} 
-                      onValueChange={(val) => {
-                          setSelectedChapter(val);
-                          setViewMode('content');
-                      }}
-                      disabled={!selectedSubject}
-                  >
-                      <SelectTrigger className="w-48 h-8 text-[11px] font-black border-2 border-black bg-white focus:ring-primary"><SelectValue placeholder="অধ্যায় নির্বাচন" /></SelectTrigger>
-                      <SelectContent className="font-kalpurush border-2 border-black">
-                          {currentChapters.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-              </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleBack} className="gap-2 font-bold border-black text-primary h-8 shrink-0 bg-white shadow-sm hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-3.5 h-3.5" /> ফিরে যান</Button>
+            {isSelecting && selectedDocIds.length > 0 && (
+                <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 animate-in slide-in-from-bottom-10 z-[100]">
+                    <Card className="bg-primary text-white shadow-2xl border-2 border-black p-4 flex items-center justify-between">
+                        <div className="font-bold flex items-center gap-3">
+                            <Badge variant="secondary" className="bg-white text-primary font-black border-black">{toBengaliNumber(selectedDocIds.length)} টি</Badge>
+                            <span>প্রশ্ন সেট সিলেক্ট করা হয়েছে</span>
+                        </div>
+                        <Button onClick={handleMergeAndCreate} disabled={merging} className="bg-white text-primary hover:bg-slate-100 font-black shadow-lg border-black">
+                            {merging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4 mr-2" />}বোর্ড প্রশ্ন তৈরি করুন
+                        </Button>
+                    </Card>
+                </div>
+            )}
         </div>
-      </header>
-      <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">{viewMode === 'classes' && renderClasses()}{viewMode === 'subjects' && renderSubjects()}{viewMode === 'chapters' && renderChapters()}{viewMode === 'content' && renderSubjectContent()}</div>
-      {isSelecting && selectedDocIds.length > 0 && (<div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 animate-in slide-in-from-bottom-10 z-[100]"><Card className="bg-primary text-white shadow-2xl border-2 border-black p-4 flex items-center justify-between"><div className="font-bold flex items-center gap-3"><Badge variant="secondary" className="bg-white text-primary font-black border-black">{toBengaliNumber(selectedDocIds.length)} টি</Badge><span>প্রশ্ন সেট সিলেক্ট করা হয়েছে</span></div><Button onClick={handleMergeAndCreate} disabled={merging} className="bg-white text-primary hover:bg-slate-100 font-black shadow-lg border-black">{merging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4 mr-2" />}বোর্ড প্রশ্ন তৈরি করুন</Button></Card></div>)}
+      </main>
     </div>
   );
 }
