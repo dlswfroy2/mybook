@@ -737,11 +737,12 @@ export default function Home() {
     // 4. Detect Chapter
     if (meta.subject && meta.classId) {
         const chaps = getChaptersForSubject(meta.classId, meta.subject);
-        const normFile = getNormalizedKey(name);
+        const tokens = name.split(/[\s\-_,।]/).filter(t => t.length > 0);
         
         for (const ch of chaps) {
             const normChap = getNormalizedKey(ch);
-            if (normFile.includes(normChap) || name.includes(ch.toLowerCase())) {
+            const isMatch = tokens.some(t => getNormalizedKey(t).includes(normChap) || t.includes(ch.toLowerCase()));
+            if (isMatch) {
                 meta.chapter = ch;
                 break;
             }
@@ -754,14 +755,17 @@ export default function Home() {
   const handleQuickPdfUpload = async (e: React.FormEvent, isConfirmed = false) => {
     e.preventDefault();
     if (!db || !user || !quickUploadFile) {
-        toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'ফাইল নিশ্চিত করুন।' });
+        toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'ফাইল নিশ্চিত করুন।'});
         return;
     }
 
-    let finalMeta = { ...quickUploadMeta };
-    if (!finalMeta.classId || !finalMeta.subject) {
-        finalMeta = parseMetadataFromFilename(quickUploadFile.name);
-    }
+    const autoMeta = parseMetadataFromFilename(quickUploadFile.name);
+    const finalMeta = {
+        category: quickUploadMeta.category || autoMeta.category,
+        classId: quickUploadMeta.classId || autoMeta.classId,
+        subject: quickUploadMeta.subject || autoMeta.subject,
+        chapter: quickUploadMeta.chapter || autoMeta.chapter
+    };
 
     if (!finalMeta.classId || !finalMeta.subject) {
         toast({ variant: 'destructive', title: 'অসম্পূর্ণ সিলেকশন', description: 'সিস্টেম শ্রেণি বা বিষয় শনাক্ত করতে পারেনি। অনুগ্রহ করে ম্যানুয়ালি সিলেক্ট করুন।' });
@@ -1712,7 +1716,7 @@ export default function Home() {
                   "text-white h-10 md:h-11 px-2 md:px-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 group active:translate-y-1 w-full cursor-pointer"
                 )}>
                   <BookOpen className="w-4 h-4 md:w-4.5 md:h-4.5 text-white shrink-0 group-hover:scale-110 transition-transform drop-shadow-md" />
-                  <span className="font-black text-xs md:text-sm leading-normal text-center whitespace-nowrap drop-shadow-sm">
+                  <span className="font-black text-xs md:sm:text-sm leading-normal text-center whitespace-nowrap drop-shadow-sm">
                     {cls.label} শ্রেণি
                   </span>
                 </div>
@@ -1928,4 +1932,3 @@ export default function Home() {
     </div>
   );
 }
-
