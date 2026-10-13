@@ -476,7 +476,7 @@ export default function Home() {
   const [isConfirmingReplace, setIsConfirmingReplace] = useState(false);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [quickUploadMeta, setQuickUploadMeta] = useState({
-    category: 'lecture_sheet',
+    category: '',
     classId: '',
     subject: '',
     chapter: ''
@@ -685,10 +685,22 @@ export default function Home() {
 
   // Smart Parsing Logic for Filenames
   const parseMetadataFromFilename = (filename: string) => {
-    const meta = { ...quickUploadMeta };
+    const meta = { category: '', classId: '', subject: '', chapter: '' };
     const name = filename.toLowerCase();
 
-    // 1. Detect Class
+    // 1. Detect Category FIRST
+    const catMap: Record<string, string> = {
+        'সৃজনশীল': 'creative', 'সৃজনশিল': 'creative', 'cq': 'creative', 'creative': 'creative',
+        'বহুনির্বাচনী': 'mcq', 'mcq': 'mcq', 'এমসিকিউ': 'mcq', 'বহুনির্বাচনি': 'mcq',
+        'উত্তরমালা': 'answer_key', 'সমাধান': 'answer_key', 'answer': 'answer_key', 'solution': 'answer_key',
+        'মডেল': 'model_test', 'model': 'model_test',
+        'লেকচার': 'lecture_sheet', 'হ্যান্ডআউট': 'lecture_sheet', 'handout': 'lecture_sheet', 'sheet': 'lecture_sheet'
+    };
+    for (const [k, v] of Object.entries(catMap)) {
+        if (name.includes(k)) { meta.category = v; break; }
+    }
+
+    // 2. Detect Class
     const classMap: Record<string, string> = {
         'ষষ্ঠ': '6', 'সপ্তম': '7', 'অষ্টম': '8', 'নবম': '9', 'দশম': '10',
         '৬ষ্ঠ': '6', '৭ম': '7', '৮ম': '8', '৯ম': '9', '১০ম': '10',
@@ -698,7 +710,7 @@ export default function Home() {
         if (name.includes(k)) { meta.classId = v; break; }
     }
 
-    // 2. Detect Subject
+    // 3. Detect Subject
     const subjectSynonyms: Record<string, string> = {
         'পদাথ': 'পদার্থ', 'পদারথ': 'পদার্থ', 'ভূগোল': 'ভূগোল ও পরিবেশ', 'রসায়ন': 'রসায়ন', 'গণিত': 'গণিত', 
         'ইংরেজি': 'ইংরেজি প্রথম', 'বাংলা': 'বাংলা প্রথম', 'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি', 
@@ -727,18 +739,6 @@ export default function Home() {
     }
     if (foundSub) meta.subject = foundSub;
 
-    // 3. Detect Category
-    const catMap: Record<string, string> = {
-        'উত্তরমালা': 'answer_key', 'সমাধান': 'answer_key', 
-        'সৃজনশীল': 'creative', 'সৃজনশিল': 'creative', 'cq': 'creative',
-        'বহুনির্বাচনী': 'mcq', 'mcq': 'mcq', 'এমসিকিউ': 'mcq',
-        'মডেল': 'model_test', 
-        'লেকচার': 'lecture_sheet', 'হ্যান্ডআউট': 'lecture_sheet', 'handout': 'lecture_sheet'
-    };
-    for (const [k, v] of Object.entries(catMap)) {
-        if (name.includes(k)) { meta.category = v; break; }
-    }
-
     // 4. Detect Chapter
     if (meta.subject && meta.classId) {
         const chaps = getChaptersForSubject(meta.classId, meta.subject);
@@ -765,8 +765,9 @@ export default function Home() {
     }
 
     const autoMeta = parseMetadataFromFilename(quickUploadFile.name);
+    // Detected Meta takes precedence over empty default state
     const finalMeta = {
-        category: quickUploadMeta.category || autoMeta.category,
+        category: quickUploadMeta.category || autoMeta.category || 'lecture_sheet',
         classId: quickUploadMeta.classId || autoMeta.classId,
         subject: quickUploadMeta.subject || autoMeta.subject,
         chapter: quickUploadMeta.chapter || autoMeta.chapter
@@ -1143,7 +1144,7 @@ export default function Home() {
                       <div className="space-y-2">
                           <Label className="font-bold">ক্যাটাগরি</Label>
                           <Select value={quickUploadMeta.category} onValueChange={(v) => setQuickUploadMeta({...quickUploadMeta, category: v})}>
-                            <SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-11 border-2"><SelectValue placeholder="সিলেক্ট ক্যাটাগরি" /></SelectTrigger>
                             <SelectContent className="font-kalpurush">
                                 <SelectItem value="lecture_sheet">লেকচার শিট</SelectItem>
                                 <SelectItem value="creative">সৃজনশীল প্রশ্ন</SelectItem>

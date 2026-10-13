@@ -357,7 +357,6 @@ function MyLibraryContent() {
           ...i, 
           source: 'lecture-sheets' as const, 
           displayTitle: i.topic || 'শিরোনামহীন শিট',
-          saveName: (i.topic || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
           fileType: 'EDITOR' as const,
           date
         };
@@ -372,7 +371,6 @@ function MyLibraryContent() {
           ...i, 
           source: 'pdf-sheets' as const, 
           displayTitle: `${i.chapterName} - ${i.subject}`,
-          saveName: (i.fileName || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
           fileType: ft,
           date
         };
@@ -383,7 +381,6 @@ function MyLibraryContent() {
           ...i, 
           source: 'questions' as const, 
           displayTitle: `${i.exam || 'পরীক্ষা'} - ${i.chapter || 'অধ্যায় নেই'}`,
-          saveName: (i.exam || '-') + ' (' + format(date, 'dd/MM/yy, hh:mm a', { locale: bn }) + ')',
           fileType: 'EDITOR' as const,
           date
         };
