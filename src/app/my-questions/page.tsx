@@ -503,7 +503,7 @@ function MyLibraryContent() {
   };
 
   const renderClasses = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+    <div className="flex flex-wrap items-center gap-3 animate-in fade-in duration-500">
       {CLASSES.map(cls => {
         const colors: Record<string, string> = {
           '6': 'bg-blue-600 hover:bg-blue-700 border-blue-800',
@@ -519,16 +519,14 @@ function MyLibraryContent() {
             key={cls.id} 
             onClick={() => { setSelectedClass(cls.id); setViewMode('subjects'); }} 
             className={cn(
-              "group relative flex flex-col items-center justify-center p-8 rounded-2xl transition-all duration-200 active:translate-y-1 active:border-b-0 border-b-[6px] shadow-xl text-white",
+              "group relative flex items-center gap-3 p-3 px-6 rounded-xl transition-all duration-200 active:translate-y-1 active:border-b-0 border-b-[6px] shadow-lg text-white",
               colorClass
             )}
           >
-            <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">
-              <div className="relative">
-                <BookOpen className="w-14 h-14 text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]" />
-              </div>
+            <div className="transform group-hover:scale-110 transition-transform duration-300">
+              <BookOpen className="w-5 h-5 text-white drop-shadow-md" />
             </div>
-            <span className="font-black text-xl drop-shadow-md">{cls.label} শ্রেণি</span>
+            <span className="font-black text-sm md:text-base drop-shadow-sm whitespace-nowrap">{cls.label} শ্রেণি</span>
           </button>
         );
       })}
@@ -630,7 +628,7 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-4">
-        {/* Filter Section based on image */}
+        {/* Filter Section directly above table as per layout request */}
         <div className="space-y-4 bg-white/40 p-4 rounded-2xl border-2 border-black/5 shadow-inner no-print">
             <div className="flex items-center gap-2 mb-2">
                 <LayoutGrid className="w-5 h-5 text-slate-800" />
@@ -740,10 +738,10 @@ function MyLibraryContent() {
                     </TableCell>
                     <TableCell className="font-bold border-r-2 border-black px-4 text-xs">
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-slate-900">
+                        <span className="text-slate-900 font-bold">
                           {item.source === 'pdf-sheets' ? item.fileName : (item.source === 'lecture-sheets' ? item.topic : item.exam) || '-'}
                         </span>
-                        <span className="text-red-600 text-[10px]">
+                        <span className="text-red-600 text-[10px] font-black">
                           ({format(item.date, 'dd/MM/yy, hh:mm a', { locale: bn })})
                         </span>
                       </div>
@@ -913,7 +911,7 @@ function MyLibraryContent() {
                             </Card>
                         </DialogTrigger>
                         <DialogContent className="font-kalpurush border-2 border-black">
-                            <DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader>
+                            <DialogHeader><DialogHeader><DialogTitle className="font-black text-primary text-xl">প্রশ্নের ধরন নির্বাচন করুন</DialogTitle></DialogHeader></DialogHeader>
                             <div className="grid grid-cols-1 gap-3 py-4">
                                 <Button variant="outline" className="h-14 font-bold gap-3 justify-start px-6 border-black" onClick={() => router.push(`/create-question?classId=${selectedClass}&subject=${encodeURIComponent(selectedSubject || '')}&chapter=${encodeURIComponent(selectedChapter === 'সাধারণ অধ্যায়' ? '' : (selectedChapter || ''))}&type=creative`)}>
                                     <div className="w-8 h-8 rounded bg-primary/10 text-primary flex items-center justify-center"><FileText className="w-4 h-4" /></div>সৃজনশীল প্রশ্নপত্র</Button>
@@ -973,3 +971,4 @@ export default function MyLibraryPage() {
     </Suspense>
   );
 }
+
