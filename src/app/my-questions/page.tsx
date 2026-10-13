@@ -624,6 +624,64 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-4">
+        {/* New Filter Section based on image */}
+        <div className="space-y-4 bg-white/40 p-4 rounded-2xl border-2 border-black/5 shadow-inner no-print">
+            <div className="flex items-center gap-2 mb-2">
+                <LayoutGrid className="w-5 h-5 text-slate-800" />
+                <h3 className="font-black text-slate-800">আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
+            </div>
+
+            {/* Category Row */}
+            <div className="flex flex-wrap gap-2">
+                {[
+                    { id: 'all', label: 'সকলগুলো', icon: LayoutGrid },
+                    { id: 'sheet', label: 'লেকচার শিট', icon: BookOpen },
+                    { id: 'creative', label: 'সৃজনশীল প্রশ্ন', icon: FileText },
+                    { id: 'mcq', label: 'বহুনির্বাচনী প্রশ্ন', icon: BrainCircuit },
+                    { id: 'model', label: 'মডেল টেস্ট', icon: BrainCircuit },
+                    { id: 'answer', label: 'উত্তরমালা', icon: CheckCircle2 }
+                ].map((cat) => (
+                    <button 
+                        key={cat.id} 
+                        onClick={() => setActiveCategory(cat.id as any)}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-full transition-all font-black text-xs border-2",
+                            activeCategory === cat.id 
+                                ? "bg-primary text-white border-primary shadow-md" 
+                                : "bg-white border-black text-slate-700 hover:bg-slate-50"
+                        )}
+                    >
+                        <cat.icon className="w-3.5 h-3.5" />
+                        <span>{cat.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* File Type Row */}
+            <div className="flex flex-wrap gap-4 items-center pt-1">
+                {[
+                    { id: 'all', label: 'সব ফরম্যাট', icon: LayoutGrid },
+                    { id: 'pdf', label: 'পিডিএফ ফাইল', icon: FileText },
+                    { id: 'word', label: 'ওয়ার্ড ফাইল', icon: FileType },
+                    { id: 'editor', label: 'কন্টেন্ট এডিটর', icon: Edit }
+                ].map((type) => (
+                    <button 
+                        key={type.id} 
+                        onClick={() => setActiveFileType(type.id as any)}
+                        className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 transition-all font-black text-xs",
+                            activeFileType === type.id 
+                                ? "bg-black text-white rounded-lg shadow-md" 
+                                : "text-slate-600 hover:text-primary"
+                        )}
+                    >
+                        <type.icon className="w-3.5 h-3.5" />
+                        <span>{type.label}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+
         <div 
           ref={topScrollRef}
           onScroll={() => handleScrollSync('top')}
@@ -852,66 +910,6 @@ function MyLibraryContent() {
                         </DialogContent>
                     </Dialog>
                 </div>
-            )}
-
-            {/* 3. My Collection Filters */}
-            {viewMode === 'content' && (
-                <Card className="border-2 border-black rounded-2xl overflow-hidden shadow-sm bg-white">
-                    <CardHeader className="bg-primary/5 p-3 border-b">
-                        <CardTitle className="text-xs font-black uppercase text-primary flex items-center gap-2"><LayoutGrid className="w-3.5 h-3.5" /> আমার সংগ্রহ ফিল্টার</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-6">
-                        <div className="space-y-2">
-                            <Label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">ক্যাটাগরি</Label>
-                            <div className="flex flex-col gap-1.5">
-                                {[
-                                    { id: 'all', label: 'সকলগুলো', icon: LayoutGrid },
-                                    { id: 'sheet', label: 'লেকচার শিট', icon: BookOpen },
-                                    { id: 'creative', label: 'সৃজনশীল', icon: FileText },
-                                    { id: 'mcq', label: 'বহুনির্বাচনী', icon: BrainCircuit },
-                                    { id: 'model', label: 'মডেল টেস্ট', icon: BrainCircuit },
-                                    { id: 'answer', label: 'উত্তরমালা', icon: CheckCircle2 }
-                                ].map((cat) => (
-                                    <button 
-                                        key={cat.id} 
-                                        onClick={() => setActiveCategory(cat.id as any)}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all font-bold text-xs border-2 text-left",
-                                            activeCategory === cat.id ? "bg-primary text-white border-primary shadow-md" : "bg-slate-50 border-black/5 text-muted-foreground hover:bg-slate-100"
-                                        )}
-                                    >
-                                        <cat.icon className="w-3.5 h-3.5" />
-                                        <span>{cat.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2 border-t pt-4">
-                            <Label className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">ফাইল ফরম্যাট</Label>
-                            <div className="flex flex-col gap-1.5">
-                                {[
-                                    { id: 'all', label: 'সব ফরম্যাট', icon: LayoutGrid },
-                                    { id: 'pdf', label: 'পিডিএফ ফাইল', icon: FileText },
-                                    { id: 'word', label: 'ওয়ার্ড ফাইল', icon: FileType },
-                                    { id: 'editor', label: 'এডিটর', icon: Edit }
-                                ].map((type) => (
-                                    <button 
-                                        key={type.id} 
-                                        onClick={() => setActiveFileType(type.id as any)}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all font-bold text-[11px] border-2 text-left",
-                                            activeFileType === type.id ? "bg-slate-800 text-white border-slate-900 shadow-md" : "bg-slate-50 border-black/5 text-muted-foreground hover:bg-slate-100"
-                                        )}
-                                    >
-                                        <type.icon className="w-3.5 h-3.5" />
-                                        <span>{type.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
             )}
 
             <Button variant="outline" size="sm" onClick={handleBack} className="w-full gap-2 font-bold border-black text-primary h-11 shrink-0 bg-white shadow-md hover:bg-primary hover:text-white transition-all"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button>
