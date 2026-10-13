@@ -4,8 +4,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -54,7 +54,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Skeleton } from '@/components/ui/skeleton';
 import { Notice } from '@/lib/notice-data';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { 
   Select, 
   SelectContent, 
@@ -142,6 +142,50 @@ async function processImage(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('ফাইল পড়া সম্ভব হয়নি।'));
     reader.readAsDataURL(file);
   });
+}
+
+function getNormalizedKey(name: string): string {
+  if (!name) return 'general';
+  let n = name.toString().toLowerCase().trim();
+  
+  // Handle Bengali digits to English
+  const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
+  n = n.replace(/[০-৯]/g, m => bnToEn[m]);
+  
+  // Handle Roman Numerals (Common in schools I-X)
+  const romanMap: Record<string, string> = {
+    'viii': '8', 'vii': '7', 'iii': '3', 'ii': '2', 'iv': '4', 'vi': '6', 'ix': '9', 'v': '5', 'x': '10', 'i': '1'
+  };
+  const sortedRomanKeys = ['viii', 'vii', 'iii', 'ii', 'iv', 'vi', 'ix', 'v', 'x', 'i'];
+  for (const r of sortedRomanKeys) {
+    const regex = new RegExp(`(^|[-_\\s])${r}([-_\\s]|$)`, 'i');
+    if (regex.test(n)) {
+      n = n.replace(regex, (match, p1, p2) => `${p1}${romanMap[r]}${p2}`);
+    }
+  }
+
+  // Handle Bengali ordinal/word map including common typos
+  const wordMap: Record<string, string> = {
+    'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
+    'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
+    'তৃতীয়': '3', '৩য়': '3', '৩': '3', '3rd': '3',
+    'চতুর্থ': '4', 'চতুথ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
+    'পঞ্চম': '5', '৫ম': '5', '৫': '5', '5th': '5',
+    'ষষ্ঠ': '6', '৬ষ্ঠ': '6', '৬': '6', '6th': '6',
+    'সপ্তম': '7', '৭ম': '7', '৭': '7', '7th': '7',
+    'অষ্টম': '8', '৮ম': '8', '৮': '8', '8th': '8',
+    'নবম': '9', '৯ম': '9', '৯': '9', '9th': '9',
+    'দশম': '10', '১০ম': '10', '১০': '10', '10th': '10',
+    'একাদশ': '11', '১১': '11', '১১শ': '11',
+    'দ্বাদশ': '12', '১২': '12', '১২শ': '12'
+  };
+
+  for (const [word, val] of Object.entries(wordMap)) {
+    if (n.includes(word)) return val;
+  }
+
+  const match = n.match(/\d+/);
+  return match ? match[0] : n;
 }
 
 const GalleryCard = () => {
@@ -236,38 +280,6 @@ const BENGALI_ORDINALS = [
   '১ম', '২য়', '৩য়', '৪র্থ', '৫ম', '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম',
   'একাদশ', 'দ্বাদশ', 'ত্রয়োদশ', 'চতুর্দশ', 'পঞ্চদশ', 'ষোড়শ', 'সপ্তদশ', 'অষ্টাদশ', 'ঊনবিংশ', 'বিংশ'
 ];
-
-function getNormalizedKey(name: string): string {
-  if (!name) return 'general';
-  let n = name.toString().toLowerCase().trim();
-  const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
-  n = n.replace(/[০-৯]/g, m => bnToEn[m]);
-  
-  const wordMap: Record<string, string> = {
-    'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
-    'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
-    'তৃতীয়': '3', '৩য়': '3', '৩': '3', '3rd': '3',
-    'চতুর্থ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
-    'পঞ্চম': '5', '৫ম': '5', '৫': '5', '5th': '5',
-    'ষষ্ঠ': '6', '৬ষ্ঠ': '6', '৬': '6', '6th': '6',
-    'সপ্তম': '7', '৭ম': '7', '৭': '7', '7th': '7',
-    'অষ্টম': '8', '৮ম': '8', '৮': '8', '8th': '8',
-    'নবম': '9', '৯ম': '9', '৯': '9', '9th': '9',
-    'দশম': '10', '১০ম': '10', '১০': '10', '10th': '10',
-    'একাদশ': '11', '১১': '11', '১১শ': '11',
-    'দ্বাদশ': '12', '১২': '12', '১২শ': '12',
-    'ত্রয়োদশ': '13', '১৩': '13', '১৩শ': '13',
-    'চতুর্দশ': '14', '১৪': '14', '১৪শ': '14',
-    'পঞ্চদশ': '15', '১৫': '15', '১৫শ': '15'
-  };
-
-  for (const [word, val] of Object.entries(wordMap)) {
-    if (n.includes(word)) return val;
-  }
-
-  const match = n.match(/\d+/);
-  return match ? match[0] : n;
-}
 
 function formatChapterDisplay(name: string): string {
   if (!name || name === 'general') return 'সাধারণ';
@@ -593,7 +605,7 @@ export default function Home() {
             toast({ 
                 variant: 'destructive', 
                 title: 'আজ ছুটির দিন!', 
-                description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে স্কুল বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
+                description: activeHoliday ? `আজ ${activeHoliday.description} উপলক্ষে আজ বিদ্যালয় বন্ধ।` : 'আজ সাপ্তাহিক ছুটি।' 
             });
             setIsSavingQuickAttendance(false);
             return;
@@ -669,134 +681,6 @@ export default function Home() {
     }
   };
 
-  const handleAiFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      if (file.type === 'application/pdf') {
-        const base64 = await fileToBase64(file);
-        setAiImage(base64);
-      } else {
-        const base64 = await processImage(file);
-        setAiImage(base64);
-      }
-      toast({ title: 'ফাইল লোড হয়েছে' });
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message });
-    }
-  };
-
-  const handleAiAction = async () => {
-    if (!aiImage && !aiRawText.trim()) return;
-    setAiProcessing(true);
-    setAiResult(null);
-    try {
-      const result = await runMultiTaskAi({
-        photoDataUri: aiImage || undefined,
-        rawText: aiRawText,
-        taskType: aiTask,
-        academicYear: selectedYear
-      });
-
-      if (result.error) throw new Error(result.error);
-      
-      setAiResult(result);
-      
-      if (result.date) setSelectedAiDate(result.date);
-      else setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
-
-      if (result.className) {
-        setSelectedAiClass(result.className);
-      } else if (aiTask === 'attendance') {
-        const rollsToMatch = result.presentRolls || (Array.isArray(result.attendanceByDate) ? result.attendanceByDate[0]?.presentRolls : []);
-        if (rollsToMatch && rollsToMatch.length > 0) {
-          const { resolvedClass } = matchStudentsAndResolveClass(
-            rollsToMatch.map((r: number) => ({ roll: r })), 
-            studentsForYear
-          );
-          if (resolvedClass) {
-            setSelectedAiClass(resolvedClass);
-            setAiResult((prev: any) => ({ ...prev, autoResolved: true }));
-          }
-        }
-      }
-
-      toast({ title: 'তথ্য শনাক্তকরণ সফল' });
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: err.message });
-    } finally {
-      setAiProcessing(false);
-    }
-  };
-
-  const applyAiData = async () => {
-    if (!db || !aiResult) return;
-    setIsSavingQuickAttendance(true);
-    try {
-      if (aiTask === 'attendance') {
-        const datesToProcess = (applyToAllDates && Array.isArray(aiResult.dates)) ? aiResult.dates : [selectedAiDate];
-        const batch = writeBatch(db);
-        let holidayFound = false;
-        
-        for (const dStr of datesToProcess) {
-          // Holiday Protection Logic
-          const activeHoliday = await isHoliday(db, dStr);
-          const dateObj = new Date(dStr);
-          const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
-
-          if (activeHoliday || isWeekend) {
-            holidayFound = true;
-            continue; 
-          }
-
-          const specificDayResult = Array.isArray(aiResult.attendanceByDate) 
-            ? aiResult.attendanceByDate.find((d: any) => d.date === dStr)
-            : aiResult;
-          
-          const presentRolls = specificDayResult?.presentRolls || aiResult.presentRolls || [];
-          const classStudents = studentsForYear.filter(s => s.className === selectedAiClass);
-          
-          if (classStudents.length === 0) continue;
-
-          const attendanceData: StudentAttendance[] = classStudents.map(student => ({
-            studentId: student.id,
-            status: (student.roll !== undefined && presentRolls.includes(student.roll)) ? 'present' : 'absent'
-          }));
-
-          const docId = `${dStr}_${selectedAiClass}_${selectedYear}`;
-          const docRef = doc(db, 'attendance', docId);
-          batch.set(docRef, {
-            date: dStr,
-            academicYear: selectedYear,
-            className: selectedAiClass,
-            attendance: attendanceData,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-        }
-
-        if (holidayFound && !applyToAllDates) {
-          toast({ variant: 'destructive', title: 'আজ ছুটির দিন!', description: 'ছুটির দিনে হাজিরা সেভ করা সম্ভব নয়।' });
-          setIsSavingQuickAttendance(false);
-          return;
-        }
-
-        await batch.commit();
-        toast({ title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে', description: holidayFound ? 'ছুটির দিনগুলো স্বয়ংক্রিয়ভাবে বাদ দেওয়া হয়েছে।' : '' });
-        refreshDashboardAttendance(studentsForYear);
-      } else {
-        toast({ title: 'ধন্যবাদ', description: 'অন্যান্য টাস্কের ডাটা সেভিং ফিচার শীঘ্রই যুক্ত হবে।' });
-      }
-      setIsAiPortalOpen(false);
-      setAiResult(null);
-      setAiImage(null);
-      setAiRawText('');
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSavingQuickAttendance(false);
-    }
-  };
-
   // Smart Parsing Logic for Filenames
   const parseMetadataFromFilename = (filename: string) => {
     const meta = { ...quickUploadMeta };
@@ -813,24 +697,33 @@ export default function Home() {
     }
 
     // 2. Detect Subject
-    const targetClass = meta.classId || '6';
-    const currentSubs = getSubjectsForClass(targetClass);
     const subjectSynonyms: Record<string, string> = {
-        'পদাথ': 'পদার্থ', 'ভূগোল': 'ভূগোল ও পরিবেশ', 'রসায়ন': 'রসায়ন', 'গণিত': 'গণিত', 'ইংরেজি': 'ইংরেজি প্রথম'
+        'পদাথ': 'পদার্থ', 'পদারথ': 'পদার্থ', 'ভূগোল': 'ভূগোল ও পরিবেশ', 'রসায়ন': 'রসায়ন', 'গণিত': 'গণিত', 
+        'ইংরেজি': 'ইংরেজি প্রথম', 'বাংলা': 'বাংলা প্রথম', 'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি', 
+        'বিজিএস': 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বা ও বি': 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বাও বি': 'বাংলাদেশ ও বিশ্ব পরিচয়',
+        'ইতিহাস': 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা', 'পৌরনীতি': 'পৌরনীতি ও নাগরিকতা'
     };
     
-    for (const sub of currentSubs) {
-        const norm = (subjectNameNormalization[sub] || sub).toLowerCase();
-        if (name.includes(norm) || name.includes(sub.toLowerCase())) {
-            meta.subject = sub;
-            break;
+    let foundSub = '';
+    for (const [syn, real] of Object.entries(subjectSynonyms)) {
+        if (name.includes(syn)) { foundSub = real; break; }
+    }
+
+    if (!foundSub) {
+        const testClasses = meta.classId ? [meta.classId] : ['6', '7', '8', '9', '10'];
+        for (const cid of testClasses) {
+            const currentSubs = getSubjectsForClass(cid);
+            for (const sub of currentSubs) {
+                const normSub = (subjectNameNormalization[sub] || sub).toLowerCase();
+                if (name.includes(normSub) || name.includes(sub.toLowerCase())) {
+                    foundSub = sub;
+                    break;
+                }
+            }
+            if (foundSub) break;
         }
     }
-    if (!meta.subject) {
-        for (const [syn, real] of Object.entries(subjectSynonyms)) {
-            if (name.includes(syn)) { meta.subject = real; break; }
-        }
-    }
+    if (foundSub) meta.subject = foundSub;
 
     // 3. Detect Category
     const catMap: Record<string, string> = {
@@ -842,18 +735,15 @@ export default function Home() {
     }
 
     // 4. Detect Chapter
-    if (meta.subject) {
-        const chaps = getChaptersForSubject(targetClass, meta.subject);
+    if (meta.subject && meta.classId) {
+        const chaps = getChaptersForSubject(meta.classId, meta.subject);
+        const normFile = getNormalizedKey(name);
+        
         for (const ch of chaps) {
-            if (name.includes(ch.toLowerCase()) || name.includes(getNormalizedKey(ch))) {
+            const normChap = getNormalizedKey(ch);
+            if (normFile.includes(normChap) || name.includes(ch.toLowerCase())) {
                 meta.chapter = ch;
                 break;
-            }
-        }
-        if (!meta.chapter) {
-            const ordinalMap: Record<string, string> = { 'প্রথম': '১ম', 'দ্বিতীয়': '২য়', 'তৃতীয়': '৩য়', 'চতুথ': '৪র্থ', 'চতুর্থ': '৪র্থ' };
-            for (const [k, v] of Object.entries(ordinalMap)) {
-                if (name.includes(k)) { meta.chapter = `${v} অধ্যায়`; break; }
             }
         }
     }
@@ -937,6 +827,134 @@ export default function Home() {
     }
   };
 
+  const handleAiFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('ফাইল সাইজ ৫ মেগাবাইটের বেশি হতে পারবে না।');
+      if (file.type === 'application/pdf') {
+        const base64 = await fileToBase64(file);
+        setAiImage(base64);
+      } else {
+        const base64 = await processImage(file);
+        setAiImage(base64);
+      }
+      toast({ title: 'ফাইল লোড হয়েছে' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message });
+    }
+  };
+
+  const handleAiAction = async () => {
+    if (!aiImage && !aiRawText.trim()) return;
+    setAiProcessing(true);
+    setAiResult(null);
+    try {
+      const result = await runMultiTaskAi({
+        photoDataUri: aiImage || undefined,
+        rawText: aiRawText,
+        taskType: aiTask,
+        academicYear: selectedYear
+      });
+
+      if (result.error) throw new Error(result.error);
+      
+      setAiResult(result);
+      
+      if (result.date) setSelectedAiDate(result.date);
+      else setSelectedAiDate(format(new Date(), 'yyyy-MM-dd'));
+
+      if (result.className) {
+        setSelectedAiClass(result.className);
+      } else if (aiTask === 'attendance') {
+        const rollsToMatch = result.presentRolls || (Array.isArray(result.attendanceByDate) ? result.attendanceByDate[0]?.presentRolls : []);
+        if (rollsToMatch && rollsToMatch.length > 0) {
+          const { resolvedClass } = matchStudentsAndResolveClass(
+            rollsToMatch.map((r: number) => ({ roll: r })), 
+            studentsForYear
+          );
+          if (resolvedClass) {
+            setSelectedAiClass(resolvedClass);
+            setAiResult((prev: any) => ({ ...prev, autoResolved: true }));
+          }
+        }
+      }
+
+      toast({ title: 'তথ্য শনাক্তকরণ সফল' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'এআই ত্রুটি', description: err.message });
+    } finally {
+      setAiProcessing(false);
+    }
+  };
+
+  const applyAiData = async () => {
+    if (!db || !aiResult) return;
+    setIsSavingQuickAttendance(true);
+    try {
+      if (aiTask === 'attendance') {
+        const datesToProcess = (applyToAllDates && Array.isArray(aiResult.dates)) ? aiResult.dates : [selectedAiDate];
+        const batch = writeBatch(db);
+        let holidayFound = false;
+        
+        for (const dStr of datesToProcess) {
+          const activeHoliday = await isHoliday(db, dStr);
+          const dateObj = new Date(dStr);
+          const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
+
+          if (activeHoliday || isWeekend) {
+            holidayFound = true;
+            continue; 
+          }
+
+          const specificDayResult = Array.isArray(aiResult.attendanceByDate) 
+            ? aiResult.attendanceByDate.find((d: any) => d.date === dStr)
+            : aiResult;
+          
+          const presentRolls = specificDayResult?.presentRolls || aiResult.presentRolls || [];
+          const classStudents = studentsForYear.filter(s => s.className === selectedAiClass);
+          
+          if (classStudents.length === 0) continue;
+
+          const attendanceData: StudentAttendance[] = classStudents.map(student => ({
+            studentId: student.id,
+            status: (student.roll !== undefined && presentRolls.includes(student.roll)) ? 'present' : 'absent'
+          }));
+
+          const docId = `${dStr}_${selectedAiClass}_${selectedYear}`;
+          const docRef = doc(db, 'attendance', docId);
+          batch.set(docRef, {
+            date: dStr,
+            academicYear: selectedYear,
+            className: selectedAiClass,
+            attendance: attendanceData,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+
+        if (holidayFound && !applyToAllDates) {
+          toast({ variant: 'destructive', title: 'আজ ছুটির দিন!', description: 'ছুটির দিনে হাজিরা সেভ করা সম্ভব নয়।'});
+          setIsSavingQuickAttendance(false);
+          return;
+        }
+
+        await batch.commit();
+        toast({ title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে', description: holidayFound ? 'ছুটির দিনগুলো স্বয়ংক্রিয়ভাবে বাদ দেওয়া হয়েছে।' : '' });
+        refreshDashboardAttendance(studentsForYear);
+      } else {
+        toast({ title: 'ধন্যবাদ', description: 'অন্যান্য টাস্কের ডাটা সেভিং ফিচার শীঘ্রই যুক্ত হবে।' });
+      }
+      setIsAiPortalOpen(false);
+      setAiResult(null);
+      setAiImage(null);
+      setAiRawText('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingQuickAttendance(false);
+    }
+  };
+
   const presentPercentage = totalStudents > 0 ? ((totalPresent / totalStudents) * 100).toFixed(1) : "০";
   const absentPercentage = totalStudents > 0 ? ((totalAbsent / totalStudents) * 100).toFixed(1) : "০";
 
@@ -979,23 +997,9 @@ export default function Home() {
       aggregate(item.classId, item.subject, item.chapter || '', type);
     });
 
-    allPdfSheets?.forEach(item => {
-        const type = item.category === 'creative' ? 'creative' : 
-                     item.category === 'lecture_sheet' ? 'lectureSheet' :
-                     item.category === 'mcq' ? 'mcq' :
-                     item.category === 'answer_key' ? 'answerKey' :
-                     item.category === 'model_test' ? 'modelTest' : null;
-        if (type) aggregate(item.classId, item.subject, item.chapterName || '', type);
-      });
-  
-      allQuestions?.forEach(item => {
-        const type = item.examType === 'model_test' ? 'modelTest' : (item.isMcq ? 'mcq' : 'creative');
-        aggregate(item.classId, item.subject, item.chapter || '', type);
-      });
-  
-      allLectureSheets?.forEach(item => {
+    allLectureSheets?.forEach(item => {
         aggregate(item.classId, item.subject, item.topic || '', 'lectureSheet');
-      });
+    });
 
     return { classData };
   }, [allQuestions, allPdfSheets, allLectureSheets]);
@@ -1924,3 +1928,4 @@ export default function Home() {
     </div>
   );
 }
+

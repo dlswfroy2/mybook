@@ -81,14 +81,29 @@ function toBengaliNumber(n: number | string | undefined | null): string {
 function getNormalizedKey(name: string): string {
   if (!name) return 'general';
   let n = name.toString().toLowerCase().trim();
+  
+  // Handle Bengali digits to English
   const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
   n = n.replace(/[০-৯]/g, m => bnToEn[m]);
   
+  // Handle Roman Numerals (Common in schools I-X)
+  const romanMap: Record<string, string> = {
+    'viii': '8', 'vii': '7', 'iii': '3', 'ii': '2', 'iv': '4', 'vi': '6', 'ix': '9', 'v': '5', 'x': '10', 'i': '1'
+  };
+  const sortedRomanKeys = ['viii', 'vii', 'iii', 'ii', 'iv', 'vi', 'ix', 'v', 'x', 'i'];
+  for (const r of sortedRomanKeys) {
+    const regex = new RegExp(`(^|[-_\\s])${r}([-_\\s]|$)`, 'i');
+    if (regex.test(n)) {
+      n = n.replace(regex, (match, p1, p2) => `${p1}${romanMap[r]}${p2}`);
+    }
+  }
+
+  // Handle Bengali ordinal/word map including common typos
   const wordMap: Record<string, string> = {
     'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
     'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
     'তৃতীয়': '3', '৩য়': '3', '৩': '3', '3rd': '3',
-    'চতুর্থ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
+    'চতুর্থ': '4', 'চতুথ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
     'পঞ্চম': '5', '৫ম': '5', '৫': '5', '5th': '5',
     'ষষ্ঠ': '6', '৬ষ্ঠ': '6', '৬': '6', '6th': '6',
     'সপ্তম': '7', '৭ম': '7', '৭': '7', '7th': '7',
@@ -96,10 +111,7 @@ function getNormalizedKey(name: string): string {
     'নবম': '9', '৯ম': '9', '৯': '9', '9th': '9',
     'দশম': '10', '১০ম': '10', '১০': '10', '10th': '10',
     'একাদশ': '11', '১১': '11', '১১শ': '11',
-    'দ্বাদশ': '12', '১২': '12', '১২শ': '12',
-    'ত্রয়োদশ': '13', '১৩': '13', '১৩শ': '13',
-    'চতুর্দশ': '14', '১৪': '14', '১৪শ': '14',
-    'পঞ্চদশ': '15', '১৫': '15', '১৫শ': '15'
+    'দ্বাদশ': '12', '১২': '12', '১২শ': '12'
   };
 
   for (const [word, val] of Object.entries(wordMap)) {
