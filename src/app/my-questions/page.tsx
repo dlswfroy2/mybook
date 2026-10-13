@@ -624,7 +624,7 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-4">
-        {/* New Filter Section based on image */}
+        {/* Filter Section based on image */}
         <div className="space-y-4 bg-white/40 p-4 rounded-2xl border-2 border-black/5 shadow-inner no-print">
             <div className="flex items-center gap-2 mb-2">
                 <LayoutGrid className="w-5 h-5 text-slate-800" />
@@ -733,7 +733,14 @@ function MyLibraryContent() {
                       {item.displayTitle}
                     </TableCell>
                     <TableCell className="font-bold border-r-2 border-black px-4 text-xs">
-                      {item.saveName || '-'}
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-slate-900">
+                          {item.source === 'pdf-sheets' ? item.fileName : (item.source === 'lecture-sheets' ? item.topic : item.exam) || '-'}
+                        </span>
+                        <span className="text-red-600 text-[10px]">
+                          ({format(item.date, 'dd/MM/yy, hh:mm a', { locale: bn })})
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-center border-r-2 border-black w-32">
                       <div className="flex items-center justify-center">
