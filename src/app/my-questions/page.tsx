@@ -68,6 +68,10 @@ const SUBJECT_ORDER = [
   'কৃষি শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'
 ];
 
+const classNamesMap: Record<string, string> = {
+  '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
+};
+
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
