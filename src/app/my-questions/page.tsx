@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect, Suspense, useCallback, useRef } from 'react';
@@ -503,7 +502,7 @@ function MyLibraryContent() {
   };
 
   const renderClasses = () => (
-    <div className="flex flex-wrap items-center gap-3 animate-in fade-in duration-500">
+    <div className="flex flex-wrap items-center gap-2 animate-in fade-in duration-500">
       {CLASSES.map(cls => {
         const colors: Record<string, string> = {
           '6': 'bg-blue-600 hover:bg-blue-700 border-blue-800',
@@ -519,14 +518,14 @@ function MyLibraryContent() {
             key={cls.id} 
             onClick={() => { setSelectedClass(cls.id); setViewMode('subjects'); }} 
             className={cn(
-              "group relative flex items-center gap-3 p-3 px-6 rounded-xl transition-all duration-200 active:translate-y-1 active:border-b-0 border-b-[6px] shadow-lg text-white",
+              "group relative flex items-center gap-2 p-2 px-4 rounded-xl transition-all duration-200 active:translate-y-0.5 active:border-b-0 border-b-[4px] shadow-md text-white",
               colorClass
             )}
           >
             <div className="transform group-hover:scale-110 transition-transform duration-300">
-              <BookOpen className="w-5 h-5 text-white drop-shadow-md" />
+              <BookOpen className="w-4 h-4 text-white drop-shadow-md" />
             </div>
-            <span className="font-black text-sm md:text-base drop-shadow-sm whitespace-nowrap">{cls.label} শ্রেণি</span>
+            <span className="font-black text-xs md:text-sm drop-shadow-sm whitespace-nowrap">{cls.label} শ্রেণি</span>
           </button>
         );
       })}
@@ -628,7 +627,7 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-4">
-        {/* Filter Section directly above table as per layout request */}
+        {/* Filter Section directly above table */}
         <div className="space-y-4 bg-white/40 p-4 rounded-2xl border-2 border-black/5 shadow-inner no-print">
             <div className="flex items-center gap-2 mb-2">
                 <LayoutGrid className="w-5 h-5 text-slate-800" />
@@ -864,7 +863,7 @@ function MyLibraryContent() {
                             disabled={!selectedClass}
                         >
                             <SelectTrigger className="h-10 font-bold border-2 border-black"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger>
-                            <SelectContent className="font-kalpurush">{currentSubjects.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                            <SelectContent className="font-kalpurush">{currentSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                         </Select>
                     </div>
 
