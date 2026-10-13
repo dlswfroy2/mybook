@@ -742,7 +742,7 @@ function MyLibraryContent() {
                           {item.source === 'pdf-sheets' ? item.fileName : (item.source === 'lecture-sheets' ? item.topic : item.exam) || '-'}
                         </span>
                         <span className="text-red-600 text-[10px] font-black">
-                          ({format(item.date, 'dd/MM/yy, hh:mm a', { locale: bn })})
+                          ({format(item.date, 'dd/MM/yy, hh:mm a')})
                         </span>
                       </div>
                     </TableCell>
@@ -864,7 +864,7 @@ function MyLibraryContent() {
                             disabled={!selectedClass}
                         >
                             <SelectTrigger className="h-10 font-bold border-2 border-black"><SelectValue placeholder="বিষয় নির্বাচন" /></SelectTrigger>
-                            <SelectContent className="font-kalpurush">{currentSubjects.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}</SelectContent>
+                            <SelectContent className="font-kalpurush">{currentSubjects.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                         </Select>
                     </div>
 
@@ -971,4 +971,3 @@ export default function MyLibraryPage() {
     </Suspense>
   );
 }
-
