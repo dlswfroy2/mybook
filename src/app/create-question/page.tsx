@@ -3,7 +3,7 @@
 
 import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { CLASSES, getSubjectsForClass } from '@/lib/constants';
+import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -111,7 +111,7 @@ function CreateQuestionContent() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'sample' | 'exam'>('sample');
   
-  const softwareDocRef = useMemo(() => doc(db, 'config', 'software'), [db]);
+  const softwareDocRef = useMemo(() => db ? doc(db, 'config', 'software') : null, [db]);
   const { data: softwareConfig } = useDoc(softwareDocRef);
   const appName = softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস';
   
@@ -247,6 +247,7 @@ function CreateQuestionContent() {
   }, [editId, source, db, user]);
 
   const subjects = useMemo(() => meta.classId ? getSubjectsForClass(meta.classId) : [], [meta.classId]);
+  const chapters = useMemo(() => (meta.classId && meta.subject) ? getChaptersForSubject(meta.classId, meta.subject) : [], [meta.classId, meta.subject]);
 
   const handleAddQuestion = (type: 'creative' | 'short' | 'mcq') => { setQuestions(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), type, content: '', imageUrl: '', section: meta.currentSection }]); };
 
@@ -275,7 +276,7 @@ function CreateQuestionContent() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-16 font-kalpurush">
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
-        <header className="flex items-center justify-between border-b pb-4">
+        <header className="flex items-center gap-4 border-b pb-4">
           <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm"><FileText className="w-7 h-7" /></div><h2 className="text-2xl font-bold text-primary">প্রশ্নপত্র নির্মাতা</h2></div>
           <div className="flex gap-2"><Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button><Button variant="secondary" onClick={() => { const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} className="gap-2 font-bold"><Printer className="w-4 h-4" /> প্রিন্ট</Button></div>
         </header>
@@ -296,7 +297,19 @@ function CreateQuestionContent() {
                   <div className="space-y-2"><label className="text-sm font-semibold">পরীক্ষার নাম</label><Input value={meta.exam || ''} onChange={e => setMeta(prev => ({...prev, exam: e.target.value}))} className="font-bold" /></div>
                   <div className="space-y-2"><label className="text-sm font-semibold">শ্রেণি</label><Select onValueChange={v => setMeta(prev => ({...prev, classId: v}))} value={meta.classId}><SelectTrigger className="font-bold"><SelectValue placeholder="শ্রেণি" /></SelectTrigger><SelectContent>{CLASSES.map(c => <SelectItem key={c.id} value={c.id}>{c.label} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
                   <div className="space-y-2"><label className="text-sm font-semibold">বিষয়</label><Select onValueChange={v => setMeta(prev => ({...prev, subject: v}))} value={meta.subject} disabled={!meta.classId}><SelectTrigger className="font-bold"><SelectValue placeholder="বিষয়" /></SelectTrigger><SelectContent>{subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><label className="text-sm font-semibold">অধ্যায় (Chapter)</label><Input value={meta.chapter || ''} onChange={e => setMeta(prev => ({...prev, chapter: e.target.value}))} placeholder="যেমন: প্রথম অধ্যায়" className="font-bold" /></div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">অধ্যায় (Chapter)</label>
+                    {chapters.length > 0 ? (
+                      <Select onValueChange={v => setMeta(prev => ({...prev, chapter: v}))} value={meta.chapter}>
+                        <SelectTrigger className="font-bold"><SelectValue placeholder="অধ্যায় নির্বাচন করুন" /></SelectTrigger>
+                        <SelectContent className="font-kalpurush border-2 border-black">
+                          {chapters.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value={meta.chapter || ''} onChange={e => setMeta(prev => ({...prev, chapter: e.target.value}))} placeholder="যেমন: প্রথম অধ্যায়" className="font-bold" />
+                    )}
+                  </div>
                   <div className="space-y-2"><label className="text-sm font-semibold">সময়</label><Input value={meta.time || ''} onChange={e => setMeta(prev => ({...prev, time: e.target.value}))} className="font-bold" /></div>
                   <div className="space-y-2"><label className="text-sm font-semibold">পূর্ণমান</label><Input value={meta.totalMarks || ''} onChange={e => setMeta(prev => ({...prev, totalMarks: e.target.value}))} className="font-bold" /></div>
                 </div>
