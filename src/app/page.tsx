@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -85,7 +84,7 @@ const classNamesMap: Record<string, string> = {
 const toBengaliNumber = (n: number | string | undefined | null): string => {
   if (n === undefined || n === null || n === '') return '০';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
+  return String(n).replace(/[0-9]/g, (w) => bengaliDigits[parseInt(w, 10)]);
 };
 
 const normalize = (name: string) => {
@@ -142,6 +141,71 @@ async function processImage(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('ফাইল পড়া সম্ভব হয়নি।'));
     reader.readAsDataURL(file);
   });
+}
+
+function getNormalizedKey(name: string): string {
+  if (!name) return 'general';
+  let n = name.toString().toLowerCase().trim();
+  
+  const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
+  n = n.replace(/[০-৯]/g, m => bnToEn[m]);
+  
+  const romanMap: Record<string, string> = {
+    'viii': '8', 'vii': '7', 'iii': '3', 'ii': '2', 'iv': '4', 'vi': '6', 'ix': '9', 'v': '5', 'x': '10', 'i': '1'
+  };
+  const sortedRomanKeys = ['viii', 'vii', 'iii', 'ii', 'iv', 'vi', 'ix', 'v', 'x', 'i'];
+  for (const r of sortedRomanKeys) {
+    const regex = new RegExp(`(^|[-_\\s])${r}([-_\\s]|$)`, 'i');
+    if (regex.test(n)) {
+      n = n.replace(regex, (match, p1, p2) => `${p1}${romanMap[r]}${p2}`);
+    }
+  }
+
+  const wordMap: Record<string, string> = {
+    'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
+    'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
+    'তৃতীয়': '3', '৩য়': '3', '৩': '3', '3rd': '3',
+    'চতুর্থ': '4', 'চতুথ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
+    'পঞ্চম': '5', '৫ম': '5', '৫': '5', '5th': '5',
+    'ষষ্ঠ': '6', '৬ষ্ঠ': '6', '৬': '6', '6th': '6',
+    'সপ্তম': '7', '৭ম': '7', '৭': '7', '7th': '7',
+    'অষ্টম': '8', '৮ম': '8', '৮': '8', '8th': '8',
+    'নবম': '9', '৯ম': '9', '৯': '9', '9th': '9',
+    'দশম': '10', '১০ম': '10', '১০': '10', '10th': '10',
+    'একাদশ': '11', '১১': '11', '১১শ': '11', 'এগারো': '11',
+    'দ্বাদশ': '12', '১২': '12', '১২শ': '12'
+  };
+
+  for (const [word, val] of Object.entries(wordMap)) {
+    if (n.includes(word)) return val;
+  }
+
+  const match = n.match(/\d+/);
+  return match ? match[0] : n;
+}
+
+function normalizeForSort(name: string): number {
+  const norm = getNormalizedKey(name);
+  const num = parseInt(norm);
+  return isNaN(num) ? 998 : num;
+}
+
+function formatChapterDisplay(name: string): string {
+  if (!name || name === 'general') return 'সাধারণ';
+  const key = getNormalizedKey(name);
+  const num = parseInt(key);
+  
+  const BENGALI_ORDINALS_INTERNAL = [
+    '১ম', '২য়', '৩য়', '৪র্থ', '৫ম', '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম',
+    'একাদশ', 'দ্বাদশ', 'ত্রয়োদশ', 'চতুর্দশ', 'পঞ্চদশ', 'ষোড়শ', 'সপ্তদশ', 'অষ্টাদশ', 'ঊনবিংশ', 'বিংশ'
+  ];
+
+  if (!isNaN(num)) {
+    if (num >= 1 && num <= 20) return BENGALI_ORDINALS_INTERNAL[num - 1];
+    return toBengaliNumber(num);
+  }
+
+  return name.split(/[\s:]/)[0] || name;
 }
 
 const MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
@@ -232,74 +296,6 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     chunks.push(array.slice(i, i + size));
   }
   return chunks;
-}
-
-const BENGALI_ORDINALS = [
-  '১ম', '২য়', '৩য়', '৪র্থ', '৫ম', '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম',
-  'একাদশ', 'দ্বাদশ', 'ত্রয়োদশ', 'চতুর্দশ', 'পঞ্চদশ', 'ষোড়শ', 'সপ্তদশ', 'অষ্টাদশ', 'ঊনবিংশ', 'বিংশ'
-];
-
-function getNormalizedKey(name: string): string {
-  if (!name) return 'general';
-  let n = name.toString().toLowerCase().trim();
-  
-  // Handle Bengali digits to English
-  const bnToEn: Record<string, string> = { '০':'0', '১':'1', '২':'2', '৩':'3', '৪':'4', '৫':'5', '৬':'6', '৭':'7', '৮':'8', '৯':'9' };
-  n = n.replace(/[০-৯]/g, m => bnToEn[m]);
-  
-  // Handle Roman Numerals (Common in schools I-X)
-  const romanMap: Record<string, string> = {
-    'viii': '8', 'vii': '7', 'iii': '3', 'ii': '2', 'iv': '4', 'vi': '6', 'ix': '9', 'v': '5', 'x': '10', 'i': '1'
-  };
-  const sortedRomanKeys = ['viii', 'vii', 'iii', 'ii', 'iv', 'vi', 'ix', 'v', 'x', 'i'];
-  for (const r of sortedRomanKeys) {
-    const regex = new RegExp(`(^|[-_\\s])${r}([-_\\s]|$)`, 'i');
-    if (regex.test(n)) {
-      n = n.replace(regex, (match, p1, p2) => `${p1}${romanMap[r]}${p2}`);
-    }
-  }
-
-  // Handle Bengali ordinal/word map including common typos
-  const wordMap: Record<string, string> = {
-    'প্রথম': '1', '১ম': '1', '১': '1', '1st': '1',
-    'দ্বিতীয়': '2', '২য়': '2', '২': '2', '2nd': '2',
-    'তৃতীয়': '3', '৩য়': '3', '৩': '3', '3rd': '3',
-    'চতুর্থ': '4', 'চতুথ': '4', '৪র্থ': '4', '৪': '4', '4th': '4',
-    'পঞ্চম': '5', '৫ম': '5', '৫': '5', '5th': '5',
-    'ষষ্ঠ': '6', '৬ষ্ঠ': '6', '৬': '6', '6th': '6',
-    'সপ্তম': '7', '৭ম': '7', '৭': '7', '7th': '7',
-    'অষ্টম': '8', '৮ম': '8', '৮': '8', '8th': '8',
-    'নবম': '9', '৯ম': '9', '৯': '9', '9th': '9',
-    'দশম': '10', '১০ম': '10', '১০': '10', '10th': '10',
-    'একাদশ': '11', '১১': '11', '১১শ': '11',
-    'দ্বাদশ': '12', '১২': '12', '১২শ': '12'
-  };
-
-  for (const [word, val] of Object.entries(wordMap)) {
-    if (n.includes(word)) return val;
-  }
-
-  const match = n.match(/\d+/);
-  return match ? match[0] : n;
-}
-
-function formatChapterDisplay(name: string): string {
-  if (!name || name === 'general') return 'সাধারণ';
-  const key = getNormalizedKey(name);
-  const num = parseInt(key);
-  
-  if (!isNaN(num)) {
-    if (num >= 1 && num <= 20) return BENGALI_ORDINALS[num - 1];
-    return toBengaliNumber(num);
-  }
-
-  return name.split(/[\s:]/)[0] || name;
-}
-
-function normalizeForSort(name: string): number {
-  const norm = getNormalizedKey(name);
-  const num = parseInt(norm);
-  return isNaN(num) ? 998 : num;
 }
 
 const NoticeTicker = () => {
@@ -693,8 +689,8 @@ export default function Home() {
         'সৃজনশীল': 'creative', 'সৃজনশিল': 'creative', 'cq': 'creative', 'creative': 'creative',
         'বহুনির্বাচনী': 'mcq', 'mcq': 'mcq', 'এমসিকিউ': 'mcq', 'বহুনির্বাচনি': 'mcq',
         'উত্তরমালা': 'answer_key', 'সমাধান': 'answer_key', 'answer': 'answer_key', 'solution': 'answer_key',
-        'মডেল': 'model_test', 'model': 'model_test',
-        'লেকচার': 'lecture_sheet', 'হ্যান্ডআউট': 'lecture_sheet', 'handout': 'lecture_sheet', 'sheet': 'lecture_sheet'
+        'মডেলটেষ্ট': 'model_test', 'মডেল টেস্ট': 'model_test', 'মডেল': 'model_test', 'model': 'model_test',
+        'লেকচার': 'lecture_sheet', 'লেকচার সিট': 'lecture_sheet', 'লেকচার সীট': 'lecture_sheet', 'লেকচার শিট': 'lecture_sheet', 'হ্যান্ডআউট': 'lecture_sheet', 'handout': 'lecture_sheet', 'sheet': 'lecture_sheet'
     };
     for (const [k, v] of Object.entries(catMap)) {
         if (name.includes(k)) { meta.category = v; break; }
@@ -702,12 +698,19 @@ export default function Home() {
 
     // 2. Detect Class
     const classMap: Record<string, string> = {
-        'ষষ্ঠ': '6', 'সপ্তম': '7', 'অষ্টম': '8', 'নবম': '9', 'দশম': '10',
+        'অষ্টম': '8', 'সপ্তম': '7', 'ষষ্ঠ': '6', 'নবম': '9', 'দশম': '10',
         '৬ষ্ঠ': '6', '৭ম': '7', '৮ম': '8', '৯ম': '9', '১০ম': '10',
-        '6': '6', '7': '7', '8': '8', '9': '9', '10': '10'
+        '6': '6', '7': '7', '8': '8', '9': '9', '10': '10',
+        'viii': '8', 'vii': '7', 'vi': '6', 'ix': '9', 'x': '10'
     };
-    for (const [k, v] of Object.entries(classMap)) {
-        if (name.includes(k)) { meta.classId = v; break; }
+    const sortedClassKeys = Object.keys(classMap).sort((a, b) => b.length - a.length);
+    let classKeywordUsed = '';
+    for (const k of sortedClassKeys) {
+        if (name.includes(k)) { 
+            meta.classId = classMap[k]; 
+            classKeywordUsed = k; 
+            break; 
+        }
     }
 
     // 3. Detect Subject
@@ -715,7 +718,8 @@ export default function Home() {
         'পদাথ': 'পদার্থ', 'পদারথ': 'পদার্থ', 'ভূগোল': 'ভূগোল ও পরিবেশ', 'রসায়ন': 'রসায়ন', 'গণিত': 'গণিত', 
         'ইংরেজি': 'ইংরেজি প্রথম', 'বাংলা': 'বাংলা প্রথম', 'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি', 
         'বিজিএস': 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বা ও বি': 'বাংলাদেশ ও বিশ্ব পরিচয়', 'বাও বি': 'বাংলাদেশ ও বিশ্ব পরিচয়',
-        'ইতিহাস': 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা', 'পৌরনীতি': 'পৌরনীতি ও নাগরিকতা'
+        'ইতিহাস': 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা', 'পৌরনীতি': 'পৌরনীতি ও নাগরিকতা',
+        'বাংলা১ম': 'বাংলা প্রথম', 'বাংলা ২য়': 'বাংলা দ্বিতীয়', 'ইংরেজি১ম': 'ইংরেজি প্রথম', 'ইংরেজি ২য়': 'ইংরেজি দ্বিতীয়'
     };
     
     let foundSub = '';
@@ -739,14 +743,29 @@ export default function Home() {
     }
     if (foundSub) meta.subject = foundSub;
 
-    // 4. Detect Chapter
+    // 4. Detect Chapter - Improved logic to avoid partial matches (e.g., 1 matching 11)
     if (meta.subject && meta.classId) {
         const chaps = getChaptersForSubject(meta.classId, meta.subject);
-        const tokens = name.split(/[\s\-_,।]/).filter(t => t.length > 0);
+        
+        // Remove class keyword from filename during chapter matching to prevent confusion
+        let strippedName = name;
+        if (classKeywordUsed) {
+            strippedName = name.replace(classKeywordUsed, '');
+        }
+        
+        const tokens = strippedName.split(/[\s\-_,।]/).filter(t => t.length > 0);
         
         for (const ch of chaps) {
             const normChap = getNormalizedKey(ch);
-            const isMatch = tokens.some(t => getNormalizedKey(t).includes(normChap) || t.includes(ch.toLowerCase()));
+            const chDisplayName = ch.toLowerCase();
+            
+            // Check for exact numeric match or display name match
+            const isMatch = tokens.some(t => {
+                const normT = getNormalizedKey(t);
+                // Explicitly check for equality to prevent "1" matching "11"
+                return (normT === normChap && normT !== 'general') || t.includes(chDisplayName);
+            });
+
             if (isMatch) {
                 meta.chapter = ch;
                 break;
@@ -943,7 +962,7 @@ export default function Home() {
         }
 
         if (holidayFound && !applyToAllDates) {
-          toast({ variant: 'destructive', title: 'আজ ছুটির দিন!', description: 'ছুটির দিনে হাজিরা সেভ করা সম্ভব নয়।'});
+          toast({ variant: 'destructive', title: 'আজ ছুটির দিন!', description: 'ছুটির দিনগুলোতে হাজিরা সেভ করা সম্ভব নয়।'});
           setIsSavingQuickAttendance(false);
           return;
         }
@@ -1360,6 +1379,7 @@ export default function Home() {
                                           </div>
                                       </div>
 
+                                      {/* Date results display */}
                                       {Array.isArray(aiResult.dates) && aiResult.dates.length > 0 && (() => {
                                           const byMonth: Record<string, string[]> = {};
                                           aiResult.dates.forEach((dStr: string) => {

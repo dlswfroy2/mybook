@@ -59,17 +59,16 @@ import { subjectNameNormalization } from '@/lib/subjects';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
-import { bn } from 'date-fns/locale';
+
+const classNamesMap: Record<string, string> = {
+  '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
+};
 
 const SUBJECT_ORDER = [
   'বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 
   'ইসলাম ধর্ম ও নৈতিক শিক্ষা', 'হিন্দু ধর্ম ও নৈতিক শিক্ষা', 'বাংলাদেশ ও বিশ্ব পরিচয়', 'সাধারণ বিজ্ঞান', 
   'কৃষি শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'
 ];
-
-const classNamesMap: Record<string, string> = {
-  '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম'
-};
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
