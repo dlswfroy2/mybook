@@ -154,9 +154,8 @@ GENERAL RULES:
 
     const availableKeys = getAvailableApiKeys();
     const candidateModels = [
-      'googleai/gemini-flash-lite-latest',
-      'googleai/gemini-3.5-flash',
       'googleai/gemini-flash-latest',
+      'googleai/gemini-3.5-flash',
     ];
 
     let lastError: any = null;
