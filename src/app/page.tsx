@@ -460,16 +460,25 @@ function normalizeClassId(raw?: string | number | null): string | null {
   return str;
 }
 
-function getBengaliNameSimilarity(extractedName: string, dbName: string): number {
-  if (!extractedName || !dbName) return 0;
-  const clean = (s: string) => s
+function cleanBengaliText(str?: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFC')
     .toLowerCase()
     .replace(/[.\-_,]/g, ' ')
-    .replace(/\b(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|মোহা|md|mst|mohammad|mohammed)\b/gi, '')
+    .replace(/\b(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|মোহা|শ্রী|শ্রীমতি|md|mst|mohammad|mohammed)\b/gi, '')
     .trim();
+}
 
-  const words1 = clean(extractedName).split(/\s+/).filter(w => w.length >= 2);
-  const words2 = clean(dbName).split(/\s+/).filter(w => w.length >= 2);
+function getBengaliNameSimilarity(extractedName: string, dbName: string): number {
+  if (!extractedName || !dbName) return 0;
+  const c1 = cleanBengaliText(extractedName);
+  const c2 = cleanBengaliText(dbName);
+
+  if (c1 === c2) return 100;
+
+  const words1 = c1.split(/\s+/).filter(w => w.length >= 2);
+  const words2 = c2.split(/\s+/).filter(w => w.length >= 2);
 
   if (words1.length === 0 || words2.length === 0) return 0;
 
@@ -477,15 +486,22 @@ function getBengaliNameSimilarity(extractedName: string, dbName: string): number
   for (const w1 of words1) {
     for (const w2 of words2) {
       if (w1 === w2) {
-        score += 5;
+        score += 10;
       } else if (w1.includes(w2) || w2.includes(w1)) {
-        score += 3;
+        score += 6;
+      } else {
+        const w1NoReph = w1.replace(/র্/g, '');
+        const w2NoReph = w2.replace(/র্/g, '');
+        if (w1NoReph === w2NoReph) {
+          score += 8;
+        } else if (w1NoReph.includes(w2NoReph) || w2NoReph.includes(w1NoReph)) {
+          score += 5;
+        }
       }
     }
   }
   return score;
 }
-
 interface ExtractedStudentItem {
   roll: number;
   name?: string;
