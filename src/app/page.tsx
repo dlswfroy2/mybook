@@ -538,37 +538,55 @@ function resolveIndividualAttendance(
     const rollNum = Number(item.roll);
     let candidates = allStudents.filter(s => Number(s.roll) === rollNum);
 
-    // 1. If explicit className is provided on the sheet/document for this student
+    if (candidates.length === 0) {
+      unmatchedList.push({ extractedStudent: item, isMatched: false });
+      return;
+    }
+
+    let matched: Student | null = null;
     const normItemClass = normalizeClassId(item.className);
-    if (normItemClass) {
-      const clsCand = candidates.find(s => normalizeClassId(s.className) === normItemClass);
-      if (clsCand) {
-        candidates = [clsCand];
-      }
-    }
-
-    // 2. If multiple candidates from different classes have this same roll, match by student name
-    if (candidates.length > 1 && item.name) {
-      let bestCand: Student | null = null;
-      let maxScore = 0;
-
-      candidates.forEach(cand => {
-        const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
-        const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
-        const totalScore = Math.max(scoreBn, scoreEn);
-        if (totalScore > maxScore && totalScore >= 3) {
-          maxScore = totalScore;
-          bestCand = cand;
-        }
-      });
-
-      if (bestCand) {
-        candidates = [bestCand];
-      }
-    }
 
     if (candidates.length === 1) {
-      const matched = candidates[0];
+      matched = candidates[0];
+    } else {
+      // Multiple candidates share the same roll across different classes.
+      // Match primarily by student name similarity!
+      if (item.name) {
+        let bestCand: Student | null = null;
+        let maxScore = 0;
+
+        candidates.forEach(cand => {
+          const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+          const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+          let totalScore = Math.max(scoreBn, scoreEn);
+
+          // If the AI-extracted class matches this candidate's class, give a small bonus,
+          // but only if the name has at least some match (score >= 3)
+          if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
+            totalScore += 2;
+          }
+
+          if (totalScore > maxScore && totalScore >= 3) {
+            maxScore = totalScore;
+            bestCand = cand;
+          }
+        });
+
+        if (bestCand) {
+          matched = bestCand;
+        }
+      }
+
+      // If no name match was found (or item.name was absent), check if explicit className is provided
+      if (!matched && normItemClass) {
+        const clsCand = candidates.find(s => normalizeClassId(s.className) === normItemClass);
+        if (clsCand) {
+          matched = clsCand;
+        }
+      }
+    }
+
+    if (matched) {
       const cls = matched.className;
       const record: IndividualAttendanceMatch = {
         extractedStudent: item,
@@ -1079,10 +1097,8 @@ export default function Home() {
               });
             }
           });
-        }
-
-        // 2. Also merge from root students array
-        if (Array.isArray(result.students) && result.students.length > 0) {
+        // 2. Otherwise extract from root students array if classesAttendance was not provided
+        } else if (Array.isArray(result.students) && result.students.length > 0) {
           result.students.forEach((s: any) => {
             rawStudentsList.push({
               ...s,
@@ -1103,11 +1119,12 @@ export default function Home() {
           });
         }
 
-        // De-duplicate items by roll + className + name
+        // De-duplicate items by roll + normalized name
         const uniqueStudents: ExtractedStudentItem[] = [];
         const seenKeys = new Set<string>();
         rawStudentsList.forEach(st => {
-          const key = `${st.roll}_${st.className || ''}_${(st.name || '').trim()}`;
+          const cleanName = cleanBengaliText(st.name || '');
+          const key = cleanName ? `${st.roll}_${cleanName}` : `${st.roll}_${st.className || ''}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             uniqueStudents.push(st);
