@@ -1097,8 +1097,10 @@ export default function Home() {
               });
             }
           });
-        // 2. Otherwise extract from root students array if classesAttendance was not provided
-        } else if (Array.isArray(result.students) && result.students.length > 0) {
+        }
+
+        // 2. Also merge from root students array
+        if (Array.isArray(result.students) && result.students.length > 0) {
           result.students.forEach((s: any) => {
             rawStudentsList.push({
               ...s,
@@ -1119,12 +1121,11 @@ export default function Home() {
           });
         }
 
-        // De-duplicate items by roll + normalized name
+        // De-duplicate items by roll + className + name
         const uniqueStudents: ExtractedStudentItem[] = [];
         const seenKeys = new Set<string>();
         rawStudentsList.forEach(st => {
-          const cleanName = cleanBengaliText(st.name || '');
-          const key = cleanName ? `${st.roll}_${cleanName}` : `${st.roll}_${st.className || ''}`;
+          const key = `${st.roll}_${st.className || ''}_${(st.name || '').trim()}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             uniqueStudents.push(st);
@@ -1270,17 +1271,17 @@ export default function Home() {
             totalSavedStudents += (matchedByClass[cls] || []).length;
 
             const attendanceData: StudentAttendance[] = classStudents.map(student => {
-              const matchedRecord = lookup?.byId.get(student.id) || 
-                (student.roll !== undefined ? lookup?.byRoll.get(Number(student.roll)) : undefined);
+              const matchedRecord = lookup?.byId.get(student.id);
 
               let status: 'present' | 'absent' = 'absent';
 
               if (matchedRecord) {
-                const sDailyMap = lookup?.dailyMap.get(`id_${student.id}`) || 
-                  (student.roll !== undefined ? lookup?.dailyMap.get(`roll_${Number(student.roll)}`) : undefined);
+                const sDailyMap = lookup?.dailyMap.get(`id_${student.id}`);
 
                 if (sDailyMap && sDailyMap.has(dStr)) {
                   status = sDailyMap.get(dStr)!;
+                } else if (sDailyMap && sDailyMap.size > 0) {
+                  status = 'absent';
                 } else if (dayDateRes) {
                   if (student.roll !== undefined && dayDateRes.presentSet.has(Number(student.roll))) {
                     status = 'present';
@@ -1293,11 +1294,7 @@ export default function Home() {
                   status = matchedRecord.extractedStudent.status || 'present';
                 }
               } else {
-                if (dayDateRes && student.roll !== undefined && dayDateRes.presentSet.has(Number(student.roll))) {
-                  status = 'present';
-                } else if (student.roll !== undefined && rootPresentSet.has(Number(student.roll))) {
-                  status = 'present';
-                }
+                status = 'absent';
               }
 
               return {

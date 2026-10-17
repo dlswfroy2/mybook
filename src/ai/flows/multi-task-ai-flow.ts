@@ -62,7 +62,7 @@ export const multiTaskAiFlow = ai.defineFlow(
    - MULTIPLE CLASSES SUPPORT (একসাথে একাধিক শ্রেণি):
      * A document or uploaded file can contain 100+ students belonging to MULTIPLE CLASSES (e.g. ৬ষ্ঠ, ৭ম, ৮ম, ৯ম, ১০ম শ্রেণি একসাথে বা আলাদা আলাদা পৃষ্ঠায়/সেকশনে)।
      * Scan all section headers, table titles, column headings, or row prefixes (e.g. '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10') to identify which class each student belongs to.
-     * For EVERY student, extract their own 'className' ('6', '7', '8', '9', '10' etc.). If no class is written on the page header, set className to null.
+     * For EVERY student, extract their own 'className' ('6', '7', '8', '9', '10' etc.).
      * NEVER lump all students into one single class if different classes are present!
      * If the document groups attendance by class, extract 'classesAttendance' array:
        [
@@ -83,7 +83,7 @@ export const multiTaskAiFlow = ai.defineFlow(
    - For EVERY student in the document/image/PDF (even if 100+ students), extract into the 'students' array:
      * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
      * name: student name in Bengali (keep as close as possible to handwritten/printed name)
-     * className: class ('6', '7', '8', '9', '10') or null if not explicitly written on page (do NOT guess or invent class names if missing)
+     * className: class ('6', '7', '8', '9', '10') or null if not identified
      * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা)
      * dailyAttendance: Array of presence/absence for EACH date column detected in the document:
        [
@@ -154,9 +154,9 @@ GENERAL RULES:
 
     const availableKeys = getAvailableApiKeys();
     const candidateModels = [
-      'googleai/gemini-flash-latest',
-      'googleai/gemini-3.5-flash',
       'googleai/gemini-flash-lite-latest',
+      'googleai/gemini-3.5-flash',
+      'googleai/gemini-flash-latest',
     ];
 
     let lastError: any = null;
