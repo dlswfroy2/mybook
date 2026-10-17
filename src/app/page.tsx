@@ -440,6 +440,67 @@ interface IndividualAttendanceMatch {
   isMatched: boolean;
 }
 
+function normalizeClassId(raw?: string | number | null): string | null {
+  if (raw === undefined || raw === null) return null;
+  const str = String(raw).trim().toLowerCase();
+  if (!str) return null;
+
+  if (str === '6' || str === '৬' || str.includes('৬ষ্ঠ') || str.includes('ষষ্ঠ') || str.includes('six')) return '6';
+  if (str === '7' || str === '৭' || str.includes('৭ম') || str.includes('সপ্তম') || str.includes('seven')) return '7';
+  if (str === '8' || str === '৮' || str.includes('৮ম') || str.includes('অষ্টম') || str.includes('eight')) return '8';
+  if (str === '9' || str === '৯' || str.includes('৯ম') || str.includes('নবম') || str.includes('nine')) return '9';
+  if (str === '10' || str === '১০' || str.includes('১০ম') || str.includes('দশম') || str.includes('ten')) return '10';
+
+  if (str === '1' || str === '১' || str.includes('১ম') || str.includes('প্রথম') || str.includes('one')) return '1';
+  if (str === '2' || str === '২' || str.includes('২য়') || str.includes('দ্বিতীয়') || str.includes('two')) return '2';
+  if (str === '3' || str === '৩' || str.includes('৩য়') || str.includes('তৃতীয়') || str.includes('three')) return '3';
+  if (str === '4' || str === '৪' || str.includes('৪র্থ') || str.includes('চতুর্থ') || str.includes('four')) return '4';
+  if (str === '5' || str === '৫' || str.includes('৫ম') || str.includes('পঞ্চম') || str.includes('five')) return '5';
+
+  return str;
+}
+
+function getBengaliNameSimilarity(extractedName: string, dbName: string): number {
+  if (!extractedName || !dbName) return 0;
+  const clean = (s: string) => s
+    .toLowerCase()
+    .replace(/[.\-_,]/g, ' ')
+    .replace(/\b(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|মোহা|md|mst|mohammad|mohammed)\b/gi, '')
+    .trim();
+
+  const words1 = clean(extractedName).split(/\s+/).filter(w => w.length >= 2);
+  const words2 = clean(dbName).split(/\s+/).filter(w => w.length >= 2);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  let score = 0;
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1 === w2) {
+        score += 5;
+      } else if (w1.includes(w2) || w2.includes(w1)) {
+        score += 3;
+      }
+    }
+  }
+  return score;
+}
+
+interface ExtractedStudentItem {
+  roll: number;
+  name?: string;
+  className?: string | null;
+  status?: 'present' | 'absent';
+  dailyAttendance?: Array<{ date: string; status: 'present' | 'absent' }>;
+}
+
+interface IndividualAttendanceMatch {
+  extractedStudent: ExtractedStudentItem;
+  dbStudent?: Student;
+  resolvedClass?: string;
+  isMatched: boolean;
+}
+
 function resolveIndividualAttendance(
   extractedList: ExtractedStudentItem[],
   allStudents: Student[]
@@ -452,14 +513,6 @@ function resolveIndividualAttendance(
   const unmatchedList: IndividualAttendanceMatch[] = [];
   const matchedByClass: Record<string, IndividualAttendanceMatch[]> = {};
 
-  const cleanName = (str?: string) => {
-    if (!str) return '';
-    return str
-      .toLowerCase()
-      .replace(/[.\-_,\s]/g, '')
-      .replace(/(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|md|mst|mohammad)/gi, '');
-  };
-
   extractedList.forEach(item => {
     if (item.roll === undefined || item.roll === null || isNaN(Number(item.roll))) {
       unmatchedList.push({ extractedStudent: item, isMatched: false });
@@ -469,31 +522,32 @@ function resolveIndividualAttendance(
     const rollNum = Number(item.roll);
     let candidates = allStudents.filter(s => Number(s.roll) === rollNum);
 
-    // 1. If explicit className is provided on the sheet/document
-    if (item.className) {
-      const clsCand = candidates.find(s => String(s.className) === String(item.className));
+    // 1. If explicit className is provided on the sheet/document for this student
+    const normItemClass = normalizeClassId(item.className);
+    if (normItemClass) {
+      const clsCand = candidates.find(s => normalizeClassId(s.className) === normItemClass);
       if (clsCand) {
         candidates = [clsCand];
       }
     }
 
     // 2. If multiple candidates from different classes have this same roll, match by student name
-    if (candidates.length > 1) {
-      const itemClean = cleanName(item.name);
-      if (itemClean) {
-        const found = candidates.find(c => {
-          const bnClean = cleanName(c.studentNameBn);
-          const enClean = cleanName(c.studentNameEn);
-          return (bnClean && (bnClean.includes(itemClean) || itemClean.includes(bnClean))) ||
-                 (enClean && (enClean.includes(itemClean) || itemClean.includes(enClean)));
-        });
-        if (found) {
-          candidates = [found];
-        } else {
-          candidates = [];
+    if (candidates.length > 1 && item.name) {
+      let bestCand: Student | null = null;
+      let maxScore = 0;
+
+      candidates.forEach(cand => {
+        const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+        const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+        const totalScore = Math.max(scoreBn, scoreEn);
+        if (totalScore > maxScore && totalScore >= 3) {
+          maxScore = totalScore;
+          bestCand = cand;
         }
-      } else {
-        candidates = [];
+      });
+
+      if (bestCand) {
+        candidates = [bestCand];
       }
     }
 
@@ -519,7 +573,6 @@ function resolveIndividualAttendance(
 
   return { matchedList, unmatchedList, matchedByClass };
 }
-
 export default function Home() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -989,34 +1042,64 @@ export default function Home() {
       if (aiTask === 'attendance') {
         let rawStudentsList: ExtractedStudentItem[] = [];
 
-        if (Array.isArray(result.students) && result.students.length > 0) {
-          rawStudentsList = result.students;
-        } else if (Array.isArray(result.classesAttendance) && result.classesAttendance.length > 0) {
+        // 1. Check classesAttendance first if multiple classes are grouped
+        if (Array.isArray(result.classesAttendance) && result.classesAttendance.length > 0) {
           result.classesAttendance.forEach((ca: any) => {
+            const classId = normalizeClassId(ca.className);
             if (Array.isArray(ca.students) && ca.students.length > 0) {
               ca.students.forEach((st: any) => {
-                rawStudentsList.push({ ...st, className: st.className || ca.className });
+                rawStudentsList.push({
+                  ...st,
+                  roll: Number(st.roll),
+                  className: normalizeClassId(st.className) || classId
+                });
               });
             } else {
               (ca.presentRolls || []).forEach((r: number) => {
-                rawStudentsList.push({ roll: r, className: ca.className, status: 'present' });
+                rawStudentsList.push({ roll: Number(r), className: classId, status: 'present' });
               });
               (ca.absentRolls || []).forEach((r: number) => {
-                rawStudentsList.push({ roll: r, className: ca.className, status: 'absent' });
+                rawStudentsList.push({ roll: Number(r), className: classId, status: 'absent' });
               });
             }
           });
-        } else {
-          (result.presentRolls || []).forEach((r: number) => {
-            rawStudentsList.push({ roll: r, className: result.className || null, status: 'present' });
-          });
-          (result.absentRolls || []).forEach((r: number) => {
-            rawStudentsList.push({ roll: r, className: result.className || null, status: 'absent' });
+        }
+
+        // 2. Also merge from root students array
+        if (Array.isArray(result.students) && result.students.length > 0) {
+          result.students.forEach((s: any) => {
+            rawStudentsList.push({
+              ...s,
+              roll: Number(s.roll),
+              className: normalizeClassId(s.className)
+            });
           });
         }
 
+        // 3. Fallback to root presentRolls / absentRolls if still empty
+        if (rawStudentsList.length === 0) {
+          const rootClass = normalizeClassId(result.className);
+          (result.presentRolls || []).forEach((r: number) => {
+            rawStudentsList.push({ roll: Number(r), className: rootClass, status: 'present' });
+          });
+          (result.absentRolls || []).forEach((r: number) => {
+            rawStudentsList.push({ roll: Number(r), className: rootClass, status: 'absent' });
+          });
+        }
+
+        // De-duplicate items by roll + className + name
+        const uniqueStudents: ExtractedStudentItem[] = [];
+        const seenKeys = new Set<string>();
+        rawStudentsList.forEach(st => {
+          const key = `${st.roll}_${st.className || ''}_${(st.name || '').trim()}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueStudents.push(st);
+          }
+        });
+
         const { matchedList, unmatchedList, matchedByClass } = resolveIndividualAttendance(
-          rawStudentsList,
+          uniqueStudents,
           studentsForYear
         );
 
@@ -1024,15 +1107,19 @@ export default function Home() {
         result.unmatchedStudents = unmatchedList;
         result.matchedByClass = matchedByClass;
 
-        const resolvedClasses = Object.keys(matchedByClass);
-        if (resolvedClasses.length > 0) {
-          setSelectedAiClass(resolvedClasses[0]);
+        const detectedClassList = Object.keys(matchedByClass);
+        if (detectedClassList.length > 1) {
+          // Multi-class auto mode: set to 'all' so all classes are entered together!
+          setSelectedAiClass('all');
+          result.autoResolved = true;
+        } else if (detectedClassList.length === 1) {
+          setSelectedAiClass(detectedClassList[0]);
           result.autoResolved = true;
         } else if (result.className) {
-          setSelectedAiClass(result.className);
+          setSelectedAiClass(normalizeClassId(result.className) || '6');
         }
       } else if (result.className) {
-        setSelectedAiClass(result.className);
+        setSelectedAiClass(normalizeClassId(result.className) || '6');
       }
 
       setAiResult(result);
@@ -1056,9 +1143,11 @@ export default function Home() {
         let holidayFound = false;
 
         const matchedByClass: Record<string, IndividualAttendanceMatch[]> = aiResult.matchedByClass || {};
-        const classesToProcess = Object.keys(matchedByClass).length > 0 
-          ? Object.keys(matchedByClass) 
+        const classesToProcess = (selectedAiClass === 'all' || !selectedAiClass)
+          ? (Object.keys(matchedByClass).length > 0 ? Object.keys(matchedByClass) : ['6'])
           : [selectedAiClass];
+
+        let totalSavedStudents = 0;
 
         for (const dStr of datesToProcess) {
           const activeHoliday = await isHoliday(db, dStr);
@@ -1075,6 +1164,7 @@ export default function Home() {
             if (classStudents.length === 0) continue;
 
             const classMatchedList = matchedByClass[cls] || [];
+            totalSavedStudents += classMatchedList.length;
 
             const attendanceData: StudentAttendance[] = classStudents.map(student => {
               const matchedRecord = classMatchedList.find(m => 
@@ -1144,9 +1234,12 @@ export default function Home() {
         }
 
         await batch.commit();
+        const classCount = classesToProcess.length;
         toast({ 
-          title: 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে', 
-          description: holidayFound ? 'ছুটির দিনগুলো স্বয়ংক্রিয়ভাবে বাদ দেওয়া হয়েছে।' : '' 
+          title: classCount > 1 
+            ? `${toBengaliNumber(classCount)}টি শ্রেণির হাজিরা সফলভাবে সংরক্ষিত হয়েছে` 
+            : 'হাজিরা সফলভাবে সংরক্ষিত হয়েছে', 
+          description: holidayFound ? 'ছুটির দিনগুলো স্বয়ংক্রিয়ভাবে বাদ দেওয়া হয়েছে।' : `মোট ${toBengaliNumber(totalSavedStudents)} জন শিক্ষার্থীর হাজিরা আপডেট হয়েছে।` 
         });
         refreshDashboardAttendance(studentsForYear);
       } else {
@@ -1531,16 +1624,21 @@ export default function Home() {
                                                       <Badge className="bg-emerald-600 text-[10px] py-0 px-1.5 font-bold">নাম ও রোল দিয়ে শনাক্ত</Badge>
                                                   )}
                                               </div>
-                                              <Select value={selectedAiClass} onValueChange={setSelectedAiClass}>
-                                                  <SelectTrigger className="h-10 font-black border-2 border-slate-200">
-                                                      <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                      {Object.entries(classNamesMap).map(([k, v]) => (
-                                                          <SelectItem key={k} value={k} className="font-bold">{v} শ্রেণি</SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                              </Select>
+                                               <Select value={selectedAiClass} onValueChange={setSelectedAiClass}>
+                                                   <SelectTrigger className="h-10 font-black border-2 border-slate-200">
+                                                       <SelectValue />
+                                                   </SelectTrigger>
+                                                   <SelectContent>
+                                                       {aiResult.matchedByClass && Object.keys(aiResult.matchedByClass).length > 1 && (
+                                                           <SelectItem value="all" className="font-black text-indigo-700 bg-indigo-50">
+                                                               ★ সকল শ্রেণি একসাথে ({toBengaliNumber(Object.keys(aiResult.matchedByClass).length)}টি শ্রেণি)
+                                                           </SelectItem>
+                                                       )}
+                                                       {Object.entries(classNamesMap).map(([k, v]) => (
+                                                           <SelectItem key={k} value={k} className="font-bold">{v} শ্রেণি</SelectItem>
+                                                       ))}
+                                                   </SelectContent>
+                                               </Select>
                                           </div>
 
                                           <div className="space-y-1">
@@ -1622,10 +1720,14 @@ export default function Home() {
                                   </div>
 
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                      <div className="p-2.5 bg-white rounded-xl border">
-                                          <p className="text-[10px] font-black text-muted-foreground uppercase">নির্বাচিত শ্রেণি</p>
-                                          <p className="font-black text-primary text-base">{classNamesMap[selectedAiClass] || selectedAiClass} শ্রেণি</p>
-                                      </div>
+                                       <div className="p-2.5 bg-white rounded-xl border">
+                                           <p className="text-[10px] font-black text-muted-foreground uppercase">নির্বাচিত শ্রেণি</p>
+                                           <p className="font-black text-primary text-base">
+                                               {selectedAiClass === 'all' 
+                                                   ? `সকল শ্রেণি (${toBengaliNumber(Object.keys(aiResult.matchedByClass || {}).length)}টি)` 
+                                                   : `${classNamesMap[selectedAiClass] || selectedAiClass} শ্রেণি`}
+                                           </p>
+                                       </div>
                                       <div className="p-2.5 bg-white rounded-xl border">
                                           <p className="text-[10px] font-black text-muted-foreground uppercase">তারিখ</p>
                                           <p className="font-black text-primary text-base">
@@ -1649,23 +1751,38 @@ export default function Home() {
                                   </div>
 
                                    {aiResult.matchedByClass && Object.keys(aiResult.matchedByClass).length > 0 && (
-                                       <div className="p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-1.5">
-                                           <p className="text-[10px] font-black text-indigo-900 uppercase tracking-wider">শনাক্তকৃত শ্রেণিসমূহ ও শিক্ষার্থী সংখ্যা</p>
+                                       <div className="p-3.5 bg-indigo-50/70 border-2 border-indigo-200 rounded-xl space-y-2">
+                                           <div className="flex items-center justify-between">
+                                               <p className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                                                   <CheckCircle2 className="w-4 h-4 text-indigo-600" /> 
+                                                   শনাক্তকৃত শ্রেণিসমূহ ({toBengaliNumber(Object.keys(aiResult.matchedByClass).length)}টি শ্রেণি, মোট {toBengaliNumber(aiResult.matchedList?.length || 0)} জন):
+                                               </p>
+                                           </div>
                                            <div className="flex flex-wrap gap-2">
                                                {Object.entries(aiResult.matchedByClass).map(([cls, list]: [string, any]) => (
-                                                   <Badge key={cls} variant="secondary" className="bg-white border border-indigo-200 text-indigo-900 font-bold text-xs py-1 px-2.5">
-                                                       {classNamesMap[cls] || cls} শ্রেণি: {toBengaliNumber(list.length)} জন
+                                                   <Badge key={cls} variant="secondary" className="bg-white border-2 border-indigo-200 text-indigo-950 font-black text-xs py-1 px-3 shadow-xs">
+                                                       {classNamesMap[cls] || cls} শ্রেণি: {toBengaliNumber(list.length)} জন শিক্ষার্থী
                                                    </Badge>
                                                ))}
                                            </div>
                                        </div>
                                    )}
-                                  {Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0 && (
-                                      <div className="p-3 bg-white rounded-xl border">
-                                          <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1.5">উপস্থিত রোলসমূহ ({toBengaliNumber(aiResult.presentRolls.length)} জন)</p>
+
+                                   {Array.isArray(aiResult.presentRolls) && aiResult.presentRolls.length > 0 && (
+                                       <div className="p-3 bg-white rounded-xl border">
+                                           <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider mb-1.5">উপস্থিত রোলসমূহ ({toBengaliNumber(aiResult.presentRolls.length)} জন)</p>
+                                           <div className="flex flex-wrap gap-1.5">
+                                               {aiResult.presentRolls.map((r: any) => (
+                                                   <span key={r} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-black text-xs rounded-md">
+                                                       {toBengaliNumber(r)}
+                                                   </span>
+                                               ))}
+                                           </div>
+                                       </div>
+                                   )}
 
                                    {Array.isArray(aiResult.unmatchedStudents) && aiResult.unmatchedStudents.length > 0 && (
-                                       <div className="p-3.5 bg-rose-50 border-2 border-rose-200 rounded-xl space-y-2">
+                                       <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-2">
                                            <p className="text-xs font-black text-rose-800 flex items-center gap-1.5">
                                                <AlertCircle className="w-4 h-4 text-rose-600" />
                                                শ্রেণি মিল পাওয়া যায়নি এমন শিক্ষার্থী ({toBengaliNumber(aiResult.unmatchedStudents.length)} জন):
@@ -1685,23 +1802,17 @@ export default function Home() {
                                            </p>
                                        </div>
                                    )}
-                                          <div className="flex flex-wrap gap-1.5">
-                                              {aiResult.presentRolls.map((r: any) => (
-                                                  <span key={r} className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-black text-xs rounded-md">
-                                                      {toBengaliNumber(r)}
-                                                  </span>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  )}
-
                                   <div className="mt-4 flex justify-end">
-                                      <Button onClick={applyAiData} disabled={isSavingQuickAttendance} className="bg-emerald-600 hover:bg-emerald-700 font-black px-8 h-12 shadow-lg gap-2 text-base">
-                                          {isSavingQuickAttendance ? <Loader2 className="animate-spin h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
-                                          {applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 1 
-                                              ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি তারিখে প্রয়োগ করুন`
-                                              : `${toBengaliNumber(selectedAiDate)} তারিখের তথ্য সিস্টেমে প্রয়োগ করুন`}
-                                      </Button>
+                                       <Button onClick={applyAiData} disabled={isSavingQuickAttendance} className="bg-emerald-600 hover:bg-emerald-700 font-black px-8 h-12 shadow-lg gap-2 text-base">
+                                           {isSavingQuickAttendance ? <Loader2 className="animate-spin h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                                           {selectedAiClass === 'all'
+                                               ? (applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 1
+                                                   ? `সকল (${toBengaliNumber(Object.keys(aiResult.matchedByClass || {}).length)})টি শ্রেণির (${toBengaliNumber(aiResult.dates.length)})টি তারিখের তথ্য প্রয়োগ করুন`
+                                                   : `সকল (${toBengaliNumber(Object.keys(aiResult.matchedByClass || {}).length)})টি শ্রেণির ${toBengaliNumber(aiResult.matchedList?.length || 0)} জন শিক্ষার্থীর তথ্য প্রয়োগ করুন`)
+                                               : (applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 1 
+                                                   ? `সকল (${toBengaliNumber(aiResult.dates.length)})টি তারিখে প্রয়োগ করুন`
+                                                   : `${toBengaliNumber(selectedAiDate)} তারিখের তথ্য সিস্টেমে প্রয়োগ করুন`)}
+                                       </Button>
                                   </div>
                               </CardContent>
                           </Card>

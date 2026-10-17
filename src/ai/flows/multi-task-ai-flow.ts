@@ -57,44 +57,45 @@ export const multiTaskAiFlow = ai.defineFlow(
          { date: "YYYY-MM-DD", year: "YYYY", month: "MM", presentRolls: [1, 2, ...], absentRolls: [...] }
        ]
 
-2. MULTI-CLASS & HANDWRITING RECOGNITION (একাধিক শ্রেণি ও হাতের লেখা শনাক্তকরণ):
-   - HANDWRITING: Accurately read handwritten Bengali rolls (১, ২, ৩...), handwritten names, and attendance marks (টিক চিহ্ন ✓, P, উপস্থিত, cross ✗, A, অনুপস্থিত, বা ফাঁকা ঘর)।
-   - MULTIPLE CLASSES SUPPORT: If the document contains attendance for MORE THAN ONE CLASS (e.g. ৬ষ্ঠ ও ৭ম শ্রেণি একসাথে, বা একাধিক শ্রেণির রোল লেখা আছে):
-     * Extract attendance grouped by class in 'classesAttendance' array:
+2. MULTI-CLASS & 100+ STUDENTS RECOGNITION (একসাথে একাধিক শ্রেণি ও ১০০+ শিক্ষার্থী নিখুঁত শনাক্তকরণ):
+   - HANDWRITING & MASSIVE DOCUMENTS: Accurately read handwritten Bengali rolls (১, ২, ৩...), handwritten names, and attendance marks (টিক চিহ্ন ✓, P, উপস্থিত, cross ✗, A, অনুপস্থিত, বা ফাঁকা ঘর)।
+   - MULTIPLE CLASSES SUPPORT (একসাথে একাধিক শ্রেণি):
+     * A document or uploaded file can contain 100+ students belonging to MULTIPLE CLASSES (e.g. ৬ষ্ঠ, ৭ম, ৮ম, ৯ম, ১০ম শ্রেণি একসাথে বা আলাদা আলাদা পৃষ্ঠায়/সেকশনে)।
+     * Scan all section headers, table titles, column headings, or row prefixes (e.g. '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10') to identify which class each student belongs to.
+     * For EVERY student, extract their own 'className' ('6', '7', '8', '9', '10' etc.).
+     * NEVER lump all students into one single class if different classes are present!
+     * If the document groups attendance by class, extract 'classesAttendance' array:
        [
          { 
            className: "6", 
            presentRolls: [1, 2, 3], 
            absentRolls: [4], 
-           students: [{ roll: 1, name: "...", status: "present" }],
+           students: [{ roll: 1, name: "...", status: "present", dailyAttendance: [{ date: "YYYY-MM-DD", status: "present" }] }],
            attendanceByDate?: [{ date: "YYYY-MM-DD", presentRolls: [1, 2], absentRolls: [3] }]
          },
          { 
            className: "7", 
            presentRolls: [1, 5], 
            absentRolls: [2], 
-           students: [{ roll: 1, name: "...", status: "present" }] 
+           students: [{ roll: 1, name: "...", status: "present", dailyAttendance: [{ date: "YYYY-MM-DD", status: "present" }] }] 
          }
        ]
-   - IF SINGLE CLASS:
-     * Set className ('6', '7', '8', '9', '10' or null if not written).
-     * If no class is explicitly written, set className to null; the system will match student names and rolls with database.
-    - For EVERY student in the document/image/PDF, extract into the 'students' array:
-      * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
-      * name: student name in Bengali (hastily handwritten names should be interpreted to closest Bengali phonetic match)
-      * className: class if explicitly written ('6', '7', '8', '9', '10') or null if not specified
-      * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা)
-      * dailyAttendance: Array of presence/absence for EACH date column detected in the document:
-        [
-          { date: "YYYY-MM-DD", status: "present" | "absent" }
-        ]
-    - CRITICAL ZERO-DROP & INDIVIDUAL ROLL/DATE RULE:
-      * Do NOT omit any roll or date from the uploaded file. Every single roll and every date column must be recorded.
-      * Do NOT merge students across classes or assume all rolls belong to the same class or month.
-      * If a student is marked on multiple dates, provide their exact presence/absence for EACH date separately in dailyAttendance.
-    - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
-    - absentRolls: array of absent roll numbers (e.g. [4])
-    - totalStudents, totalPresent, totalAbsent
+   - For EVERY student in the document/image/PDF (even if 100+ students), extract into the 'students' array:
+     * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
+     * name: student name in Bengali (keep as close as possible to handwritten/printed name)
+     * className: class ('6', '7', '8', '9', '10') or null if not identified
+     * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা)
+     * dailyAttendance: Array of presence/absence for EACH date column detected in the document:
+       [
+         { date: "YYYY-MM-DD", status: "present" | "absent" }
+       ]
+   - CRITICAL ZERO-DROP & INDIVIDUAL ROLL/DATE RULE:
+     * Do NOT omit any roll or date from the uploaded file. Every single roll and every date column must be recorded.
+     * Do NOT merge students across classes or assume all rolls belong to the same class or month.
+     * If a student is marked on multiple dates, provide their exact presence/absence for EACH date separately in dailyAttendance.
+   - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
+   - absentRolls: array of absent roll numbers (e.g. [4])
+   - totalStudents, totalPresent, totalAbsent
    - description: Bengali summary of what was extracted (e.g. '২০২৫ সালের সেপ্টেম্বর মাসের ৬ষ্ঠ শ্রেণির এবং ২০২৬ সালের ৭ম শ্রেণির হাজিরা শনাক্ত হয়েছে।')
    - actionPlan: "নির্দিষ্ট শিক্ষাবর্ষ, শ্রেণি ও তারিখসমূহ অনুযায়ী নির্ভুলভাবে ডাটাবেজে সংরক্ষণ করা হবে।"`,
 
@@ -153,9 +154,9 @@ GENERAL RULES:
 
     const availableKeys = getAvailableApiKeys();
     const candidateModels = [
-      'googleai/gemini-flash-lite-latest',
       'googleai/gemini-flash-latest',
       'googleai/gemini-3.5-flash',
+      'googleai/gemini-flash-lite-latest',
     ];
 
     let lastError: any = null;
@@ -175,6 +176,8 @@ GENERAL RULES:
             prompt: parts,
             config: {
               responseMimeType: 'application/json',
+              maxOutputTokens: 16384,
+              temperature: 0.1,
             },
           });
 
