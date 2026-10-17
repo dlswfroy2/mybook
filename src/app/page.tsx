@@ -1172,72 +1172,130 @@ export default function Home() {
         const datesToProcess = (applyToAllDates && Array.isArray(aiResult.dates) && aiResult.dates.length > 0) 
           ? aiResult.dates 
           : [selectedAiDate];
-        const batch = writeBatch(db);
-        let holidayFound = false;
+
+        // 1. Fetch holidays in a single bulk query (instead of N sequential network calls)
+        const holidayDateSet = new Set<string>();
+        try {
+          const holidaySnap = await getDocs(collection(db, 'holidays'));
+          holidaySnap.docs.forEach(docSnap => {
+            const hDate = docSnap.data()?.date;
+            if (hDate) holidayDateSet.add(hDate);
+          });
+        } catch (e) {
+          console.warn('Could not fetch bulk holidays:', e);
+        }
 
         const matchedByClass: Record<string, IndividualAttendanceMatch[]> = aiResult.matchedByClass || {};
         const classesToProcess = (selectedAiClass === 'all' || !selectedAiClass)
           ? (Object.keys(matchedByClass).length > 0 ? Object.keys(matchedByClass) : ['6'])
           : [selectedAiClass];
 
+        // 2. Pre-index students by class
+        const studentsByClass: Record<string, Student[]> = {};
+        studentsForYear.forEach(s => {
+          const c = String(s.className);
+          if (!studentsByClass[c]) studentsByClass[c] = [];
+          studentsByClass[c].push(s);
+        });
+
+        // 3. Pre-index matched records by studentId and roll with O(1) map, including daily attendance lookup map
+        const classMatchedLookups: Record<string, {
+          byId: Map<string, IndividualAttendanceMatch>;
+          byRoll: Map<number, IndividualAttendanceMatch>;
+          dailyMap: Map<string, Map<string, 'present' | 'absent'>>;
+        }> = {};
+
+        for (const cls of classesToProcess) {
+          const byId = new Map<string, IndividualAttendanceMatch>();
+          const byRoll = new Map<number, IndividualAttendanceMatch>();
+          const dailyMap = new Map<string, Map<string, 'present' | 'absent'>>();
+
+          const classMatchedList = matchedByClass[cls] || [];
+          classMatchedList.forEach(m => {
+            if (m.dbStudent?.id) byId.set(m.dbStudent.id, m);
+            if (m.extractedStudent?.roll !== undefined) byRoll.set(Number(m.extractedStudent.roll), m);
+
+            if (Array.isArray(m.extractedStudent.dailyAttendance)) {
+              const dMap = new Map<string, 'present' | 'absent'>();
+              m.extractedStudent.dailyAttendance.forEach(d => {
+                if (d.date && d.status) dMap.set(d.date, d.status);
+              });
+              if (m.dbStudent?.id) dailyMap.set(`id_${m.dbStudent.id}`, dMap);
+              if (m.extractedStudent?.roll !== undefined) dailyMap.set(`roll_${Number(m.extractedStudent.roll)}`, dMap);
+            }
+          });
+
+          classMatchedLookups[cls] = { byId, byRoll, dailyMap };
+        }
+
+        // 4. Pre-index attendanceByDate for rapid lookup
+        const attendanceByDateMap = new Map<string, { presentSet: Set<number>; absentSet: Set<number> }>();
+        if (Array.isArray(aiResult.attendanceByDate)) {
+          aiResult.attendanceByDate.forEach((d: any) => {
+            if (d.date) {
+              attendanceByDateMap.set(d.date, {
+                presentSet: new Set(d.presentRolls || []),
+                absentSet: new Set(d.absentRolls || [])
+              });
+            }
+          });
+        }
+        const rootPresentSet = new Set(Array.isArray(aiResult.presentRolls) ? aiResult.presentRolls.map(Number) : []);
+
         let totalSavedStudents = 0;
+        let holidayFound = false;
+
+        // Batch writer with automatic chunking (Firestore limit is 500 per batch)
+        let currentBatch = writeBatch(db);
+        let batchOpCount = 0;
+        const commitPromises: Promise<void>[] = [];
 
         for (const dStr of datesToProcess) {
-          const activeHoliday = await isHoliday(db, dStr);
+          const isHolidayActive = holidayDateSet.has(dStr);
           const dateObj = new Date(dStr);
           const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
 
-          if (activeHoliday || isWeekend) {
+          if (isHolidayActive || isWeekend) {
             holidayFound = true;
             continue; 
           }
 
+          const dayDateRes = attendanceByDateMap.get(dStr);
+
           for (const cls of classesToProcess) {
-            const classStudents = studentsForYear.filter(s => String(s.className) === String(cls));
+            const classStudents = studentsByClass[cls] || [];
             if (classStudents.length === 0) continue;
 
-            const classMatchedList = matchedByClass[cls] || [];
-            totalSavedStudents += classMatchedList.length;
+            const lookup = classMatchedLookups[cls];
+            totalSavedStudents += (matchedByClass[cls] || []).length;
 
             const attendanceData: StudentAttendance[] = classStudents.map(student => {
-              const matchedRecord = classMatchedList.find(m => 
-                (m.dbStudent && m.dbStudent.id === student.id) || 
-                (student.roll !== undefined && Number(m.extractedStudent.roll) === Number(student.roll))
-              );
+              const matchedRecord = lookup?.byId.get(student.id) || 
+                (student.roll !== undefined ? lookup?.byRoll.get(Number(student.roll)) : undefined);
 
               let status: 'present' | 'absent' = 'absent';
 
               if (matchedRecord) {
-                if (Array.isArray(matchedRecord.extractedStudent.dailyAttendance)) {
-                  const dayEntry = matchedRecord.extractedStudent.dailyAttendance.find(d => d.date === dStr);
-                  if (dayEntry) {
-                    status = dayEntry.status;
+                const sDailyMap = lookup?.dailyMap.get(`id_${student.id}`) || 
+                  (student.roll !== undefined ? lookup?.dailyMap.get(`roll_${Number(student.roll)}`) : undefined);
+
+                if (sDailyMap && sDailyMap.has(dStr)) {
+                  status = sDailyMap.get(dStr)!;
+                } else if (dayDateRes) {
+                  if (student.roll !== undefined && dayDateRes.presentSet.has(Number(student.roll))) {
+                    status = 'present';
+                  } else if (student.roll !== undefined && dayDateRes.absentSet.has(Number(student.roll))) {
+                    status = 'absent';
                   } else {
-                    status = matchedRecord.extractedStudent.status || 'present';
-                  }
-                } else if (Array.isArray(aiResult.attendanceByDate)) {
-                  const dayRes = aiResult.attendanceByDate.find((d: any) => d.date === dStr);
-                  if (dayRes) {
-                    if (Array.isArray(dayRes.presentRolls) && student.roll !== undefined && dayRes.presentRolls.includes(Number(student.roll))) {
-                      status = 'present';
-                    } else if (Array.isArray(dayRes.absentRolls) && student.roll !== undefined && dayRes.absentRolls.includes(Number(student.roll))) {
-                      status = 'absent';
-                    } else {
-                      status = matchedRecord.extractedStudent.status || 'absent';
-                    }
-                  } else {
-                    status = matchedRecord.extractedStudent.status || 'present';
+                    status = matchedRecord.extractedStudent.status || 'absent';
                   }
                 } else {
                   status = matchedRecord.extractedStudent.status || 'present';
                 }
               } else {
-                if (Array.isArray(aiResult.attendanceByDate)) {
-                  const dayRes = aiResult.attendanceByDate.find((d: any) => d.date === dStr);
-                  if (dayRes && Array.isArray(dayRes.presentRolls) && student.roll !== undefined && dayRes.presentRolls.includes(Number(student.roll))) {
-                    status = 'present';
-                  }
-                } else if (Array.isArray(aiResult.presentRolls) && student.roll !== undefined && aiResult.presentRolls.includes(Number(student.roll))) {
+                if (dayDateRes && student.roll !== undefined && dayDateRes.presentSet.has(Number(student.roll))) {
+                  status = 'present';
+                } else if (student.roll !== undefined && rootPresentSet.has(Number(student.roll))) {
                   status = 'present';
                 }
               }
@@ -1250,14 +1308,25 @@ export default function Home() {
 
             const docId = `${dStr}_${cls}_${selectedYear}`;
             const docRef = doc(db, 'attendance', docId);
-            batch.set(docRef, {
+            currentBatch.set(docRef, {
               date: dStr,
               academicYear: selectedYear,
               className: cls,
               attendance: attendanceData,
               updatedAt: new Date().toISOString()
             }, { merge: true });
+
+            batchOpCount++;
+            if (batchOpCount >= 400) {
+              commitPromises.push(currentBatch.commit());
+              currentBatch = writeBatch(db);
+              batchOpCount = 0;
+            }
           }
+        }
+
+        if (batchOpCount > 0) {
+          commitPromises.push(currentBatch.commit());
         }
 
         if (holidayFound && !applyToAllDates) {
@@ -1266,7 +1335,7 @@ export default function Home() {
           return;
         }
 
-        await batch.commit();
+        await Promise.all(commitPromises);
         const classCount = classesToProcess.length;
         toast({ 
           title: classCount > 1 
