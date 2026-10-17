@@ -91,6 +91,8 @@ export const multiTaskAiFlow = ai.defineFlow(
        ]
    - CRITICAL ZERO-DROP & INDIVIDUAL ROLL/DATE RULE:
      * Do NOT omit any roll or date from the uploaded file. Every single roll and every date column must be recorded.
+     * Even if a student row has empty, blank, or unmarked attendance cells, ALWAYS extract that student into 'students' with status: 'absent'. NEVER skip any row!
+     * If a page contains a row with a different class or note at the bottom (e.g. roll 1, 1s, or a separate student), extract that student with their exact roll, name, and class!
      * Do NOT merge students across classes or assume all rolls belong to the same class or month.
      * If a student is marked on multiple dates, provide their exact presence/absence for EACH date separately in dailyAttendance.
    - presentRolls: array of present roll numbers (e.g. [1, 2, 3])

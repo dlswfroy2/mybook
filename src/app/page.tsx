@@ -467,6 +467,15 @@ function cleanBengaliText(str?: string): string {
     .toLowerCase()
     .replace(/[.\-_,]/g, ' ')
     .replace(/\b(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|মোহা|শ্রী|শ্রীমতি|md|mst|mohammad|mohammed)\b/gi, '')
+    .replace(/[য়য]/g, 'য')
+    .replace(/[ড়ঢ়]/g, 'র')
+    .replace(/ৎ/g, 'ত')
+    .replace(/ণ/g, 'ন')
+    .replace(/[ষস]/g, 'শ')
+    .replace(/ী/g, 'ি')
+    .replace(/ূ/g, 'ু')
+    .replace(/্/g, '')
+    .replace(/[\u09BC\u09BD\u09CD]/g, '')
     .trim();
 }
 
@@ -530,59 +539,64 @@ function resolveIndividualAttendance(
   const matchedByClass: Record<string, IndividualAttendanceMatch[]> = {};
 
   extractedList.forEach(item => {
-    if (item.roll === undefined || item.roll === null || isNaN(Number(item.roll))) {
-      unmatchedList.push({ extractedStudent: item, isMatched: false });
-      return;
-    }
-
     const rollNum = Number(item.roll);
-    let candidates = allStudents.filter(s => Number(s.roll) === rollNum);
-
-    if (candidates.length === 0) {
-      unmatchedList.push({ extractedStudent: item, isMatched: false });
-      return;
-    }
-
-    let matched: Student | null = null;
     const normItemClass = normalizeClassId(item.className);
 
-    if (candidates.length === 1) {
-      matched = candidates[0];
-    } else {
-      // Multiple candidates share the same roll across different classes.
-      // Match primarily by student name similarity!
-      if (item.name) {
-        let bestCand: Student | null = null;
-        let maxScore = 0;
+    // 1. Search candidates with matching roll
+    const candidates = !isNaN(rollNum) ? allStudents.filter(s => Number(s.roll) === rollNum) : [];
 
-        candidates.forEach(cand => {
+    let matched: Student | null = null;
+
+    if (item.name) {
+      let bestCand: Student | null = null;
+      let maxScore = 0;
+
+      // First check roll candidates
+      candidates.forEach(cand => {
+        const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+        const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+        let totalScore = Math.max(scoreBn, scoreEn);
+
+        // Class match bonus
+        if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
+          totalScore += 5;
+        }
+
+        if (totalScore > maxScore && totalScore >= 3) {
+          maxScore = totalScore;
+          bestCand = cand;
+        }
+      });
+
+      // If no roll candidate had a strong name match (score >= 6),
+      // search all students in the school by name in case roll was misread (e.g. '1s' read as 28)
+      if (maxScore < 6) {
+        allStudents.forEach(cand => {
           const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
           const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
           let totalScore = Math.max(scoreBn, scoreEn);
-
-          // If the AI-extracted class matches this candidate's class, give a small bonus,
-          // but only if the name has at least some match (score >= 3)
           if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
-            totalScore += 2;
+            totalScore += 5;
           }
-
-          if (totalScore > maxScore && totalScore >= 3) {
+          if (totalScore > maxScore && totalScore >= 10) {
             maxScore = totalScore;
             bestCand = cand;
           }
         });
-
-        if (bestCand) {
-          matched = bestCand;
-        }
       }
 
-      // If no name match was found (or item.name was absent), check if explicit className is provided
-      if (!matched && normItemClass) {
+      if (bestCand) {
+        matched = bestCand;
+      }
+    }
+
+    // If no name match was possible but roll matches and class matches
+    if (!matched && candidates.length > 0) {
+      if (normItemClass) {
         const clsCand = candidates.find(s => normalizeClassId(s.className) === normItemClass);
-        if (clsCand) {
-          matched = clsCand;
-        }
+        if (clsCand) matched = clsCand;
+      } else if (candidates.length === 1) {
+        matched = candidates[0];
       }
     }
 
@@ -1076,8 +1090,16 @@ export default function Home() {
       if (aiTask === 'attendance') {
         let rawStudentsList: ExtractedStudentItem[] = [];
 
-        // 1. Check classesAttendance first if multiple classes are grouped
-        if (Array.isArray(result.classesAttendance) && result.classesAttendance.length > 0) {
+        // 1. If result.students is populated, use it as the primary authoritative list
+        if (Array.isArray(result.students) && result.students.length > 0) {
+          result.students.forEach((s: any) => {
+            rawStudentsList.push({
+              ...s,
+              roll: Number(s.roll),
+              className: normalizeClassId(s.className)
+            });
+          });
+        } else if (Array.isArray(result.classesAttendance) && result.classesAttendance.length > 0) {
           result.classesAttendance.forEach((ca: any) => {
             const classId = normalizeClassId(ca.className);
             if (Array.isArray(ca.students) && ca.students.length > 0) {
@@ -1097,21 +1119,8 @@ export default function Home() {
               });
             }
           });
-        }
-
-        // 2. Also merge from root students array
-        if (Array.isArray(result.students) && result.students.length > 0) {
-          result.students.forEach((s: any) => {
-            rawStudentsList.push({
-              ...s,
-              roll: Number(s.roll),
-              className: normalizeClassId(s.className)
-            });
-          });
-        }
-
-        // 3. Fallback to root presentRolls / absentRolls if still empty
-        if (rawStudentsList.length === 0) {
+        } else {
+          // Fallback to root presentRolls / absentRolls if neither students nor classesAttendance exist
           const rootClass = normalizeClassId(result.className);
           (result.presentRolls || []).forEach((r: number) => {
             rawStudentsList.push({ roll: Number(r), className: rootClass, status: 'present' });
@@ -1121,11 +1130,12 @@ export default function Home() {
           });
         }
 
-        // De-duplicate items by roll + className + name
+        // De-duplicate items by roll + cleaned Bengali name
         const uniqueStudents: ExtractedStudentItem[] = [];
         const seenKeys = new Set<string>();
         rawStudentsList.forEach(st => {
-          const key = `${st.roll}_${st.className || ''}_${(st.name || '').trim()}`;
+          const cName = cleanBengaliText(st.name || '');
+          const key = cName ? `${st.roll}_${cName}` : `${st.roll}_${st.className || ''}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             uniqueStudents.push(st);
