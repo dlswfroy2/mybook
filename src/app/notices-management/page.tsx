@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { format } from "date-fns";
 import { bn } from 'date-fns/locale';
-import { useToast } from "@/hooks/use-toast";
+import { useToast, toast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore, useUser, useDoc } from '@/firebase';
 import { collection, onSnapshot, query, orderBy, limit, Timestamp, doc } from 'firebase/firestore';
@@ -188,17 +188,13 @@ export default function NoticeManagementPage() {
     const handleToggleScrolling = (id: string, currentStatus: boolean) => {
         if (!db) return;
         updateNoticeScrolling(db, id, !currentStatus);
-        const { toast } = import("@/hooks/use-toast").then(({ toast }) => {
-            toast({ title: 'স্ক্রল স্ট্যাটাস পরিবর্তন হয়েছে' });
-        });
+        toast({ title: 'স্ক্রল স্ট্যাটাস পরিবর্তন হয়েছে' });
     };
 
     const handleDelete = (id: string) => {
         if (!db) return;
         deleteNotice(db, id);
-        const { toast } = import("@/hooks/use-toast").then(({ toast }) => {
-            toast({ title: 'নোটিশ মুছে ফেলা হয়েছে' });
-        });
+        toast({ title: 'নোটিশ মুছে ফেলা হয়েছে' });
     };
 
     const handlePrint = (notice: Notice) => {
