@@ -79,14 +79,22 @@ export const multiTaskAiFlow = ai.defineFlow(
    - IF SINGLE CLASS:
      * Set className ('6', '7', '8', '9', '10' or null if not written).
      * If no class is explicitly written, set className to null; the system will match student names and rolls with database.
-   - For EVERY student in the document, extract:
-     * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
-     * name: student name in Bengali (hastily handwritten names should be interpreted to closest Bengali phonetic match)
-     * className: class if identifiable ('6', '7', '8', '9', '10') or null
-     * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা).
-   - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
-   - absentRolls: array of absent roll numbers (e.g. [4])
-   - totalStudents, totalPresent, totalAbsent
+    - For EVERY student in the document/image/PDF, extract into the 'students' array:
+      * roll: integer (convert Bengali digits ১..১০ to standard 1..10)
+      * name: student name in Bengali (hastily handwritten names should be interpreted to closest Bengali phonetic match)
+      * className: class if explicitly written ('6', '7', '8', '9', '10') or null if not specified
+      * status: 'present' (if marked P, উপস্থিত, টিকচিহ্ন ✓, বা রোল লেখা আছে), or 'absent' (if marked A, অনুপস্থিত, ক্রস ✗, বা ফাঁকা)
+      * dailyAttendance: Array of presence/absence for EACH date column detected in the document:
+        [
+          { date: "YYYY-MM-DD", status: "present" | "absent" }
+        ]
+    - CRITICAL ZERO-DROP & INDIVIDUAL ROLL/DATE RULE:
+      * Do NOT omit any roll or date from the uploaded file. Every single roll and every date column must be recorded.
+      * Do NOT merge students across classes or assume all rolls belong to the same class or month.
+      * If a student is marked on multiple dates, provide their exact presence/absence for EACH date separately in dailyAttendance.
+    - presentRolls: array of present roll numbers (e.g. [1, 2, 3])
+    - absentRolls: array of absent roll numbers (e.g. [4])
+    - totalStudents, totalPresent, totalAbsent
    - description: Bengali summary of what was extracted (e.g. '২০২৫ সালের সেপ্টেম্বর মাসের ৬ষ্ঠ শ্রেণির এবং ২০২৬ সালের ৭ম শ্রেণির হাজিরা শনাক্ত হয়েছে।')
    - actionPlan: "নির্দিষ্ট শিক্ষাবর্ষ, শ্রেণি ও তারিখসমূহ অনুযায়ী নির্ভুলভাবে ডাটাবেজে সংরক্ষণ করা হবে।"`,
 
