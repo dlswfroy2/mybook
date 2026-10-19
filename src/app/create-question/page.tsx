@@ -141,6 +141,11 @@ function CreateQuestionContent() {
   const [aiCount, setAiCount] = useState<number>(3);
   const [aiTopic, setAiTopic] = useState('');
 
+  // Set A / Set B States
+  const [questionSet, setQuestionSet] = useState<'A' | 'B' | 'both'>('A');
+  const [questionsB, setQuestionsB] = useState<Question[]>([]);
+  const [activeSet, setActiveSet] = useState<'A' | 'B'>('A');
+
   const handleGenerateAiQuestions = async () => {
     if (!meta.classId || !meta.subject) {
       toast({
@@ -175,7 +180,11 @@ function CreateQuestionContent() {
         section: meta.currentSection,
       }));
 
-      setQuestions((prev) => [...prev, ...newGeneratedList]);
+      if (activeSet === 'B') {
+        setQuestionsB((prev) => [...prev, ...newGeneratedList]);
+      } else {
+        setQuestions((prev) => [...prev, ...newGeneratedList]);
+      }
       setAiModalOpen(false);
       toast({
         title: 'প্রশ্নপত্র প্রস্তুত! 🎉',
@@ -249,7 +258,11 @@ function CreateQuestionContent() {
   const subjects = useMemo(() => meta.classId ? getSubjectsForClass(meta.classId) : [], [meta.classId]);
   const chapters = useMemo(() => (meta.classId && meta.subject) ? getChaptersForSubject(meta.classId, meta.subject) : [], [meta.classId, meta.subject]);
 
-  const handleAddQuestion = (type: 'creative' | 'short' | 'mcq') => { setQuestions(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), type, content: '', imageUrl: '', section: meta.currentSection }]); };
+  const handleAddQuestion = (type: 'creative' | 'short' | 'mcq') => {
+    const newQ = { id: Math.random().toString(36).substr(2, 9), type, content: '', imageUrl: '', section: meta.currentSection };
+    if (activeSet === 'B') setQuestionsB(prev => [...prev, newQ]);
+    else setQuestions(prev => [...prev, newQ]);
+  };
 
   const handleSaveToDb = () => {
     if (!user || !db) return; setSaving(true);
@@ -320,7 +333,20 @@ function CreateQuestionContent() {
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-3 gap-3">
-            <h3 className="text-lg font-bold">প্রশ্নসমূহ ({toBengaliNumber(questions.length)})</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-bold">প্রশ্নসমূহ ({toBengaliNumber(activeSet === 'A' ? questions.length : questionsB.length)})</h3>
+              {/* Set A / Set B toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveSet('A')}
+                  className={`px-3 py-1 text-xs font-black rounded-md transition-all ${activeSet === 'A' ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-white'}`}
+                >সেট A</button>
+                <button
+                  onClick={() => setActiveSet('B')}
+                  className={`px-3 py-1 text-xs font-black rounded-md transition-all ${activeSet === 'B' ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-white'}`}
+                >সেট B</button>
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -412,10 +438,16 @@ function CreateQuestionContent() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          {questions.map((q, idx) => (
+          {(activeSet === 'A' ? questions : questionsB).map((q, idx) => (
             <Card key={q.id} className={cn("relative border-l-4 animate-in slide-in-from-right-2 duration-300", q.type === 'mcq' ? 'border-l-orange-500' : q.type === 'short' ? 'border-l-accent' : 'border-l-primary')}>
-              <div className="absolute top-2 right-2 no-print flex gap-1"><Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => setQuestions(prev => prev.filter(item => item.id !== q.id))}><Trash2 className="w-4 h-4" /></Button></div>
-              <CardContent className="pt-6 space-y-4"><div className="flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[10px] font-bold rounded ${q.type === 'mcq' ? 'bg-orange-100 text-orange-600' : q.type === 'short' ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'}`}>{q.type === 'mcq' ? 'বহুনির্বাচনি' : q.type === 'short' ? 'সংক্ষিপ্ত' : 'সৃজনশীল'}</span><span className="text-sm font-bold">প্রশ্ন নং: {isEnglish ? (idx + 1) : toBengaliNumber(idx + 1)}</span></div><Textarea placeholder="উদ্দীপক ও প্রশ্ন ক. খ. গ. ঘ. সহ লিখুন..." value={q.content} onChange={e => setQuestions(prev => prev.map(item => item.id === q.id ? {...item, content: e.target.value} : item))} className="min-h-[120px] text-sm font-bold" /></CardContent>
+              <div className="absolute top-2 right-2 no-print flex gap-1"><Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => {
+                if (activeSet === 'A') setQuestions(prev => prev.filter(item => item.id !== q.id));
+                else setQuestionsB(prev => prev.filter(item => item.id !== q.id));
+              }}><Trash2 className="w-4 h-4" /></Button></div>
+              <CardContent className="pt-6 space-y-4"><div className="flex items-center gap-2 flex-wrap"><span className={`px-2 py-0.5 text-[10px] font-bold rounded ${q.type === 'mcq' ? 'bg-orange-100 text-orange-600' : q.type === 'short' ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'}`}>{q.type === 'mcq' ? 'বহুনির্বাচনি' : q.type === 'short' ? 'সংক্ষিপ্ত' : 'সৃজনশীল'}</span><span className="text-sm font-bold">প্রশ্ন নং: {isEnglish ? (idx + 1) : toBengaliNumber(idx + 1)}</span></div><Textarea placeholder="উদ্দীপক ও প্রশ্ন ক. খ. গ. ঘ. সহ লিখুন..." value={q.content} onChange={e => {
+                const updated = (activeSet === 'A' ? questions : questionsB).map(item => item.id === q.id ? {...item, content: e.target.value} : item);
+                if (activeSet === 'A') setQuestions(updated); else setQuestionsB(updated);
+              }} className="min-h-[120px] text-sm font-bold" /></CardContent>
             </Card>
           ))}
         </div>
@@ -442,6 +474,7 @@ function CreateQuestionContent() {
                   <h2 className="text-[15pt] font-bold text-black mt-2 underline">{meta.exam}</h2>
                   <div className="flex justify-between items-center text-[12pt] font-bold mt-6 px-4">
                     <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
+                     {questionsB.length > 0 && <span className="text-[14pt] font-black border-2 border-black px-3 py-0.5">সেট: ক (A)</span>}
                     <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
                   </div>
                   <div className="flex justify-between items-center text-[11pt] font-bold mt-2 px-4 italic border-t pt-1 border-dashed border-slate-300">
@@ -473,6 +506,39 @@ function CreateQuestionContent() {
                   <span>{appName} - ডিজিটাল প্রশ্ন ব্যাংক</span>
                 </footer>
              </div>
+
+             {/* ── SET B page (only if Set B has questions) ── */}
+             {questionsB.length > 0 && (
+               <div className="paper shadow-2xl bg-white relative overflow-hidden p-[0.7in] font-kalpurush set-b-page" style={{ width: '8.27in', minHeight: '11.69in' }}>
+                  <header className="text-center border-b-2 border-black pb-2 mb-6">
+                    <h1 className="font-black text-[24pt] text-black leading-tight uppercase">{meta.institution || appName}</h1>
+                    <h2 className="text-[15pt] font-bold text-black mt-2 underline">{meta.exam}</h2>
+                    <div className="flex justify-between items-center text-[12pt] font-bold mt-6 px-4">
+                      <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
+                      <span className="text-[14pt] font-black border-2 border-black px-3 py-0.5">সেট: খ (B)</span>
+                      <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11pt] font-bold mt-2 px-4 italic border-t pt-1 border-dashed border-slate-300">
+                      <span>সময়: {meta.time}</span>
+                      <span>পূর্ণমান: {toBengaliNumber(meta.totalMarks)}</span>
+                    </div>
+                  </header>
+                  <div className="space-y-8 text-black text-[11pt]">
+                     {questionsB.map((q, idx) => (
+                       <div key={q.id} className="space-y-3">
+                         <div className="flex gap-2 font-bold">
+                           <span className="shrink-0">{isEnglish ? (idx + 1) : toBengaliNumber(idx + 1)}.</span>
+                           <div className="flex-1 whitespace-pre-wrap leading-relaxed text-justify" dangerouslySetInnerHTML={{ __html: formatMath(q.content) }} />
+                         </div>
+                       </div>
+                     ))}
+                  </div>
+                  <footer className="mt-auto pt-10 flex justify-between text-[8pt] font-bold text-slate-400">
+                    <span>মুদ্রিত তারিখ: {format(new Date(), 'dd/MM/yyyy')}</span>
+                    <span>{appName} - ডিজিটাল প্রশ্ন ব্যাংক</span>
+                  </footer>
+               </div>
+             )}
           </main>
         </div>
       )}
@@ -493,6 +559,7 @@ function CreateQuestionContent() {
           .no-print { display: none !important; }
           .print-view-container { position: absolute !important; top: 0 !important; left: 0 !important; margin: 0 !important; padding: 0 !important; background: white !important; width: 100% !important; }
           .paper { width: 8.27in !important; min-height: 11.69in !important; margin: 0 !important; padding: 0.7in !important; box-shadow: none !important; }
+          .set-b-page { page-break-before: always !important; }
           @page { size: A4; margin: 0 !important; }
         }
       `}} />
