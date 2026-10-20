@@ -177,6 +177,66 @@ function EditableContentArea({
     }
   }, []);
 
+  // Paste হলে raw HTML বা inline style বাদ দিয়ে শুধু clean content রাখুন
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const clipboardData = e.clipboardData;
+
+    // প্রথমে HTML চেষ্টা করুন — style/data-* strip করে
+    const htmlData = clipboardData.getData('text/html');
+    if (htmlData) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = htmlData;
+      // সমস্ত element থেকে ক্ষতিকর attribute সরান
+      tmp.querySelectorAll('*').forEach((el) => {
+        // style ও সমস্ত data-* attribute সরান
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+        el.removeAttribute('id');
+        Array.from(el.attributes).forEach((attr) => {
+          if (attr.name.startsWith('data-') || attr.name.startsWith('on')) {
+            el.removeAttribute(attr.name);
+          }
+        });
+        // Google Docs থেকে আসা b, span ইত্যাদি unwrap করুন যদি শুধু styling এর জন্য
+        if (['SPAN', 'FONT'].includes(el.tagName) && el.attributes.length === 0) {
+          const parent = el.parentNode;
+          if (parent) {
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            parent.removeChild(el);
+          }
+        }
+      });
+      // meta/script/style ট্যাগ সরান
+      tmp.querySelectorAll('meta, script, style, head, html, body').forEach((el) => el.remove());
+      const cleanHtml = tmp.innerHTML;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const fragment = range.createContextualFragment(cleanHtml);
+        range.insertNode(fragment);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } else {
+      // HTML না থাকলে plain text ইনসার্ট করুন
+      const text = clipboardData.getData('text/plain');
+      if (text) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(text));
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     // Support Tab / Shift+Tab to navigate table cells or add rows
     if (e.key === 'Tab') {
@@ -256,6 +316,7 @@ function EditableContentArea({
       onFocus={onFocus}
       onClick={onClick}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
       onBlur={(e) => {
         const val = e.currentTarget.innerHTML;
         onBlur(val);
