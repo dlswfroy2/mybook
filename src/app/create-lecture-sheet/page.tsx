@@ -394,7 +394,7 @@ function CreateLectureSheetContent() {
     
     const initialStyles: Record<number, any> = {}, initialManual: Record<number, string> = {};
     pagesToRender.forEach((p, i) => { 
-      initialStyles[i] = pageStyles[i] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: marginT, mB: mB, mL: marginL, mR: marginR }; 
+      initialStyles[i] = pageStyles[i] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: marginT, mB: mB, mL: marginL, mR: marginR, columns: 1, columnRule: false, orientation: 'portrait', border: 'none' }; 
       initialManual[i] = p; 
     });
     setPageStyles(initialStyles); 
@@ -407,7 +407,7 @@ function CreateLectureSheetContent() {
 
   const updatePageStyle = useCallback((idx: number, key: string, val: any) => { 
     setPageStyles(prev => {
-      const current = prev[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5 };
+      const current = prev[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, columns: 1, columnRule: false, orientation: 'portrait', border: 'none' };
       return { ...prev, [idx]: { ...current, [key]: val } };
     }); 
   }, [globalFontSize, globalLineHeight]);
@@ -1080,6 +1080,56 @@ function CreateLectureSheetContent() {
             totalPages={paginatedPages.length}
             zoomLevel={previewZoom}
             onZoomChange={setPreviewZoom}
+            currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
+            currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
+            onColumnsChange={(cols, hasRule) => {
+              if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'columns', cols);
+                updatePageStyle(activeEditIdx, 'columnRule', !!hasRule);
+              } else {
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'columns', cols);
+                  updatePageStyle(i, 'columnRule', !!hasRule);
+                });
+              }
+            }}
+            currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
+            onOrientationChange={(orient) => {
+              if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'orientation', orient);
+              } else {
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'orientation', orient);
+                });
+              }
+            }}
+            onMarginPresetChange={(preset) => {
+              const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
+              if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'mT', mVal);
+                updatePageStyle(activeEditIdx, 'mB', mVal);
+                updatePageStyle(activeEditIdx, 'mL', mVal);
+                updatePageStyle(activeEditIdx, 'mR', mVal);
+              } else {
+                setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'mT', mVal);
+                  updatePageStyle(i, 'mB', mVal);
+                  updatePageStyle(i, 'mL', mVal);
+                  updatePageStyle(i, 'mR', mVal);
+                });
+              }
+            }}
+            currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
+            onPageBorderChange={(border) => {
+              if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'border', border);
+              } else {
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'border', border);
+                });
+              }
+            }}
           />
           <div className="flex-1 flex overflow-hidden">
             <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
@@ -1157,8 +1207,16 @@ function CreateLectureSheetContent() {
                {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5 };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
+                 const isLandscape = style.orientation === 'landscape';
+                 const pWidth = isLandscape ? '11.69in' : '8.27in';
+                 const pHeight = isLandscape ? '8.27in' : '11.69in';
+                 const borderCss = style.border === 'thin' ? '1.5px solid #000' :
+                                   style.border === 'double' ? '3.5px double #000' :
+                                   style.border === 'box' ? '2.5px solid #1e293b' : undefined;
+                 const cols = style.columns || 1;
+                 const hasRule = style.columnRule || false;
                  return (
-                 <div key={idx} className={cn(`paper paper-idx-${idx} shadow-2xl bg-white relative overflow-hidden shrink-0 group transition-all`, activeEditIdx === idx && "ring-4 ring-blue-500 shadow-blue-200")} style={{ width: '8.27in', height: '11.69in', padding: `${marginT}in ${marginR}in ${marginB}in ${marginL}in`, lineHeight: '1.2', boxSizing: 'border-box' }}>
+                 <div key={idx} className={cn(`paper paper-idx-${idx} shadow-2xl bg-white relative overflow-hidden shrink-0 group transition-all`, activeEditIdx === idx && "ring-4 ring-blue-500 shadow-blue-200")} style={{ width: pWidth, height: pHeight, padding: `${marginT}in ${marginR}in ${marginB}in ${marginL}in`, lineHeight: '1.2', boxSizing: 'border-box', border: borderCss }}>
                     <div className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 flex gap-2"><Button size="sm" variant={activeEditIdx === idx ? 'default' : 'secondary'} className="gap-2 font-bold shadow-lg" onClick={() => setActiveEditIdx(idx)}><Edit3 className="w-3.5 h-3.5" /> এডিট করুন</Button><Button size="sm" variant="destructive" className="gap-2 font-bold shadow-lg" onClick={() => { if(!confirm("মুছে ফেলবেন?")) return; const newP = paginatedPages.filter((_, i) => i !== idx); setPaginatedPages(newP); }}><Trash2 className="w-3.5 h-3.5" /> মুছে ফেলুন</Button></div>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden" style={{ opacity: (printSettings.watermarkOpacity || 0) / 100, transform: `rotate(${printSettings.watermarkRotation || 0}deg)`, whiteSpace: 'nowrap' }}>
                       {printSettings.watermarkType === 'image' && printSettings.watermarkImageUrl ? (<img src={printSettings.watermarkImageUrl} alt="Watermark" style={{ width: `${printSettings.watermarkImageSize || 70}%`, height: 'auto', objectFit: 'contain' }} />) : (<span className="font-black text-black" style={{ fontSize: `${(printSettings.watermarkImageSize || 80) * 1.2}pt` }}>{printSettings.watermarkText || data.institution || softwareConfig?.appName || 'টপ গ্রেড'}</span>)}
@@ -1169,7 +1227,7 @@ function CreateLectureSheetContent() {
                         <div className="flex justify-center gap-8 text-[10pt] font-bold mt-1"><span>শ্রেণি: {CLASSES.find(c => c.id === data.classId)?.label || ''} শ্রেণি</span><span>বিষয়: {data.subject}</span></div>
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
-                      <div contentEditable={activeEditIdx === idx} onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }} onFocus={() => setActiveEditIdx(idx)} className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/20 p-1 rounded border border-dashed border-blue-300")} style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%' }} dangerouslySetInnerHTML={{ __html: manualPages[idx] || pageHtml }} />
+                      <div contentEditable={activeEditIdx === idx} onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }} onFocus={() => setActiveEditIdx(idx)} className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/20 p-1 rounded border border-dashed border-blue-300")} style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%', columnCount: cols, columnGap: cols > 1 ? '0.35in' : undefined, columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined }} dangerouslySetInnerHTML={{ __html: manualPages[idx] || pageHtml }} />
                       <footer className="mt-auto pt-4 flex justify-between text-[9pt] font-bold border-t border-slate-200"><span>পাতা: {toBengaliNumber(idx + 1)} / {toBengaliNumber(paginatedPages.length)}</span><span>{softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস'}</span></footer>
                     </div>
                  </div>
@@ -1192,6 +1250,10 @@ function CreateLectureSheetContent() {
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
           .paper { color: black !important; overflow: hidden; display: flex; flex-direction: column; }
+          .callout-note-box { position: relative; }
+          .callout-note-box .callout-delete-btn { opacity: 0.6; transition: opacity 0.2s, background 0.2s; }
+          .callout-note-box:hover .callout-delete-btn { opacity: 1; }
+          .callout-delete-btn:hover { background: #fee2e2 !important; color: #b91c1c !important; }
           .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           .no-arrows { -moz-appearance: textfield; }

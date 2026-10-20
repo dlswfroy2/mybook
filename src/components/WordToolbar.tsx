@@ -38,7 +38,20 @@ import {
   Info,
   Check,
   Calculator,
-  Type
+  Type,
+  Columns2,
+  Columns3,
+  Square,
+  RectangleHorizontal,
+  RectangleVertical,
+  Calendar,
+  Divide,
+  CornerDownLeft,
+  Scissors,
+  Copy,
+  TableProperties,
+  ArrowRight,
+  Maximize2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -46,6 +59,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -65,6 +81,15 @@ export interface WordToolbarProps {
   totalPages?: number;
   zoomLevel?: number;
   onZoomChange?: (zoom: number) => void;
+  // Page Layout Props
+  onColumnsChange?: (cols: number, hasRule?: boolean) => void;
+  currentColumns?: number;
+  currentColumnRule?: boolean;
+  onOrientationChange?: (orientation: 'portrait' | 'landscape') => void;
+  currentOrientation?: 'portrait' | 'landscape';
+  onMarginPresetChange?: (preset: 'normal' | 'narrow' | 'wide') => void;
+  onPageBorderChange?: (borderStyle: 'none' | 'thin' | 'double' | 'box') => void;
+  currentPageBorder?: string;
   className?: string;
 }
 
@@ -75,12 +100,21 @@ export function WordToolbar({
   totalPages = 1,
   zoomLevel = 100,
   onZoomChange,
+  onColumnsChange,
+  currentColumns = 1,
+  currentColumnRule = false,
+  onOrientationChange,
+  currentOrientation = 'portrait',
+  onMarginPresetChange,
+  onPageBorderChange,
+  currentPageBorder = 'none',
   className
 }: WordToolbarProps) {
   const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
+  const [tableBorderType, setTableBorderType] = useState<'solid' | 'double' | 'dashed'>('solid');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [symbolsOpen, setSymbolsOpen] = useState(false);
@@ -128,6 +162,114 @@ export function WordToolbar({
     }
   };
 
+  // Table manipulation helpers
+  const getActiveTableCell = (): HTMLTableCellElement | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    let node: Node | null = sel.anchorNode;
+    while (node) {
+      if (node.nodeName === 'TD' || node.nodeName === 'TH') return node as HTMLTableCellElement;
+      node = node.parentNode;
+    }
+    return null;
+  };
+
+  const insertTableRow = (below = true) => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
+    const tr = td.closest('tr');
+    const table = td.closest('table');
+    if (!tr || !table) return;
+    const colCount = tr.children.length;
+    const newTr = document.createElement('tr');
+    for (let i = 0; i < colCount; i++) {
+      const newTd = document.createElement('td');
+      newTd.style.border = '1px solid #000';
+      newTd.style.padding = '6px 10px';
+      newTd.innerHTML = '<br/>';
+      newTr.appendChild(newTd);
+    }
+    if (below) {
+      tr.parentNode?.insertBefore(newTr, tr.nextSibling);
+    } else {
+      tr.parentNode?.insertBefore(newTr, tr);
+    }
+  };
+
+  const insertTableColumn = (right = true) => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
+    const tr = td.closest('tr');
+    const table = td.closest('table');
+    if (!tr || !table) return;
+    const colIndex = Array.from(tr.children).indexOf(td);
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(r => {
+      const newTd = document.createElement('td');
+      newTd.style.border = '1px solid #000';
+      newTd.style.padding = '6px 10px';
+      newTd.innerHTML = '<br/>';
+      const refChild = r.children[right ? colIndex + 1 : colIndex];
+      if (refChild) {
+        r.insertBefore(newTd, refChild);
+      } else {
+        r.appendChild(newTd);
+      }
+    });
+  };
+
+  const deleteTableRow = () => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
+    const tr = td.closest('tr');
+    if (tr) tr.remove();
+  };
+
+  const deleteTableColumn = () => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
+    const tr = td.closest('tr');
+    const table = td.closest('table');
+    if (!tr || !table) return;
+    const colIndex = Array.from(tr.children).indexOf(td);
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(r => {
+      if (r.children[colIndex]) {
+        r.children[colIndex].remove();
+      }
+    });
+  };
+
+  const deleteActiveTable = () => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
+    const table = td.closest('table');
+    if (table) table.remove();
+  };
+
+  // Delete active callout box
+  const deleteActiveNoteBox = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return alert('মুছে ফেলার জন্য নোট বক্সের ভেতরে ক্লিক করুন।');
+    let node: Node | null = sel.anchorNode;
+    while (node) {
+      if (node instanceof HTMLElement && node.classList.contains('callout-note-box')) {
+        node.remove();
+        return;
+      }
+      node = node.parentNode;
+    }
+    // Fallback: look for last callout box in active paper
+    const activeEl = document.querySelector('.paper.ring-4 .callout-note-box') || 
+                     document.querySelector('.callout-note-box:hover') ||
+                     document.querySelector('.callout-note-box');
+    if (activeEl) {
+      activeEl.remove();
+    } else {
+      alert('কোনো নোট বক্স খুঁজে পাওয়া যায়নি। নোট বক্সের ভেতরে ক্লিক করে আবার চাপুন।');
+    }
+  };
+
   // Font families supported
   const FONT_FAMILIES = [
     { label: 'কালপুরুষ (Kalpurush)', value: "'Kalpurush', sans-serif" },
@@ -149,7 +291,6 @@ export function WordToolbar({
     { label: '2.0 (দ্বিগুণ)', value: '2.0' },
   ];
 
-  // Quick Colors
   const TEXT_COLORS = [
     { label: 'কালো', value: '#000000' },
     { label: 'গাঢ় নীল', value: '#1e3a8a' },
@@ -176,7 +317,7 @@ export function WordToolbar({
     '²', '³', '⁴', 'ⁿ', '₁', '₂', '₃', '½', '¼', '¾', '∈', '∉', '⊂', '⊆', '∪', '∩'
   ];
 
-  // Callout Boxes
+  // Callout Boxes - with explicit delete button and proper container
   const CALLOUT_BOXES = [
     {
       title: 'বিশেষ দ্রষ্টব্য (নীল)',
@@ -206,11 +347,20 @@ export function WordToolbar({
       icon: '✓',
       label: 'উদাহরণ:'
     },
+    {
+      title: 'প্রশ্ন বা টাস্ক বক্স (গাঢ় ধূসর)',
+      border: '#475569',
+      bg: '#f8fafc',
+      icon: '📝',
+      label: 'অনুশীলন কাজ:'
+    }
   ];
 
   // Insert Table
   const handleInsertTable = () => {
-    let tableHtml = `<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: 1.5px solid #000; font-size: inherit;">\n<tbody>\n`;
+    const borderStyleCss = tableBorderType === 'double' ? '3px double #000' : 
+                           tableBorderType === 'dashed' ? '1.5px dashed #000' : '1.5px solid #000';
+    let tableHtml = `<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: ${borderStyleCss}; font-size: inherit;">\n<tbody>\n`;
     for (let r = 0; r < tableRows; r++) {
       tableHtml += `  <tr>\n`;
       for (let c = 0; c < tableCols; c++) {
@@ -226,10 +376,11 @@ export function WordToolbar({
     setTableDialogOpen(false);
   };
 
-  // Insert Callout Box
+  // Insert Callout Box WITH 1-click delete button (hidden on print)
   const handleInsertCallout = (box: typeof CALLOUT_BOXES[0]) => {
     const boxHtml = `
-      <div style="border-left: 4px solid ${box.border}; background-color: ${box.bg}; padding: 10px 14px; margin: 10px 0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <div class="callout-note-box relative group" style="border-left: 4px solid ${box.border}; background-color: ${box.bg}; padding: 10px 14px; margin: 12px 0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative;">
+        <button type="button" contenteditable="false" class="no-print callout-delete-btn" onclick="this.closest('.callout-note-box').remove()" title="নোট বক্সটি মুছে ফেলুন" style="position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: rgba(0,0,0,0.08); color: #dc2626; border: 1px solid rgba(0,0,0,0.15); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; line-height: 1;">✕</button>
         <p style="margin: 0; font-weight: bold; color: ${box.border}; display: flex; align-items: center; gap: 6px;">
           <span>${box.icon}</span> <span>${box.label}</span>
         </p>
@@ -238,6 +389,49 @@ export function WordToolbar({
       <p><br/></p>
     `;
     insertHtmlAtCursor(boxHtml);
+  };
+
+  // Insert MCQ 4-Option Grid (ক, খ, গ, ঘ)
+  const handleInsertMcqGrid = () => {
+    const mcqHtml = `
+      <table style="width: 100%; border-collapse: collapse; margin: 8px 0; border: none; font-size: inherit;">
+        <tbody>
+          <tr>
+            <td style="width: 50%; padding: 4px 8px; border: none;">(ক) অপশন ১</td>
+            <td style="width: 50%; padding: 4px 8px; border: none;">(খ) অপশন ২</td>
+          </tr>
+          <tr>
+            <td style="width: 50%; padding: 4px 8px; border: none;">(গ) অপশন ৩</td>
+            <td style="width: 50%; padding: 4px 8px; border: none;">(ঘ) অপশন ৪</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><br/></p>
+    `;
+    insertHtmlAtCursor(mcqHtml);
+  };
+
+  // Insert Fraction (ভগ্নাংশ)
+  const handleInsertFraction = () => {
+    const fracHtml = `
+      <span class="math-frac" style="display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.9em; margin: 0 3px;">
+        <span class="math-num" style="border-bottom: 1px solid currentColor; padding: 0 3px;">লব</span>
+        <span class="math-den" style="padding: 0 3px;">হর</span>
+      </span>&nbsp;
+    `;
+    insertHtmlAtCursor(fracHtml);
+  };
+
+  // Insert Today's Date
+  const handleInsertDate = (bengali = true) => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    const dateStr = `${day}/${month}/${year}`;
+    const resultStr = bengali ? dateStr.replace(/\d/g, d => bengaliDigits[parseInt(d)]) : dateStr;
+    insertHtmlAtCursor(`<strong>তারিখ: ${resultStr}</strong> `);
   };
 
   // Insert Image from file
@@ -287,7 +481,6 @@ export function WordToolbar({
         exec('fontSize', '3');
       }
     } else {
-      // Apply to active editable
       const activeEl = document.querySelector('.content-area:focus') || 
                        document.querySelector('.paper.ring-4 .content-area');
       if (activeEl instanceof HTMLElement) {
@@ -544,7 +737,6 @@ export function WordToolbar({
 
             {/* Colors: Text & Highlight */}
             <div className="flex items-center gap-1 border-r border-slate-300 pr-2">
-              {/* Font Color Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -581,7 +773,6 @@ export function WordToolbar({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Highlight Color Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -734,20 +925,57 @@ export function WordToolbar({
         {/* ═══════════ TAB 2: INSERT (ইনসার্ট) ═══════════ */}
         {activeTab === 'insert' && (
           <>
-            {/* Insert Table Button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => setTableDialogOpen(true)}
-              className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
-            >
-              <TableIcon className="w-4 h-4 text-indigo-600" />
-              ছক / টেবিল যোগ করুন
-            </Button>
+            {/* 1. Table Menu with Complete Controls */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+                >
+                  <TableIcon className="w-4 h-4 text-indigo-600" />
+                  ছক / টেবিল
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => setTableDialogOpen(true)} 
+                  className="text-xs font-bold cursor-pointer text-indigo-700 flex items-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" /> নতুন টেবিল ইনসার্ট করুন...
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">টেবিল এডিটিং টুলস:</div>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => insertTableRow(false)} className="text-xs font-bold cursor-pointer">
+                  উপরে সারি যোগ করুন (Row Above)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => insertTableRow(true)} className="text-xs font-bold cursor-pointer">
+                  নিচে সারি যোগ করুন (Row Below)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => insertTableColumn(false)} className="text-xs font-bold cursor-pointer">
+                  বামে কলাম যোগ করুন (Column Left)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => insertTableColumn(true)} className="text-xs font-bold cursor-pointer">
+                  ডানে কলাম যোগ করুন (Column Right)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={deleteTableRow} className="text-xs font-bold cursor-pointer text-amber-700">
+                  বর্তমান সারি মুছুন (Delete Row)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={deleteTableColumn} className="text-xs font-bold cursor-pointer text-amber-700">
+                  বর্তমান কলাম মুছুন (Delete Column)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={deleteActiveTable} className="text-xs font-bold cursor-pointer text-destructive">
+                  পুরো টেবিল মুছুন (Delete Table)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            {/* Insert Image Button */}
+            {/* 2. Insert Image Button */}
             <Button
               type="button"
               variant="outline"
@@ -760,50 +988,79 @@ export function WordToolbar({
               ছবি যোগ করুন
             </Button>
 
-            {/* Horizontal Line */}
+            {/* 3. Callout Box Dropdown & Delete Tool */}
+            <div className="flex items-center gap-1 border-l border-r border-slate-300 px-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    নোট বক্স
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
+                  {CALLOUT_BOXES.map(box => (
+                    <DropdownMenuItem
+                      key={box.title}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => handleInsertCallout(box)}
+                      className="text-xs font-bold cursor-pointer flex items-center gap-2 hover:bg-indigo-50"
+                    >
+                      <span>{box.icon}</span>
+                      <span>{box.title}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Dedicated Note Box Delete Button to fix user issue! */}
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={deleteActiveNoteBox}
+                className="h-8 px-2 text-xs font-bold rounded border border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-1 shadow-xs transition-colors"
+                title="কার্সর যেখানে আছে সেই নোট বক্সটি সম্পূর্ণ মুছে ফেলুন"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                নোট বক্স মুছুন
+              </button>
+            </div>
+
+            {/* 4. MCQ 4-Option Grid */}
             <Button
               type="button"
               variant="outline"
               size="sm"
               onMouseDown={e => e.preventDefault()}
-              onClick={() => insertHtmlAtCursor('<hr style="border: none; border-top: 1.5px solid #000; margin: 12px 0;" /><p><br/></p>')}
+              onClick={handleInsertMcqGrid}
               className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+              title="MCQ এর ৪টি অপশন ক, খ, গ, ঘ গ্রিড ছক ইনসার্ট করুন"
             >
-              <Minus className="w-4 h-4" />
-              বিভাজক রেখা
+              <FileText className="w-4 h-4 text-orange-600" />
+              MCQ অপশন ছক
             </Button>
 
-            {/* Callout Box Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={e => e.preventDefault()}
-                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  নোট বক্স / বিশেষ দ্রষ্টব্য
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
-                {CALLOUT_BOXES.map(box => (
-                  <DropdownMenuItem
-                    key={box.title}
-                    onMouseDown={e => e.preventDefault()}
-                    onClick={() => handleInsertCallout(box)}
-                    className="text-xs font-bold cursor-pointer flex items-center gap-2 hover:bg-indigo-50"
-                  >
-                    <span>{box.icon}</span>
-                    <span>{box.title}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* 5. Math Fraction */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onMouseDown={e => e.preventDefault()}
+              onClick={handleInsertFraction}
+              className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+              title="লব ও হর যুক্ত ভগ্নাংশ যোগ করুন"
+            >
+              <Divide className="w-4 h-4 text-purple-600" />
+              ভগ্নাংশ
+            </Button>
 
-            {/* Math & Special Symbols Palette Dropdown */}
+            {/* 6. Math & Special Symbols Palette Dropdown */}
             <DropdownMenu open={symbolsOpen} onOpenChange={setSymbolsOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -814,7 +1071,7 @@ export function WordToolbar({
                   className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
                 >
                   <Calculator className="w-4 h-4 text-purple-600" />
-                  প্রতীক ও গাণিতিক চিহ্ন
+                  প্রতীক ও চিহ্ন
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
@@ -838,42 +1095,245 @@ export function WordToolbar({
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* 7. Date & Horizontal Line */}
+            <div className="flex items-center gap-1 border-l border-slate-300 pl-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => handleInsertDate(true)}
+                className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+                title="আজকের তারিখ যোগ করুন"
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                তারিখ
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => insertHtmlAtCursor('<hr style="border: none; border-top: 1.5px solid #000; margin: 12px 0;" /><p><br/></p>')}
+                className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-700 shadow-xs"
+                title="অনুভূমিক বিভাজক দাগ যোগ করুন"
+              >
+                <Minus className="w-4 h-4" />
+                দাগ
+              </Button>
+            </div>
           </>
         )}
 
         {/* ═══════════ TAB 3: PAGE LAYOUT (পেজ লেআউট) ═══════════ */}
         {activeTab === 'layout' && (
           <>
-            {onAddPage && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onMouseDown={e => e.preventDefault()}
-                onClick={onAddPage}
-                className="h-8 gap-1.5 font-bold text-xs bg-white border-emerald-500 text-emerald-700 hover:bg-emerald-50 shadow-xs"
-              >
-                <Plus className="w-4 h-4" />
-                নতুন পাতা যোগ করুন
-              </Button>
-            )}
+            {/* 1. Multi-Column Controls (কলাম যোগ করুন - ১ কলাম, ২ কলাম, ৩ কলাম ও মাঝে দাগ) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-indigo-400 text-indigo-700 hover:bg-indigo-50 shadow-xs"
+                  title="পৃষ্ঠার লেখাগুলো একাধিক কলামে বিভক্ত করুন"
+                >
+                  <Columns2 className="w-4 h-4 text-indigo-600" />
+                  <span>কলাম ({currentColumns === 2 ? '২টি' : currentColumns === 3 ? '৩টি' : '১টি'})</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
+                <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের সংখ্যা নির্বাচন:</div>
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onColumnsChange?.(1, false)} 
+                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 1 && "bg-indigo-50 text-indigo-700")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Square className="w-4 h-4 text-slate-500" />
+                    <span>১টি কলাম (সাধারণ / ফুল পেজ)</span>
+                  </div>
+                  {currentColumns === 1 && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onColumnsChange?.(2, currentColumnRule)} 
+                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 2 && "bg-indigo-50 text-indigo-700")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Columns2 className="w-4 h-4 text-indigo-600" />
+                    <span>২টি কলাম (প্রশ্নপত্র ও লেকচার শিট)</span>
+                  </div>
+                  {currentColumns === 2 && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onColumnsChange?.(3, currentColumnRule)} 
+                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 3 && "bg-indigo-50 text-indigo-700")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Columns3 className="w-4 h-4 text-indigo-600" />
+                    <span>৩টি কলাম (নিউজলেটার / তিন সারি)</span>
+                  </div>
+                  {currentColumns === 3 && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
 
-            {onDeletePage && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onMouseDown={e => e.preventDefault()}
-                onClick={onDeletePage}
-                className="h-8 gap-1.5 font-bold text-xs bg-white border-red-300 text-red-600 hover:bg-red-50 shadow-xs"
-              >
-                <Trash2 className="w-4 h-4" />
-                বর্তমান পাতা মুছুন
-              </Button>
-            )}
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের মাঝে বিভাজক দাগ:</div>
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onColumnsChange?.(currentColumns || 2, !currentColumnRule)} 
+                  className="text-xs font-bold cursor-pointer flex items-center justify-between"
+                >
+                  <span>কলামের মাঝে কালো দাগ (Line Between)</span>
+                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", currentColumnRule ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+                    {currentColumnRule ? 'চালু আছে' : 'বন্ধ'}
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <div className="text-xs text-slate-500 font-bold ml-2">
-              💡 পেজের মার্জিন, সাইজ এবং জলছাপ পরিবর্তন করতে বামপাশের সাইডবার ব্যবহার করুন।
+            {/* 2. Orientation (পোর্ট্রেট / ল্যান্ডস্কেপ) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                >
+                  {currentOrientation === 'landscape' ? <RectangleHorizontal className="w-4 h-4 text-blue-600" /> : <RectangleVertical className="w-4 h-4 text-blue-600" />}
+                  <span>{currentOrientation === 'landscape' ? 'ল্যান্ডস্কেপ' : 'পোর্ট্রেট'}</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onOrientationChange?.('portrait')} 
+                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'portrait' && "bg-indigo-50 text-indigo-700")}
+                >
+                  <div className="flex items-center gap-2">
+                    <RectangleVertical className="w-4 h-4" />
+                    <span>পোর্ট্রেট (খাড়া পাতা)</span>
+                  </div>
+                  {currentOrientation === 'portrait' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onMouseDown={e => e.preventDefault()} 
+                  onClick={() => onOrientationChange?.('landscape')} 
+                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'landscape' && "bg-indigo-50 text-indigo-700")}
+                >
+                  <div className="flex items-center gap-2">
+                    <RectangleHorizontal className="w-4 h-4" />
+                    <span>ল্যান্ডস্কেপ (আড়াআড়ি)</span>
+                  </div>
+                  {currentOrientation === 'landscape' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 3. Margin Presets */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                >
+                  <Square className="w-3.5 h-3.5 text-slate-600" />
+                  <span>মার্জিন প্রিসেট</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200">
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('normal')} className="text-xs font-bold cursor-pointer">
+                  সাধারণ (Normal - ০.৫ ইঞ্চি)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('narrow')} className="text-xs font-bold cursor-pointer">
+                  ন্যারো / টাইট (Narrow - ০.২৫ ইঞ্চি)
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('wide')} className="text-xs font-bold cursor-pointer">
+                  চওড়া (Wide - ১.০ ইঞ্চি)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1 text-[10px] text-slate-400">
+                  * নির্দিষ্ট পাতার মার্জিন পরিবর্তন করতে বাম সাইডবার ব্যবহার করুন।
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 4. Page Border Style */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                >
+                  <Square className="w-3.5 h-3.5 text-purple-600" />
+                  <span>পেজ বর্ডার</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('none')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'none' && "bg-indigo-50")}>
+                  <span>বর্ডার ছাড়া (None)</span>
+                  {currentPageBorder === 'none' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('thin')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'thin' && "bg-indigo-50")}>
+                  <span>চিকন বর্ডার (Thin)</span>
+                  {currentPageBorder === 'thin' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('double')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'double' && "bg-indigo-50")}>
+                  <span>ডাবল বর্ডার (Double)</span>
+                  {currentPageBorder === 'double' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('box')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'box' && "bg-indigo-50")}>
+                  <span>বক্স ফ্রেম (Box)</span>
+                  {currentPageBorder === 'box' && <Check className="w-3.5 h-3.5" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* 5. Page Management Controls */}
+            <div className="flex items-center gap-1 border-l border-slate-300 pl-2">
+              {onAddPage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={onAddPage}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-emerald-500 text-emerald-700 hover:bg-emerald-50 shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  নতুন পাতা যোগ
+                </Button>
+              )}
+
+              {onDeletePage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={onDeletePage}
+                  className="h-8 gap-1.5 font-bold text-xs bg-white border-red-300 text-red-600 hover:bg-red-50 shadow-xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  বর্তমান পাতা মুছুন
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -913,8 +1373,36 @@ export function WordToolbar({
                 />
               </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">বর্ডার স্টাইল</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTableBorderType('solid')}
+                  className={cn("h-8 text-xs font-bold rounded border transition-all", tableBorderType === 'solid' ? "bg-indigo-50 border-indigo-600 text-indigo-700" : "border-slate-200")}
+                >
+                  সাধারণ বর্ডার
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableBorderType('double')}
+                  className={cn("h-8 text-xs font-bold rounded border transition-all", tableBorderType === 'double' ? "bg-indigo-50 border-indigo-600 text-indigo-700" : "border-slate-200")}
+                >
+                  ডাবল বর্ডার
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableBorderType('dashed')}
+                  className={cn("h-8 text-xs font-bold rounded border transition-all", tableBorderType === 'dashed' ? "bg-indigo-50 border-indigo-600 text-indigo-700" : "border-slate-200")}
+                >
+                  ড্যাশড বর্ডার
+                </button>
+              </div>
+            </div>
+
             <p className="text-[11px] text-slate-500 font-bold">
-              * তৈরি হওয়ার পর টেবিলে ক্লিক করে সরাসরি যেকোনো তথ্য লিখতে পারবেন।
+              * ইনসার্ট করার পর উপরের 'ছক / টেবিল' মেনু থেকে সারি বা কলাম যোগ/মুছে ফেলতে পারবেন।
             </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
