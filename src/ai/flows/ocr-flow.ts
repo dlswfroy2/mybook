@@ -2,16 +2,15 @@
 
 /**
  * @fileOverview AI-powered OCR flow using Gemini Vision.
- * Supports images (JPG, PNG, WEBP) and multi-page PDF (page-by-page).
+ * Supports images (JPG, PNG, WEBP) and multi-page PDF.
  * Accurately extracts Bengali, English, math formulas, and tables.
  */
 
 import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
 
 export interface AiOcrInput {
-  /** data URI or multiple URIs joined with "|||" for multi-page */
   fileDataUri: string;
-  mimeType: string;
+  mimeType?: string;
 }
 
 export interface AiOcrOutput {
@@ -31,13 +30,14 @@ const OCR_PROMPT = `তুমি একজন বিশ্বমানের OCR
 
 এখন নিচের ডকুমেন্ট থেকে সম্পূর্ণ টেক্সট উদ্ধার করো:`;
 
-async function ocrSingleImage(imageDataUri: string, mimeType: string): Promise<string> {
+async function ocrSingleDocument(dataUri: string): Promise<string> {
   const availableKeys = getAvailableApiKeys();
   const candidateModels = [
     'googleai/gemini-flash-latest',
-    'googleai/gemini-3.5-flash',
     'googleai/gemini-flash-lite-latest',
   ];
+
+  let lastError: any = null;
 
   for (const key of availableKeys) {
     for (const model of candidateModels) {
@@ -47,34 +47,37 @@ async function ocrSingleImage(imageDataUri: string, mimeType: string): Promise<s
           model,
           prompt: [
             { text: OCR_PROMPT },
-            { media: { url: imageDataUri, contentType: mimeType as any } },
+            { media: { url: dataUri } },
           ],
         });
         const text = resp.text?.trim();
-        if (text && text.length > 5) return text;
-      } catch (_err) {
-        // try next model/key
+        if (text && text.length > 3) return text;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[OCR Failover] Key ending ...${key.slice(-4)} with ${model} failed: ${err?.message || err}`);
       }
     }
   }
-  throw new Error('AI OCR ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+
+  throw new Error(lastError?.message || 'AI OCR ব্যর্থ হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
 }
 
 export async function performAiOcr(input: AiOcrInput): Promise<AiOcrOutput> {
-  const { fileDataUri, mimeType } = input;
+  const { fileDataUri } = input;
+  if (!fileDataUri) {
+    throw new Error('কোনো ফাইল ডাটা পাওয়া যায়নি।');
+  }
 
-  // Multi-page: pages joined with "|||"
   if (fileDataUri.includes('|||')) {
     const pages = fileDataUri.split('|||').filter(Boolean);
     const pageTexts: string[] = [];
     for (let i = 0; i < pages.length; i++) {
-      const pageText = await ocrSingleImage(pages[i], 'image/png');
+      const pageText = await ocrSingleDocument(pages[i]);
       pageTexts.push(`--- পৃষ্ঠা ${i + 1} ---\n${pageText}`);
     }
     return { text: pageTexts.join('\n\n'), pageCount: pages.length };
   }
 
-  // Single image
-  const text = await ocrSingleImage(fileDataUri, mimeType);
+  const text = await ocrSingleDocument(fileDataUri);
   return { text, pageCount: 1 };
 }

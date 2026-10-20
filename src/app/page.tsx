@@ -465,8 +465,9 @@ function cleanBengaliText(str?: string): string {
   return str
     .normalize('NFC')
     .toLowerCase()
-    .replace(/[.\-_,]/g, ' ')
-    .replace(/\b(মো|মোঃ|মোহাম্মদ|মোসা|মোসাম্মৎ|মোহা|শ্রী|শ্রীমতি|md|mst|mohammad|mohammed)\b/gi, '')
+    .replace(/[.\-_,:;!?|~`"'/\\()[\]{}<>@#$%^&*+=]/g, ' ')
+    .replace(/(^|\s+)(মো[ঃ:]?|মোঃ|মোহাম্মদ|মোসা[ঃ:]?|মোছা[ঃ:]?|মোসাম্মৎ|মোসাম্মত|মোছাম্মৎ|মোহা|শ্রী|শ্রীমতি|শ্রীমতী|md|mst|mohammad|mohammed)(?=\s+|$)/gi, ' ')
+    .replace(/র্/g, '')
     .replace(/[য়য]/g, 'য')
     .replace(/[ড়ঢ়]/g, 'র')
     .replace(/ৎ/g, 'ত')
@@ -475,9 +476,15 @@ function cleanBengaliText(str?: string): string {
     .replace(/ী/g, 'ি')
     .replace(/ূ/g, 'ু')
     .replace(/্/g, '')
-    .replace(/[\u09BC\u09BD\u09CD]/g, '')
+    .replace(/[\u0982\u0983\u09BC\u09BD\u09CD]/g, '')
     .trim();
 }
+
+const GENERIC_NAME_SUFFIXES = new Set([
+  'আক্তার', 'খাতুন', 'বেগম', 'রানী', 'পারভীন',
+  'ইসলাম', 'হোসেন', 'হাসান', 'আলী', 'মিয়া', 'চৌধুরী',
+  'রায়', 'বর্মন', 'বর্ম্মন', 'শীল', 'দাস', 'সরকার', 'দে'
+].map(s => cleanBengaliText(s)));
 
 function getBengaliNameSimilarity(extractedName: string, dbName: string): number {
   if (!extractedName || !dbName) return 0;
@@ -492,23 +499,42 @@ function getBengaliNameSimilarity(extractedName: string, dbName: string): number
   if (words1.length === 0 || words2.length === 0) return 0;
 
   let score = 0;
+  let hasDistinctiveMatch = false;
+
   for (const w1 of words1) {
+    const isW1Generic = GENERIC_NAME_SUFFIXES.has(w1);
     for (const w2 of words2) {
+      const isW2Generic = GENERIC_NAME_SUFFIXES.has(w2);
+
+      let wordMatch = 0;
       if (w1 === w2) {
-        score += 10;
+        wordMatch = 10;
       } else if (w1.includes(w2) || w2.includes(w1)) {
-        score += 6;
+        wordMatch = 6;
       } else {
         const w1NoReph = w1.replace(/র্/g, '');
         const w2NoReph = w2.replace(/র্/g, '');
         if (w1NoReph === w2NoReph) {
-          score += 8;
+          wordMatch = 8;
         } else if (w1NoReph.includes(w2NoReph) || w2NoReph.includes(w1NoReph)) {
-          score += 5;
+          wordMatch = 5;
+        }
+      }
+
+      if (wordMatch > 0) {
+        score += wordMatch;
+        if (!isW1Generic || !isW2Generic) {
+          hasDistinctiveMatch = true;
         }
       }
     }
   }
+
+  // Reject match if only generic surnames/titles matched with no distinctive name
+  if (!hasDistinctiveMatch) {
+    return 0;
+  }
+
   return score;
 }
 interface ExtractedStudentItem {
@@ -1292,16 +1318,8 @@ export default function Home() {
                   status = sDailyMap.get(dStr)!;
                 } else if (sDailyMap && sDailyMap.size > 0) {
                   status = 'absent';
-                } else if (dayDateRes) {
-                  if (student.roll !== undefined && dayDateRes.presentSet.has(Number(student.roll))) {
-                    status = 'present';
-                  } else if (student.roll !== undefined && dayDateRes.absentSet.has(Number(student.roll))) {
-                    status = 'absent';
-                  } else {
-                    status = matchedRecord.extractedStudent.status || 'absent';
-                  }
                 } else {
-                  status = matchedRecord.extractedStudent.status || 'present';
+                  status = matchedRecord.extractedStudent.status === 'present' ? 'present' : 'absent';
                 }
               } else {
                 status = 'absent';

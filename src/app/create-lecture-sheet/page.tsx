@@ -590,43 +590,89 @@ function CreateLectureSheetContent() {
     window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSave, handleFormatting, activeEditIdx, pageStyles, globalFontSize, updatePageStyle]);
 
+  const compressImageForOcr = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxSide = 1800;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxSide || height > maxSide) {
+            if (width > height) {
+              height = Math.round((height * maxSide) / width);
+              width = maxSide;
+            } else {
+              width = Math.round((width * maxSide) / height);
+              height = maxSide;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(e.target?.result as string);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast({
+        variant: 'destructive',
+        title: 'ফাইলটি অনেক বড়',
+        description: 'দয়া করে ২০ মেগাবাইট বা তার ছোট ফাইল আপলোড করুন।',
+      });
+      return;
+    }
+
     setIsScanning(true);
-    toast({ title: 'AI স্ক্যান শুরু হয়েছে...', description: file.name + ' — Gemini Vision প্রসেস করছে।' });
+    toast({
+      title: 'AI স্ক্যান শুরু হয়েছে...',
+      description: `${file.name} — টেক্সট উদ্ধার করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন।`,
+    });
+
     try {
       let fileDataUri = '';
-      const mimeType = file.type || 'image/png';
+      const mimeType = file.type || 'image/jpeg';
+
       if (file.type === 'application/pdf') {
-        const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@' + pdfjsLib.version + '/build/pdf.worker.min.mjs';
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        toast({ title: 'PDF লোড হয়েছে', description: 'মোট ' + pdf.numPages + 'টি পৃষ্ঠা স্ক্যান হচ্ছে...' });
-        const pageUris = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) continue;
-          await page.render({ canvasContext: ctx as any, canvas, viewport } as any).promise;
-          pageUris.push(canvas.toDataURL('image/png'));
-        }
-        fileDataUri = pageUris.join('|||');
-      } else {
         fileDataUri = await fileToBase64(file);
+      } else {
+        fileDataUri = await compressImageForOcr(file);
       }
+
       const result = await performAiOcr({ fileDataUri, mimeType });
       if (result?.text) {
-        setData(prev => ({ ...prev, content: prev.content ? prev.content + '\n\n' + result.text : result.text }));
-        toast({ title: 'AI স্ক্যান সম্পন্ন!', description: (result.pageCount || 1) + 'টি পৃষ্ঠা থেকে সম্পূর্ণ টেক্সট উদ্ধার হয়েছে।' });
+        setData((prev) => ({
+          ...prev,
+          content: prev.content ? prev.content + '\n\n' + result.text : result.text,
+        }));
+        toast({
+          title: 'AI স্ক্যান সম্পন্ন! 🎉',
+          description: 'সফলভাবে টেক্সট উদ্ধার করে শিটে যুক্ত করা হয়েছে।',
+        });
+      } else {
+        throw new Error('কোনো টেক্সট পাওয়া যায়নি।');
       }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'স্ক্যান ব্যর্থ হয়েছে', description: (error && (error as any).message) ? (error as any).message : 'পুনরায় চেষ্টা করুন।' });
+    } catch (error: any) {
+      console.error('OCR Error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'স্ক্যান ব্যর্থ হয়েছে',
+        description: error?.message || 'পুনরায় চেষ্টা করুন।',
+      });
     } finally {
       setIsScanning(false);
       if (ocrInputRef.current) ocrInputRef.current.value = '';
