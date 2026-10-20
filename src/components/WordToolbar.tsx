@@ -114,34 +114,12 @@ export function WordToolbar({
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
+  const [gridHover, setGridHover] = useState<{ r: number; c: number }>({ r: 3, c: 3 });
   const [tableBorderType, setTableBorderType] = useState<'solid' | 'double' | 'dashed'>('solid');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Reference to preserve last selection range inside .content-area when dialog opens
-  const lastValidRangeRef = useRef<{ range: Range; contentArea: HTMLElement } | null>(null);
-
-  const openTableDialog = () => {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && sel.anchorNode) {
-      let curr: Node | null = sel.anchorNode;
-      while (curr) {
-        if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
-          try {
-            lastValidRangeRef.current = {
-              range: sel.getRangeAt(0).cloneRange(),
-              contentArea: curr
-            };
-          } catch (e) {}
-          break;
-        }
-        curr = curr.parentNode;
-      }
-    }
-    setTableDialogOpen(true);
-  };
 
   // Helper to execute standard execCommand preserving selection
   const exec = (command: string, value: string = '') => {
@@ -154,34 +132,40 @@ export function WordToolbar({
 
   // Helper to insert arbitrary HTML at cursor in the currently focused contentEditable
   const insertHtmlAtCursor = (html: string) => {
+    const activePaperIdx = typeof activePageIndex === 'number' ? activePageIndex : 0;
+    const targetArea = (document.querySelector(`.paper-idx-${activePaperIdx} .content-area`) || 
+                        document.querySelector('.paper.ring-4 .content-area') ||
+                        document.querySelector('.content-area')) as HTMLElement | null;
+
+    if (!targetArea) return;
+
+    // Check if the current selection is inside targetArea
     const sel = window.getSelection();
-    let isInsideValidContentArea = false;
-    let targetArea: HTMLElement | null = null;
-    let targetRange: Range | null = null;
+    let isInside = false;
+    let range: Range | null = null;
 
     if (sel && sel.rangeCount > 0 && sel.anchorNode) {
-      let curr: Node | null = sel.anchorNode;
-      while (curr) {
-        if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
-          isInsideValidContentArea = true;
-          targetArea = curr;
-          targetRange = sel.getRangeAt(0);
+      let node: Node | null = sel.anchorNode;
+      while (node) {
+        if (node === targetArea) {
+          isInside = true;
+          range = sel.getRangeAt(0);
           break;
         }
-        curr = curr.parentNode;
+        node = node.parentNode;
       }
     }
 
-    // If current selection is NOT inside .content-area, use the saved range if valid
-    if (!isInsideValidContentArea && lastValidRangeRef.current && document.body.contains(lastValidRangeRef.current.contentArea)) {
-      targetRange = lastValidRangeRef.current.range;
-      targetArea = lastValidRangeRef.current.contentArea;
-      isInsideValidContentArea = true;
-    }
-
-    if (isInsideValidContentArea && targetRange) {
+    if (isInside && range) {
       try {
-        targetRange.deleteContents();
+        targetArea.focus();
+        if (document.execCommand('insertHTML', false, html)) {
+          return;
+        }
+      } catch (e) {}
+
+      try {
+        range.deleteContents();
         const el = document.createElement('div');
         el.innerHTML = html;
         const frag = document.createDocumentFragment();
@@ -190,7 +174,7 @@ export function WordToolbar({
         while ((node = el.firstChild)) {
           lastNode = frag.appendChild(node);
         }
-        targetRange.insertNode(frag);
+        range.insertNode(frag);
         if (lastNode && sel) {
           const newRange = document.createRange();
           newRange.setStartAfter(lastNode);
@@ -198,24 +182,15 @@ export function WordToolbar({
           sel.removeAllRanges();
           sel.addRange(newRange);
         }
+        return;
       } catch (err) {
         console.warn('Range insertion error, falling back:', err);
-        if (targetArea) {
-          targetArea.insertAdjacentHTML('beforeend', html);
-        }
-      }
-    } else {
-      // Safe fallback: append ONLY to active page's .content-area (never to header or outside)
-      const activePaperIdx = typeof activePageIndex === 'number' ? activePageIndex : 0;
-      const activeEl = (document.querySelector(`.paper-idx-${activePaperIdx} .content-area`) || 
-                        document.querySelector('.paper.ring-4 .content-area') ||
-                        document.querySelector('.content-area')) as HTMLElement | null;
-      if (activeEl) {
-        targetArea = activeEl;
-        activeEl.focus();
-        activeEl.insertAdjacentHTML('beforeend', html);
       }
     }
+
+    // Default fallback: focus into targetArea and append
+    targetArea.focus();
+    targetArea.insertAdjacentHTML('beforeend', html);
   };
 
   // Table manipulation helpers
@@ -422,15 +397,18 @@ export function WordToolbar({
   ];
 
   // Insert Table
-  const handleInsertTable = () => {
-    const borderStyleCss = tableBorderType === 'double' ? '3px double #000' : 
-                           tableBorderType === 'dashed' ? '1.5px dashed #000' : '1.5px solid #000';
+  const handleInsertTable = (customRows?: number, customCols?: number, customBorderType?: 'solid' | 'double' | 'dashed') => {
+    const rCount = customRows || tableRows || 3;
+    const cCount = customCols || tableCols || 3;
+    const bType = customBorderType || tableBorderType || 'solid';
+    const borderStyleCss = bType === 'double' ? '3px double #000' : 
+                           bType === 'dashed' ? '1.5px dashed #000' : '1.5px solid #000';
     let tableHtml = `<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: ${borderStyleCss}; font-size: inherit; table-layout: fixed;">\n<tbody>\n`;
-    for (let r = 0; r < tableRows; r++) {
+    for (let r = 0; r < rCount; r++) {
       tableHtml += `  <tr>\n`;
-      for (let c = 0; c < tableCols; c++) {
+      for (let c = 0; c < cCount; c++) {
         const isHeader = r === 0;
-        tableHtml += `    <td style="border: 1px solid #333; padding: 8px 10px; min-width: 40px; vertical-align: top; ${isHeader ? 'background-color: #f8fafc; font-weight: bold;' : ''}"><br/></td>\n`;
+        tableHtml += `    <td style="border: 1px solid #333; padding: 8px 10px; min-width: 40px; height: 32px; vertical-align: top; ${isHeader ? 'background-color: #f8fafc; font-weight: bold;' : ''}"><br/></td>\n`;
       }
       tableHtml += `  </tr>\n`;
     }
@@ -1003,16 +981,75 @@ export function WordToolbar({
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={openTableDialog} 
-                  className="text-xs font-bold cursor-pointer text-indigo-700 flex items-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5" /> নতুন টেবিল ইনসার্ট করুন...
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">টেবিল এডিটিং টুলস:</div>
+              <DropdownMenuContent align="start" className="font-kalpurush w-64 p-3 bg-white border border-slate-200 shadow-xl">
+                <div className="text-xs font-black text-slate-700 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><TableIcon className="w-3.5 h-3.5 text-indigo-600" /> টেবিল নির্বাচন করুন</span>
+                  <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                    {gridHover.r} × {gridHover.c}
+                  </span>
+                </div>
+
+                {/* 5x5 Visual Quick Selector */}
+                <div className="grid grid-cols-5 gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg mb-3">
+                  {[1, 2, 3, 4, 5].map(r => 
+                    [1, 2, 3, 4, 5].map(c => {
+                      const isHovered = r <= gridHover.r && c <= gridHover.c;
+                      return (
+                        <div
+                          key={`${r}-${c}`}
+                          onMouseEnter={() => setGridHover({ r, c })}
+                          onClick={() => handleInsertTable(r, c)}
+                          className={cn(
+                            "w-8 h-7 rounded border transition-all cursor-pointer flex items-center justify-center text-[10px]",
+                            isHovered 
+                              ? "bg-indigo-600 border-indigo-700 shadow-xs" 
+                              : "bg-white border-slate-300 hover:border-slate-400"
+                          )}
+                          title={`${r} সারি × ${c} কলাম টেবিল ইনসার্ট`}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Quick Rows & Cols Inputs */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">সারি (Rows)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={tableRows}
+                        onChange={e => setTableRows(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-7 text-xs font-bold"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">কলাম (Cols)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={15}
+                        value={tableCols}
+                        onChange={e => setTableCols(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="h-7 text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleInsertTable(tableRows, tableCols)}
+                    className="w-full h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> টেবিল তৈরি করুন
+                  </Button>
+                </div>
+
+                <DropdownMenuSeparator className="my-2" />
+                <div className="px-1 py-1 text-[10px] font-black text-slate-400 uppercase">টেবিল এডিটিং টুলস:</div>
                 <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => insertTableRow(false)} className="text-xs font-bold cursor-pointer">
                   উপরে সারি যোগ করুন (Row Above)
                 </DropdownMenuItem>
@@ -1472,7 +1509,7 @@ export function WordToolbar({
             <Button variant="outline" size="sm" onClick={() => setTableDialogOpen(false)}>
               বাতিল
             </Button>
-            <Button size="sm" onClick={handleInsertTable} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+            <Button size="sm" onClick={() => handleInsertTable(tableRows, tableCols)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
               টেবিল তৈরি করুন
             </Button>
           </DialogFooter>

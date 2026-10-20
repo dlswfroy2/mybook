@@ -169,15 +169,13 @@ function EditableContentArea({
   const ref = useRef<HTMLDivElement>(null);
   const isLoadedRef = useRef(false);
 
+  // Load initial content only once on mount so typing is never interrupted or wiped
   useEffect(() => {
-    if (ref.current) {
-      const isFocused = ref.current.contains(document.activeElement);
-      if (!isLoadedRef.current || (!isFocused && ref.current.innerHTML !== initialHtml)) {
-        ref.current.innerHTML = initialHtml;
-        isLoadedRef.current = true;
-      }
+    if (ref.current && !isLoadedRef.current) {
+      ref.current.innerHTML = initialHtml;
+      isLoadedRef.current = true;
     }
-  }, [initialHtml]);
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     // Support Tab / Shift+Tab to navigate table cells or add rows
@@ -276,7 +274,7 @@ function EditableContentArea({
         textAlign: style.align as any,
         minHeight: 0,
         maxHeight: '100%',
-        columnCount: cols,
+        columnCount: cols > 1 ? cols : undefined,
         columnGap: cols > 1 ? '0.35in' : undefined,
         columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined
       }}
@@ -1397,15 +1395,17 @@ function CreateLectureSheetContent() {
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
+          body { pointer-events: auto !important; }
           .paper { color: black !important; overflow: hidden; display: flex; flex-direction: column; }
           .callout-note-box { position: relative; }
           .callout-note-box .callout-delete-btn { opacity: 0.6; transition: opacity 0.2s, background 0.2s; }
           .callout-note-box:hover .callout-delete-btn { opacity: 1; }
           .callout-delete-btn:hover { background: #fee2e2 !important; color: #b91c1c !important; }
           .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
-          .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; break-inside: avoid; }
-          .content-area table td, .content-area table th { min-width: 30px; min-height: 28px; vertical-align: top; word-break: break-word; cursor: text; }
+          .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
+          .content-area table td, .content-area table th { min-width: 30px; height: 32px; min-height: 32px; padding: 6px 10px; vertical-align: top; word-break: break-word; cursor: text; user-select: text; -webkit-user-select: text; }
           .content-area table td:focus, .content-area table td:focus-visible { outline: 2px solid #2563eb !important; background-color: #eff6ff !important; }
+          .content-area table td * { pointer-events: auto; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           .no-arrows { -moz-appearance: textfield; }
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
