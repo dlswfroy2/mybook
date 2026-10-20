@@ -145,6 +145,145 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+interface EditableContentAreaProps {
+  initialHtml: string;
+  style: any;
+  cols: number;
+  hasRule: boolean;
+  isActive: boolean;
+  onFocus: () => void;
+  onClick: () => void;
+  onBlur: (val: string) => void;
+}
+
+function EditableContentArea({
+  initialHtml,
+  style,
+  cols,
+  hasRule,
+  isActive,
+  onFocus,
+  onClick,
+  onBlur,
+}: EditableContentAreaProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (ref.current) {
+      const isFocused = ref.current.contains(document.activeElement);
+      if (!isLoadedRef.current || (!isFocused && ref.current.innerHTML !== initialHtml)) {
+        ref.current.innerHTML = initialHtml;
+        isLoadedRef.current = true;
+      }
+    }
+  }, [initialHtml]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Support Tab / Shift+Tab to navigate table cells or add rows
+    if (e.key === 'Tab') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+        let node: Node | null = sel.anchorNode;
+        let currentTd: HTMLTableCellElement | null = null;
+        while (node && node !== e.currentTarget) {
+          if (node.nodeName === 'TD' || node.nodeName === 'TH') {
+            currentTd = node as HTMLTableCellElement;
+            break;
+          }
+          node = node.parentNode;
+        }
+        if (currentTd) {
+          e.preventDefault();
+          const table = currentTd.closest('table');
+          if (!table) return;
+          const allCells = Array.from(table.querySelectorAll('td, th'));
+          const currentIndex = allCells.indexOf(currentTd);
+          if (e.shiftKey) {
+            if (currentIndex > 0) {
+              const prevCell = allCells[currentIndex - 1] as HTMLElement;
+              prevCell.focus();
+              const r = document.createRange();
+              r.selectNodeContents(prevCell);
+              r.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            }
+          } else {
+            if (currentIndex < allCells.length - 1) {
+              const nextCell = allCells[currentIndex + 1] as HTMLElement;
+              nextCell.focus();
+              const r = document.createRange();
+              r.selectNodeContents(nextCell);
+              r.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            } else {
+              const tr = currentTd.closest('tr');
+              if (tr) {
+                const colCount = tr.children.length;
+                const newTr = document.createElement('tr');
+                for (let i = 0; i < colCount; i++) {
+                  const newTd = document.createElement('td');
+                  newTd.style.border = '1px solid #333';
+                  newTd.style.padding = '8px 10px';
+                  newTd.style.minWidth = '40px';
+                  newTd.style.verticalAlign = 'top';
+                  newTd.innerHTML = '<br/>';
+                  newTr.appendChild(newTd);
+                }
+                tr.parentNode?.appendChild(newTr);
+                const firstNewCell = newTr.firstElementChild as HTMLElement;
+                if (firstNewCell) {
+                  firstNewCell.focus();
+                  const r = document.createRange();
+                  r.selectNodeContents(firstNewCell);
+                  r.collapse(false);
+                  sel.removeAllRanges();
+                  sel.addRange(r);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  return (
+    <div
+      ref={ref}
+      contentEditable={true}
+      suppressContentEditableWarning={true}
+      onFocus={onFocus}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      onBlur={(e) => {
+        const val = e.currentTarget.innerHTML;
+        onBlur(val);
+      }}
+      className={cn(
+        "content-area flex-1 font-kalpurush outline-none overflow-hidden",
+        isActive && "bg-blue-50/15 ring-1 ring-blue-300 rounded"
+      )}
+      style={{
+        lineHeight: String(style.lineHeight),
+        fontSize: `${style.fontSize}pt`,
+        fontWeight: style.bold ? 'bold' : 'normal',
+        fontStyle: style.italic ? 'italic' : 'normal',
+        textDecoration: style.underline ? 'underline' : 'none',
+        color: style.color,
+        textAlign: style.align as any,
+        minHeight: 0,
+        maxHeight: '100%',
+        columnCount: cols,
+        columnGap: cols > 1 ? '0.35in' : undefined,
+        columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined
+      }}
+    />
+  );
+}
+
 function CreateLectureSheetContent() {
   const db = useFirestore();
   const storage = useStorage();
@@ -1227,16 +1366,15 @@ function CreateLectureSheetContent() {
                         <div className="flex justify-center gap-8 text-[10pt] font-bold mt-1"><span>শ্রেণি: {CLASSES.find(c => c.id === data.classId)?.label || ''} শ্রেণি</span><span>বিষয়: {data.subject}</span></div>
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
-                      <div
-                        contentEditable={true}
-                        suppressContentEditableWarning={true}
-                        onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }}
-                        onInput={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }}
+                      <EditableContentArea
+                        initialHtml={manualPages[idx] !== undefined ? manualPages[idx] : pageHtml}
+                        style={style}
+                        cols={cols}
+                        hasRule={hasRule}
+                        isActive={activeEditIdx === idx}
                         onFocus={() => setActiveEditIdx(idx)}
                         onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
-                        className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/15 ring-1 ring-blue-300 rounded")}
-                        style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%', columnCount: cols, columnGap: cols > 1 ? '0.35in' : undefined, columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined }}
-                        dangerouslySetInnerHTML={{ __html: manualPages[idx] !== undefined ? manualPages[idx] : pageHtml }}
+                        onBlur={(val) => setManualPages(prev => ({ ...prev, [idx]: val }))}
                       />
                       <footer className="mt-auto pt-4 flex justify-between text-[9pt] font-bold border-t border-slate-200"><span>পাতা: {toBengaliNumber(idx + 1)} / {toBengaliNumber(paginatedPages.length)}</span><span>{softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস'}</span></footer>
                     </div>
@@ -1266,8 +1404,8 @@ function CreateLectureSheetContent() {
           .callout-delete-btn:hover { background: #fee2e2 !important; color: #b91c1c !important; }
           .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
           .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; break-inside: avoid; }
-          .content-area table td, .content-area table th { min-width: 30px; min-height: 28px; vertical-align: top; }
-          .content-area table td:focus { outline: 1.5px dashed #3b82f6; }
+          .content-area table td, .content-area table th { min-width: 30px; min-height: 28px; vertical-align: top; word-break: break-word; cursor: text; }
+          .content-area table td:focus, .content-area table td:focus-visible { outline: 2px solid #2563eb !important; background-color: #eff6ff !important; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           .no-arrows { -moz-appearance: textfield; }
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }

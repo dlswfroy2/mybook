@@ -120,52 +120,28 @@ export function WordToolbar({
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
-  // References to preserve last selection range and active table cell inside .content-area
+  // Reference to preserve last selection range inside .content-area when dialog opens
   const lastValidRangeRef = useRef<{ range: Range; contentArea: HTMLElement } | null>(null);
-  const lastActiveTableCellRef = useRef<HTMLTableCellElement | null>(null);
 
-  React.useEffect(() => {
-    const handleSelectionOrFocus = () => {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && sel.anchorNode) {
-        let curr: Node | null = sel.anchorNode;
-        let foundArea: HTMLElement | null = null;
-        let foundCell: HTMLTableCellElement | null = null;
-        while (curr) {
-          if (!foundCell && (curr.nodeName === 'TD' || curr.nodeName === 'TH')) {
-            foundCell = curr as HTMLTableCellElement;
-          }
-          if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
-            foundArea = curr;
-            break;
-          }
-          curr = curr.parentNode;
-        }
-        if (foundArea) {
+  const openTableDialog = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+      let curr: Node | null = sel.anchorNode;
+      while (curr) {
+        if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
           try {
             lastValidRangeRef.current = {
               range: sel.getRangeAt(0).cloneRange(),
-              contentArea: foundArea
+              contentArea: curr
             };
-          } catch (e) {
-            // Ignore cloning errors if range detached
-          }
+          } catch (e) {}
+          break;
         }
-        if (foundCell) {
-          lastActiveTableCellRef.current = foundCell;
-        }
+        curr = curr.parentNode;
       }
-    };
-
-    document.addEventListener('selectionchange', handleSelectionOrFocus);
-    document.addEventListener('mouseup', handleSelectionOrFocus);
-    document.addEventListener('keyup', handleSelectionOrFocus);
-    return () => {
-      document.removeEventListener('selectionchange', handleSelectionOrFocus);
-      document.removeEventListener('mouseup', handleSelectionOrFocus);
-      document.removeEventListener('keyup', handleSelectionOrFocus);
-    };
-  }, []);
+    }
+    setTableDialogOpen(true);
+  };
 
   // Helper to execute standard execCommand preserving selection
   const exec = (command: string, value: string = '') => {
@@ -240,25 +216,17 @@ export function WordToolbar({
         activeEl.insertAdjacentHTML('beforeend', html);
       }
     }
-
-    // Crucial: trigger 'input' event so React manualPages state is updated immediately
-    if (targetArea) {
-      targetArea.dispatchEvent(new Event('input', { bubbles: true }));
-    }
   };
 
   // Table manipulation helpers
   const getActiveTableCell = (): HTMLTableCellElement | null => {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && sel.anchorNode) {
-      let node: Node | null = sel.anchorNode;
-      while (node) {
-        if (node.nodeName === 'TD' || node.nodeName === 'TH') return node as HTMLTableCellElement;
-        node = node.parentNode;
-      }
-    }
-    if (lastActiveTableCellRef.current && document.body.contains(lastActiveTableCellRef.current)) {
-      return lastActiveTableCellRef.current;
+    if (!sel || sel.rangeCount === 0 || !sel.anchorNode) return null;
+    let node: Node | null = sel.anchorNode;
+    while (node) {
+      if (node.nodeName === 'TD' || node.nodeName === 'TH') return node as HTMLTableCellElement;
+      if (node instanceof HTMLElement && node.classList.contains('content-area')) break;
+      node = node.parentNode;
     }
     return null;
   };
@@ -268,7 +236,6 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
-    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colCount = tr.children.length;
     const newTr = document.createElement('tr');
@@ -286,7 +253,6 @@ export function WordToolbar({
     } else {
       tr.parentNode?.insertBefore(newTr, tr);
     }
-    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const insertTableColumn = (right = true) => {
@@ -294,7 +260,6 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
-    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colIndex = Array.from(tr.children).indexOf(td);
     const rows = table.querySelectorAll('tr');
@@ -312,17 +277,14 @@ export function WordToolbar({
         r.appendChild(newTd);
       }
     });
-    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const deleteTableRow = () => {
     const td = getActiveTableCell();
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
-    const contentArea = td.closest('.content-area');
     if (tr) {
       tr.remove();
-      if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
     }
   };
 
@@ -331,7 +293,6 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
-    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colIndex = Array.from(tr.children).indexOf(td);
     const rows = table.querySelectorAll('tr');
@@ -340,17 +301,14 @@ export function WordToolbar({
         r.children[colIndex].remove();
       }
     });
-    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const deleteActiveTable = () => {
     const td = getActiveTableCell();
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const table = td.closest('table');
-    const contentArea = td.closest('.content-area');
     if (table) {
       table.remove();
-      if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
     }
   };
 
@@ -361,9 +319,7 @@ export function WordToolbar({
     let node: Node | null = sel.anchorNode;
     while (node) {
       if (node instanceof HTMLElement && node.classList.contains('callout-note-box')) {
-        const ca = node.closest('.content-area');
         node.remove();
-        if (ca) ca.dispatchEvent(new Event('input', { bubbles: true }));
         return;
       }
       node = node.parentNode;
@@ -373,9 +329,7 @@ export function WordToolbar({
                      document.querySelector('.callout-note-box:hover') ||
                      document.querySelector('.callout-note-box');
     if (activeEl) {
-      const ca = activeEl.closest('.content-area');
       activeEl.remove();
-      if (ca) ca.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
       alert('কোনো নোট বক্স খুঁজে পাওয়া যায়নি। নোট বক্সের ভেতরে ক্লিক করে আবার চাপুন।');
     }
@@ -1052,7 +1006,7 @@ export function WordToolbar({
               <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
                 <DropdownMenuItem 
                   onMouseDown={e => e.preventDefault()} 
-                  onClick={() => setTableDialogOpen(true)} 
+                  onClick={openTableDialog} 
                   className="text-xs font-bold cursor-pointer text-indigo-700 flex items-center gap-2"
                 >
                   <Plus className="w-3.5 h-3.5" /> নতুন টেবিল ইনসার্ট করুন...
