@@ -57,6 +57,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
+import { WordToolbar } from '@/components/WordToolbar';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
@@ -282,6 +283,7 @@ function CreateLectureSheetContent() {
   const [globalLineHeight, setGlobalLineHeight] = useState(1.2);
   const [fontSizeDraft, setFontSizeDraft] = useState("");
   const [lineHeightDraft, setLineHeightDraft] = useState("");
+  const [previewZoom, setPreviewZoom] = useState(100);
 
   useEffect(() => {
     if (!editId) {
@@ -1058,6 +1060,27 @@ function CreateLectureSheetContent() {
                <Button size="sm" onClick={() => window.print()} className="gap-2 font-bold bg-primary px-6"><Printer className="w-4 h-4" /> প্রিন্ট করুন</Button>
              </div>
           </header>
+
+          {/* Microsoft Word Ribbon Toolbar */}
+          <WordToolbar
+            onAddPage={() => setPaginatedPages(prev => [...prev, ""])}
+            onDeletePage={() => {
+              if (activeEditIdx === null) {
+                if (paginatedPages.length <= 1) return;
+                const newP = paginatedPages.slice(0, -1);
+                setPaginatedPages(newP);
+                return;
+              }
+              if (!confirm(`পাতা ${activeEditIdx + 1} মুছে ফেলবেন?`)) return;
+              const newP = paginatedPages.filter((_, i) => i !== activeEditIdx);
+              setPaginatedPages(newP);
+              setActiveEditIdx(null);
+            }}
+            activePageIndex={activeEditIdx}
+            totalPages={paginatedPages.length}
+            zoomLevel={previewZoom}
+            onZoomChange={setPreviewZoom}
+          />
           <div className="flex-1 flex overflow-hidden">
             <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
                {activeEditIdx !== null && pageStyles[activeEditIdx] ? (
@@ -1130,7 +1153,7 @@ function CreateLectureSheetContent() {
                  </div>
                </div>
             </aside>
-            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-16 pb-12 flex flex-col items-center gap-10 relative">
+            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-12 pb-12 flex flex-col items-center gap-10 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
                {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5 };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
