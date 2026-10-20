@@ -206,18 +206,33 @@ export function WordToolbar({
     return null;
   };
 
+  const getActiveTable = (): HTMLTableElement | null => {
+    const td = getActiveTableCell();
+    if (td) return td.closest('table');
+    const activePaperIdx = typeof activePageIndex === 'number' ? activePageIndex : 0;
+    const paper = document.querySelector(`.paper-idx-${activePaperIdx}`);
+    if (paper) {
+      const t = paper.querySelector('table');
+      if (t) return t;
+    }
+    return document.querySelector('.content-area table');
+  };
+
   const insertTableRow = (below = true) => {
     const td = getActiveTableCell();
-    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
-    const tr = td.closest('tr');
-    const table = td.closest('table');
-    if (!tr || !table) return;
+    const table = td ? td.closest('table') : getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+
+    const tr = td ? td.closest('tr') : (below ? table.querySelector('tr:last-child') : table.querySelector('tr:first-child'));
+    if (!tr) return;
+
     const colCount = tr.children.length;
     const newTr = document.createElement('tr');
     for (let i = 0; i < colCount; i++) {
       const newTd = document.createElement('td');
       newTd.style.border = '1px solid #333';
       newTd.style.padding = '8px 10px';
+      newTd.style.height = '32px';
       newTd.style.minWidth = '40px';
       newTd.style.verticalAlign = 'top';
       newTd.innerHTML = '<br/>';
@@ -228,20 +243,24 @@ export function WordToolbar({
     } else {
       tr.parentNode?.insertBefore(newTr, tr);
     }
+    const firstCell = newTr.firstElementChild as HTMLElement;
+    if (firstCell) firstCell.focus();
   };
 
   const insertTableColumn = (right = true) => {
     const td = getActiveTableCell();
-    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
-    const tr = td.closest('tr');
-    const table = td.closest('table');
-    if (!tr || !table) return;
-    const colIndex = Array.from(tr.children).indexOf(td);
+    const table = td ? td.closest('table') : getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+
+    const tr = td ? td.closest('tr') : table.querySelector('tr');
+    if (!tr) return;
+    const colIndex = td ? Array.from(tr.children).indexOf(td) : (right ? tr.children.length - 1 : 0);
     const rows = table.querySelectorAll('tr');
     rows.forEach(r => {
       const newTd = document.createElement('td');
       newTd.style.border = '1px solid #333';
       newTd.style.padding = '8px 10px';
+      newTd.style.height = '32px';
       newTd.style.minWidth = '40px';
       newTd.style.verticalAlign = 'top';
       newTd.innerHTML = '<br/>';
@@ -256,20 +275,36 @@ export function WordToolbar({
 
   const deleteTableRow = () => {
     const td = getActiveTableCell();
-    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
-    const tr = td.closest('tr');
+    const table = td ? td.closest('table') : getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+
+    const tr = td ? td.closest('tr') : table.querySelector('tr:last-child');
     if (tr) {
+      const allRows = table.querySelectorAll('tr');
+      if (allRows.length <= 1) {
+        if (confirm('এটি টেবিলের শেষ সারি। পুরো টেবিল মুছে ফেলবেন?')) {
+          table.remove();
+        }
+        return;
+      }
       tr.remove();
     }
   };
 
   const deleteTableColumn = () => {
     const td = getActiveTableCell();
-    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
-    const tr = td.closest('tr');
-    const table = td.closest('table');
-    if (!tr || !table) return;
-    const colIndex = Array.from(tr.children).indexOf(td);
+    const table = td ? td.closest('table') : getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+
+    const tr = td ? td.closest('tr') : table.querySelector('tr');
+    if (!tr) return;
+    if (tr.children.length <= 1) {
+      if (confirm('এটি টেবিলের শেষ কলাম। পুরো টেবিল মুছে ফেলবেন?')) {
+        table.remove();
+      }
+      return;
+    }
+    const colIndex = td ? Array.from(tr.children).indexOf(td) : tr.children.length - 1;
     const rows = table.querySelectorAll('tr');
     rows.forEach(r => {
       if (r.children[colIndex]) {
@@ -279,12 +314,67 @@ export function WordToolbar({
   };
 
   const deleteActiveTable = () => {
-    const td = getActiveTableCell();
-    if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
-    const table = td.closest('table');
-    if (table) {
+    const table = getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+    if (confirm('সম্পূর্ণ টেবিলটি মুছে ফেলতে চান?')) {
       table.remove();
     }
+  };
+
+  // Adjust Table Width (টেবিলের প্রস্থ বাড়ানো / কমানো)
+  const setTableWidth = (width: '100%' | '80%' | '60%' | 'auto') => {
+    const table = getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+    table.style.width = width;
+    if (width !== '100%') {
+      table.style.marginLeft = 'auto';
+      table.style.marginRight = 'auto';
+    } else {
+      table.style.marginLeft = '0';
+      table.style.marginRight = '0';
+    }
+  };
+
+  // Adjust Cell Padding / Height (সেলের ঘর বড় / মাঝারি / ছোট করা)
+  const setTableCellPadding = (size: 'compact' | 'normal' | 'spacious') => {
+    const table = getActiveTable();
+    if (!table) return alert('প্রথমে যেকোনো টেবিল বা সেলে ক্লিক করুন।');
+    const cells = table.querySelectorAll('td, th');
+    cells.forEach(c => {
+      const el = c as HTMLElement;
+      if (size === 'compact') {
+        el.style.padding = '4px 6px';
+        el.style.height = '24px';
+        el.style.minHeight = '24px';
+      } else if (size === 'spacious') {
+        el.style.padding = '14px 16px';
+        el.style.height = '48px';
+        el.style.minHeight = '48px';
+      } else {
+        el.style.padding = '8px 10px';
+        el.style.height = '32px';
+        el.style.minHeight = '32px';
+      }
+    });
+  };
+
+  // Adjust Column Width (কলাম চওড়া বা সরু করা)
+  const adjustColumnWidth = (deltaPx: number) => {
+    const td = getActiveTableCell();
+    if (!td) return alert('প্রথমে যেকোনো সেলে ক্লিক করুন।');
+    const tr = td.closest('tr');
+    const table = td.closest('table');
+    if (!tr || !table) return;
+    const colIndex = Array.from(tr.children).indexOf(td);
+    const rows = table.querySelectorAll('tr');
+    rows.forEach(r => {
+      const cell = r.children[colIndex] as HTMLElement;
+      if (cell) {
+        const currentW = cell.offsetWidth || 60;
+        const newW = Math.max(30, currentW + deltaPx);
+        cell.style.width = `${newW}px`;
+      }
+    });
   };
 
   // Delete active callout box
@@ -1075,6 +1165,99 @@ export function WordToolbar({
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Table Expand / Shrink & Size Toolbar Group */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => insertTableRow(true)}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিলের নিচে নতুন ১টি সারি বাড়ান (+১ সারি)"
+              >
+                <Plus className="w-3 h-3 text-indigo-600" />
+                <span>সারি বাড়ান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={deleteTableRow}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-red-50 hover:text-red-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিল থেকে ১টি সারি কমান (-১ সারি)"
+              >
+                <Minus className="w-3 h-3 text-red-500" />
+                <span>সারি কমান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => insertTableColumn(true)}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিলের ডানে নতুন ১টি কলাম বাড়ান (+১ কলাম)"
+              >
+                <Plus className="w-3 h-3 text-indigo-600" />
+                <span>কলাম বাড়ান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={deleteTableColumn}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-red-50 hover:text-red-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিল থেকে ১টি কলাম কমান (-১ কলাম)"
+              >
+                <Minus className="w-3 h-3 text-red-500" />
+                <span>কলাম কমান</span>
+              </button>
+
+              {/* Table Size & Padding Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-slate-50 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                    title="টেবিলের আকার ও ঘরের ফাঁকা পরিবর্তন"
+                  >
+                    <Maximize2 className="w-3 h-3 text-slate-600" />
+                    <span>টেবিলের আকার</span>
+                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200 shadow-lg">
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">টেবিলের প্রস্থ (Width):</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('100%')} className="text-xs font-bold cursor-pointer">
+                    পুরো পেজ (১০০% Width)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('80%')} className="text-xs font-bold cursor-pointer">
+                    মাঝারি সাইজ (৮০% Width)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('60%')} className="text-xs font-bold cursor-pointer">
+                    ছোট সাইজ (৬০% Width)
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">ঘরের উচ্চতা / ফাঁকা:</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('spacious')} className="text-xs font-bold cursor-pointer">
+                    বড় ঘর (Spacious ফাঁকা)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('normal')} className="text-xs font-bold cursor-pointer">
+                    সাধারণ ঘর (Normal ফাঁকা)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('compact')} className="text-xs font-bold cursor-pointer">
+                    ছোট ঘর (Compact ফাঁকা)
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">কলামের চওড়া:</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => adjustColumnWidth(25)} className="text-xs font-bold cursor-pointer text-indigo-700">
+                    বর্তমান কলাম চওড়া করুন (+২৫px)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => adjustColumnWidth(-25)} className="text-xs font-bold cursor-pointer text-slate-600">
+                    বর্তমান কলাম সরু করুন (-২৫px)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
             {/* 2. Insert Image Button */}
             <Button
               type="button"
@@ -1404,6 +1587,99 @@ export function WordToolbar({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Table Layout Controls */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => insertTableRow(true)}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিলের নিচে নতুন ১টি সারি বাড়ান (+১ সারি)"
+              >
+                <Plus className="w-3 h-3 text-indigo-600" />
+                <span>সারি বাড়ান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={deleteTableRow}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-red-50 hover:text-red-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিল থেকে ১টি সারি কমান (-১ সারি)"
+              >
+                <Minus className="w-3 h-3 text-red-500" />
+                <span>সারি কমান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => insertTableColumn(true)}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিলের ডানে নতুন ১টি কলাম বাড়ান (+১ কলাম)"
+              >
+                <Plus className="w-3 h-3 text-indigo-600" />
+                <span>কলাম বাড়ান</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={deleteTableColumn}
+                className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-red-50 hover:text-red-700 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                title="টেবিল থেকে ১টি কলাম কমান (-১ কলাম)"
+              >
+                <Minus className="w-3 h-3 text-red-500" />
+                <span>কলাম কমান</span>
+              </button>
+
+              {/* Table Size Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-7 px-2 text-[11px] font-bold bg-white hover:bg-slate-50 text-slate-700 rounded border border-slate-200 shadow-xs flex items-center gap-1 transition-all"
+                    title="টেবিলের আকার ও ঘরের ফাঁকা পরিবর্তন"
+                  >
+                    <Maximize2 className="w-3 h-3 text-slate-600" />
+                    <span>টেবিলের আকার</span>
+                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200 shadow-lg">
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">টেবিলের প্রস্থ (Width):</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('100%')} className="text-xs font-bold cursor-pointer">
+                    পুরো পেজ (১০০% Width)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('80%')} className="text-xs font-bold cursor-pointer">
+                    মাঝারি সাইজ (৮০% Width)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableWidth('60%')} className="text-xs font-bold cursor-pointer">
+                    ছোট সাইজ (৬০% Width)
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">ঘরের উচ্চতা / ফাঁকা:</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('spacious')} className="text-xs font-bold cursor-pointer">
+                    বড় ঘর (Spacious ফাঁকা)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('normal')} className="text-xs font-bold cursor-pointer">
+                    সাধারণ ঘর (Normal ফাঁকা)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => setTableCellPadding('compact')} className="text-xs font-bold cursor-pointer">
+                    ছোট ঘর (Compact ফাঁকা)
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase">কলামের চওড়া:</div>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => adjustColumnWidth(25)} className="text-xs font-bold cursor-pointer text-indigo-700">
+                    বর্তমান কলাম চওড়া করুন (+২৫px)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => adjustColumnWidth(-25)} className="text-xs font-bold cursor-pointer text-slate-600">
+                    বর্তমান কলাম সরু করুন (-২৫px)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* 5. Page Management Controls */}
             <div className="flex items-center gap-1 border-l border-slate-300 pl-2">
