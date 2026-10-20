@@ -120,6 +120,53 @@ export function WordToolbar({
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
+  // References to preserve last selection range and active table cell inside .content-area
+  const lastValidRangeRef = useRef<{ range: Range; contentArea: HTMLElement } | null>(null);
+  const lastActiveTableCellRef = useRef<HTMLTableCellElement | null>(null);
+
+  React.useEffect(() => {
+    const handleSelectionOrFocus = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+        let curr: Node | null = sel.anchorNode;
+        let foundArea: HTMLElement | null = null;
+        let foundCell: HTMLTableCellElement | null = null;
+        while (curr) {
+          if (!foundCell && (curr.nodeName === 'TD' || curr.nodeName === 'TH')) {
+            foundCell = curr as HTMLTableCellElement;
+          }
+          if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
+            foundArea = curr;
+            break;
+          }
+          curr = curr.parentNode;
+        }
+        if (foundArea) {
+          try {
+            lastValidRangeRef.current = {
+              range: sel.getRangeAt(0).cloneRange(),
+              contentArea: foundArea
+            };
+          } catch (e) {
+            // Ignore cloning errors if range detached
+          }
+        }
+        if (foundCell) {
+          lastActiveTableCellRef.current = foundCell;
+        }
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionOrFocus);
+    document.addEventListener('mouseup', handleSelectionOrFocus);
+    document.addEventListener('keyup', handleSelectionOrFocus);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionOrFocus);
+      document.removeEventListener('mouseup', handleSelectionOrFocus);
+      document.removeEventListener('keyup', handleSelectionOrFocus);
+    };
+  }, []);
+
   // Helper to execute standard execCommand preserving selection
   const exec = (command: string, value: string = '') => {
     try {
@@ -132,44 +179,86 @@ export function WordToolbar({
   // Helper to insert arbitrary HTML at cursor in the currently focused contentEditable
   const insertHtmlAtCursor = (html: string) => {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const el = document.createElement('div');
-      el.innerHTML = html;
-      const frag = document.createDocumentFragment();
-      let node: Node | null;
-      let lastNode: Node | null = null;
-      while ((node = el.firstChild)) {
-        lastNode = frag.appendChild(node);
+    let isInsideValidContentArea = false;
+    let targetArea: HTMLElement | null = null;
+    let targetRange: Range | null = null;
+
+    if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+      let curr: Node | null = sel.anchorNode;
+      while (curr) {
+        if (curr instanceof HTMLElement && curr.classList.contains('content-area')) {
+          isInsideValidContentArea = true;
+          targetArea = curr;
+          targetRange = sel.getRangeAt(0);
+          break;
+        }
+        curr = curr.parentNode;
       }
-      range.insertNode(frag);
-      if (lastNode) {
-        const newRange = range.cloneRange();
-        newRange.setStartAfter(lastNode);
-        newRange.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
+    }
+
+    // If current selection is NOT inside .content-area, use the saved range if valid
+    if (!isInsideValidContentArea && lastValidRangeRef.current && document.body.contains(lastValidRangeRef.current.contentArea)) {
+      targetRange = lastValidRangeRef.current.range;
+      targetArea = lastValidRangeRef.current.contentArea;
+      isInsideValidContentArea = true;
+    }
+
+    if (isInsideValidContentArea && targetRange) {
+      try {
+        targetRange.deleteContents();
+        const el = document.createElement('div');
+        el.innerHTML = html;
+        const frag = document.createDocumentFragment();
+        let node: Node | null;
+        let lastNode: Node | null = null;
+        while ((node = el.firstChild)) {
+          lastNode = frag.appendChild(node);
+        }
+        targetRange.insertNode(frag);
+        if (lastNode && sel) {
+          const newRange = document.createRange();
+          newRange.setStartAfter(lastNode);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      } catch (err) {
+        console.warn('Range insertion error, falling back:', err);
+        if (targetArea) {
+          targetArea.insertAdjacentHTML('beforeend', html);
+        }
       }
     } else {
-      // Fallback: append to currently active editable area
-      const activeEl = document.querySelector('.content-area:focus') || 
-                       document.querySelector('.paper.ring-4 .content-area') ||
-                       document.querySelector('.content-area');
+      // Safe fallback: append ONLY to active page's .content-area (never to header or outside)
+      const activePaperIdx = typeof activePageIndex === 'number' ? activePageIndex : 0;
+      const activeEl = (document.querySelector(`.paper-idx-${activePaperIdx} .content-area`) || 
+                        document.querySelector('.paper.ring-4 .content-area') ||
+                        document.querySelector('.content-area')) as HTMLElement | null;
       if (activeEl) {
-        activeEl.innerHTML += html;
+        targetArea = activeEl;
+        activeEl.focus();
+        activeEl.insertAdjacentHTML('beforeend', html);
       }
+    }
+
+    // Crucial: trigger 'input' event so React manualPages state is updated immediately
+    if (targetArea) {
+      targetArea.dispatchEvent(new Event('input', { bubbles: true }));
     }
   };
 
   // Table manipulation helpers
   const getActiveTableCell = (): HTMLTableCellElement | null => {
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
-    let node: Node | null = sel.anchorNode;
-    while (node) {
-      if (node.nodeName === 'TD' || node.nodeName === 'TH') return node as HTMLTableCellElement;
-      node = node.parentNode;
+    if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+      let node: Node | null = sel.anchorNode;
+      while (node) {
+        if (node.nodeName === 'TD' || node.nodeName === 'TH') return node as HTMLTableCellElement;
+        node = node.parentNode;
+      }
+    }
+    if (lastActiveTableCellRef.current && document.body.contains(lastActiveTableCellRef.current)) {
+      return lastActiveTableCellRef.current;
     }
     return null;
   };
@@ -179,13 +268,16 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
+    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colCount = tr.children.length;
     const newTr = document.createElement('tr');
     for (let i = 0; i < colCount; i++) {
       const newTd = document.createElement('td');
-      newTd.style.border = '1px solid #000';
-      newTd.style.padding = '6px 10px';
+      newTd.style.border = '1px solid #333';
+      newTd.style.padding = '8px 10px';
+      newTd.style.minWidth = '40px';
+      newTd.style.verticalAlign = 'top';
       newTd.innerHTML = '<br/>';
       newTr.appendChild(newTd);
     }
@@ -194,6 +286,7 @@ export function WordToolbar({
     } else {
       tr.parentNode?.insertBefore(newTr, tr);
     }
+    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const insertTableColumn = (right = true) => {
@@ -201,13 +294,16 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
+    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colIndex = Array.from(tr.children).indexOf(td);
     const rows = table.querySelectorAll('tr');
     rows.forEach(r => {
       const newTd = document.createElement('td');
-      newTd.style.border = '1px solid #000';
-      newTd.style.padding = '6px 10px';
+      newTd.style.border = '1px solid #333';
+      newTd.style.padding = '8px 10px';
+      newTd.style.minWidth = '40px';
+      newTd.style.verticalAlign = 'top';
       newTd.innerHTML = '<br/>';
       const refChild = r.children[right ? colIndex + 1 : colIndex];
       if (refChild) {
@@ -216,13 +312,18 @@ export function WordToolbar({
         r.appendChild(newTd);
       }
     });
+    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const deleteTableRow = () => {
     const td = getActiveTableCell();
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
-    if (tr) tr.remove();
+    const contentArea = td.closest('.content-area');
+    if (tr) {
+      tr.remove();
+      if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
 
   const deleteTableColumn = () => {
@@ -230,6 +331,7 @@ export function WordToolbar({
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const tr = td.closest('tr');
     const table = td.closest('table');
+    const contentArea = td.closest('.content-area');
     if (!tr || !table) return;
     const colIndex = Array.from(tr.children).indexOf(td);
     const rows = table.querySelectorAll('tr');
@@ -238,13 +340,18 @@ export function WordToolbar({
         r.children[colIndex].remove();
       }
     });
+    if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const deleteActiveTable = () => {
     const td = getActiveTableCell();
     if (!td) return alert('প্রথমে যেকোনো টেবিল বা সেলে কার্সর রাখুন।');
     const table = td.closest('table');
-    if (table) table.remove();
+    const contentArea = td.closest('.content-area');
+    if (table) {
+      table.remove();
+      if (contentArea) contentArea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
 
   // Delete active callout box
@@ -254,7 +361,9 @@ export function WordToolbar({
     let node: Node | null = sel.anchorNode;
     while (node) {
       if (node instanceof HTMLElement && node.classList.contains('callout-note-box')) {
+        const ca = node.closest('.content-area');
         node.remove();
+        if (ca) ca.dispatchEvent(new Event('input', { bubbles: true }));
         return;
       }
       node = node.parentNode;
@@ -264,7 +373,9 @@ export function WordToolbar({
                      document.querySelector('.callout-note-box:hover') ||
                      document.querySelector('.callout-note-box');
     if (activeEl) {
+      const ca = activeEl.closest('.content-area');
       activeEl.remove();
+      if (ca) ca.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
       alert('কোনো নোট বক্স খুঁজে পাওয়া যায়নি। নোট বক্সের ভেতরে ক্লিক করে আবার চাপুন।');
     }
@@ -360,14 +471,12 @@ export function WordToolbar({
   const handleInsertTable = () => {
     const borderStyleCss = tableBorderType === 'double' ? '3px double #000' : 
                            tableBorderType === 'dashed' ? '1.5px dashed #000' : '1.5px solid #000';
-    let tableHtml = `<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: ${borderStyleCss}; font-size: inherit;">\n<tbody>\n`;
+    let tableHtml = `<table style="width: 100%; border-collapse: collapse; margin: 12px 0; border: ${borderStyleCss}; font-size: inherit; table-layout: fixed;">\n<tbody>\n`;
     for (let r = 0; r < tableRows; r++) {
       tableHtml += `  <tr>\n`;
       for (let c = 0; c < tableCols; c++) {
         const isHeader = r === 0;
-        tableHtml += `    <td style="border: 1px solid #000; padding: 6px 10px; ${isHeader ? 'background-color: #f1f5f9; font-weight: bold; text-align: center;' : ''}">` +
-                     (isHeader ? `কলাম ${c + 1}` : `ডাটা`) +
-                     `</td>\n`;
+        tableHtml += `    <td style="border: 1px solid #333; padding: 8px 10px; min-width: 40px; vertical-align: top; ${isHeader ? 'background-color: #f8fafc; font-weight: bold;' : ''}"><br/></td>\n`;
       }
       tableHtml += `  </tr>\n`;
     }
@@ -380,7 +489,7 @@ export function WordToolbar({
   const handleInsertCallout = (box: typeof CALLOUT_BOXES[0]) => {
     const boxHtml = `
       <div class="callout-note-box relative group" style="border-left: 4px solid ${box.border}; background-color: ${box.bg}; padding: 10px 14px; margin: 12px 0; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative;">
-        <button type="button" contenteditable="false" class="no-print callout-delete-btn" onclick="this.closest('.callout-note-box').remove()" title="নোট বক্সটি মুছে ফেলুন" style="position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: rgba(0,0,0,0.08); color: #dc2626; border: 1px solid rgba(0,0,0,0.15); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; line-height: 1;">✕</button>
+        <button type="button" contenteditable="false" class="no-print callout-delete-btn" onclick="const p=this.closest('.callout-note-box'); const ca=p?.closest('.content-area'); p?.remove(); if(ca) ca.dispatchEvent(new Event('input', {bubbles:true}));" title="নোট বক্সটি মুছে ফেলুন" style="position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: rgba(0,0,0,0.08); color: #dc2626; border: 1px solid rgba(0,0,0,0.15); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; line-height: 1;">✕</button>
         <p style="margin: 0; font-weight: bold; color: ${box.border}; display: flex; align-items: center; gap: 6px;">
           <span>${box.icon}</span> <span>${box.label}</span>
         </p>
@@ -397,12 +506,12 @@ export function WordToolbar({
       <table style="width: 100%; border-collapse: collapse; margin: 8px 0; border: none; font-size: inherit;">
         <tbody>
           <tr>
-            <td style="width: 50%; padding: 4px 8px; border: none;">(ক) অপশন ১</td>
-            <td style="width: 50%; padding: 4px 8px; border: none;">(খ) অপশন ২</td>
+            <td style="width: 50%; padding: 6px 8px; border: none;">(ক)&nbsp;</td>
+            <td style="width: 50%; padding: 6px 8px; border: none;">(খ)&nbsp;</td>
           </tr>
           <tr>
-            <td style="width: 50%; padding: 4px 8px; border: none;">(গ) অপশন ৩</td>
-            <td style="width: 50%; padding: 4px 8px; border: none;">(ঘ) অপশন ৪</td>
+            <td style="width: 50%; padding: 6px 8px; border: none;">(গ)&nbsp;</td>
+            <td style="width: 50%; padding: 6px 8px; border: none;">(ঘ)&nbsp;</td>
           </tr>
         </tbody>
       </table>
@@ -415,8 +524,8 @@ export function WordToolbar({
   const handleInsertFraction = () => {
     const fracHtml = `
       <span class="math-frac" style="display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.9em; margin: 0 3px;">
-        <span class="math-num" style="border-bottom: 1px solid currentColor; padding: 0 3px;">লব</span>
-        <span class="math-den" style="padding: 0 3px;">হর</span>
+        <span class="math-num" style="border-bottom: 1px solid currentColor; padding: 0 3px;">১</span>
+        <span class="math-den" style="padding: 0 3px;">২</span>
       </span>&nbsp;
     `;
     insertHtmlAtCursor(fracHtml);

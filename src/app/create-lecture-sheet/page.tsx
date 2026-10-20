@@ -277,7 +277,7 @@ function CreateLectureSheetContent() {
 
   const [paginatedPages, setPaginatedPages] = useState<string[]>([]);
   const [pageStyles, setPageStyles] = useState<Record<number, any>>({});
-  const [activeEditIdx, setActiveEditIdx] = useState<number | null>(null);
+  const [activeEditIdx, setActiveEditIdx] = useState<number | null>(0);
   const [manualPages, setManualPages] = useState<Record<number, string>>({});
   const [globalFontSize, setGlobalFontSize] = useState(10.5);
   const [globalLineHeight, setGlobalLineHeight] = useState(1.2);
@@ -1049,7 +1049,7 @@ function CreateLectureSheetContent() {
 
       {isPrintMode && (
         <div className="print-view-container flex flex-col h-screen fixed inset-0 top-0 left-0 bg-slate-100 z-[40] font-kalpurush overflow-hidden">
-          <header className="no-print h-14 bg-white border-b flex items-center justify-between px-6 shrink-0 shadow-sm z-50">
+          <header className="no-print h-14 bg-white border-b flex items-center justify-between px-6 shrink-0 shadow-sm z-50 select-none">
              <div className="flex items-center gap-3">
                <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center"><Eye className="w-5 h-5" /></div>
                <h3 className="font-bold text-lg">প্রিন্ট প্রিভিউ ও লেআউট - {data.institution || softwareConfig?.appName || 'টপ গ্রেড'}</h3>
@@ -1227,7 +1227,17 @@ function CreateLectureSheetContent() {
                         <div className="flex justify-center gap-8 text-[10pt] font-bold mt-1"><span>শ্রেণি: {CLASSES.find(c => c.id === data.classId)?.label || ''} শ্রেণি</span><span>বিষয়: {data.subject}</span></div>
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
-                      <div contentEditable={activeEditIdx === idx} onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }} onFocus={() => setActiveEditIdx(idx)} className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/20 p-1 rounded border border-dashed border-blue-300")} style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%', columnCount: cols, columnGap: cols > 1 ? '0.35in' : undefined, columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined }} dangerouslySetInnerHTML={{ __html: manualPages[idx] || pageHtml }} />
+                      <div
+                        contentEditable={true}
+                        suppressContentEditableWarning={true}
+                        onBlur={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }}
+                        onInput={(e) => { const htmlValue = e.currentTarget?.innerHTML || ""; setManualPages(prev => ({ ...prev, [idx]: htmlValue })); }}
+                        onFocus={() => setActiveEditIdx(idx)}
+                        onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
+                        className={cn("content-area flex-1 font-kalpurush outline-none overflow-hidden", activeEditIdx === idx && "bg-blue-50/15 ring-1 ring-blue-300 rounded")}
+                        style={{ lineHeight: String(style.lineHeight), fontSize: `${style.fontSize}pt`, fontWeight: style.bold ? 'bold' : 'normal', fontStyle: style.italic ? 'italic' : 'normal', textDecoration: style.underline ? 'underline' : 'none', color: style.color, textAlign: style.align as any, minHeight: 0, maxHeight: '100%', columnCount: cols, columnGap: cols > 1 ? '0.35in' : undefined, columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined }}
+                        dangerouslySetInnerHTML={{ __html: manualPages[idx] !== undefined ? manualPages[idx] : pageHtml }}
+                      />
                       <footer className="mt-auto pt-4 flex justify-between text-[9pt] font-bold border-t border-slate-200"><span>পাতা: {toBengaliNumber(idx + 1)} / {toBengaliNumber(paginatedPages.length)}</span><span>{softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস'}</span></footer>
                     </div>
                  </div>
@@ -1255,6 +1265,9 @@ function CreateLectureSheetContent() {
           .callout-note-box:hover .callout-delete-btn { opacity: 1; }
           .callout-delete-btn:hover { background: #fee2e2 !important; color: #b91c1c !important; }
           .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
+          .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; break-inside: avoid; }
+          .content-area table td, .content-area table th { min-width: 30px; min-height: 28px; vertical-align: top; }
+          .content-area table td:focus { outline: 1.5px dashed #3b82f6; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
           .no-arrows { -moz-appearance: textfield; }
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
