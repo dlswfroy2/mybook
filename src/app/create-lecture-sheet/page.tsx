@@ -2,6 +2,8 @@
 "use client";
 
 import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react';
+import 'katex/dist/katex.min.css';
+import katex from 'katex';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -177,64 +179,64 @@ function EditableContentArea({
     }
   }, []);
 
-  // Paste হলে raw HTML বা inline style বাদ দিয়ে শুধু clean content রাখুন
+  // plain text থেকে LaTeX সহ HTML তৈরি করে (KaTeX render সহ)
+  const renderMathInText = (text: string): string => {
+    const lines = text.split('\n');
+    const htmlLines = lines.map((line) => {
+      if (line.trim() === '') return '<br>';
+      // $$ ... $$ (display math) আগে ধরুন
+      line = line.replace(/\$\$(.+?)\$\$/g, (_, math) => {
+        try {
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+        } catch {
+          return `<span>$$${math}$$</span>`;
+        }
+      });
+      // $ ... $ (inline math)
+      line = line.replace(/\$([^$\n]+?)\$/g, (_, math) => {
+        try {
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+        } catch {
+          return `<span>$${math}$</span>`;
+        }
+      });
+      return `<p style="margin:0 0 2px 0;padding:0">${line}</p>`;
+    });
+    return htmlLines.join('');
+  };
+
+  // Paste হলে plain text নিয়ে LaTeX render করুন (Gemini/web থেকে আসা raw HTML বাদ দিন)
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
     const clipboardData = e.clipboardData;
 
-    // প্রথমে HTML চেষ্টা করুন — style/data-* strip করে
-    const htmlData = clipboardData.getData('text/html');
-    if (htmlData) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = htmlData;
-      // সমস্ত element থেকে ক্ষতিকর attribute সরান
-      tmp.querySelectorAll('*').forEach((el) => {
-        // style ও সমস্ত data-* attribute সরান
-        el.removeAttribute('style');
-        el.removeAttribute('class');
-        el.removeAttribute('id');
-        Array.from(el.attributes).forEach((attr) => {
-          if (attr.name.startsWith('data-') || attr.name.startsWith('on')) {
-            el.removeAttribute(attr.name);
-          }
-        });
-        // Google Docs থেকে আসা b, span ইত্যাদি unwrap করুন যদি শুধু styling এর জন্য
-        if (['SPAN', 'FONT'].includes(el.tagName) && el.attributes.length === 0) {
-          const parent = el.parentNode;
-          if (parent) {
-            while (el.firstChild) parent.insertBefore(el.firstChild, el);
-            parent.removeChild(el);
-          }
-        }
-      });
-      // meta/script/style ট্যাগ সরান
-      tmp.querySelectorAll('meta, script, style, head, html, body').forEach((el) => el.remove());
-      const cleanHtml = tmp.innerHTML;
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        const fragment = range.createContextualFragment(cleanHtml);
-        range.insertNode(fragment);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+    // সবসময় plain text নিন — এতে Gemini-র LaTeX ($...$) অক্ষুণ্ণ থাকে
+    const text = clipboardData.getData('text/plain');
+    if (!text) return;
+
+    // LaTeX থাকলে KaTeX দিয়ে render করুন, না থাকলে plain text
+    const hasLatex = /\$/.test(text);
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    if (hasLatex) {
+      const renderedHtml = renderMathInText(text);
+      const fragment = range.createContextualFragment(renderedHtml);
+      range.insertNode(fragment);
     } else {
-      // HTML না থাকলে plain text ইনসার্ট করুন
-      const text = clipboardData.getData('text/plain');
-      if (text) {
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          range.deleteContents();
-          range.insertNode(document.createTextNode(text));
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
+      // plain text — newline কে <br> তে রূপান্তর করুন
+      const lines = text.split('\n');
+      lines.forEach((line, i) => {
+        if (i > 0) range.insertNode(document.createElement('br'));
+        range.insertNode(document.createTextNode(line));
+        range.collapse(false);
+      });
     }
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
