@@ -72,71 +72,121 @@ function toBengaliNumber(n: number | string | undefined | null): string {
 }
 
 function stripDirtyHtml(html: string): string {
-  // যদি HTML tag থাকে তবে DOM দিয়ে পরিষ্কার করুন
   if (typeof window === 'undefined') return html;
-  if (!/<[a-z][\s\S]*>/i.test(html)) return html; // plain text — এড়িয়ে যান
+  if (!/<[a-z][\s\S]*>/i.test(html)) return html;
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
+
   tmp.querySelectorAll('*').forEach((el) => {
-    // ক্ষতিকর attributes সরান
+    // Keep KaTeX and math structures intact
+    if (el.classList.contains('katex') || el.closest('.katex') || el.classList.contains('math-frac') || el.closest('.math-frac')) {
+      return;
+    }
+
+    // Only remove Gemini data attributes and event handlers
     Array.from(el.attributes).forEach((attr) => {
-      if (
-        attr.name.startsWith('data-') ||
-        attr.name === 'style' ||
-        attr.name === 'class' ||
-        attr.name === 'id' ||
-        attr.name.startsWith('on')
-      ) {
+      if (attr.name.startsWith('data-index') || attr.name.startsWith('data-node') || attr.name.startsWith('on')) {
         el.removeAttribute(attr.name);
       }
     });
+
+    // Only clean Gemini junk styles (margin-top: 0px !important, line-height: 1.15 !important)
+    if (el.hasAttribute('style')) {
+      const s = el.getAttribute('style') || '';
+      if (s.includes('data-index') || s.includes('margin-top: 0px !important') || s.includes('line-height: 1.15 !important')) {
+        const cleaned = s
+          .replace(/margin-top:\s*0px\s*!important;?/gi, '')
+          .replace(/margin-left:\s*0px\s*!important;?/gi, '')
+          .replace(/margin-right:\s*0px\s*!important;?/gi, '')
+          .replace(/margin-bottom:\s*0px\s*!important;?/gi, '')
+          .replace(/line-height:\s*1\.15\s*!important;?/gi, '')
+          .trim();
+        if (cleaned) {
+          el.setAttribute('style', cleaned);
+        } else {
+          el.removeAttribute('style');
+        }
+      }
+    }
   });
-  // meta/script/style ট্যাগ সরান
-  tmp.querySelectorAll('meta, script, style').forEach((el) => el.remove());
+
+  tmp.querySelectorAll('meta, script').forEach((el) => el.remove());
   return tmp.innerHTML;
 }
 
-function formatMath(text: string) {
+function formatMath(text: string): string {
   if (!text) return '';
-  // প্রথমে dirty HTML পরিষ্কার করুন (data-*, inline style সরান)
   text = stripDirtyHtml(text);
-  let formatted = text.replace(/#+\s*\**|\*\*/g, '');
-  formatted = formatted.replace(/([a-zA-Z])\s*\n\s*([-+]?\d+)/g, '$1^$2');
-  formatted = formatted.replace(/ms\s*\n\s*-2/g, 'ms^-2');
-  formatted = formatted.replace(/−/g, '-'); 
-  formatted = formatted.replace(/\$|\\\(|\\\)|\\\[|\\\]/g, '');
-  formatted = formatted.replace(/\n\s*\n\s*\n+/g, '\n\n');
-  formatted = formatted.replace(/\(\((.*?)\)\)/g, '$1').replace(/\[\[(.*?)\]\]/g, '$1').trim();
-  formatted = formatted.replace(/\\text\{([^}]+)\}/g, '<span class="math-text">$1</span>');
-  const fracRegex = /\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g;
-  formatted = formatted.replace(fracRegex, '<span class="math-frac"><span class="math-num">$1</span><span class="math-den">$2</span></span>');
-  formatted = formatted.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, '<span class="math-sqrt"><sup class="math-root">$1</sup>√<span class="math-sqrt-stem">$2</span></span>');
-  formatted = formatted.replace(/\\sqrt\{([^}]+)\}/g, '<span class="math-sqrt">√<span class="math-sqrt-stem">$1</span></span>');
-  formatted = formatted.replace(/\^\{([^}]+)\}/g, '<sup class="math-sup">$1</sup>');
-  formatted = formatted.replace(/\^([-+]?\d+|[a-zA-Z])/g, '<sup class="math-sup">$1</sup>');
-  formatted = formatted.replace(/_\{([^}]+)\}/g, '<sub class="math-sub">$1</sub>');
-  formatted = formatted.replace(/_([-+]?\d+|[a-zA-Z])/g, '<sub class="math-sub">$1</sub>');
-  const symbolMap: Record<string, string> = {
-    '\\\\log': 'log', '\\\\triangle': '△', '\\\\angle': '∠', '\\\\circ': '°',
-    '\\\\theta': 'θ', '\\\\pi': 'π', '\\\\pm': '±', '\\\\times': '×',
-    '\\\\neq': '≠', '\\\\ne': '≠', '\\\\leq': '≤', '\\\\geq': '≥',
-    '\\\\degree': '°', '\\\\cdot': '·', '\\\\infty': '∞', '\\\\approx': '≈',
-    '\\\\sum': '∑', '\\\\prod': '∏', '\\\\alpha': 'α', '\\\\beta': 'β',
-    '\\\\gamma': 'γ', '\\\\delta': 'δ', '\\\\sigma': 'σ', '\\\\phi': 'φ', '\\\\omega': 'ω',
-    '\\\\eta': 'η', '\\\\rho': 'র', '\\\\lambda': 'λ', '\\\\mu': 'μ',
-    '\\\\div': '÷', '\\\\rightarrow': '→', '\\\\to': '→', '\\\\arrow': '→',
-    '\\\\in': '∈', '\\\\mathbb\\{N\\}': 'ℕ', '\\\\mathbb\\{R\\}': 'ℝ', '\\\\mathbb\\{Z\\}': 'ℤ',
-    '\\\\mathbb\\{Q\\}': 'ℚ', '\\\\subset': '⊂', '\\\\subseteq': '⊆', '\\\\cup': '∪',
-    '\\\\cap': '∩', '\\\\emptyset': '∅', '\\\\forall': '∀', '\\\\exists': '∃', 
-    '\\\\Rightarrow': '⇒', '\\\\leftarrow': '←', '\\\\Leftarrow': '⇐', 
-    '\\\\leftrightarrow': '↔', '\\\\Leftrightarrow': '⇔',
-    '\\\\left': '', '\\\\right': '', '\\\\\%': '%', '\\\\setminus': '\\', '\\\\backslash': '\\',
-    '\\\\propto': '∝', '\\\\parallel': '∥', '\\\\perp': '⊥'
-  };
-  Object.entries(symbolMap).forEach(([key, val]) => { formatted = formatted.replace(new RegExp(key, 'g'), val); });
-  formatted = formatted.replace(/\\dot\{([^}]+)\}/g, '<span class="math-dot">$1</span>');
-  formatted = formatted.replace(/\\/g, '');
-  return formatted;
+
+  // If text already contains KaTeX HTML, return directly without running regex
+  if (text.includes('class="katex"') || text.includes("class='katex'")) {
+    return text;
+  }
+
+  // Convert $$ ... $$ (display math)
+  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+    } catch {
+      return `$$${math}$$`;
+    }
+  });
+
+  // Convert $ ... $ (inline math)
+  text = text.replace(/\$([^$\n]+?)\$/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+    } catch {
+      return `$${math}$`;
+    }
+  });
+
+  // Convert \[ ... \] and \( ... \)
+  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+    } catch {
+      return math;
+    }
+  });
+  text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+    } catch {
+      return math;
+    }
+  });
+
+  // Convert standalone \frac{...}{...}
+  if (/\\frac\{/.test(text)) {
+    text = text.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (_, num, den) => {
+      try {
+        return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false });
+      } catch {
+        return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
+      }
+    });
+  }
+
+  // Convert standalone \sqrt
+  if (/\\sqrt/.test(text)) {
+    text = text.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, (_, root, val) => {
+      try {
+        return katex.renderToString(`\\sqrt[${root}]{${val}}`, { throwOnError: false, displayMode: false });
+      } catch {
+        return `<sup>${root}</sup>√<span>${val}</span>`;
+      }
+    });
+    text = text.replace(/\\sqrt\{([^}]+)\}/g, (_, val) => {
+      try {
+        return katex.renderToString(`\\sqrt{${val}}`, { throwOnError: false, displayMode: false });
+      } catch {
+        return `√<span>${val}</span>`;
+      }
+    });
+  }
+
+  return text;
 }
 
 async function processWatermarkImage(file: File): Promise<string> {
@@ -384,21 +434,41 @@ function EditableContentArea({
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
     const clipboardData = e.clipboardData;
-    const text = clipboardData.getData('text/plain');
-    if (!text) return;
+    const htmlData = clipboardData.getData('text/html');
+    const plainText = clipboardData.getData('text/plain');
 
-    const hasLatex = /\$/.test(text);
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     range.deleteContents();
 
-    if (hasLatex) {
-      const renderedHtml = renderMathInText(text);
+    // 1. If text has LaTeX ($...$ or \[...\] or \frac): render with KaTeX
+    if (plainText && (/\$/.test(plainText) || /\\frac\{/.test(plainText) || /\\sqrt/.test(plainText))) {
+      const renderedHtml = renderMathInText(plainText);
       const fragment = range.createContextualFragment(renderedHtml);
       range.insertNode(fragment);
-    } else {
-      const lines = text.split('\n');
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      setTimeout(checkAndReflow, 40);
+      return;
+    }
+
+    // 2. If rich HTML is present (e.g. from Word or web with tables/formatting): preserve formatting!
+    if (htmlData && /<(table|p|div|ul|ol|h[1-6]|span|b|strong|i|em)[^>]*>/i.test(htmlData)) {
+      const cleanHtml = stripDirtyHtml(htmlData);
+      const fragment = range.createContextualFragment(cleanHtml);
+      range.insertNode(fragment);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      setTimeout(checkAndReflow, 40);
+      return;
+    }
+
+    // 3. Plain text fallback: wrap lines in <p>
+    if (plainText) {
+      const lines = plainText.split('\n');
       const frag = document.createDocumentFragment();
       lines.forEach((line) => {
         const p = document.createElement('p');
@@ -407,12 +477,11 @@ function EditableContentArea({
         frag.appendChild(p);
       });
       range.insertNode(frag);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      setTimeout(checkAndReflow, 40);
     }
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-
-    setTimeout(checkAndReflow, 40);
   };
 
   const handleInput = () => {
@@ -1475,7 +1544,7 @@ function CreateLectureSheetContent() {
                           }}
                           className="outline-none focus:ring-2 focus:ring-indigo-300 rounded-lg p-2 min-h-[550px] space-y-3 prose max-w-none text-base"
                           dangerouslySetInnerHTML={{
-                            __html: formatMath(data.content || '<p class="text-slate-400 font-bold italic">এখানে লেকচার শিটের বিষয়বস্তু লিখুন বা বামপাশ থেকে "AI দিয়ে লেকচার শিট তৈরি করুন" বাটনে চাপ দিন...</p>')
+                            __html: formatMath(data.content || '')
                           }}
                         />
                       </div>
@@ -1749,17 +1818,19 @@ function CreateLectureSheetContent() {
         </div>
       )}
       <style dangerouslySetInnerHTML={{ __html: `
+        .math-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.85em; margin: 0 2px; }
+        .math-num { border-bottom: 0.5pt solid black; padding: 0 1px; }
+        .math-den { padding: 0 1px; }
+        .math-dot { position: relative; display: inline-block; }
+        .math-dot::after { content: "·"; position: absolute; top: -0.6em; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 1.2em; }
+        .math-sqrt { display: inline-flex; align-items: center; }
+        .math-sqrt-stem { border-top: 0.5pt solid black; padding-top: 1px; }
+        .math-sup { font-size: 0.7em; vertical-align: super; }
+        .math-sub { font-size: 0.7em; vertical-align: sub; }
+        .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
+        .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
+        .content-area table td, .content-area table th { min-width: 30px; height: 32px; min-height: 32px; padding: 6px 10px; vertical-align: top; word-break: break-word; }
         @media screen {
-          .math-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.85em; margin: 0 2px; }
-          .math-num { border-bottom: 0.5pt solid black; padding: 0 1px; }
-          .math-den { padding: 0 1px; }
-          .math-dot { position: relative; display: inline-block; }
-          .math-dot::after { content: "·"; position: absolute; top: -0.6em; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 1.2em; }
-          .math-sqrt { display: inline-flex; align-items: center; }
-          .math-sqrt-stem { border-top: 0.5pt solid black; padding-top: 1px; }
-          .math-sup { font-size: 0.7em; vertical-align: super; }
-          .math-sub { font-size: 0.7em; vertical-align: sub; }
-          .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
           body { pointer-events: auto !important; }
           .paper { color: black !important; overflow: hidden; display: flex; flex-direction: column; }
           .callout-note-box { position: relative; }
@@ -1767,8 +1838,7 @@ function CreateLectureSheetContent() {
           .callout-note-box:hover .callout-delete-btn { opacity: 1; }
           .callout-delete-btn:hover { background: #fee2e2 !important; color: #b91c1c !important; }
           .content-area { overflow: hidden; min-height: 0; flex: 1 1 0%; display: block; }
-          .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
-          .content-area table td, .content-area table th { min-width: 30px; height: 32px; min-height: 32px; padding: 6px 10px; vertical-align: top; word-break: break-word; cursor: text; user-select: text; -webkit-user-select: text; }
+          .content-area table td, .content-area table th { cursor: text; user-select: text; -webkit-user-select: text; }
           .content-area table td:focus, .content-area table td:focus-visible { outline: 2px solid #2563eb !important; background-color: #eff6ff !important; }
           .content-area table td * { pointer-events: auto; }
           .no-arrows::-webkit-inner-spin-button, .no-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
