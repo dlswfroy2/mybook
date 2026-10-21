@@ -73,13 +73,30 @@ function toBengaliNumber(n: number | string | undefined | null): string {
 
 function stripDirtyHtml(html: string): string {
   if (typeof window === 'undefined') return html;
-  if (!/<[a-z][\s\S]*>/i.test(html)) return html;
+  if (!html) return '';
+
+  // Clean raw plain text remnants of Gemini data attributes or style strings
+  let cleanedStr = html
+    .replace(/data-index-in-node="[^"]*"\s*/gi, '')
+    .replace(/style="[^"]*line-height:\s*1\.15[^"]*"\s*>?/gi, '');
+
+  if (!/<[a-z][\s\S]*>/i.test(cleanedStr)) return cleanedStr;
+
   const tmp = document.createElement('div');
-  tmp.innerHTML = html;
+  tmp.innerHTML = cleanedStr;
 
   tmp.querySelectorAll('*').forEach((el) => {
-    // Keep KaTeX and math structures intact
-    if (el.classList.contains('katex') || el.closest('.katex') || el.classList.contains('math-frac') || el.closest('.math-frac')) {
+    // Keep KaTeX, tables, and math structures intact
+    if (
+      el.classList.contains('katex') ||
+      el.closest('.katex') ||
+      el.classList.contains('math-frac') ||
+      el.closest('.math-frac') ||
+      el.tagName === 'TABLE' ||
+      el.tagName === 'TR' ||
+      el.tagName === 'TD' ||
+      el.tagName === 'TH'
+    ) {
       return;
     }
 
@@ -123,19 +140,19 @@ function formatMath(text: string): string {
     return text;
   }
 
-  // Convert $$ ... $$ (display math)
+  // Convert $$ ... $$ (display math) with output: 'html' (prevents unstyled MathML stacking)
   text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
     try {
-      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
     } catch {
       return `$$${math}$$`;
     }
   });
 
-  // Convert $ ... $ (inline math)
+  // Convert $ ... $ (inline math) with output: 'html'
   text = text.replace(/\$([^$\n]+?)\$/g, (_, math) => {
     try {
-      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
     } catch {
       return `$${math}$`;
     }
@@ -144,14 +161,14 @@ function formatMath(text: string): string {
   // Convert \[ ... \] and \( ... \)
   text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
     try {
-      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
     } catch {
       return math;
     }
   });
   text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, math) => {
     try {
-      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
     } catch {
       return math;
     }
@@ -161,7 +178,7 @@ function formatMath(text: string): string {
   if (/\\frac\{/.test(text)) {
     text = text.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (_, num, den) => {
       try {
-        return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false });
+        return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
       } catch {
         return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
       }
@@ -172,14 +189,14 @@ function formatMath(text: string): string {
   if (/\\sqrt/.test(text)) {
     text = text.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, (_, root, val) => {
       try {
-        return katex.renderToString(`\\sqrt[${root}]{${val}}`, { throwOnError: false, displayMode: false });
+        return katex.renderToString(`\\sqrt[${root}]{${val}}`, { throwOnError: false, displayMode: false, output: 'html' });
       } catch {
         return `<sup>${root}</sup>√<span>${val}</span>`;
       }
     });
     text = text.replace(/\\sqrt\{([^}]+)\}/g, (_, val) => {
       try {
-        return katex.renderToString(`\\sqrt{${val}}`, { throwOnError: false, displayMode: false });
+        return katex.renderToString(`\\sqrt{${val}}`, { throwOnError: false, displayMode: false, output: 'html' });
       } catch {
         return `√<span>${val}</span>`;
       }
@@ -304,7 +321,7 @@ function EditableContentArea({
   const inputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dynamic Word-like auto-reflow (overflow to next page & pull-up on underflow)
-  const checkAndReflow = useCallback(() => {
+  const checkAndReflow = useCallback((allowUnderflow = false) => {
     if (isReflowingRef.current) return;
     const el = ref.current;
     if (!el) return;
@@ -314,14 +331,48 @@ function EditableContentArea({
     isReflowingRef.current = true;
 
     try {
+      // If content is wrapped in a single container element, unwrap it so individual paragraphs/questions can flow
+      if (el.childNodes.length === 1 && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
+        const wrapper = el.firstChild as HTMLElement;
+        if (wrapper.tagName === 'DIV' || wrapper.tagName === 'P' || wrapper.tagName === 'SECTION' || wrapper.tagName === 'ARTICLE') {
+          if (wrapper.childNodes.length > 1) {
+            while (wrapper.firstChild) {
+              el.insertBefore(wrapper.firstChild, wrapper);
+            }
+            el.removeChild(wrapper);
+          }
+        }
+      }
+
       // 1. OVERFLOW: content exceeds available page clientHeight
-      if (el.scrollHeight > maxH + 3 && el.childNodes.length > 1) {
+      if (el.scrollHeight > maxH + 3) {
         const overflowNodes: Node[] = [];
+
+        // Remove last child nodes until content fits inside maxH
         while (el.scrollHeight > maxH + 3 && el.childNodes.length > 1) {
           const last = el.lastChild;
           if (!last) break;
           el.removeChild(last);
           overflowNodes.unshift(last);
+        }
+
+        // If single large child remains and still overflows (e.g. a large div or table), extract its child nodes
+        if (el.scrollHeight > maxH + 3 && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
+          const onlyChild = el.firstChild as HTMLElement;
+          if (onlyChild.childNodes.length > 1) {
+            const innerOverflow: Node[] = [];
+            while (el.scrollHeight > maxH + 3 && onlyChild.childNodes.length > 1) {
+              const last = onlyChild.lastChild;
+              if (!last) break;
+              onlyChild.removeChild(last);
+              innerOverflow.unshift(last);
+            }
+            if (innerOverflow.length > 0) {
+              const clone = onlyChild.cloneNode(false) as HTMLElement;
+              innerOverflow.forEach((n) => clone.appendChild(n));
+              overflowNodes.unshift(clone);
+            }
+          }
         }
 
         if (overflowNodes.length > 0) {
@@ -348,8 +399,8 @@ function EditableContentArea({
           }
         }
       }
-      // 2. UNDERFLOW: empty space available in this page, pull up from next page
-      else if (maxH - el.scrollHeight > 35) {
+      // 2. UNDERFLOW: empty space available in this page, pull up from next page (ONLY when allowed, e.g. after Backspace/Delete)
+      else if (allowUnderflow && maxH - el.scrollHeight > 35) {
         const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
         if (nextEl && nextEl.childNodes.length > 0) {
           let movedCount = 0;
@@ -373,7 +424,7 @@ function EditableContentArea({
               }
             } else {
               setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1 } }));
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
               }, 30);
             }
           }
@@ -388,31 +439,36 @@ function EditableContentArea({
   useEffect(() => {
     const handleReflowEvent = (e: any) => {
       if (e.detail?.pageIndex === pageIndex) {
-        checkAndReflow();
+        checkAndReflow(e.detail?.allowUnderflow || false);
       }
     };
     window.addEventListener('reflow-page', handleReflowEvent);
     return () => window.removeEventListener('reflow-page', handleReflowEvent);
   }, [pageIndex, checkAndReflow]);
 
-  // Load initial content once on mount, then trigger initial reflow check
+  // Load initial content once on mount, then trigger initial reflow check including font readiness
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
       ref.current.innerHTML = initialHtml;
       isLoadedRef.current = true;
-      setTimeout(checkAndReflow, 150);
+      setTimeout(() => checkAndReflow(false), 100);
+      if (typeof document !== 'undefined' && document.fonts) {
+        document.fonts.ready.then(() => {
+          setTimeout(() => checkAndReflow(false), 50);
+        });
+      }
     }
   }, []);
 
-  // plain text থেকে LaTeX সহ HTML তৈরি করে (KaTeX render সহ)
+  // plain text থেকে LaTeX সহ HTML তৈরি করে (KaTeX render সহ, output: 'html')
   const renderMathInText = (text: string): string => {
     const lines = text.split('\n');
     const htmlLines = lines.map((line) => {
       if (line.trim() === '') return '<p style="margin:0 0 2px 0;padding:0"><br/></p>';
-      // $$ ... $$ (display math) আগে ধরুন
+      // $$ ... $$ (display math)
       line = line.replace(/\$\$(.+?)\$\$/g, (_, math) => {
         try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true });
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
         } catch {
           return `<span>$$${math}$$</span>`;
         }
@@ -420,7 +476,7 @@ function EditableContentArea({
       // $ ... $ (inline math)
       line = line.replace(/\$([^$\n]+?)\$/g, (_, math) => {
         try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false });
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
         } catch {
           return `<span>$${math}$</span>`;
         }
@@ -579,7 +635,7 @@ function EditableContentArea({
         }
         return;
       }
-      setTimeout(checkAndReflow, 50);
+      setTimeout(() => checkAndReflow(false), 50);
       return;
     }
 
@@ -610,17 +666,17 @@ function EditableContentArea({
           onRemoveEmptyPage(pageIndex);
         } else {
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex - 1 } }));
+            window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex - 1, allowUnderflow: true } }));
           }, 50);
         }
         return;
       }
-      setTimeout(checkAndReflow, 100);
+      setTimeout(() => checkAndReflow(true), 100);
       return;
     }
 
     if (e.key === 'Delete') {
-      setTimeout(checkAndReflow, 100);
+      setTimeout(() => checkAndReflow(true), 100);
     }
   };
 
@@ -933,10 +989,10 @@ function CreateLectureSheetContent() {
   }, [isPrintMode, data.content, mT, mB, mL, mR, globalFontSize, globalLineHeight]);
 
   const handleAddNextPage = useCallback((initialContent: string = '') => {
-    setPaginatedPages(prev => {
-      const nextIdx = prev.length;
-      setManualPages(m => ({ ...m, [nextIdx]: initialContent }));
-      return [...prev, initialContent];
+    setPaginatedPages(prev => [...prev, initialContent]);
+    setManualPages(prev => {
+      const nextIdx = Object.keys(prev).length;
+      return { ...prev, [nextIdx]: initialContent };
     });
   }, []);
 
@@ -1828,8 +1884,13 @@ function CreateLectureSheetContent() {
         .math-sup { font-size: 0.7em; vertical-align: super; }
         .math-sub { font-size: 0.7em; vertical-align: sub; }
         .math-text { font-family: 'Kalpurush', sans-serif; font-style: normal; }
-        .content-area table { width: 100%; border-collapse: collapse; margin: 8px 0; table-layout: fixed; }
-        .content-area table td, .content-area table th { min-width: 30px; height: 32px; min-height: 32px; padding: 6px 10px; vertical-align: top; word-break: break-word; }
+        .katex { font-size: 1.15em; line-height: 1.2; text-indent: 0; text-rendering: auto; }
+        .katex .mfrac .vlist-t { display: inline-table; table-layout: fixed; vertical-align: middle; }
+        .katex .mfrac .frac-line { border-bottom: 1.5px solid currentColor !important; display: inline-block; width: 100%; min-height: 1.5px; }
+        .content-area table { width: 100% !important; border-collapse: collapse !important; margin: 10px 0 !important; border: 1.5px solid #222 !important; }
+        .content-area table td, .content-area table th { border: 1px solid #333 !important; min-width: 35px !important; height: 32px !important; min-height: 32px !important; padding: 8px 10px !important; vertical-align: top !important; word-break: break-word !important; }
+        .content-area table th { background-color: #f1f5f9 !important; font-weight: bold !important; }
+        .content-area p { margin: 0 0 4px 0; }
         @media screen {
           body { pointer-events: auto !important; }
           .paper { color: black !important; overflow: hidden; display: flex; flex-direction: column; }
