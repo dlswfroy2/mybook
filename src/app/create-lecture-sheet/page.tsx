@@ -71,8 +71,35 @@ function toBengaliNumber(n: number | string | undefined | null): string {
   return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
 }
 
+function stripDirtyHtml(html: string): string {
+  // যদি HTML tag থাকে তবে DOM দিয়ে পরিষ্কার করুন
+  if (typeof window === 'undefined') return html;
+  if (!/<[a-z][\s\S]*>/i.test(html)) return html; // plain text — এড়িয়ে যান
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  tmp.querySelectorAll('*').forEach((el) => {
+    // ক্ষতিকর attributes সরান
+    Array.from(el.attributes).forEach((attr) => {
+      if (
+        attr.name.startsWith('data-') ||
+        attr.name === 'style' ||
+        attr.name === 'class' ||
+        attr.name === 'id' ||
+        attr.name.startsWith('on')
+      ) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  // meta/script/style ট্যাগ সরান
+  tmp.querySelectorAll('meta, script, style').forEach((el) => el.remove());
+  return tmp.innerHTML;
+}
+
 function formatMath(text: string) {
   if (!text) return '';
+  // প্রথমে dirty HTML পরিষ্কার করুন (data-*, inline style সরান)
+  text = stripDirtyHtml(text);
   let formatted = text.replace(/#+\s*\**|\*\*/g, '');
   formatted = formatted.replace(/([a-zA-Z])\s*\n\s*([-+]?\d+)/g, '$1^$2');
   formatted = formatted.replace(/ms\s*\n\s*-2/g, 'ms^-2');
