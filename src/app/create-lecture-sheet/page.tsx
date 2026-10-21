@@ -174,15 +174,62 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+function isCursorAtStart(el: HTMLElement): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return false;
+  try {
+    const preRange = document.createRange();
+    preRange.selectNodeContents(el);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    return preRange.toString().trim().length === 0;
+  } catch {
+    return false;
+  }
+}
+
+function isCursorAtEnd(el: HTMLElement): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return false;
+  try {
+    const postRange = document.createRange();
+    postRange.selectNodeContents(el);
+    postRange.setStart(range.endContainer, range.endOffset);
+    return postRange.toString().trim().length === 0;
+  } catch {
+    return false;
+  }
+}
+
+function setCursor(el: HTMLElement, position: 'start' | 'end') {
+  el.focus();
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(position === 'start');
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 interface EditableContentAreaProps {
   initialHtml: string;
   style: any;
   cols: number;
   hasRule: boolean;
   isActive: boolean;
+  pageIndex: number;
+  totalPages: number;
   onFocus: () => void;
   onClick: () => void;
   onBlur: (val: string) => void;
+  onAddNextPage: (initialContent?: string) => void;
+  onRemoveEmptyPage: (pageIndex: number) => void;
+  onFocusPage: (pageIndex: number, position: 'start' | 'end') => void;
+  onSyncPageContent: (pageIndex: number, content: string) => void;
 }
 
 function EditableContentArea({
@@ -191,18 +238,119 @@ function EditableContentArea({
   cols,
   hasRule,
   isActive,
+  pageIndex,
+  totalPages,
   onFocus,
   onClick,
   onBlur,
+  onAddNextPage,
+  onRemoveEmptyPage,
+  onFocusPage,
+  onSyncPageContent,
 }: EditableContentAreaProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isLoadedRef = useRef(false);
+  const isReflowingRef = useRef(false);
+  const inputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load initial content only once on mount so typing is never interrupted or wiped
+  // Dynamic Word-like auto-reflow (overflow to next page & pull-up on underflow)
+  const checkAndReflow = useCallback(() => {
+    if (isReflowingRef.current) return;
+    const el = ref.current;
+    if (!el) return;
+    const maxH = el.clientHeight;
+    if (!maxH || maxH <= 0) return;
+
+    isReflowingRef.current = true;
+
+    try {
+      // 1. OVERFLOW: content exceeds available page clientHeight
+      if (el.scrollHeight > maxH + 3 && el.childNodes.length > 1) {
+        const overflowNodes: Node[] = [];
+        while (el.scrollHeight > maxH + 3 && el.childNodes.length > 1) {
+          const last = el.lastChild;
+          if (!last) break;
+          el.removeChild(last);
+          overflowNodes.unshift(last);
+        }
+
+        if (overflowNodes.length > 0) {
+          const tempDiv = document.createElement('div');
+          overflowNodes.forEach((node) => tempDiv.appendChild(node));
+          const overflowHtml = tempDiv.innerHTML;
+
+          const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
+          if (nextEl) {
+            const frag = document.createRange().createContextualFragment(overflowHtml);
+            if (nextEl.firstChild) {
+              nextEl.insertBefore(frag, nextEl.firstChild);
+            } else {
+              nextEl.appendChild(frag);
+            }
+            onSyncPageContent(pageIndex, el.innerHTML);
+            onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1 } }));
+            }, 30);
+          } else {
+            onSyncPageContent(pageIndex, el.innerHTML);
+            onAddNextPage(overflowHtml);
+          }
+        }
+      }
+      // 2. UNDERFLOW: empty space available in this page, pull up from next page
+      else if (maxH - el.scrollHeight > 35) {
+        const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
+        if (nextEl && nextEl.childNodes.length > 0) {
+          let movedCount = 0;
+          while (nextEl.childNodes.length > 0 && maxH - el.scrollHeight > 15) {
+            const firstNode = nextEl.firstChild!;
+            el.appendChild(firstNode);
+            if (el.scrollHeight > maxH + 2) {
+              // Exceeded, put back
+              nextEl.insertBefore(firstNode, nextEl.firstChild);
+              break;
+            }
+            movedCount++;
+          }
+          if (movedCount > 0) {
+            onSyncPageContent(pageIndex, el.innerHTML);
+            onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
+            // If next page is completely empty and it is the last page, remove it
+            if (nextEl.innerText.trim() === '' && nextEl.innerHTML.replace(/<[^>]*>/g, '').trim() === '') {
+              if (pageIndex + 1 === totalPages - 1 && totalPages > 1) {
+                onRemoveEmptyPage(pageIndex + 1);
+              }
+            } else {
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1 } }));
+              }, 30);
+            }
+          }
+        }
+      }
+    } finally {
+      isReflowingRef.current = false;
+    }
+  }, [pageIndex, totalPages, onAddNextPage, onRemoveEmptyPage, onSyncPageContent]);
+
+  // Listen to custom reflow-page events dispatched from adjacent pages
+  useEffect(() => {
+    const handleReflowEvent = (e: any) => {
+      if (e.detail?.pageIndex === pageIndex) {
+        checkAndReflow();
+      }
+    };
+    window.addEventListener('reflow-page', handleReflowEvent);
+    return () => window.removeEventListener('reflow-page', handleReflowEvent);
+  }, [pageIndex, checkAndReflow]);
+
+  // Load initial content once on mount, then trigger initial reflow check
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
       ref.current.innerHTML = initialHtml;
       isLoadedRef.current = true;
+      setTimeout(checkAndReflow, 150);
     }
   }, []);
 
@@ -210,7 +358,7 @@ function EditableContentArea({
   const renderMathInText = (text: string): string => {
     const lines = text.split('\n');
     const htmlLines = lines.map((line) => {
-      if (line.trim() === '') return '<br>';
+      if (line.trim() === '') return '<p style="margin:0 0 2px 0;padding:0"><br/></p>';
       // $$ ... $$ (display math) আগে ধরুন
       line = line.replace(/\$\$(.+?)\$\$/g, (_, math) => {
         try {
@@ -232,16 +380,13 @@ function EditableContentArea({
     return htmlLines.join('');
   };
 
-  // Paste হলে plain text নিয়ে LaTeX render করুন (Gemini/web থেকে আসা raw HTML বাদ দিন)
+  // Paste হলে clean LaTeX / formatted paragraphs পেস্ট করুন এবং সাথে সাথে reflow করুন
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
     const clipboardData = e.clipboardData;
-
-    // সবসময় plain text নিন — এতে Gemini-র LaTeX ($...$) অক্ষুণ্ণ থাকে
     const text = clipboardData.getData('text/plain');
     if (!text) return;
 
-    // LaTeX থাকলে KaTeX দিয়ে render করুন, না থাকলে plain text
     const hasLatex = /\$/.test(text);
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -253,21 +398,35 @@ function EditableContentArea({
       const fragment = range.createContextualFragment(renderedHtml);
       range.insertNode(fragment);
     } else {
-      // plain text — newline কে <br> তে রূপান্তর করুন
       const lines = text.split('\n');
-      lines.forEach((line, i) => {
-        if (i > 0) range.insertNode(document.createElement('br'));
-        range.insertNode(document.createTextNode(line));
-        range.collapse(false);
+      const frag = document.createDocumentFragment();
+      lines.forEach((line) => {
+        const p = document.createElement('p');
+        p.style.margin = '0 0 2px 0';
+        p.textContent = line || '\u00A0';
+        frag.appendChild(p);
       });
+      range.insertNode(frag);
     }
     range.collapse(false);
     sel.removeAllRanges();
     sel.addRange(range);
+
+    setTimeout(checkAndReflow, 40);
+  };
+
+  const handleInput = () => {
+    if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
+    inputTimerRef.current = setTimeout(() => {
+      checkAndReflow();
+    }, 150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Support Tab / Shift+Tab to navigate table cells or add rows
+    const el = ref.current;
+    if (!el) return;
+
+    // 1. Support Tab / Shift+Tab to navigate table cells or add rows
     if (e.key === 'Tab') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && sel.anchorNode) {
@@ -332,8 +491,67 @@ function EditableContentArea({
               }
             }
           }
+          return;
         }
       }
+    }
+
+    // 2. Enter at bottom of page -> transition to next page
+    if (e.key === 'Enter') {
+      const isEnd = isCursorAtEnd(el);
+      const isFull = el.scrollHeight >= el.clientHeight - 10;
+      if (isEnd && isFull) {
+        e.preventDefault();
+        if (pageIndex < totalPages - 1) {
+          onFocusPage(pageIndex + 1, 'start');
+        } else {
+          onAddNextPage('<p><br/></p>');
+          setTimeout(() => onFocusPage(pageIndex + 1, 'start'), 80);
+        }
+        return;
+      }
+      setTimeout(checkAndReflow, 50);
+      return;
+    }
+
+    // 3. ArrowDown at bottom of page -> move cursor to next page
+    if (e.key === 'ArrowDown') {
+      if (isCursorAtEnd(el) && pageIndex < totalPages - 1) {
+        e.preventDefault();
+        onFocusPage(pageIndex + 1, 'start');
+        return;
+      }
+    }
+
+    // 4. ArrowUp at top of page -> move cursor to previous page
+    if (e.key === 'ArrowUp') {
+      if (isCursorAtStart(el) && pageIndex > 0) {
+        e.preventDefault();
+        onFocusPage(pageIndex - 1, 'end');
+        return;
+      }
+    }
+
+    // 5. Backspace at top of page -> pull to previous page / delete empty page
+    if (e.key === 'Backspace') {
+      if (isCursorAtStart(el) && pageIndex > 0) {
+        e.preventDefault();
+        onFocusPage(pageIndex - 1, 'end');
+        if (el.innerText.trim() === '' && el.querySelectorAll('img, table').length === 0) {
+          onRemoveEmptyPage(pageIndex);
+        } else {
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex - 1 } }));
+          }, 50);
+        }
+        return;
+      }
+      setTimeout(checkAndReflow, 100);
+      return;
+    }
+
+    if (e.key === 'Delete') {
+      setTimeout(checkAndReflow, 100);
     }
   };
 
@@ -345,6 +563,7 @@ function EditableContentArea({
       onFocus={onFocus}
       onClick={onClick}
       onKeyDown={handleKeyDown}
+      onInput={handleInput}
       onPaste={handlePaste}
       onBlur={(e) => {
         const val = e.currentTarget.innerHTML;
@@ -591,8 +810,23 @@ function CreateLectureSheetContent() {
     container.style.fontSize = globalFontSize + 'pt';
     container.style.lineHeight = String(globalLineHeight);
     
-    const tempLines = contentHtml.split('\n');
-    container.innerHTML = tempLines.map(line => `<div class="measure-line" style="min-height: 1.2em;">${line.trim() || '&nbsp;'}</div>`).join('');
+    // Split content by block tags or newlines
+    let tempBlocks: string[] = [];
+    if (/<(p|div|h[1-6]|table|blockquote|li)[^>]*>/i.test(contentHtml)) {
+      const parserDiv = document.createElement('div');
+      parserDiv.innerHTML = contentHtml;
+      Array.from(parserDiv.childNodes).forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          tempBlocks.push((node as HTMLElement).outerHTML);
+        } else if (node.textContent && node.textContent.trim()) {
+          tempBlocks.push(`<p>${node.textContent}</p>`);
+        }
+      });
+    }
+    if (tempBlocks.length === 0) {
+      tempBlocks = contentHtml.split('\n').filter(l => l.trim() !== '');
+    }
+    container.innerHTML = tempBlocks.map(block => `<div class="measure-line" style="min-height: 1.2em;">${block}</div>`).join('');
     
     const headerSpace = 135, footerSpace = 65, topicSpacePx = 65, totalPageHeightPx = 11.69 * 96;
     const availableHeightPx = totalPageHeightPx - (marginT * 96) - (parseFloat(String(mB)) * 96) - headerSpace - footerSpace;
@@ -628,6 +862,41 @@ function CreateLectureSheetContent() {
     setManualPages(initialManual);
 
   }, [isPrintMode, data.content, mT, mB, mL, mR, globalFontSize, globalLineHeight]);
+
+  const handleAddNextPage = useCallback((initialContent: string = '') => {
+    setPaginatedPages(prev => {
+      const nextIdx = prev.length;
+      setManualPages(m => ({ ...m, [nextIdx]: initialContent }));
+      return [...prev, initialContent];
+    });
+  }, []);
+
+  const handleRemoveEmptyPage = useCallback((idxToRemove: number) => {
+    setPaginatedPages(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== idxToRemove);
+    });
+    setManualPages(prev => {
+      const updated: Record<number, string> = {};
+      const sortedKeys = Object.keys(prev).map(Number).sort((a, b) => a - b).filter(i => i !== idxToRemove);
+      sortedKeys.forEach((oldIdx, newIdx) => {
+        updated[newIdx] = prev[oldIdx];
+      });
+      return updated;
+    });
+  }, []);
+
+  const handleFocusPage = useCallback((pageIdx: number, position: 'start' | 'end') => {
+    setActiveEditIdx(pageIdx);
+    const targetEl = document.querySelector(`.paper-idx-${pageIdx} .content-area`) as HTMLElement | null;
+    if (targetEl) {
+      setCursor(targetEl, position);
+    }
+  }, []);
+
+  const handleSyncPageContent = useCallback((pageIdx: number, content: string) => {
+    setManualPages(prev => ({ ...prev, [pageIdx]: content }));
+  }, []);
 
   const subjects = useMemo(() => data.classId ? getSubjectsForClass(data.classId) : [], [data.classId]);
   const chapters = useMemo(() => (data.classId && data.subject) ? getChaptersForSubject(data.classId, data.subject) : [], [data.classId, data.subject]);
@@ -1460,9 +1729,15 @@ function CreateLectureSheetContent() {
                         cols={cols}
                         hasRule={hasRule}
                         isActive={activeEditIdx === idx}
+                        pageIndex={idx}
+                        totalPages={paginatedPages.length}
                         onFocus={() => setActiveEditIdx(idx)}
                         onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
                         onBlur={(val) => setManualPages(prev => ({ ...prev, [idx]: val }))}
+                        onAddNextPage={handleAddNextPage}
+                        onRemoveEmptyPage={handleRemoveEmptyPage}
+                        onFocusPage={handleFocusPage}
+                        onSyncPageContent={handleSyncPageContent}
                       />
                       <footer className="mt-auto pt-4 flex justify-between text-[9pt] font-bold border-t border-slate-200"><span>পাতা: {toBengaliNumber(idx + 1)} / {toBengaliNumber(paginatedPages.length)}</span><span>{softwareConfig?.appName || 'টপ গ্রেড টিউটোরিয়ালস'}</span></footer>
                     </div>
