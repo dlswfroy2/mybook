@@ -1597,16 +1597,36 @@ function CreateLectureSheetContent() {
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
   const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
   const [activeCursorPos, setActiveCursorPos] = useState<number | null>(null);
+  const lastTargetBlockRef = useRef<HTMLElement | null>(null);
+  const lastRangeRef = useRef<Range | null>(null);
 
-  // Listen to active cursor position detected from content areas
+  // Listen to active cursor position & track selected target block continuously
   useEffect(() => {
     const handleCursorDetected = (e: any) => {
       if (typeof e.detail?.cursorInches === 'number') {
         setActiveCursorPos(e.detail.cursorInches);
       }
     };
+    const handleSelTrack = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        lastRangeRef.current = sel.getRangeAt(0).cloneRange();
+        let node: Node | null = sel.anchorNode;
+        while (node) {
+          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement?.classList.contains('content-area')) {
+            lastTargetBlockRef.current = node as HTMLElement;
+            break;
+          }
+          node = node.parentNode;
+        }
+      }
+    };
+    document.addEventListener('selectionchange', handleSelTrack);
     window.addEventListener('active-cursor-pos-detected', handleCursorDetected);
-    return () => window.removeEventListener('active-cursor-pos-detected', handleCursorDetected);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelTrack);
+      window.removeEventListener('active-cursor-pos-detected', handleCursorDetected);
+    };
   }, []);
 
   useEffect(() => {
@@ -1793,6 +1813,28 @@ function CreateLectureSheetContent() {
     }); 
   }, [globalFontSize, globalLineHeight]);
 
+  // ব্লকের ইনডেন্ট, প্যাডিং ও লিডিং স্পেস মুছে পাতার শুরুতে নেওয়ার হেল্পার
+  const cleanBlockIndent = (block: HTMLElement, indentStr: string) => {
+    block.style.marginLeft = indentStr;
+    if (!indentStr) {
+      block.style.paddingLeft = '';
+      block.style.textIndent = '';
+      // লিডিং স্পেস, &nbsp;, ট্যাব ও খালি স্প্যান রিমুভ
+      block.innerHTML = block.innerHTML
+        .replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '')
+        .replace(/^<span[^>]*>(\s|&nbsp;|\u00A0|\t)*<\/span>/gi, '')
+        .replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
+      block.querySelectorAll('*').forEach((child) => {
+        const cel = child as HTMLElement;
+        if (cel.style) {
+          if (cel.style.marginLeft) cel.style.marginLeft = '';
+          if (cel.style.paddingLeft) cel.style.paddingLeft = '';
+          if (cel.style.textIndent) cel.style.textIndent = '';
+        }
+      });
+    }
+  };
+
   // রুলারের 'L' পয়েন্ট বা ইন্ডেন্ট মার্কার ড্র্যাগ করলে কারসরের লাইনে সরাসরি মার্জিন প্রয়োগ
   const handleLineIndentChange = useCallback((newIndentInches: number) => {
     setActiveLineIndent(newIndentInches);
@@ -1808,13 +1850,7 @@ function CreateLectureSheetContent() {
         const ca = document.querySelector(`.paper-idx-${pIdx} .content-area`) as HTMLElement | null;
         if (ca) {
           Array.from(ca.children).forEach((child) => {
-            const el = child as HTMLElement;
-            el.style.marginLeft = indentStr;
-            if (!indentStr) {
-              el.style.paddingLeft = '';
-              el.style.textIndent = '';
-              el.innerHTML = el.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
-            }
+            cleanBlockIndent(child as HTMLElement, indentStr);
           });
           handleSyncPageContent(pIdx, ca.innerHTML);
         }
@@ -1825,7 +1861,6 @@ function CreateLectureSheetContent() {
       const targetBlocks: HTMLElement[] = [];
 
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        // একাধিক লাইন/প্যারাগ্রাফ সিলেক্ট থাকলে সবগুলোতে প্রয়োগ করুন
         const range = sel.getRangeAt(0);
         Array.from(contentArea.children).forEach((child) => {
           if (range.intersectsNode(child)) {
@@ -1845,24 +1880,29 @@ function CreateLectureSheetContent() {
         }
       }
 
+      // যদি ফোকাস নষ্ট হয়ে থাকে (যেমন বোতামে ক্লিক করার কারণে), সংরক্ষিত lastTargetBlockRef ব্যবহার করুন
+      if (targetBlocks.length === 0 && lastTargetBlockRef.current && contentArea.contains(lastTargetBlockRef.current)) {
+        targetBlocks.push(lastTargetBlockRef.current);
+      }
+
       if (targetBlocks.length === 0) {
         const first = contentArea.firstElementChild as HTMLElement | null;
         if (first) targetBlocks.push(first);
       }
 
       targetBlocks.forEach((tb) => {
-        tb.style.marginLeft = indentStr;
-        if (!indentStr) {
-          tb.style.paddingLeft = '';
-          tb.style.textIndent = '';
-          // শুরুতে থাকা অপ্রয়োজনীয় স্পেস বা &nbsp; মুছে পাতার একদম শুরুতে নিয়ে যান
-          tb.innerHTML = tb.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
-        }
+        cleanBlockIndent(tb, indentStr);
       });
 
       handleSyncPageContent(activePaperIdx, contentArea.innerHTML);
     }
-  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent]);
+
+    if (!indentStr) {
+      try { document.execCommand('outdent', false); } catch {}
+      const curL = parseFloat(String(pageStyles[activePaperIdx]?.mL ?? printSettings.marginLeft)) || 0.5;
+      setActiveCursorPos(curL);
+    }
+  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent, pageStyles, printSettings.marginLeft]);
 
   const handleFormatting = useCallback((command: string, value: string | null = null) => {
     const selection = window.getSelection();
@@ -2553,8 +2593,9 @@ function CreateLectureSheetContent() {
             )}
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleLineIndentChange(0)}
-              className="px-2.5 py-0.5 rounded-full border border-amber-300 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold transition-all text-[11px] flex items-center gap-1 shadow-xs ml-auto"
+              className="px-2.5 py-0.5 rounded-full border border-amber-300 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-950 font-bold transition-all text-[11px] flex items-center gap-1 shadow-xs ml-auto cursor-pointer"
               title="কারসর থাকা লাইন বা নির্বাচিত লাইনগুলোকে সরাসরি পাতার শুরুতে ফিরিয়ে আনুন"
             >
               ⬅ পাতার শুরুতে আনুন
