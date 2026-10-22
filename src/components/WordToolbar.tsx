@@ -1035,7 +1035,10 @@ export function WordToolbar({
               <button
                 type="button"
                 onMouseDown={e => e.preventDefault()}
-                onClick={() => exec('outdent')}
+                onClick={() => {
+                  exec('outdent');
+                  onIndentChange?.('left', -0.25);
+                }}
                 className="p-1.5 hover:bg-slate-200 active:bg-slate-300 rounded transition-colors"
                 title="ইনডেন্ট কমান (Outdent)"
               >
@@ -1044,7 +1047,10 @@ export function WordToolbar({
               <button
                 type="button"
                 onMouseDown={e => e.preventDefault()}
-                onClick={() => exec('indent')}
+                onClick={() => {
+                  exec('indent');
+                  onIndentChange?.('left', 0.25);
+                }}
                 className="p-1.5 hover:bg-slate-200 active:bg-slate-300 rounded transition-colors"
                 title="ইনডেন্ট বাড়ান (Indent)"
               >

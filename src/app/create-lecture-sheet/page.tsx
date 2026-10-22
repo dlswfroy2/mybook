@@ -434,7 +434,6 @@ interface WordRulerProps {
   tabStops?: number[];
   onTabStopsChange?: (stops: number[]) => void;
   activeLineIndent?: number; // কারসর থাকা লাইনের ইন্ডেন্ট (ইঞ্চি)
-  activeCursorPos?: number | null; // ডকুমেন্টে কারসর যেখানে আছে তার এক্সাক্ট ইঞ্চি অবস্থান
   onLineIndentChange?: (newIndentInches: number) => void;
 }
 
@@ -447,7 +446,6 @@ function WordRuler({
   tabStops = [],
   onTabStopsChange = () => {},
   activeLineIndent = 0,
-  activeCursorPos = null,
   onLineIndentChange = () => {},
 }: WordRulerProps) {
   const rulerRef = useRef<HTMLDivElement>(null);
@@ -703,20 +701,7 @@ function WordRuler({
           ))}
         </div>
 
-        {/* 5. Live Cursor Position 'L' Marker (কারসর যেখানে থাকবে ঠিক সেখানে 'L' চিহ্ন অবস্থান করবে) */}
-        {activeCursorPos !== null && activeCursorPos > 0 && (
-          <div
-            onMouseDown={handleMouseDownLineIndent}
-            className="absolute bottom-0 z-40 cursor-ew-resize group -ml-1 w-4 h-5 flex items-end justify-center"
-            style={{ left: `${activeCursorPos}in` }}
-            title={`কারসর অবস্থান 'L': ${activeCursorPos.toFixed(2)}" (টেনে কারসর থাকা লাইনটি সামনে/পিছনে সরান)`}
-          >
-            {/* Iconic 'L' mark directly over the cursor */}
-            <div className="w-3 h-3.5 border-l-[2.5px] border-b-[2.5px] border-amber-300 drop-shadow-md group-hover:scale-125 transition-transform" />
-          </div>
-        )}
-
-        {/* 5.1 User-placed 'L' Tab Stop Points (ব্যবহারকারী রুলারে ক্লিক করে তৈরি করলে দেখা যাবে) */}
+        {/* 5. User-placed 'L' Tab Stop Points (শুধুমাত্র ব্যবহারকারী রুলারে ক্লিক করে তৈরি করলে দেখা যাবে) */}
         {tabStops.map((pos, idx) => (
           <div
             key={idx}
@@ -734,19 +719,17 @@ function WordRuler({
           </div>
         ))}
 
-        {/* 6. Word Paragraph Indent Markers (কারসর যে লাইনে আছে তার ইনডেন্ট অনুযায়ী অবস্থান করে) */}
+        {/* 6. Active Cursor Line 'L' Indent Marker (কারসর যে লাইনে আছে তার অবস্থান নির্দেশক 'L' মার্কার) */}
         <div
           onMouseDown={handleMouseDownLineIndent}
-          className="absolute top-0 bottom-0 z-40 cursor-ew-resize group -ml-2 w-4 flex flex-col items-center justify-between"
+          className="absolute bottom-0 z-40 cursor-ew-resize group -ml-2 w-5 h-6 flex flex-col items-center justify-end select-none"
           style={{ left: `${marginLeft + activeLineIndent}in` }}
-          title={`কারসর লাইনের ইনডেন্ট: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে লাইন সামনে/পিছনে সরান)`}
+          title={`কারসর লাইনের 'L' অবস্থান: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে কারসর থাকা লাইনটি সামনে/পিছনে সরান)`}
         >
-          {/* Top downward triangle (First Line Indent) */}
-          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-amber-300 drop-shadow hover:border-t-amber-400" />
-          {/* Middle upward triangle (Hanging Indent) */}
-          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-amber-300 drop-shadow hover:border-b-amber-400" />
-          {/* Bottom rectangle (Left Indent) */}
-          <div className="w-2.5 h-1.5 bg-amber-300 border border-amber-600 rounded-[1px] drop-shadow hover:bg-amber-400" />
+          {/* Top Downward pointer */}
+          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-amber-300 drop-shadow group-hover:border-t-amber-400 mb-0.5" />
+          {/* Iconic Yellow 'L' symbol representing Word Tab / Indent */}
+          <div className="w-3.5 h-4 border-l-[3px] border-b-[3px] border-amber-300 drop-shadow-md group-hover:scale-125 group-hover:border-amber-400 transition-transform pointer-events-none" />
         </div>
 
         {/* 6.1 Page Margin Boundary Marker (পাতার মার্জিন পরিবর্তনকারী রেখা) */}
@@ -1289,10 +1272,11 @@ function EditableContentArea({
       }
     }
 
-    // 5. Backspace -> যদি ইনডেন্টেড লাইনের শুরুতে থাকে তবে পাতার শুরুতে নিয়ে যান, অন্যথায় পেজ পুল করুন
+    // 5. Backspace -> মাইক্রোসফট ওয়ার্ডের মতো পারফেক্ট আচরণ:
+    // ইনডেন্টেড লাইনের শুরুতে ব্যাকস্পেস দিলে লাইন কিছুতেই উপরে জোড়া লাগবে না, বরং সোজা বাম মার্জিনে (পাতার শুরুতে) চলে আসবে!
     if (e.key === 'Backspace') {
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
         let blockNode: HTMLElement | null = null;
         let curr: Node | null = sel.anchorNode;
         while (curr && curr !== el) {
@@ -1304,44 +1288,84 @@ function EditableContentArea({
         }
 
         if (blockNode) {
-          try {
-            const range = sel.getRangeAt(0);
-            let prevNode = range.startContainer.previousSibling;
-            if (!prevNode && range.startContainer.parentNode !== blockNode) {
-              prevNode = (range.startContainer.parentNode as Node)?.previousSibling || null;
+          const range = sel.getRangeAt(0);
+
+          // কারসরের পূর্বে এই ব্লকের কনটেন্ট চেক করি
+          const preRange = document.createRange();
+          preRange.selectNodeContents(blockNode);
+          preRange.setEnd(range.startContainer, range.startOffset);
+          const textBefore = preRange.toString();
+
+          // চেক করি কারসরের ঠিক পূর্বে কোনো <br> আছে কি না (যদি একই ব্লকে একাধিক লাইন থাকে)
+          let isJustAfterBr = false;
+          const startNode = range.startContainer;
+          const offset = range.startOffset;
+          if (startNode.nodeType === Node.TEXT_NODE && offset === 0) {
+            let prevSib: Node | null = startNode.previousSibling;
+            while (prevSib && prevSib.nodeType === Node.TEXT_NODE && prevSib.textContent?.trim() === '') {
+              prevSib = prevSib.previousSibling;
             }
-            const isJustAfterBr = prevNode && (prevNode.nodeName === 'BR');
+            if (prevSib && prevSib.nodeName === 'BR') isJustAfterBr = true;
+          } else if (startNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
+            const childBefore = startNode.childNodes[offset - 1];
+            if (childBefore && childBefore.nodeName === 'BR') isJustAfterBr = true;
+          }
 
-            const preRange = document.createRange();
-            preRange.selectNodeContents(blockNode);
-            preRange.setEnd(range.startContainer, range.startOffset);
-            const isAtBlockStart = preRange.toString().trim().length === 0;
+          // যদি লাইনের শুরুতে থাকে (পূর্বে শুধুমাত্র স্পেস, nbsp বা কিছু নেই)
+          const isAtStartOfText = /^[\s\u00A0\t]*$/.test(textBefore);
 
-            if (isAtBlockStart || isJustAfterBr) {
-              e.preventDefault();
-              blockNode.style.marginLeft = '';
-              blockNode.style.paddingLeft = '';
-              blockNode.style.textIndent = '';
-              blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0|\t)+/, '');
+          // চেক করি ব্লকে কি কোনো মার্জিন/ইনডেন্ট বা লিডিং স্পেস আছে?
+          const hasInlineIndent = (parseFloat(blockNode.style.marginLeft || '0') > 0) ||
+                                  (parseFloat(blockNode.style.paddingLeft || '0') > 0) ||
+                                  (parseFloat(blockNode.style.textIndent || '0') > 0);
+          const hasLeadingSpaces = /^(\s|&nbsp;|\u00A0|\t)+/i.test(blockNode.innerHTML);
 
-              // যদি ব্লকে একাধিক লাইন <br> দিয়ে যুক্ত থাকে, আলাদা প্যারাগ্রাফে ভেঙে দিন যাতে জোড়া না লাগে
-              if (blockNode.querySelector('br')) {
-                const parts = blockNode.innerHTML.split(/<br\s*\/?>/i);
-                if (parts.length > 1) {
-                  const frag = document.createDocumentFragment();
-                  let focusTarget: HTMLElement | null = null;
-                  parts.forEach((part, pIdx) => {
-                    const p = document.createElement('p');
-                    p.style.margin = '0 0 4px 0';
-                    p.innerHTML = part.replace(/^(\s|&nbsp;|\u00A0|\t)+/, '');
-                    frag.appendChild(p);
-                    if (pIdx === 1) focusTarget = p;
-                  });
-                  blockNode.parentNode?.replaceChild(frag, blockNode);
-                  if (focusTarget) setCursor(focusTarget, 'start');
-                }
+          if (isAtStartOfText && (hasInlineIndent || hasLeadingSpaces || textBefore.length > 0)) {
+            // ওয়ার্ডের মতো লাইনটিকে সোজা বাম মার্জিনে (পাতার শুরুতে) নিয়ে আসুন
+            e.preventDefault();
+            blockNode.style.marginLeft = '';
+            blockNode.style.paddingLeft = '';
+            blockNode.style.textIndent = '';
+            blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
+
+            // কারসরকে লেখার শুরুতে সেট করি
+            const newRange = document.createRange();
+            newRange.selectNodeContents(blockNode);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+
+            onSyncPageContent(pageIndex, el.innerHTML);
+            setTimeout(() => {
+              checkAndReflow(true);
+              updateActiveLineIndent();
+            }, 30);
+            return;
+          }
+
+          // যদি একই ব্লকে <br> এর পর নতুন লাইন থাকে এবং সেখানে ব্যাকস্পেস চাপা হয়:
+          if (isJustAfterBr) {
+            // উপরের লাইনে জোড়া না লাগিয়ে লাইন দুটিকে আলাদা দুটি স্বাধীন <p> এ বিভক্ত করুন
+            e.preventDefault();
+            const parts = blockNode.innerHTML.split(/<br\s*\/?>/i);
+            if (parts.length > 1) {
+              const frag = document.createDocumentFragment();
+              let targetP: HTMLElement | null = null;
+              parts.forEach((part, pIdx) => {
+                const p = document.createElement('p');
+                p.style.margin = '0 0 4px 0';
+                p.innerHTML = part.replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
+                frag.appendChild(p);
+                if (pIdx === 1) targetP = p;
+              });
+              blockNode.parentNode?.replaceChild(frag, blockNode);
+              if (targetP) {
+                const newRange = document.createRange();
+                newRange.selectNodeContents(targetP);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
               }
-
               onSyncPageContent(pageIndex, el.innerHTML);
               setTimeout(() => {
                 checkAndReflow(true);
@@ -1349,7 +1373,7 @@ function EditableContentArea({
               }, 40);
               return;
             }
-          } catch {}
+          }
         }
       }
 
@@ -1390,32 +1414,60 @@ function EditableContentArea({
     if (!el) return;
 
     try {
-      const range = sel.getRangeAt(0);
-      let rect = range.getBoundingClientRect();
-      let cursorLeft = rect.left;
-
-      // Collapsed range এর ক্ষেত্রে rect.left ০ হতে পারে, তখন ডামি নোড দিয়ে এক্সাক্ট পজিশন নেওয়া
-      if ((cursorLeft === 0 || rect.width === 0) && range.startContainer) {
-        const dummy = document.createElement('span');
-        dummy.textContent = '\uFEFF';
-        const clone = range.cloneRange();
-        clone.insertNode(dummy);
-        cursorLeft = dummy.getBoundingClientRect().left;
-        dummy.remove();
+      // Find the block element containing the cursor
+      let blockNode: HTMLElement | null = null;
+      let curr: Node | null = sel.anchorNode;
+      while (curr && curr !== el) {
+        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).parentElement === el) {
+          blockNode = curr as HTMLElement;
+          break;
+        }
+        curr = curr.parentNode;
       }
 
-      const paperEl = el.closest('.paper') as HTMLElement | null;
-      if (paperEl && cursorLeft > 0) {
-        const paperRect = paperEl.getBoundingClientRect();
-        const zoom = (style.zoom || 100) / 100;
-        const rawInches = (cursorLeft - paperRect.left) / (96 * zoom);
-        const cursorInches = Math.max(0.1, Math.round(rawInches * 100) / 100);
-        window.dispatchEvent(new CustomEvent('active-cursor-pos-detected', { detail: { cursorInches } }));
+      if (!blockNode) return;
+
+      const zoom = (style.zoom || 100) / 100;
+
+      // 1. First check explicit inline CSS indent
+      let indentInches = 0;
+      if (blockNode.style.marginLeft) {
+        const ml = blockNode.style.marginLeft.trim();
+        if (ml.endsWith('in')) {
+          indentInches = parseFloat(ml) || 0;
+        } else if (ml.endsWith('px')) {
+          indentInches = (parseFloat(ml) || 0) / 96;
+        }
       }
+
+      // 2. If no explicit inline margin, measure rendered DOM indent
+      if (indentInches === 0) {
+        const blockRect = blockNode.getBoundingClientRect();
+        const contentRect = el.getBoundingClientRect();
+        const diffPx = blockRect.left - contentRect.left;
+        if (diffPx > 4) {
+          indentInches = diffPx / (96 * zoom);
+        } else {
+          // Check leading spaces or text start
+          const text = blockNode.innerText || '';
+          const match = text.match(/^(\s|\u00A0)+/);
+          if (match && match[0].length > 0) {
+            indentInches = Math.min(2.0, match[0].length * 0.08);
+          }
+        }
+      }
+
+      indentInches = Math.max(0, Math.round(indentInches * 16) / 16);
+
+      window.dispatchEvent(
+        new CustomEvent('active-line-indent-detected', {
+          detail: { indentInches, pageIndex },
+        })
+      );
     } catch (err) {
-      console.warn('Error detecting cursor pos:', err);
+      console.warn('Error detecting line indent:', err);
     }
-  }, [style.zoom]);
+  }, [style.zoom, pageIndex]);
 
   useEffect(() => {
     const handleSelChange = () => {
@@ -1447,6 +1499,9 @@ function EditableContentArea({
         contentEditable={true}
         suppressContentEditableWarning={true}
         onFocus={() => {
+          try {
+            document.execCommand('defaultParagraphSeparator', false, 'p');
+          } catch {}
           onFocus();
           updateActiveLineIndent();
         }}
@@ -1636,15 +1691,14 @@ function CreateLectureSheetContent() {
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
   const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
-  const [activeCursorPos, setActiveCursorPos] = useState<number | null>(null);
   const lastTargetBlockRef = useRef<HTMLElement | null>(null);
   const lastRangeRef = useRef<Range | null>(null);
 
-  // Listen to active cursor position & track selected target block continuously
+  // Listen to active line indent & track selected target block continuously
   useEffect(() => {
-    const handleCursorDetected = (e: any) => {
-      if (typeof e.detail?.cursorInches === 'number') {
-        setActiveCursorPos(e.detail.cursorInches);
+    const handleLineIndentDetected = (e: any) => {
+      if (typeof e.detail?.indentInches === 'number') {
+        setActiveLineIndent(e.detail.indentInches);
       }
     };
     const handleSelTrack = () => {
@@ -1662,10 +1716,10 @@ function CreateLectureSheetContent() {
       }
     };
     document.addEventListener('selectionchange', handleSelTrack);
-    window.addEventListener('active-cursor-pos-detected', handleCursorDetected);
+    window.addEventListener('active-line-indent-detected', handleLineIndentDetected);
     return () => {
       document.removeEventListener('selectionchange', handleSelTrack);
-      window.removeEventListener('active-cursor-pos-detected', handleCursorDetected);
+      window.removeEventListener('active-line-indent-detected', handleLineIndentDetected);
     };
   }, []);
 
@@ -1939,10 +1993,9 @@ function CreateLectureSheetContent() {
 
     if (!indentStr) {
       try { document.execCommand('outdent', false); } catch {}
-      const curL = parseFloat(String(pageStyles[activePaperIdx]?.mL ?? printSettings.marginLeft)) || 0.5;
-      setActiveCursorPos(curL);
+      setActiveLineIndent(0);
     }
-  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent, pageStyles, printSettings.marginLeft]);
+  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent]);
 
   const handleFormatting = useCallback((command: string, value: string | null = null) => {
     const selection = window.getSelection();
@@ -2735,6 +2788,7 @@ function CreateLectureSheetContent() {
                 handleFocusPage(nextIdx, 'start');
               }, 60);
             }}
+            onIndentChange={(_dir, delta) => handleLineIndentChange(Math.max(0, activeLineIndent + delta))}
           />
           <div className="flex-1 flex overflow-hidden">
             <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
@@ -2830,7 +2884,6 @@ function CreateLectureSheetContent() {
                         tabStops={tabStops}
                         onTabStopsChange={setTabStops}
                         activeLineIndent={activeLineIndent}
-                        activeCursorPos={activeCursorPos}
                         onLineIndentChange={handleLineIndentChange}
                         onMarginChange={(newLeft, newRight) => {
                           if (applyScope === 'all') {
