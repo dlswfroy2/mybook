@@ -1573,14 +1573,29 @@ function EditableContentArea({
       // Find where this line's first character/content physically starts on screen:
       let startX = 0;
       try {
-        const range = document.createRange();
-        range.selectNodeContents(blockNode);
-        range.collapse(true); // start of line
-        const rRect = range.getBoundingClientRect();
-        if (rRect.left > 0) {
-          startX = rRect.left;
+        // Find first text node or child to measure text start accurately
+        let firstTextNode: Node | null = blockNode.firstChild;
+        while (firstTextNode && firstTextNode.firstChild) {
+          firstTextNode = firstTextNode.firstChild;
+        }
+        if (firstTextNode && firstTextNode.nodeType === Node.TEXT_NODE) {
+          const tr = document.createRange();
+          tr.setStart(firstTextNode, 0);
+          tr.setEnd(firstTextNode, Math.min(1, firstTextNode.textContent?.length || 1));
+          const r = tr.getBoundingClientRect();
+          if (r.left > 0) startX = r.left;
         }
       } catch {}
+
+      if (startX === 0) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(blockNode);
+          range.collapse(true);
+          const rRect = range.getBoundingClientRect();
+          if (rRect.left > 0) startX = rRect.left;
+        } catch {}
+      }
 
       if (startX === 0) {
         const firstChild = blockNode.firstElementChild || blockNode;
@@ -1606,9 +1621,34 @@ function EditableContentArea({
         indentInches = Math.max(0, Math.round((rulerPos - pageML) * 16) / 16);
       }
 
+      // Real-time font size detection at cursor:
+      let detectedFontSize = style.fontSize || 10.5;
+      if (sel.anchorNode) {
+        let elNode: HTMLElement | null = null;
+        if (sel.anchorNode.nodeType === Node.ELEMENT_NODE) {
+          elNode = sel.anchorNode as HTMLElement;
+        } else {
+          elNode = sel.anchorNode.parentElement;
+        }
+        if (elNode) {
+          const compStyle = window.getComputedStyle(elNode);
+          const pxSize = parseFloat(compStyle.fontSize);
+          if (pxSize > 0) {
+            // 1pt = 1.333px in 96 DPI CSS
+            const ptSize = Math.round((pxSize * 0.75) * 10) / 10;
+            detectedFontSize = ptSize;
+          }
+        }
+      }
+
       window.dispatchEvent(
         new CustomEvent('active-line-indent-detected', {
           detail: { indentInches, rulerPosInches: rulerPos, pageIndex },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('active-cursor-font-detected', {
+          detail: { fontSize: detectedFontSize, pageIndex },
         })
       );
     } catch (err) {
@@ -1832,6 +1872,7 @@ function CreateLectureSheetContent() {
   const [globalFontSize, setGlobalFontSize] = useState(10.5);
   const [globalLineHeight, setGlobalLineHeight] = useState(1.2);
   const [fontSizeDraft, setFontSizeDraft] = useState("");
+  const [currentDetectedFontSize, setCurrentDetectedFontSize] = useState<number>(10.5);
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
   const [showRuler, setShowRuler] = useState(true);
@@ -1869,11 +1910,19 @@ function CreateLectureSheetContent() {
         }
       }
     };
+    const handleCursorFontDetected = (e: any) => {
+      if (typeof e.detail?.fontSize === 'number') {
+        setCurrentDetectedFontSize(e.detail.fontSize);
+        setFontSizeDraft(String(e.detail.fontSize));
+      }
+    };
     document.addEventListener('selectionchange', handleSelTrack);
     window.addEventListener('active-line-indent-detected', handleLineIndentDetected);
+    window.addEventListener('active-cursor-font-detected', handleCursorFontDetected);
     return () => {
       document.removeEventListener('selectionchange', handleSelTrack);
       window.removeEventListener('active-line-indent-detected', handleLineIndentDetected);
+      window.removeEventListener('active-cursor-font-detected', handleCursorFontDetected);
     };
   }, []);
 
@@ -2209,21 +2258,39 @@ function CreateLectureSheetContent() {
       manualPages: updatedManualPages, 
       updatedAt: serverTimestamp() 
     };
+    payload.userId = user.uid;
     if (!editId) {
-      payload.userId = user.uid;
       payload.createdAt = serverTimestamp();
     }
+
+    const sanitizeFS = (obj: any): any => {
+      if (obj === null || obj === undefined) return null;
+      if (typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) return obj.map(sanitizeFS);
+      const out: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        if (obj[key] !== undefined) out[key] = sanitizeFS(obj[key]);
+      }
+      return out;
+    };
+    const cleanPayload = sanitizeFS(payload);
+    try { localStorage.setItem('lecture_sheet_backup_' + docId, JSON.stringify({ ...cleanPayload, _savedAt: new Date().toISOString() })); } catch {}
     
-    setDoc(ref, payload, { merge: true }).then(() => { 
+    setDoc(ref, cleanPayload, { merge: true }).then(() => { 
       setSaving(false); 
       setManualPages(updatedManualPages); 
       setData(prev => ({ ...prev, content: updatedFullContent })); 
       toast({ title: "সফল!", description: "শিটটি সংরক্ষিত হয়েছে।" }); 
       if (!editId) router.replace(`/create-lecture-sheet?id=${docId}`); 
     })
-    .catch(async (error) => { 
-      setSaving(false); 
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ref.path, operation: 'write', requestResourceData: payload })); 
+    .catch(async (error: any) => { 
+      setSaving(false);
+      console.error('Save error:', error);
+      if (error?.code === 'permission-denied') {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ref.path, operation: 'write', requestResourceData: cleanPayload }));
+      } else {
+        toast({ variant: 'destructive', title: 'সেভ করতে সমস্যা হয়েছে', description: error?.message || 'অজানা ত্রুটি' });
+      }
     });
   }, [user, db, editId, data, printSettings, pageStyles, manualPages, router, toast, isPrintMode]);
 
@@ -2932,6 +2999,32 @@ function CreateLectureSheetContent() {
                 const nextIdx = (activeEditIdx !== null ? activeEditIdx : 0) + 1;
                 handleFocusPage(nextIdx, 'start');
               }, 60);
+            }}
+            currentFontSize={currentDetectedFontSize}
+            onFontSizeChange={(size) => {
+              setCurrentDetectedFontSize(size);
+              setFontSizeDraft(String(size));
+              const sel = window.getSelection();
+              if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                document.execCommand('fontSize', false, '7');
+                document.querySelectorAll('font[size="7"]').forEach(el => {
+                  const span = document.createElement('span');
+                  span.style.fontSize = `${size}pt`;
+                  el.parentNode?.insertBefore(span, el);
+                  while (el.firstChild) span.appendChild(el.firstChild);
+                  el.parentNode?.removeChild(el);
+                });
+              } else {
+                if (applyScope === 'all') {
+                  setGlobalFontSize(size);
+                  paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
+                } else if (activeEditIdx !== null) {
+                  updatePageStyle(activeEditIdx, 'fontSize', size);
+                } else {
+                  setGlobalFontSize(size);
+                  paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
+                }
+              }
             }}
             onIndentChange={(_dir, delta) => handleLineIndentChange(Math.max(0, activeLineIndent + delta))}
           />

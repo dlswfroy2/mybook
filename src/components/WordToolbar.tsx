@@ -106,6 +106,8 @@ export interface WordToolbarProps {
   spacingBefore?: number;
   spacingAfter?: number;
   onSpacingChange?: (type: 'before' | 'after', delta: number) => void;
+  currentFontSize?: number | string;
+  onFontSizeChange?: (size: number) => void;
   className?: string;
 }
 
@@ -135,6 +137,8 @@ export function WordToolbar({
   spacingBefore = 0,
   spacingAfter = 4,
   onSpacingChange,
+  currentFontSize = 10.5,
+  onFontSizeChange,
   className
 }: WordToolbarProps) {
   const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
@@ -792,8 +796,9 @@ export function WordToolbar({
                 <button
                   onMouseDown={e => e.preventDefault()}
                   className="h-8 px-2 text-xs font-bold bg-white border border-slate-300 rounded hover:bg-slate-100 flex items-center gap-1 min-w-[54px] justify-between shadow-xs"
+                  title="ফন্ট সাইজ (রিয়েল-টাইম)"
                 >
-                  <span>10.5</span>
+                  <span>{currentFontSize || 10.5}</span>
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
@@ -802,7 +807,13 @@ export function WordToolbar({
                   <DropdownMenuItem
                     key={size}
                     onMouseDown={e => e.preventDefault()}
-                    onClick={() => handleFontSize(size)}
+                    onClick={() => {
+                      if (onFontSizeChange) {
+                        onFontSizeChange(size);
+                      } else {
+                        handleFontSize(size);
+                      }
+                    }}
                     className="text-xs font-bold cursor-pointer hover:bg-indigo-50"
                   >
                     {size} pt

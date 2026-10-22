@@ -1395,6 +1395,32 @@ export default function Home() {
   const { data: allPdfSheets } = useCollection(pQuery);
   const { data: allLectureSheets } = useCollection(lQuery);
 
+  const recentActivity = useMemo(() => {
+    const items: { type: string; label: string; subLabel: string; href: string; time: any; icon: string; color: string }[] = [];
+    allLectureSheets?.forEach((sheet: any) => {
+      items.push({ type: 'lecture_sheet', label: sheet.topic || sheet.subject || 'লেকচার শিট',
+        subLabel: ((sheet.classId ? 'শ্রেণি ' + sheet.classId : '') + ' ' + (sheet.subject || '')).trim(),
+        href: '/create-lecture-sheet?id=' + sheet.id,
+        time: sheet.updatedAt || sheet.createdAt, icon: 'book', color: 'emerald' });
+    });
+    allPdfSheets?.forEach((pdf: any) => {
+      items.push({ type: 'pdf', label: pdf.fileName || pdf.chapterName || 'আপলোড করা ফাইল',
+        subLabel: ((pdf.classId ? 'শ্রেণি ' + pdf.classId : '') + ' ' + (pdf.subject || '')).trim(),
+        href: '/my-questions', time: pdf.uploadedAt || pdf.createdAt, icon: 'upload', color: 'blue' });
+    });
+    allQuestions?.forEach((q: any) => {
+      items.push({ type: 'question', label: q.chapter || q.subject || 'প্রশ্নপত্র',
+        subLabel: ((q.classId ? 'শ্রেণি ' + q.classId : '') + ' ' + (q.subject || '')).trim(),
+        href: '/my-questions', time: q.createdAt || q.updatedAt, icon: 'question', color: 'red' });
+    });
+    items.sort((a, b) => {
+      const ta = a.time?.toDate ? a.time.toDate().getTime() : (a.time ? new Date(a.time).getTime() : 0);
+      const tb = b.time?.toDate ? b.time.toDate().getTime() : (b.time ? new Date(b.time).getTime() : 0);
+      return tb - ta;
+    });
+    return items.slice(0, 6);
+  }, [allLectureSheets, allPdfSheets, allQuestions]);
+
   const stats = useMemo(() => {
     const classData: Record<string, Record<string, Record<string, any>>> = {};
     CLASSES.forEach(c => { classData[c.id] = {}; });
@@ -2038,6 +2064,59 @@ export default function Home() {
         students={studentsForYear} 
         academicYear={selectedYear} 
       />
+
+      {/* সর্বশেষ কার্যক্রম */}
+      <section className="mb-2">
+        <div className="flex items-center justify-between mb-3 border-b-2 border-black pb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-violet-600 text-white flex items-center justify-center shadow">
+              <Clock className="w-4 h-4" />
+            </div>
+            <h3 className="text-base font-black text-foreground uppercase tracking-tight">সর্বশেষ কার্যক্রম</h3>
+          </div>
+          <Badge variant="outline" className="text-xs font-black border-violet-400 text-violet-700">লাইভ</Badge>
+        </div>
+        {recentActivity.length === 0 ? (
+          <div className="p-6 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+            <p className="text-sm font-bold text-slate-400">এখনো কোনো কার্যক্রম নেই</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {recentActivity.map((item, i) => {
+              const timeStr = item.time?.toDate
+                ? format(item.time.toDate(), 'dd MMM, HH:mm', { locale: bn })
+                : (item.time ? format(new Date(item.time), 'dd MMM, HH:mm', { locale: bn }) : '');
+              const colorMap: Record<string, { bg: string; border: string; badge: string; text: string }> = {
+                emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-600', text: 'text-emerald-800' },
+                blue:    { bg: 'bg-blue-50',    border: 'border-blue-200',    badge: 'bg-blue-600',    text: 'text-blue-800'    },
+                red:     { bg: 'bg-red-50',     border: 'border-red-200',     badge: 'bg-red-600',     text: 'text-red-800'     },
+              };
+              const c = colorMap[item.color] || colorMap.blue;
+              const typeLabel = item.type === 'lecture_sheet' ? 'লেকচার শিট' : item.type === 'pdf' ? 'আপলোড ফাইল' : 'প্রশ্নপত্র';
+              return (
+                <Link key={i} href={item.href} className="block group">
+                  <div className={`flex items-start gap-3 p-3 rounded-xl border-2 ${c.bg} ${c.border} hover:shadow-md transition-all duration-200 group-hover:-translate-y-0.5`}>
+                    <div className={`${c.badge} text-white rounded-lg p-1.5 shrink-0 mt-0.5`}>
+                      {item.icon === 'book'   ? <BookOpen    className="w-3.5 h-3.5" /> :
+                       item.icon === 'upload' ? <FileUp      className="w-3.5 h-3.5" /> :
+                                                <BrainCircuit className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <Badge className={`${c.badge} text-white text-[9px] px-1.5 py-0 font-bold`}>{typeLabel}</Badge>
+                      </div>
+                      <p className={`text-xs font-black ${c.text} truncate leading-tight`}>{item.label}</p>
+                      {item.subLabel && <p className="text-[10px] font-medium text-slate-500 truncate">{item.subLabel}</p>}
+                      {timeStr && <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{timeStr}</p>}
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-1 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5 md:gap-2">
         <Link href="/create-question" className="block w-full">
