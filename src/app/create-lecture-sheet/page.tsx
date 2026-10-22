@@ -419,7 +419,7 @@ function WordRuler({
   marginRight,
   zoomLevel,
   onMarginChange,
-  tabStops = [1.25, 2.0],
+  tabStops = [],
   onTabStopsChange = () => {},
   activeLineIndent = 0,
   onLineIndentChange = () => {},
@@ -677,19 +677,7 @@ function WordRuler({
           ))}
         </div>
 
-        {/* 5. Active Line Indent 'L' Marker (কারসর যে লাইনে আছে তার জন্য বিশেষ 'L' মার্কার) */}
-        <div
-          onMouseDown={handleMouseDownLineIndent}
-          className="absolute bottom-0 z-40 cursor-ew-resize group -ml-1.5 w-4 h-5 flex flex-col items-center justify-end"
-          style={{ left: `${marginLeft + activeLineIndent}in` }}
-          title={`কারসর লাইনের অবস্থান: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে লাইনটি সামনে/পিছনে সরান)`}
-        >
-          {/* L marker for active line (Bright Amber / Gold) */}
-          <div className="w-3 h-3.5 border-l-[2.5px] border-b-[2.5px] border-amber-400 drop-shadow-md group-hover:scale-125 transition-transform" />
-          <div className="w-1.5 h-1 bg-amber-400 rounded-full -mt-0.5" />
-        </div>
-
-        {/* 5.1 User-placed 'L' Tab Stop Points (হুবহু Image 1 এর মতো 'L' পয়েন্ট) */}
+        {/* 5. User-placed 'L' Tab Stop Points (শুধুমাত্র ব্যবহারকারী ক্লিক করে তৈরি করলে দেখা যাবে) */}
         {tabStops.map((pos, idx) => (
           <div
             key={idx}
@@ -700,27 +688,37 @@ function WordRuler({
             }}
             className="absolute bottom-0 z-30 cursor-ew-resize group -ml-1 w-3.5 h-4 flex items-end justify-center"
             style={{ left: `${pos}in` }}
-            title={`ট্যাব পয়েন্ট ${idx + 1}: ${pos.toFixed(2)}" (টেনে কারসর লাইন সরান বা ডাবল-ক্লিকে মুছুন)`}
+            title={`ট্যাব পয়েন্ট 'L': ${pos.toFixed(2)}" (টেনে কারসর লাইন সরান, ডাবল-ক্লিকে মুছুন)`}
           >
-            {/* Iconic 'L' mark as seen in Image 1 */}
-            <div className="w-2.5 h-3 border-l-2 border-b-2 border-slate-100 drop-shadow hover:border-amber-300 transition-colors pointer-events-none" />
+            {/* Iconic 'L' mark as seen in Word */}
+            <div className="w-2.5 h-3 border-l-2 border-b-2 border-slate-100 drop-shadow hover:border-amber-400 transition-colors pointer-events-none" />
           </div>
         ))}
 
-        {/* 6. Left Margin Slider Marker (Classic Word Hourglass + Rectangle base) */}
+        {/* 6. Word Paragraph Indent Markers (কারসর যে লাইনে আছে তার ইনডেন্ট অনুযায়ী অবস্থান করে) */}
         <div
-          onMouseDown={(e) => handleMouseDownMargin('left', e)}
+          onMouseDown={handleMouseDownLineIndent}
           className="absolute top-0 bottom-0 z-40 cursor-ew-resize group -ml-2 w-4 flex flex-col items-center justify-between"
-          style={{ left: `${marginLeft}in` }}
-          title={`বাম মার্জিন: ${marginLeft.toFixed(2)} ইঞ্চি (টেনে পরিবর্তন করুন)`}
+          style={{ left: `${marginLeft + activeLineIndent}in` }}
+          title={`কারসর লাইনের ইনডেন্ট: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে লাইন সামনে/পিছনে সরান)`}
         >
           {/* Top downward triangle (First Line Indent) */}
-          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-slate-200 drop-shadow" />
+          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-amber-300 drop-shadow hover:border-t-amber-400" />
           {/* Middle upward triangle (Hanging Indent) */}
-          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-slate-200 drop-shadow" />
+          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-amber-300 drop-shadow hover:border-b-amber-400" />
           {/* Bottom rectangle (Left Indent) */}
-          <div className="w-2.5 h-1.5 bg-slate-200 border border-slate-600 rounded-[1px] drop-shadow" />
+          <div className="w-2.5 h-1.5 bg-amber-300 border border-amber-600 rounded-[1px] drop-shadow hover:bg-amber-400" />
         </div>
+
+        {/* 6.1 Page Margin Boundary Marker (পাতার মার্জিন পরিবর্তনকারী রেখা) */}
+        {activeLineIndent > 0.05 && (
+          <div
+            onMouseDown={(e) => handleMouseDownMargin('left', e)}
+            className="absolute top-0 bottom-0 z-30 cursor-ew-resize -ml-0.5 w-1 bg-indigo-400/60 hover:bg-indigo-400"
+            style={{ left: `${marginLeft}in` }}
+            title={`বাম মার্জিন সীমানা: ${marginLeft.toFixed(2)}" (টেনে পাতার মার্জিন পরিবর্তন করুন)`}
+          />
+        )}
 
         {/* 7. Right Margin Slider Marker (Classic Word Upward Triangle) */}
         <div
@@ -1500,7 +1498,7 @@ function CreateLectureSheetContent() {
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
   const [showRuler, setShowRuler] = useState(true);
-  const [tabStops, setTabStops] = useState<number[]>([1.25, 2.0]);
+  const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
   const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
 
