@@ -75,16 +75,25 @@ function stripDirtyHtml(html: string): string {
   if (typeof window === 'undefined') return html;
   if (!html) return '';
 
-  // Clean raw plain text remnants of Gemini data attributes or style strings
-  let cleanedStr = html
-    .replace(/data-index-in-node="[^"]*"\s*/gi, '')
-    .replace(/style="[^"]*line-height:\s*1\.15[^"]*"\s*>?/gi, '');
+  // 1. Repair any corrupted artifacts like <="" span=""> or </span"> or ="" created previously
+  let cleaned = html
+    .replace(/<=""\s*span="">/gi, '')
+    .replace(/<\/span">/gi, '')
+    .replace(/<span\s+a<=""\s*span="">/gi, '')
+    .replace(/=""/g, '')
+    .replace(/data-index-in-node="[^"]*"/gi, '')
+    .replace(/ba\\right\)\^n/g, '(ab)^n')
+    .replace(/\\right\)/g, ')')
+    .replace(/=\s*"([a-zA-Z0-9^_+-\s]+)"/g, '= $1')
+    .replace(/"\s*\\frac/g, '\\frac');
 
-  if (!/<[a-z][\s\S]*>/i.test(cleanedStr)) return cleanedStr;
+  if (!/<[a-z][\s\S]*>/i.test(cleaned)) return cleaned;
 
+  // 2. Parse cleanly into DOM without destructive tag regex
   const tmp = document.createElement('div');
-  tmp.innerHTML = cleanedStr;
+  tmp.innerHTML = cleaned;
 
+  // 3. Use standard DOM API to clean up elements
   tmp.querySelectorAll('*').forEach((el) => {
     // Keep KaTeX, tables, and math structures intact
     if (
@@ -100,26 +109,23 @@ function stripDirtyHtml(html: string): string {
       return;
     }
 
-    // Only remove Gemini data attributes and event handlers
+    // Safely remove any Gemini data attributes or event handlers
     Array.from(el.attributes).forEach((attr) => {
-      if (attr.name.startsWith('data-index') || attr.name.startsWith('data-node') || attr.name.startsWith('on')) {
+      if (attr.name.startsWith('data-') || attr.name.startsWith('on')) {
         el.removeAttribute(attr.name);
       }
     });
 
-    // Only clean Gemini junk styles (margin-top: 0px !important, line-height: 1.15 !important)
+    // Clean Gemini junk styles (margin-top: 0px !important, line-height: 1.15 !important)
     if (el.hasAttribute('style')) {
       const s = el.getAttribute('style') || '';
-      if (s.includes('data-index') || s.includes('margin-top: 0px !important') || s.includes('line-height: 1.15 !important')) {
-        const cleaned = s
-          .replace(/margin-top:\s*0px\s*!important;?/gi, '')
-          .replace(/margin-left:\s*0px\s*!important;?/gi, '')
-          .replace(/margin-right:\s*0px\s*!important;?/gi, '')
-          .replace(/margin-bottom:\s*0px\s*!important;?/gi, '')
+      if (s.includes('line-height: 1.15') || s.includes('margin-top: 0px') || s.includes('margin-left: 0px')) {
+        const cleanedStyle = s
+          .replace(/margin-(top|left|right|bottom):\s*0px\s*!important;?/gi, '')
           .replace(/line-height:\s*1\.15\s*!important;?/gi, '')
           .trim();
-        if (cleaned) {
-          el.setAttribute('style', cleaned);
+        if (cleanedStyle) {
+          el.setAttribute('style', cleanedStyle);
         } else {
           el.removeAttribute('style');
         }
@@ -449,7 +455,7 @@ function EditableContentArea({
   // Load initial content once on mount, then trigger initial reflow check including font readiness
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
-      ref.current.innerHTML = initialHtml;
+      ref.current.innerHTML = stripDirtyHtml(initialHtml);
       isLoadedRef.current = true;
       setTimeout(() => checkAndReflow(false), 100);
       if (typeof document !== 'undefined' && document.fonts) {
@@ -462,9 +468,15 @@ function EditableContentArea({
 
   // plain text থেকে LaTeX সহ HTML তৈরি করে (KaTeX render সহ, output: 'html')
   const renderMathInText = (text: string): string => {
-    const lines = text.split('\n');
+    // Clean any broken artifacts from text
+    let clean = text
+      .replace(/<=""\s*span="">/gi, '')
+      .replace(/<\/span">/gi, '')
+      .replace(/=""/g, '');
+
+    const lines = clean.split('\n');
     const htmlLines = lines.map((line) => {
-      if (line.trim() === '') return '<p style="margin:0 0 2px 0;padding:0"><br/></p>';
+      if (line.trim() === '') return '<p style="margin:0 0 4px 0;padding:0"><br/></p>';
       // $$ ... $$ (display math)
       line = line.replace(/\$\$(.+?)\$\$/g, (_, math) => {
         try {
@@ -481,7 +493,32 @@ function EditableContentArea({
           return `<span>$${math}$</span>`;
         }
       });
-      return `<p style="margin:0 0 2px 0;padding:0">${line}</p>`;
+      // \[ ... \] and \( ... \)
+      line = line.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
+        try {
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
+        } catch {
+          return math;
+        }
+      });
+      line = line.replace(/\\\(([\s\S]+?)\\\)/g, (_, math) => {
+        try {
+          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+        } catch {
+          return math;
+        }
+      });
+      // Standalone \frac without $
+      if (/\\frac\{/.test(line)) {
+        line = line.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (_, num, den) => {
+          try {
+            return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
+          } catch {
+            return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
+          }
+        });
+      }
+      return `<p style="margin:0 0 4px 0;padding:0">${line}</p>`;
     });
     return htmlLines.join('');
   };
@@ -498,27 +535,29 @@ function EditableContentArea({
     const range = sel.getRangeAt(0);
     range.deleteContents();
 
-    // 1. If text has LaTeX ($...$ or \[...\] or \frac): render with KaTeX
-    if (plainText && (/\$/.test(plainText) || /\\frac\{/.test(plainText) || /\\sqrt/.test(plainText))) {
+    const isGemini = htmlData && (htmlData.includes('data-index-in-node') || htmlData.includes('line-height: 1.15'));
+
+    // 1. If text has LaTeX ($...$ or \[...\] or \frac) OR is from Gemini: ALWAYS use plainText + KaTeX
+    if (plainText && (isGemini || /\$/.test(plainText) || /\\frac\{/.test(plainText) || /\\sqrt/.test(plainText) || /\\times/.test(plainText))) {
       const renderedHtml = renderMathInText(plainText);
       const fragment = range.createContextualFragment(renderedHtml);
       range.insertNode(fragment);
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(checkAndReflow, 40);
+      setTimeout(() => checkAndReflow(false), 40);
       return;
     }
 
-    // 2. If rich HTML is present (e.g. from Word or web with tables/formatting): preserve formatting!
-    if (htmlData && /<(table|p|div|ul|ol|h[1-6]|span|b|strong|i|em)[^>]*>/i.test(htmlData)) {
+    // 2. If rich HTML is present (e.g. from Word or web with tables): preserve formatting!
+    if (htmlData && /<(table|ul|ol|h[1-6]|b|strong|i|em)[^>]*>/i.test(htmlData)) {
       const cleanHtml = stripDirtyHtml(htmlData);
       const fragment = range.createContextualFragment(cleanHtml);
       range.insertNode(fragment);
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(checkAndReflow, 40);
+      setTimeout(() => checkAndReflow(false), 40);
       return;
     }
 
@@ -528,7 +567,7 @@ function EditableContentArea({
       const frag = document.createDocumentFragment();
       lines.forEach((line) => {
         const p = document.createElement('p');
-        p.style.margin = '0 0 2px 0';
+        p.style.margin = '0 0 4px 0';
         p.textContent = line || '\u00A0';
         frag.appendChild(p);
       });
@@ -536,7 +575,7 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(checkAndReflow, 40);
+      setTimeout(() => checkAndReflow(false), 40);
     }
   };
 
@@ -880,12 +919,13 @@ function CreateLectureSheetContent() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const docData = docSnap.data();
+          const cleanContent = stripDirtyHtml(docData.content || '');
           setData({
             institution: docData.institution || 'টপ গ্রেড টিউটোরিয়ালস',
             classId: docData.classId || '',
             subject: docData.subject || '',
             topic: docData.topic || '',
-            content: docData.content || '',
+            content: cleanContent,
             type: docData.type || 'lecture_sheet'
           });
           if (docData.printSettings) setPrintSettings((prev: any) => ({ ...prev, ...docData.printSettings }));
@@ -894,7 +934,13 @@ function CreateLectureSheetContent() {
             if (docData.pageStyles[0]?.fontSize) { setGlobalFontSize(docData.pageStyles[0].fontSize); setFontSizeDraft(String(docData.pageStyles[0].fontSize)); }
             if (docData.pageStyles[0]?.lineHeight) { setGlobalLineHeight(docData.pageStyles[0].lineHeight); setLineHeightDraft(String(docData.pageStyles[0].lineHeight)); }
           }
-          if (docData.manualPages) setManualPages(docData.manualPages);
+          if (docData.manualPages) {
+            const cleanedManual: Record<number, string> = {};
+            Object.keys(docData.manualPages).forEach(k => {
+              cleanedManual[Number(k)] = stripDirtyHtml(docData.manualPages[Number(k)]);
+            });
+            setManualPages(cleanedManual);
+          }
         }
       } catch (e) {
         toast({ variant: "destructive", title: "ত্রুটি", description: "শীট লোড করা সম্ভব হয়নি।" });
