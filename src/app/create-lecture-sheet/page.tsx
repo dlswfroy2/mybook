@@ -1207,13 +1207,23 @@ function EditableContentArea({
           currNode = currNode.parentNode;
         }
         if (targetBlock) {
-          const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
-          const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
-          const delta = e.shiftKey ? -0.25 : 0.25;
-          const newInches = Math.max(0, Math.round((currentInches + delta) * 16) / 16);
-          targetBlock.style.marginLeft = newInches > 0 ? `${newInches}in` : '';
-          onSyncPageContent(pageIndex, el.innerHTML);
-          window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: newInches } }));
+          if (e.shiftKey) {
+            // Shift + Tab: সরাসরি পাতার শুরুতে রিসেট করুন
+            targetBlock.style.marginLeft = '';
+            targetBlock.style.paddingLeft = '';
+            targetBlock.style.textIndent = '';
+            targetBlock.innerHTML = targetBlock.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
+            onSyncPageContent(pageIndex, el.innerHTML);
+            setTimeout(updateActiveLineIndent, 30);
+          } else {
+            // Tab: ০.২৫ ইঞ্চি ডানে ইনডেন্ট করুন
+            const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
+            const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
+            const newInches = Math.round((currentInches + 0.25) * 16) / 16;
+            targetBlock.style.marginLeft = `${newInches}in`;
+            onSyncPageContent(pageIndex, el.innerHTML);
+            setTimeout(updateActiveLineIndent, 30);
+          }
         }
         return;
       }
@@ -1255,8 +1265,54 @@ function EditableContentArea({
       }
     }
 
-    // 5. Backspace at top of page -> pull to previous page / delete empty page
+    // 5. Backspace -> যদি ইনডেন্টেড লাইনের শুরুতে থাকে তবে পাতার শুরুতে নিয়ে যান, অন্যথায় পেজ পুল করুন
     if (e.key === 'Backspace') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let blockNode: HTMLElement | null = null;
+        let curr: Node | null = sel.anchorNode;
+        while (curr && curr !== el) {
+          if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).parentElement === el) {
+            blockNode = curr as HTMLElement;
+            break;
+          }
+          curr = curr.parentNode;
+        }
+
+        if (blockNode) {
+          try {
+            const preRange = document.createRange();
+            preRange.selectNodeContents(blockNode);
+            preRange.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+            const isAtBlockStart = preRange.toString().trim().length === 0;
+
+            if (isAtBlockStart) {
+              let hasIndent = false;
+              if (blockNode.style.marginLeft || blockNode.style.paddingLeft || blockNode.style.textIndent) {
+                blockNode.style.marginLeft = '';
+                blockNode.style.paddingLeft = '';
+                blockNode.style.textIndent = '';
+                hasIndent = true;
+              }
+              if (/^(\s|&nbsp;|\u00A0)+/.test(blockNode.innerHTML)) {
+                blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
+                hasIndent = true;
+              }
+              if (hasIndent) {
+                e.preventDefault();
+                onSyncPageContent(pageIndex, el.innerHTML);
+                setCursor(blockNode, 'start');
+                setTimeout(() => {
+                  checkAndReflow(true);
+                  updateActiveLineIndent();
+                }, 40);
+                return;
+              }
+            }
+          } catch {}
+        }
+      }
+
       if (isCursorAtStart(el) && pageIndex > 0) {
         e.preventDefault();
         onFocusPage(pageIndex - 1, 'end');
@@ -1269,7 +1325,10 @@ function EditableContentArea({
         }
         return;
       }
-      setTimeout(() => checkAndReflow(true), 60);
+      setTimeout(() => {
+        checkAndReflow(true);
+        updateActiveLineIndent();
+      }, 60);
       return;
     }
 
@@ -1741,41 +1800,67 @@ function CreateLectureSheetContent() {
     const contentArea = document.querySelector(`.paper-idx-${activePaperIdx} .content-area`) as HTMLElement | null;
     if (!contentArea) return;
 
-    const indentStr = newIndentInches > 0 ? `${newIndentInches}in` : '';
+    const indentStr = newIndentInches > 0.05 ? `${newIndentInches}in` : '';
 
     if (applyScope === 'all') {
-      // সমস্ত পাতায় সব লাইনে একযোগে ইন্ডেন্ট প্রয়োগ
+      // সমস্ত পাতায় সব লাইনে একযোগে ইন্ডেন্ট প্রয়োগ / রিসেট
       paginatedPages.forEach((_, pIdx) => {
         const ca = document.querySelector(`.paper-idx-${pIdx} .content-area`) as HTMLElement | null;
         if (ca) {
           Array.from(ca.children).forEach((child) => {
-            (child as HTMLElement).style.marginLeft = indentStr;
+            const el = child as HTMLElement;
+            el.style.marginLeft = indentStr;
+            if (!indentStr) {
+              el.style.paddingLeft = '';
+              el.style.textIndent = '';
+              el.innerHTML = el.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
+            }
           });
           handleSyncPageContent(pIdx, ca.innerHTML);
         }
       });
     } else {
-      // শুধু সক্রিয় পাতার যে লাইনে কারসর আছে (বা সিলেক্ট করা ব্লকে) প্রয়োগ
+      // নির্বাচিত পাতায়: যদি একাধিক ব্লক সিলেক্ট করা থাকে অথবা একটি ব্লকে কারসর থাকে
       const sel = window.getSelection();
-      let targetBlock: HTMLElement | null = null;
-      if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+      const targetBlocks: HTMLElement[] = [];
+
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        // একাধিক লাইন/প্যারাগ্রাফ সিলেক্ট থাকলে সবগুলোতে প্রয়োগ করুন
+        const range = sel.getRangeAt(0);
+        Array.from(contentArea.children).forEach((child) => {
+          if (range.intersectsNode(child)) {
+            targetBlocks.push(child as HTMLElement);
+          }
+        });
+      }
+
+      if (targetBlocks.length === 0 && sel && sel.rangeCount > 0 && sel.anchorNode) {
         let node: Node | null = sel.anchorNode;
         while (node && node !== contentArea) {
           if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement === contentArea) {
-            targetBlock = node as HTMLElement;
+            targetBlocks.push(node as HTMLElement);
             break;
           }
           node = node.parentNode;
         }
       }
-      if (!targetBlock) {
-        // যদি সুনির্দিষ্ট ব্লক না মেলে, প্রথম বা ফোকাসড ব্লক নিন
-        targetBlock = (contentArea.firstElementChild as HTMLElement) || contentArea;
+
+      if (targetBlocks.length === 0) {
+        const first = contentArea.firstElementChild as HTMLElement | null;
+        if (first) targetBlocks.push(first);
       }
-      if (targetBlock && targetBlock !== contentArea) {
-        targetBlock.style.marginLeft = indentStr;
-        handleSyncPageContent(activePaperIdx, contentArea.innerHTML);
-      }
+
+      targetBlocks.forEach((tb) => {
+        tb.style.marginLeft = indentStr;
+        if (!indentStr) {
+          tb.style.paddingLeft = '';
+          tb.style.textIndent = '';
+          // শুরুতে থাকা অপ্রয়োজনীয় স্পেস বা &nbsp; মুছে পাতার একদম শুরুতে নিয়ে যান
+          tb.innerHTML = tb.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
+        }
+      });
+
+      handleSyncPageContent(activePaperIdx, contentArea.innerHTML);
     }
   }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent]);
 
@@ -2466,6 +2551,14 @@ function CreateLectureSheetContent() {
                 পাতা {activeEditIdx + 1} এ প্রয়োগ হবে
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => handleLineIndentChange(0)}
+              className="px-2.5 py-0.5 rounded-full border border-amber-300 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold transition-all text-[11px] flex items-center gap-1 shadow-xs ml-auto"
+              title="কারসর থাকা লাইন বা নির্বাচিত লাইনগুলোকে সরাসরি পাতার শুরুতে ফিরিয়ে আনুন"
+            >
+              ⬅ পাতার শুরুতে আনুন
+            </button>
           </div>
           <WordToolbar
             onAddPage={() => setPaginatedPages(prev => [...prev, ""])}
