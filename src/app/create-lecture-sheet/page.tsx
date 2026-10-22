@@ -54,7 +54,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { useFirestore, useUser, useDoc, useStorage } from '@/firebase';
-import { collection, setDoc, doc, getDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, setDoc, doc, getDoc, serverTimestamp, addDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
@@ -253,12 +253,38 @@ function resetBlockToZero(block: HTMLElement, contentArea?: HTMLElement | null):
     pNode = pNode.parentElement;
   }
 
+  // ৩.৫. blockquote বা nested div থেকে unwrap করুন
+  if (target.tagName === 'BLOCKQUOTE' || (target.tagName === 'DIV' && target.className.includes('indent'))) {
+    const p = document.createElement('p');
+    p.style.margin = '0 0 4px 0';
+    p.innerHTML = target.innerHTML;
+    target.parentNode?.replaceChild(p, target);
+    target = p;
+  }
+
   // ৪. সব ধরণের ইউনিকোড স্পেস, &nbsp;, &emsp;, ট্যাব, ফাঁকা স্প্যান মুছে ফেলুন
   const spaceRegex = /^([\s\t\r\n]|&nbsp;|&emsp;|&ensp;|&#160;|&#8195;|&#8194;|\u00A0|\u2000|\u2001|\u2002|\u2003|\u2004|\u2005|\u2006|\u2007|\u2008|\u2009|\u200A|\u3000)+/gi;
   target.innerHTML = target.innerHTML
     .replace(spaceRegex, '')
     .replace(/^<span[^>]*>([\s\t]|&nbsp;|&emsp;|\u00A0)*<\/span>/gi, '')
     .replace(spaceRegex, '');
+
+  // ৪.৫. style attribute-এ margin-left থাকলে সরাসরি সরান (inline style string)
+  const styleAttr = target.getAttribute('style') || '';
+  if (styleAttr) {
+    const cleaned = styleAttr
+      .replace(/margin-left\s*:[^;]+;?/gi, '')
+      .replace(/padding-left\s*:[^;]+;?/gi, '')
+      .replace(/text-indent\s*:[^;]+;?/gi, '')
+      .replace(/margin-inline-start\s*:[^;]+;?/gi, '')
+      .replace(/padding-inline-start\s*:[^;]+;?/gi, '')
+      .trim();
+    if (cleaned) {
+      target.setAttribute('style', cleaned);
+    } else {
+      target.removeAttribute('style');
+    }
+  }
 
   // ৫. চাইল্ড নোডগুলোতেও মার্জিন সাফ করুন
   target.querySelectorAll('*').forEach((child) => {
@@ -269,6 +295,12 @@ function resetBlockToZero(block: HTMLElement, contentArea?: HTMLElement | null):
       if (cel.style.textIndent) cel.style.textIndent = '';
       if (cel.style.marginInlineStart) cel.style.marginInlineStart = '';
       if (cel.style.paddingInlineStart) cel.style.paddingInlineStart = '';
+    }
+    // Also clean style attribute string for any child
+    const cs = cel.getAttribute('style') || '';
+    if (cs && (cs.includes('margin-left') || cs.includes('padding-left') || cs.includes('text-indent'))) {
+      const cc = cs.replace(/margin-left\s*:[^;]+;?/gi, '').replace(/padding-left\s*:[^;]+;?/gi, '').replace(/text-indent\s*:[^;]+;?/gi, '').trim();
+      if (cc) cel.setAttribute('style', cc); else cel.removeAttribute('style');
     }
   });
 
@@ -1965,7 +1997,21 @@ function CreateLectureSheetContent() {
             if (docData.pageStyles[0]?.fontSize) { setGlobalFontSize(docData.pageStyles[0].fontSize); setFontSizeDraft(String(docData.pageStyles[0].fontSize)); }
             if (docData.pageStyles[0]?.lineHeight) { setGlobalLineHeight(docData.pageStyles[0].lineHeight); setLineHeightDraft(String(docData.pageStyles[0].lineHeight)); }
           }
-          if (docData.manualPages) {
+          if (docData.hasPageDocs) {
+            // Pages stored in sub-collection lecture-sheets/{id}/pages/{pageIdx}
+            try {
+              const pagesCol = collection(db, 'lecture-sheets', editId, 'pages');
+              const pagesSnap = await getDocs(pagesCol);
+              const cleanedManual: Record<number, string> = {};
+              pagesSnap.forEach(pd => {
+                const pageIdx = Number(pd.id);
+                cleanedManual[pageIdx] = stripDirtyHtml(pd.data().html || '');
+              });
+              if (Object.keys(cleanedManual).length > 0) setManualPages(cleanedManual);
+            } catch (pe) {
+              console.warn('Could not load page sub-docs:', pe);
+            }
+          } else if (docData.manualPages) {
             const cleanedManual: Record<number, string> = {};
             Object.keys(docData.manualPages).forEach(k => {
               cleanedManual[Number(k)] = stripDirtyHtml(docData.manualPages[Number(k)]);
@@ -2188,6 +2234,10 @@ function CreateLectureSheetContent() {
       setActiveLineIndent(0);
       const curL = parseFloat(String(pageStyles[activePaperIdx]?.mL ?? printSettings.marginLeft)) || 0.5;
       setActiveRulerPos(curL);
+      // Force ruler to snap back to page margin
+      window.dispatchEvent(new CustomEvent('active-line-indent-detected', {
+        detail: { indentInches: 0, rulerPosInches: curL, pageIndex: activePaperIdx }
+      }));
     }
   }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent, pageStyles, printSettings.marginLeft]);
 
@@ -2226,72 +2276,135 @@ function CreateLectureSheetContent() {
     }
   }, [activeEditIdx, pageStyles, updatePageStyle]);
 
-  const handleSave = useCallback(() => {
+  const sanitizeFS = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizeFS);
+    const out: Record<string, any> = {};
+    for (const key of Object.keys(obj)) {
+      if (obj[key] !== undefined) out[key] = sanitizeFS(obj[key]);
+    }
+    return out;
+  };
+
+  // Compress HTML: remove comments, collapse whitespace between tags, trim
+  const compressHtml = (html: string): string => {
+    return html
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/> </g, '><')
+      .trim();
+  };
+
+  const handleSave = useCallback(async () => {
     if (!user || !db) return;
     setSaving(true);
-    let updatedFullContent = data.content, updatedManualPages = { ...manualPages };
-    
-    if (isPrintMode) {
-      const papers = document.querySelectorAll('.paper');
-      const tempManual: Record<number, string> = {};
-      papers.forEach(paper => { 
-        const match = paper.className.match(/paper-idx-(\d+)/); 
-        if (match) { 
-           const idx = parseInt(match[1]); 
-           const contentArea = paper.querySelector('.content-area'); 
-           if (contentArea) tempManual[idx] = contentArea.innerHTML || ""; 
-        } 
-      });
-      updatedManualPages = tempManual;
-      const sortedIndices = Object.keys(tempManual).map(Number).sort((a, b) => a - b);
-      updatedFullContent = sortedIndices.map(idx => tempManual[idx]).join('\n\n');
-    }
 
-    const docId = editId || doc(collection(db, 'lecture-sheets')).id;
-    const ref = doc(db, 'lecture-sheets', docId);
-    
-    const payload: any = { 
-      ...data, 
-      content: updatedFullContent, 
-      printSettings, 
-      pageStyles, 
-      manualPages: updatedManualPages, 
-      updatedAt: serverTimestamp() 
-    };
-    payload.userId = user.uid;
-    if (!editId) {
-      payload.createdAt = serverTimestamp();
-    }
+    try {
+      let updatedFullContent = data.content;
+      let updatedManualPages = { ...manualPages };
 
-    const sanitizeFS = (obj: any): any => {
-      if (obj === null || obj === undefined) return null;
-      if (typeof obj !== 'object') return obj;
-      if (Array.isArray(obj)) return obj.map(sanitizeFS);
-      const out: Record<string, any> = {};
-      for (const key of Object.keys(obj)) {
-        if (obj[key] !== undefined) out[key] = sanitizeFS(obj[key]);
+      if (isPrintMode) {
+        const papers = document.querySelectorAll('.paper');
+        const tempManual: Record<number, string> = {};
+        papers.forEach(paper => {
+          const match = paper.className.match(/paper-idx-(\d+)/);
+          if (match) {
+            const idx = parseInt(match[1]);
+            const contentArea = paper.querySelector('.content-area');
+            if (contentArea) tempManual[idx] = contentArea.innerHTML || '';
+          }
+        });
+        updatedManualPages = tempManual;
+        const sortedIndices = Object.keys(tempManual).map(Number).sort((a, b) => a - b);
+        updatedFullContent = sortedIndices.map(idx => tempManual[idx]).join('\n\n');
       }
-      return out;
-    };
-    const cleanPayload = sanitizeFS(payload);
-    try { localStorage.setItem('lecture_sheet_backup_' + docId, JSON.stringify({ ...cleanPayload, _savedAt: new Date().toISOString() })); } catch {}
-    
-    setDoc(ref, cleanPayload, { merge: true }).then(() => { 
-      setSaving(false); 
-      setManualPages(updatedManualPages); 
-      setData(prev => ({ ...prev, content: updatedFullContent })); 
-      toast({ title: "সফল!", description: "শিটটি সংরক্ষিত হয়েছে।" }); 
-      if (!editId) router.replace(`/create-lecture-sheet?id=${docId}`); 
-    })
-    .catch(async (error: any) => { 
+
+      const docId = editId || doc(collection(db, 'lecture-sheets')).id;
+      const mainRef = doc(db, 'lecture-sheets', docId);
+
+      // Compress manualPages HTML to reduce size
+      const compressedManualPages: Record<number, string> = {};
+      Object.entries(updatedManualPages).forEach(([k, v]) => {
+        compressedManualPages[Number(k)] = compressHtml(v);
+      });
+      const compressedContent = compressHtml(updatedFullContent);
+
+      // Build main payload WITHOUT manualPages (to avoid 1MB limit)
+      const mainPayload: any = {
+        ...data,
+        content: compressedContent,
+        printSettings,
+        pageStyles,
+        updatedAt: serverTimestamp(),
+        hasPageDocs: true,
+        pageCount: Object.keys(compressedManualPages).length,
+      };
+      mainPayload.userId = user.uid;
+      if (!editId) {
+        mainPayload.createdAt = serverTimestamp();
+      }
+
+      const cleanMain = sanitizeFS(mainPayload);
+
+      // Check size: if content itself is small enough, include manualPages inline
+      const manualStr = JSON.stringify(compressedManualPages);
+      const mainStr = JSON.stringify(cleanMain);
+      const totalEstimate = mainStr.length + manualStr.length;
+      const LIMIT = 900_000; // 900KB safety limit
+
+      let savePromise: Promise<void>;
+
+      if (totalEstimate < LIMIT) {
+        // Inline save — fits in one document
+        const inlinePayload = { ...cleanMain, manualPages: compressedManualPages, hasPageDocs: false };
+        try {
+          localStorage.setItem('lecture_sheet_backup_' + docId, JSON.stringify({ ...inlinePayload, _savedAt: new Date().toISOString() }));
+        } catch {}
+        savePromise = setDoc(mainRef, inlinePayload, { merge: true });
+      } else {
+        // Split save — store pages in sub-collection
+        try {
+          localStorage.setItem('lecture_sheet_backup_' + docId, JSON.stringify({ ...cleanMain, manualPages: compressedManualPages, _savedAt: new Date().toISOString() }));
+        } catch {}
+
+        // Save main doc first (no manualPages)
+        await setDoc(mainRef, cleanMain, { merge: true });
+
+        // Save each page as a separate sub-doc in batches
+        const pageEntries = Object.entries(compressedManualPages);
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < pageEntries.length; i += BATCH_SIZE) {
+          const batch = writeBatch(db);
+          pageEntries.slice(i, i + BATCH_SIZE).forEach(([pageIdx, html]) => {
+            const pageRef = doc(db, 'lecture-sheets', docId, 'pages', String(pageIdx));
+            batch.set(pageRef, { html, updatedAt: serverTimestamp() });
+          });
+          await batch.commit();
+        }
+        savePromise = Promise.resolve();
+      }
+
+      await savePromise;
+      setSaving(false);
+      setManualPages(updatedManualPages);
+      setData(prev => ({ ...prev, content: updatedFullContent }));
+      toast({ title: 'সফল!', description: 'শিটটি সংরক্ষিত হয়েছে।' });
+      if (!editId) router.replace(`/create-lecture-sheet?id=${docId}`);
+
+    } catch (error: any) {
       setSaving(false);
       console.error('Save error:', error);
       if (error?.code === 'permission-denied') {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: ref.path, operation: 'write', requestResourceData: cleanPayload }));
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: `lecture-sheets/${editId || 'new'}`,
+          operation: 'write',
+          requestResourceData: {}
+        }));
       } else {
         toast({ variant: 'destructive', title: 'সেভ করতে সমস্যা হয়েছে', description: error?.message || 'অজানা ত্রুটি' });
       }
-    });
+    }
   }, [user, db, editId, data, printSettings, pageStyles, manualPages, router, toast, isPrintMode]);
 
   const handleFileUpload = async () => {
