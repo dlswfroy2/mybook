@@ -75,17 +75,19 @@ function stripDirtyHtml(html: string): string {
   if (typeof window === 'undefined') return html;
   if (!html) return '';
 
-  // 1. Repair any corrupted artifacts like <="" span=""> or </span"> or ="" created previously
+  // 1. Repair any corrupted artifacts or leaked KaTeX internal tags
   let cleaned = html
     .replace(/<=""\s*span="">/gi, '')
     .replace(/<\/span">/gi, '')
     .replace(/<span\s+a<=""\s*span="">/gi, '')
     .replace(/=""/g, '')
     .replace(/data-index-in-node="[^"]*"/gi, '')
-    .replace(/ba\\right\)\^n/g, '(ab)^n')
-    .replace(/\\right\)/g, ')')
-    .replace(/=\s*"([a-zA-Z0-9^_+-\s]+)"/g, '= $1')
-    .replace(/"\s*\\frac/g, '\\frac');
+    .replace(/<spanclass="[^"]*"[^>]*>/gi, '')
+    .replace(/<spanstyle="[^"]*"[^>]*>/gi, '')
+    .replace(/&lt;spanclass="[^"]*"[^&]*&gt;/gi, '')
+    .replace(/&lt;spanstyle="[^"]*"[^&]*&gt;/gi, '')
+    .replace(/&lt;\/span&gt;/gi, '')
+    .replace(/ba\\right\)\^n/g, '(ab)^n');
 
   if (!/<[a-z][\s\S]*>/i.test(cleaned)) return cleaned;
 
@@ -137,6 +139,14 @@ function stripDirtyHtml(html: string): string {
   return tmp.innerHTML;
 }
 
+function repairLatex(math: string): string {
+  if (!math) return '';
+  return math.replace(/\\left\(([\s\S]*?)(?:\\right)?\)/g, (match, inner) => {
+    if (inner.includes('\\right')) return match;
+    return `\\left(${inner}\\right)`;
+  });
+}
+
 function formatMath(text: string): string {
   if (!text) return '';
   text = stripDirtyHtml(text);
@@ -145,6 +155,9 @@ function formatMath(text: string): string {
   if (text.includes('class="katex"') || text.includes("class='katex'")) {
     return text;
   }
+
+  // Repair unbalanced LaTeX (e.g. \left( without matching \right)
+  text = repairLatex(text);
 
   // Decode common HTML entities that might interfere with LaTeX math (<, >, &)
   text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
@@ -233,20 +246,59 @@ function formatMath(text: string): string {
     }
   });
 
-  // 9. Clean up any leftover standalone LaTeX commands so raw code never leaks to the UI
+  // 9. Format Science Symbols (Physics, Chemistry, Geometry, Mathematics, Logic)
   text = text
+    .replace(/\\vec\{([a-zA-Z])\}/g, '$1⃗')
+    .replace(/\\angle/g, '∠')
+    .replace(/\\triangle/g, '△')
+    .replace(/\\perp/g, '⊥')
+    .replace(/\\parallel/g, '∥')
+    .replace(/\\cong/g, '≅')
+    .replace(/\\sim(?![a-zA-Z])/g, '~')
+    .replace(/\\circ/g, '°')
+    .replace(/\\rightarrow|\\to|\\longrightarrow/g, ' → ')
+    .replace(/\\rightleftharpoons/g, ' ⇌ ')
+    .replace(/\\uparrow/g, ' ↑ ')
+    .replace(/\\downarrow/g, ' ↓ ')
+    .replace(/\\Delta/g, 'Δ')
+    .replace(/\\Omega/g, 'Ω')
+    .replace(/\\mu/g, 'µ')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\rho/g, 'ρ')
+    .replace(/\\omega/g, 'ω')
+    .replace(/\\tau/g, 'τ')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
     .replace(/\\times/g, ' × ')
     .replace(/\\cdot/g, ' · ')
     .replace(/\\div/g, ' ÷ ')
     .replace(/\\pm/g, ' ± ')
+    .replace(/\\mp/g, ' ∓ ')
     .replace(/\\neq/g, ' ≠ ')
     .replace(/\\ne(?![a-zA-Z])/g, ' ≠ ')
     .replace(/\\ge(?![a-zA-Z])/g, ' ≥ ')
     .replace(/\\le(?![a-zA-Z])/g, ' ≤ ')
+    .replace(/\\approx/g, ' ≈ ')
+    .replace(/\\equiv/g, ' ≡ ')
+    .replace(/\\propto/g, ' ∝ ')
+    .replace(/\\infty/g, ' ∞ ')
+    .replace(/\\therefore/g, ' ∴ ')
+    .replace(/\\because/g, ' ∵ ')
     .replace(/\\in(?![a-zA-Z])/g, ' ∈ ')
+    .replace(/\\notin/g, ' ∉ ')
+    .replace(/\\subset/g, ' ⊂ ')
+    .replace(/\\subseteq/g, ' ⊆ ')
+    .replace(/\\cup/g, ' ∪ ')
+    .replace(/\\cap/g, ' ∩ ')
+    .replace(/\\emptyset/g, ' ∅ ')
     .replace(/\\mathbb\{N\}/g, 'ℕ')
     .replace(/\\mathbb\{R\}/g, 'ℝ')
-    .replace(/\\mathbb\{Z\}/g, 'ℤ');
+    .replace(/\\mathbb\{Z\}/g, 'ℤ')
+    .replace(/\\mathbb\{Q\}/g, 'ℚ')
+    .replace(/\\mathbb\{C\}/g, 'ℂ');
 
   return text;
 }
@@ -355,6 +407,10 @@ interface WordRulerProps {
   marginRight: number;
   zoomLevel: number;
   onMarginChange: (left: number, right: number) => void;
+  tabStops?: number[];
+  onTabStopsChange?: (stops: number[]) => void;
+  activeLineIndent?: number; // কারসর থাকা লাইনের ইন্ডেন্ট (ইঞ্চি)
+  onLineIndentChange?: (newIndentInches: number) => void;
 }
 
 function WordRuler({
@@ -363,12 +419,40 @@ function WordRuler({
   marginRight,
   zoomLevel,
   onMarginChange,
+  tabStops = [1.25, 2.0],
+  onTabStopsChange = () => {},
+  activeLineIndent = 0,
+  onLineIndentChange = () => {},
 }: WordRulerProps) {
-  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+  const rulerRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<'left' | 'right' | 'lineIndent' | number | null>(null);
+  const [guideX, setGuideX] = useState<number | null>(null);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const totalInches = Math.floor(paperWidthInches);
 
-  const handleMouseDown = (type: 'left' | 'right', e: React.MouseEvent) => {
+  // Click on ruler to add a new Tab Stop 'L' point & move current line to that point
+  const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!rulerRef.current) return;
+    const rect = rulerRef.current.getBoundingClientRect();
+    const zoom = (zoomLevel || 100) / 100;
+    const clickPx = (e.clientX - rect.left) / zoom;
+    const clickInches = Math.round((clickPx / 96) * 16) / 16;
+
+    if (clickInches >= marginLeft && clickInches <= paperWidthInches - marginRight - 0.1) {
+      const exists = tabStops.some(p => Math.abs(p - clickInches) < 0.1);
+      if (!exists) {
+        const next = [...tabStops, clickInches].sort((a, b) => a - b);
+        onTabStopsChange(next);
+      }
+      // কারসর থাকা লাইনের ইন্ডেন্ট এই পয়েন্টে সেট করুন
+      const lineRelIndent = Math.max(0, clickInches - marginLeft);
+      onLineIndentChange(lineRelIndent);
+    }
+  };
+
+  const handleMouseDownMargin = (type: 'left' | 'right', e: React.MouseEvent) => {
+    e.stopPropagation();
     e.preventDefault();
     setDragging(type);
 
@@ -376,131 +460,371 @@ function WordRuler({
     const startLeft = marginLeft;
     const startRight = marginRight;
 
-    const handleMouseMove = (moveEvt: MouseEvent) => {
-      const zoomFactor = (zoomLevel || 100) / 100;
-      const deltaX = (moveEvt.clientX - startX) / zoomFactor;
+    const onMove = (moveEvt: MouseEvent) => {
+      const zoom = (zoomLevel || 100) / 100;
+      const deltaX = (moveEvt.clientX - startX) / zoom;
       const deltaInches = deltaX / 96;
 
       if (type === 'left') {
         const rawNewLeft = Math.round((startLeft + deltaInches) * 16) / 16;
         const newLeft = Math.max(0.125, Math.min(paperWidthInches - marginRight - 1.0, rawNewLeft));
         onMarginChange(newLeft, marginRight);
+        setActiveTooltip(`বাম মার্জিন: ${newLeft.toFixed(2)}"`);
       } else {
         const rawNewRight = Math.round((startRight - deltaInches) * 16) / 16;
         const newRight = Math.max(0.125, Math.min(paperWidthInches - marginLeft - 1.0, rawNewRight));
         onMarginChange(marginLeft, newRight);
+        setActiveTooltip(`ডান মার্জিন: ${newRight.toFixed(2)}"`);
+      }
+      setGuideX(moveEvt.clientX);
+    };
+
+    const onUp = () => {
+      setDragging(null);
+      setGuideX(null);
+      setActiveTooltip(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Dragging the Active Line's 'L' Marker (কারসর থাকা লাইন সামনে/পিছনে সরানো)
+  const handleMouseDownLineIndent = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDragging('lineIndent');
+
+    const startX = e.clientX;
+    const startIndent = activeLineIndent;
+
+    const onMove = (moveEvt: MouseEvent) => {
+      const zoom = (zoomLevel || 100) / 100;
+      const deltaX = (moveEvt.clientX - startX) / zoom;
+      const deltaInches = deltaX / 96;
+
+      const rawNewIndent = Math.round((startIndent + deltaInches) * 16) / 16;
+      const maxAllowed = paperWidthInches - marginLeft - marginRight - 0.5;
+      const newIndent = Math.max(0, Math.min(maxAllowed, rawNewIndent));
+
+      onLineIndentChange(newIndent);
+      setActiveTooltip(`কারসর লাইন ইন্ডেন্ট: ${newIndent.toFixed(2)}"`);
+      setGuideX(moveEvt.clientX);
+    };
+
+    const onUp = () => {
+      setDragging(null);
+      setGuideX(null);
+      setActiveTooltip(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleMouseDownTab = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDragging(index);
+
+    const startX = e.clientX;
+    const startPos = tabStops[index];
+
+    const onMove = (moveEvt: MouseEvent) => {
+      const zoom = (zoomLevel || 100) / 100;
+      const deltaX = (moveEvt.clientX - startX) / zoom;
+      const deltaInches = deltaX / 96;
+
+      const newPos = Math.max(
+        marginLeft,
+        Math.min(paperWidthInches - marginRight, Math.round((startPos + deltaInches) * 16) / 16)
+      );
+
+      const next = [...tabStops];
+      next[index] = newPos;
+      onTabStopsChange(next);
+
+      // কারসর যে লাইনে আছে সেই লাইনের মার্জিনও এই L পয়েন্টের সাথে সাথে সামনে-পিছনে সরবে!
+      const lineIndent = Math.max(0, newPos - marginLeft);
+      onLineIndentChange(lineIndent);
+
+      setActiveTooltip(`এল (L) পয়েন্ট / লাইন পজিশন: ${newPos.toFixed(2)}"`);
+      setGuideX(moveEvt.clientX);
+    };
+
+    const onUp = (upEvt: MouseEvent) => {
+      setDragging(null);
+      setGuideX(null);
+      setActiveTooltip(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      // If dragged vertically outside the ruler by more than 30px, remove it!
+      if (rulerRef.current) {
+        const rect = rulerRef.current.getBoundingClientRect();
+        if (upEvt.clientY > rect.bottom + 30 || upEvt.clientY < rect.top - 20) {
+          onTabStopsChange(tabStops.filter((_, i) => i !== index));
+        }
       }
     };
 
-    const handleMouseUp = () => {
-      setDragging(null);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
   return (
-    <div
-      className="relative h-7 bg-slate-200 border border-slate-300 select-none shadow-xs text-slate-700 font-mono text-[9px] overflow-hidden rounded-t"
-      style={{ width: `${paperWidthInches}in` }}
-    >
-      {/* 1. Left Margin Shaded Area */}
-      <div
-        className="absolute top-0 bottom-0 left-0 bg-slate-300 border-r border-slate-400"
-        style={{ width: `${marginLeft}in` }}
-      />
+    <>
+      {/* Vertical Alignment Guide Line while dragging */}
+      {guideX !== null && (
+        <div
+          className="pointer-events-none fixed top-0 bottom-0 z-50 border-r-2 border-dashed border-indigo-500 shadow-sm"
+          style={{ left: guideX }}
+        />
+      )}
 
-      {/* 2. Printable Center Area (White) */}
       <div
-        className="absolute top-0 bottom-0 bg-white"
-        style={{ left: `${marginLeft}in`, right: `${marginRight}in` }}
-      />
+        ref={rulerRef}
+        onClick={handleRulerClick}
+        className="relative h-[26px] bg-[#2b3038] border-t border-b border-[#1c2025] select-none text-slate-200 font-sans text-[10px] overflow-visible rounded shadow-md cursor-crosshair"
+        style={{ width: `${paperWidthInches}in` }}
+        title="রুলারে ক্লিক করে নতুন পয়েন্ট (Tab Stop) যোগ করুন"
+      >
+        {/* 1. Left Margin Shaded Area (Darker Slate) */}
+        <div
+          className="absolute top-0 bottom-0 left-0 bg-[#1e2329] border-r border-[#3a414b]"
+          style={{ width: `${marginLeft}in` }}
+        />
 
-      {/* 3. Right Margin Shaded Area */}
-      <div
-        className="absolute top-0 bottom-0 right-0 bg-slate-300 border-l border-slate-400"
-        style={{ width: `${marginRight}in` }}
-      />
+        {/* 2. Printable Center Area (Slightly lighter slate like Image 1) */}
+        <div
+          className="absolute top-0 bottom-0 bg-[#3a414b]"
+          style={{ left: `${marginLeft}in`, right: `${marginRight}in` }}
+        />
 
-      {/* 4. Inch Marks & Subdivisions */}
-      <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: totalInches + 1 }).map((_, inch) => (
-          <React.Fragment key={inch}>
-            {/* Major 1-inch tick mark */}
-            <div
-              className="absolute top-0 w-px bg-slate-500 h-3"
-              style={{ left: `${inch}in` }}
-            />
-            {inch < totalInches && (
-              <span
-                className="absolute top-3 font-bold -translate-x-1/2 text-slate-700 text-[9px]"
-                style={{ left: `${inch + 1}in` }}
-              >
-                {inch + 1}
-              </span>
-            )}
-            {/* 1/2 inch */}
-            {inch + 0.5 < paperWidthInches && (
+        {/* 3. Right Margin Shaded Area (Darker Slate) */}
+        <div
+          className="absolute top-0 bottom-0 right-0 bg-[#1e2329] border-l border-[#3a414b]"
+          style={{ width: `${marginRight}in` }}
+        />
+
+        {/* 4. Inch Marks & Subdivisions (Dots & Bars matching Image 1) */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: totalInches + 1 }).map((_, inch) => (
+            <React.Fragment key={inch}>
+              {/* Full inch major mark */}
               <div
-                className="absolute top-0 w-px bg-slate-400 h-2"
-                style={{ left: `${inch + 0.5}in` }}
+                className="absolute top-0 w-[1.5px] bg-slate-300 h-2"
+                style={{ left: `${inch}in` }}
               />
-            )}
-            {/* 1/4 and 3/4 inch */}
-            {inch + 0.25 < paperWidthInches && (
-              <div
-                className="absolute top-0 w-px bg-slate-300 h-1.5"
-                style={{ left: `${inch + 0.25}in` }}
-              />
-            )}
-            {inch + 0.75 < paperWidthInches && (
-              <div
-                className="absolute top-0 w-px bg-slate-300 h-1.5"
-                style={{ left: `${inch + 0.75}in` }}
-              />
-            )}
-          </React.Fragment>
+              {inch < totalInches && (
+                <span
+                  className="absolute bottom-1 font-semibold text-[9px] -translate-x-1/2 text-slate-200 tracking-tight"
+                  style={{ left: `${inch + 1}in` }}
+                >
+                  {inch + 1}
+                </span>
+              )}
+              {/* 1/2 inch dot */}
+              {inch + 0.5 < paperWidthInches && (
+                <div
+                  className="absolute top-1.5 w-1 h-1 rounded-full bg-slate-300 -translate-x-1/2"
+                  style={{ left: `${inch + 0.5}in` }}
+                />
+              )}
+              {/* 1/4 and 3/4 inch small dots */}
+              {inch + 0.25 < paperWidthInches && (
+                <div
+                  className="absolute top-1.5 w-0.5 h-0.5 rounded-full bg-slate-400 -translate-x-1/2"
+                  style={{ left: `${inch + 0.25}in` }}
+                />
+              )}
+              {inch + 0.75 < paperWidthInches && (
+                <div
+                  className="absolute top-1.5 w-0.5 h-0.5 rounded-full bg-slate-400 -translate-x-1/2"
+                  style={{ left: `${inch + 0.75}in` }}
+                />
+              )}
+              {/* 1/8 and 3/8 inch tiny tick */}
+              {inch + 0.125 < paperWidthInches && (
+                <div
+                  className="absolute top-0 w-px h-1 bg-slate-500"
+                  style={{ left: `${inch + 0.125}in` }}
+                />
+              )}
+              {inch + 0.375 < paperWidthInches && (
+                <div
+                  className="absolute top-0 w-px h-1 bg-slate-500"
+                  style={{ left: `${inch + 0.375}in` }}
+                />
+              )}
+              {inch + 0.625 < paperWidthInches && (
+                <div
+                  className="absolute top-0 w-px h-1 bg-slate-500"
+                  style={{ left: `${inch + 0.625}in` }}
+                />
+              )}
+              {inch + 0.875 < paperWidthInches && (
+                <div
+                  className="absolute top-0 w-px h-1 bg-slate-500"
+                  style={{ left: `${inch + 0.875}in` }}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* 5. Active Line Indent 'L' Marker (কারসর যে লাইনে আছে তার জন্য বিশেষ 'L' মার্কার) */}
+        <div
+          onMouseDown={handleMouseDownLineIndent}
+          className="absolute bottom-0 z-40 cursor-ew-resize group -ml-1.5 w-4 h-5 flex flex-col items-center justify-end"
+          style={{ left: `${marginLeft + activeLineIndent}in` }}
+          title={`কারসর লাইনের অবস্থান: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে লাইনটি সামনে/পিছনে সরান)`}
+        >
+          {/* L marker for active line (Bright Amber / Gold) */}
+          <div className="w-3 h-3.5 border-l-[2.5px] border-b-[2.5px] border-amber-400 drop-shadow-md group-hover:scale-125 transition-transform" />
+          <div className="w-1.5 h-1 bg-amber-400 rounded-full -mt-0.5" />
+        </div>
+
+        {/* 5.1 User-placed 'L' Tab Stop Points (হুবহু Image 1 এর মতো 'L' পয়েন্ট) */}
+        {tabStops.map((pos, idx) => (
+          <div
+            key={idx}
+            onMouseDown={(e) => handleMouseDownTab(idx, e)}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              onTabStopsChange(tabStops.filter((_, i) => i !== idx));
+            }}
+            className="absolute bottom-0 z-30 cursor-ew-resize group -ml-1 w-3.5 h-4 flex items-end justify-center"
+            style={{ left: `${pos}in` }}
+            title={`ট্যাব পয়েন্ট ${idx + 1}: ${pos.toFixed(2)}" (টেনে কারসর লাইন সরান বা ডাবল-ক্লিকে মুছুন)`}
+          >
+            {/* Iconic 'L' mark as seen in Image 1 */}
+            <div className="w-2.5 h-3 border-l-2 border-b-2 border-slate-100 drop-shadow hover:border-amber-300 transition-colors pointer-events-none" />
+          </div>
         ))}
-      </div>
 
-      {/* 5. Left Margin Interactive Slider Marker */}
-      <div
-        onMouseDown={(e) => handleMouseDown('left', e)}
-        className="absolute top-0 bottom-0 z-20 cursor-ew-resize group -ml-2 w-4 flex flex-col items-center justify-between"
-        style={{ left: `${marginLeft}in` }}
-        title={`বাম মার্জিন: ${marginLeft.toFixed(2)} ইঞ্চি (টেনে মার্জিন পরিবর্তন করুন)`}
-      >
-        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-indigo-700 drop-shadow-xs" />
-        <div className="w-0.5 h-2 bg-indigo-600 rounded-full" />
-        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-indigo-700 drop-shadow-xs" />
+        {/* 6. Left Margin Slider Marker (Classic Word Hourglass + Rectangle base) */}
+        <div
+          onMouseDown={(e) => handleMouseDownMargin('left', e)}
+          className="absolute top-0 bottom-0 z-40 cursor-ew-resize group -ml-2 w-4 flex flex-col items-center justify-between"
+          style={{ left: `${marginLeft}in` }}
+          title={`বাম মার্জিন: ${marginLeft.toFixed(2)} ইঞ্চি (টেনে পরিবর্তন করুন)`}
+        >
+          {/* Top downward triangle (First Line Indent) */}
+          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-slate-200 drop-shadow" />
+          {/* Middle upward triangle (Hanging Indent) */}
+          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-slate-200 drop-shadow" />
+          {/* Bottom rectangle (Left Indent) */}
+          <div className="w-2.5 h-1.5 bg-slate-200 border border-slate-600 rounded-[1px] drop-shadow" />
+        </div>
 
-        {dragging === 'left' && (
-          <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[10px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 pointer-events-none">
-            বাম: {marginLeft.toFixed(2)}"
+        {/* 7. Right Margin Slider Marker (Classic Word Upward Triangle) */}
+        <div
+          onMouseDown={(e) => handleMouseDownMargin('right', e)}
+          className="absolute bottom-0 z-40 cursor-ew-resize group -mr-2 w-4 flex flex-col items-center justify-end"
+          style={{ right: `${marginRight}in` }}
+          title={`ডান মার্জিন: ${marginRight.toFixed(2)} ইঞ্চি (টেনে পরিবর্তন করুন)`}
+        >
+          <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-slate-200 drop-shadow" />
+        </div>
+
+        {/* Active Tooltip showing exact measurement while dragging */}
+        {activeTooltip && (
+          <div
+            className="absolute top-7 z-50 bg-slate-900/95 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none border border-slate-700"
+            style={{
+              left:
+                dragging === 'left'
+                  ? `${marginLeft}in`
+                  : dragging === 'right'
+                  ? `calc(${paperWidthInches - marginRight}in - 40px)`
+                  : dragging === 'lineIndent'
+                  ? `${marginLeft + activeLineIndent}in`
+                  : typeof dragging === 'number'
+                  ? `${tabStops[dragging]}in`
+                  : '50%',
+            }}
+          >
+            {activeTooltip}
           </div>
         )}
       </div>
+    </>
+  );
+}
 
-      {/* 6. Right Margin Interactive Slider Marker */}
-      <div
-        onMouseDown={(e) => handleMouseDown('right', e)}
-        className="absolute top-0 bottom-0 z-20 cursor-ew-resize group -mr-2 w-4 flex flex-col items-center justify-between"
-        style={{ right: `${marginRight}in` }}
-        title={`ডান মার্জিন: ${marginRight.toFixed(2)} ইঞ্চি (টেনে মার্জিন পরিবর্তন করুন)`}
-      >
-        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-indigo-700 drop-shadow-xs" />
-        <div className="w-0.5 h-2 bg-indigo-600 rounded-full" />
-        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-indigo-700 drop-shadow-xs" />
+// লাইন/অনুচ্ছেদ সরানোর হ্যান্ডেল কম্পোনেন্ট
+function ParagraphMoveHandles({
+  contentRef,
+  onMoveParagraph,
+}: {
+  contentRef: React.RefObject<HTMLDivElement | null>;
+  onMoveParagraph: (idx: number, direction: 'up' | 'down') => void;
+}) {
+  const [handles, setHandles] = useState<{ top: number; height: number; idx: number; total: number }[]>([]);
 
-        {dragging === 'right' && (
-          <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[10px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 pointer-events-none">
-            ডান: {marginRight.toFixed(2)}"
-          </div>
-        )}
-      </div>
+  useEffect(() => {
+    const update = () => {
+      const el = contentRef.current;
+      if (!el) return;
+      const elRect = el.getBoundingClientRect();
+      const children = Array.from(el.children);
+      const total = children.length;
+      const newHandles = children.map((child, idx) => {
+        const rect = (child as HTMLElement).getBoundingClientRect();
+        return {
+          top: rect.top - elRect.top,
+          height: Math.max(rect.height, 18),
+          idx,
+          total,
+        };
+      });
+      setHandles(newHandles);
+    };
+    update();
+    const el = contentRef.current;
+    if (!el) return;
+    const obs = new MutationObserver(update);
+    obs.observe(el, { childList: true, subtree: false, characterData: false });
+    window.addEventListener('resize', update);
+    return () => { obs.disconnect(); window.removeEventListener('resize', update); };
+  }, [contentRef]);
+
+  if (handles.length <= 1) return null;
+
+  return (
+    <div
+      className="absolute top-0 bottom-0 pointer-events-none"
+      style={{ left: '-26px', width: '24px' }}
+    >
+      {handles.map(({ top, height, idx, total }) => (
+        <div
+          key={idx}
+          className="absolute flex flex-col items-center justify-center gap-px pointer-events-auto"
+          style={{ top: `${top}px`, height: `${height}px`, width: '22px' }}
+        >
+          {idx > 0 && (
+            <button
+              type="button"
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onMoveParagraph(idx, 'up'); }}
+              className="w-5 h-3.5 bg-blue-100 hover:bg-blue-500 hover:text-white text-blue-600 border border-blue-300 rounded text-[8px] flex items-center justify-center transition-colors shadow-sm opacity-50 hover:opacity-100"
+              title="উপরে নিন"
+            >▲</button>
+          )}
+          {idx < total - 1 && (
+            <button
+              type="button"
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onMoveParagraph(idx, 'down'); }}
+              className="w-5 h-3.5 bg-blue-100 hover:bg-blue-500 hover:text-white text-blue-600 border border-blue-300 rounded text-[8px] flex items-center justify-center transition-colors shadow-sm opacity-50 hover:opacity-100"
+              title="নিচে নিন"
+            >▼</button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -857,6 +1181,28 @@ function EditableContentArea({
           }
           return;
         }
+
+        // Table cell না হলে: কারসর যে লাইনে আছে সেই লাইনের মার্জিন সামনে/পিছনে সরান (Tab = সামনে, Shift+Tab = পিছনে)
+        e.preventDefault();
+        let targetBlock: HTMLElement | null = null;
+        let currNode: Node | null = sel.anchorNode;
+        while (currNode && currNode !== el) {
+          if (currNode.nodeType === Node.ELEMENT_NODE && (currNode as HTMLElement).parentElement === el) {
+            targetBlock = currNode as HTMLElement;
+            break;
+          }
+          currNode = currNode.parentNode;
+        }
+        if (targetBlock) {
+          const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
+          const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
+          const delta = e.shiftKey ? -0.25 : 0.25;
+          const newInches = Math.max(0, Math.round((currentInches + delta) * 16) / 16);
+          targetBlock.style.marginLeft = newInches > 0 ? `${newInches}in` : '';
+          onSyncPageContent(pageIndex, el.innerHTML);
+          window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: newInches } }));
+        }
+        return;
       }
     }
 
@@ -925,42 +1271,92 @@ function EditableContentArea({
     }
   };
 
+  const updateActiveLineIndent = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    let node: Node | null = sel.anchorNode;
+    const el = ref.current;
+    if (!el) return;
+    let targetBlock: HTMLElement | null = null;
+    while (node && node !== el) {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement === el) {
+        targetBlock = node as HTMLElement;
+        break;
+      }
+      node = node.parentNode;
+    }
+    if (targetBlock) {
+      const ml = targetBlock.style.marginLeft || '';
+      let inches = 0;
+      if (ml.endsWith('in')) inches = parseFloat(ml) || 0;
+      else if (ml.endsWith('px')) inches = (parseFloat(ml) || 0) / 96;
+      window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: inches } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: 0 } }));
+    }
+  }, []);
+
+  const moveParagraph = useCallback((fromIdx: number, direction: 'up' | 'down') => {
+    const el = ref.current;
+    if (!el) return;
+    const children = Array.from(el.children);
+    if (direction === 'up' && fromIdx > 0) {
+      el.insertBefore(children[fromIdx], children[fromIdx - 1]);
+    } else if (direction === 'down' && fromIdx < children.length - 1) {
+      el.insertBefore(children[fromIdx + 1], children[fromIdx]);
+    }
+    setTimeout(() => checkAndReflow(true), 50);
+  }, [checkAndReflow]);
+
   return (
-    <div
-      ref={ref}
-      contentEditable={true}
-      suppressContentEditableWarning={true}
-      onFocus={onFocus}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      onInput={handleInput}
-      onCut={() => {
-        setTimeout(() => checkAndReflow(true), 60);
-      }}
-      onPaste={handlePaste}
-      onBlur={(e) => {
-        const val = e.currentTarget.innerHTML;
-        onBlur(val);
-      }}
-      className={cn(
-        "content-area flex-1 font-kalpurush outline-none overflow-hidden",
-        isActive && "bg-blue-50/15 ring-1 ring-blue-300 rounded"
+    <div className="relative flex-1 min-h-0 overflow-hidden group/ca">
+      <div
+        ref={ref}
+        contentEditable={true}
+        suppressContentEditableWarning={true}
+        onFocus={() => {
+          onFocus();
+          updateActiveLineIndent();
+        }}
+        onClick={() => {
+          onClick();
+          updateActiveLineIndent();
+        }}
+        onKeyUp={updateActiveLineIndent}
+        onKeyDown={handleKeyDown}
+        onInput={handleInput}
+        onCut={() => {
+          setTimeout(() => checkAndReflow(true), 60);
+        }}
+        onPaste={handlePaste}
+        onBlur={(e) => {
+          const val = e.currentTarget.innerHTML;
+          onBlur(val);
+        }}
+        className={cn(
+          "content-area w-full h-full font-kalpurush outline-none overflow-hidden",
+          isActive && "bg-blue-50/15 ring-1 ring-blue-300 rounded"
+        )}
+        style={{
+          lineHeight: String(style.lineHeight),
+          fontSize: `${style.fontSize}pt`,
+          fontWeight: style.bold ? 'bold' : 'normal',
+          fontStyle: style.italic ? 'italic' : 'normal',
+          textDecoration: style.underline ? 'underline' : 'none',
+          color: style.color,
+          textAlign: style.align as any,
+          minHeight: 0,
+          maxHeight: '100%',
+          columnCount: cols > 1 ? cols : undefined,
+          columnGap: cols > 1 ? '0.35in' : undefined,
+          columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined
+        }}
+      />
+      {/* লাইন/অনুচ্ছেদ সরানোর হ্যান্ডেল — শুধু সক্রিয় পাতায় দেখা যাবে */}
+      {isActive && (
+        <ParagraphMoveHandles contentRef={ref} onMoveParagraph={moveParagraph} />
       )}
-      style={{
-        lineHeight: String(style.lineHeight),
-        fontSize: `${style.fontSize}pt`,
-        fontWeight: style.bold ? 'bold' : 'normal',
-        fontStyle: style.italic ? 'italic' : 'normal',
-        textDecoration: style.underline ? 'underline' : 'none',
-        color: style.color,
-        textAlign: style.align as any,
-        minHeight: 0,
-        maxHeight: '100%',
-        columnCount: cols > 1 ? cols : undefined,
-        columnGap: cols > 1 ? '0.35in' : undefined,
-        columnRule: (cols > 1 && hasRule) ? '1.5px solid #000' : undefined
-      }}
-    />
+    </div>
   );
 }
 
@@ -1104,6 +1500,20 @@ function CreateLectureSheetContent() {
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
   const [showRuler, setShowRuler] = useState(true);
+  const [tabStops, setTabStops] = useState<number[]>([1.25, 2.0]);
+  const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
+  const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
+
+  // Listen to active line indent detected from content areas
+  useEffect(() => {
+    const handleIndentDetected = (e: any) => {
+      if (typeof e.detail?.indent === 'number') {
+        setActiveLineIndent(e.detail.indent);
+      }
+    };
+    window.addEventListener('active-line-indent-detected', handleIndentDetected);
+    return () => window.removeEventListener('active-line-indent-detected', handleIndentDetected);
+  }, []);
 
   useEffect(() => {
     if (!editId) {
@@ -1288,6 +1698,51 @@ function CreateLectureSheetContent() {
       return { ...prev, [idx]: { ...current, [key]: val } };
     }); 
   }, [globalFontSize, globalLineHeight]);
+
+  // রুলারের 'L' পয়েন্ট বা ইন্ডেন্ট মার্কার ড্র্যাগ করলে কারসরের লাইনে সরাসরি মার্জিন প্রয়োগ
+  const handleLineIndentChange = useCallback((newIndentInches: number) => {
+    setActiveLineIndent(newIndentInches);
+    const activePaperIdx = activeEditIdx !== null ? activeEditIdx : 0;
+    const contentArea = document.querySelector(`.paper-idx-${activePaperIdx} .content-area`) as HTMLElement | null;
+    if (!contentArea) return;
+
+    const indentStr = newIndentInches > 0 ? `${newIndentInches}in` : '';
+
+    if (applyScope === 'all') {
+      // সমস্ত পাতায় সব লাইনে একযোগে ইন্ডেন্ট প্রয়োগ
+      paginatedPages.forEach((_, pIdx) => {
+        const ca = document.querySelector(`.paper-idx-${pIdx} .content-area`) as HTMLElement | null;
+        if (ca) {
+          Array.from(ca.children).forEach((child) => {
+            (child as HTMLElement).style.marginLeft = indentStr;
+          });
+          handleSyncPageContent(pIdx, ca.innerHTML);
+        }
+      });
+    } else {
+      // শুধু সক্রিয় পাতার যে লাইনে কারসর আছে (বা সিলেক্ট করা ব্লকে) প্রয়োগ
+      const sel = window.getSelection();
+      let targetBlock: HTMLElement | null = null;
+      if (sel && sel.rangeCount > 0 && sel.anchorNode) {
+        let node: Node | null = sel.anchorNode;
+        while (node && node !== contentArea) {
+          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement === contentArea) {
+            targetBlock = node as HTMLElement;
+            break;
+          }
+          node = node.parentNode;
+        }
+      }
+      if (!targetBlock) {
+        // যদি সুনির্দিষ্ট ব্লক না মেলে, প্রথম বা ফোকাসড ব্লক নিন
+        targetBlock = (contentArea.firstElementChild as HTMLElement) || contentArea;
+      }
+      if (targetBlock && targetBlock !== contentArea) {
+        targetBlock.style.marginLeft = indentStr;
+        handleSyncPageContent(activePaperIdx, contentArea.innerHTML);
+      }
+    }
+  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent]);
 
   const handleFormatting = useCallback((command: string, value: string | null = null) => {
     const selection = window.getSelection();
@@ -1939,6 +2394,44 @@ function CreateLectureSheetContent() {
           </header>
 
           {/* Microsoft Word Ribbon Toolbar */}
+          {/* সব পাতায় / এই পাতায় apply scope toggle */}
+          <div className="no-print flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs font-bold shrink-0 select-none">
+            <span className="text-amber-800 font-black">সেটিংস প্রয়োগ:</span>
+            <button
+              type="button"
+              onClick={() => setApplyScope('single')}
+              className={cn(
+                "px-3 py-0.5 rounded-full border font-bold transition-all text-[11px]",
+                applyScope === 'single'
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-300 hover:border-blue-400"
+              )}
+            >
+              📄 এই পাতায়
+            </button>
+            <button
+              type="button"
+              onClick={() => setApplyScope('all')}
+              className={cn(
+                "px-3 py-0.5 rounded-full border font-bold transition-all text-[11px]",
+                applyScope === 'all'
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"
+              )}
+            >
+              📑 সব পাতায়
+            </button>
+            {applyScope === 'all' && (
+              <span className="text-indigo-700 text-[10px] font-bold ml-1 animate-pulse">
+                ✓ সকল পাতায় একযোগে প্রয়োগ হবে
+              </span>
+            )}
+            {applyScope === 'single' && activeEditIdx !== null && (
+              <span className="text-blue-700 text-[10px] font-bold ml-1">
+                পাতা {activeEditIdx + 1} এ প্রয়োগ হবে
+              </span>
+            )}
+          </div>
           <WordToolbar
             onAddPage={() => setPaginatedPages(prev => [...prev, ""])}
             onDeletePage={() => {
@@ -1960,7 +2453,12 @@ function CreateLectureSheetContent() {
             currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
             currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
             onColumnsChange={(cols, hasRule) => {
-              if (activeEditIdx !== null) {
+              if (applyScope === 'all') {
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'columns', cols);
+                  updatePageStyle(i, 'columnRule', !!hasRule);
+                });
+              } else if (activeEditIdx !== null) {
                 updatePageStyle(activeEditIdx, 'columns', cols);
                 updatePageStyle(activeEditIdx, 'columnRule', !!hasRule);
               } else {
@@ -1972,51 +2470,53 @@ function CreateLectureSheetContent() {
             }}
             currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
             onOrientationChange={(orient) => {
-              if (activeEditIdx !== null) {
+              if (applyScope === 'all') {
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'orientation', orient); });
+              } else if (activeEditIdx !== null) {
                 updatePageStyle(activeEditIdx, 'orientation', orient);
               } else {
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'orientation', orient);
-                });
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'orientation', orient); });
               }
             }}
             onMarginPresetChange={(preset) => {
               const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
-              if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'mT', mVal);
-                updatePageStyle(activeEditIdx, 'mB', mVal);
-                updatePageStyle(activeEditIdx, 'mL', mVal);
-                updatePageStyle(activeEditIdx, 'mR', mVal);
+              if (applyScope === 'all') {
+                setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'mT', mVal); updatePageStyle(i, 'mB', mVal);
+                  updatePageStyle(i, 'mL', mVal); updatePageStyle(i, 'mR', mVal);
+                });
+              } else if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'mT', mVal); updatePageStyle(activeEditIdx, 'mB', mVal);
+                updatePageStyle(activeEditIdx, 'mL', mVal); updatePageStyle(activeEditIdx, 'mR', mVal);
               } else {
                 setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
                 paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'mT', mVal);
-                  updatePageStyle(i, 'mB', mVal);
-                  updatePageStyle(i, 'mL', mVal);
-                  updatePageStyle(i, 'mR', mVal);
+                  updatePageStyle(i, 'mT', mVal); updatePageStyle(i, 'mB', mVal);
+                  updatePageStyle(i, 'mL', mVal); updatePageStyle(i, 'mR', mVal);
                 });
               }
             }}
             currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
             onPageBorderChange={(border) => {
-              if (activeEditIdx !== null) {
+              if (applyScope === 'all') {
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
+              } else if (activeEditIdx !== null) {
                 updatePageStyle(activeEditIdx, 'border', border);
               } else {
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'border', border);
-                });
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
               }
             }}
             showRuler={showRuler}
             onToggleRuler={() => setShowRuler(prev => !prev)}
             currentPageSize={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.pageSize || 'a4'}
             onPageSizeChange={(size) => {
-              if (activeEditIdx !== null) {
+              if (applyScope === 'all') {
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
+              } else if (activeEditIdx !== null) {
                 updatePageStyle(activeEditIdx, 'pageSize', size);
               } else {
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'pageSize', size);
-                });
+                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
               }
             }}
             onInsertPageBreak={() => {
@@ -2099,43 +2599,54 @@ function CreateLectureSheetContent() {
                  </div>
                </div>
             </aside>
-            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-6 pb-12 flex flex-col items-center gap-8 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
-               {/* Horizontal Interactive Word Ruler */}
-               {showRuler && (
-                 <div className="no-print sticky top-0 z-30 pb-2 flex justify-center w-full">
-                   {(() => {
-                     const curStyle = pageStyles[activeEditIdx !== null ? activeEditIdx : 0] || {};
-                     const isLand = curStyle.orientation === 'landscape';
-                     const pSize = curStyle.pageSize || 'a4';
-                     const bW = pSize === 'letter' ? 8.5 : pSize === 'legal' ? 8.5 : 8.27;
-                     const bH = pSize === 'letter' ? 11.0 : pSize === 'legal' ? 14.0 : 11.69;
-                     const rulerWidth = isLand ? bH : bW;
-                     const curL = parseFloat(String(curStyle.mL ?? printSettings.marginLeft)) || 0.5;
-                     const curR = parseFloat(String(curStyle.mR ?? printSettings.marginRight)) || 0.5;
-                     return (
-                       <WordRuler
-                         paperWidthInches={rulerWidth}
-                         marginLeft={curL}
-                         marginRight={curR}
-                         zoomLevel={previewZoom}
-                         onMarginChange={(newLeft, newRight) => {
-                           if (activeEditIdx !== null) {
-                             updatePageStyle(activeEditIdx, 'mL', newLeft);
-                             updatePageStyle(activeEditIdx, 'mR', newRight);
-                           } else {
-                             setPrintSettings((p: any) => ({ ...p, marginLeft: newLeft, marginRight: newRight }));
-                             paginatedPages.forEach((_, i) => {
-                               updatePageStyle(i, 'mL', newLeft);
-                               updatePageStyle(i, 'mR', newRight);
-                             });
-                           }
-                         }}
-                       />
-                     );
-                   })()}
-                 </div>
-               )}
-               {paginatedPages.map((pageHtml, idx) => {
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Horizontal Interactive Word Ruler - Fixed at Top, Never Overlaps Content */}
+              {showRuler && (
+                <div className="no-print bg-[#1e2329] border-b border-[#121519] py-1.5 flex justify-center w-full shrink-0 shadow-md z-30">
+                  {(() => {
+                    const curStyle = pageStyles[activeEditIdx !== null ? activeEditIdx : 0] || {};
+                    const isLand = curStyle.orientation === 'landscape';
+                    const pSize = curStyle.pageSize || 'a4';
+                    const bW = pSize === 'letter' ? 8.5 : pSize === 'legal' ? 8.5 : 8.27;
+                    const bH = pSize === 'letter' ? 11.0 : pSize === 'legal' ? 14.0 : 11.69;
+                    const rulerWidth = isLand ? bH : bW;
+                    const curL = parseFloat(String(curStyle.mL ?? printSettings.marginLeft)) || 0.5;
+                    const curR = parseFloat(String(curStyle.mR ?? printSettings.marginRight)) || 0.5;
+                    return (
+                      <WordRuler
+                        paperWidthInches={rulerWidth}
+                        marginLeft={curL}
+                        marginRight={curR}
+                        zoomLevel={previewZoom}
+                        tabStops={tabStops}
+                        onTabStopsChange={setTabStops}
+                        activeLineIndent={activeLineIndent}
+                        onLineIndentChange={handleLineIndentChange}
+                        onMarginChange={(newLeft, newRight) => {
+                          if (applyScope === 'all') {
+                            setPrintSettings((p: any) => ({ ...p, marginLeft: newLeft, marginRight: newRight }));
+                            paginatedPages.forEach((_, i) => {
+                              updatePageStyle(i, 'mL', newLeft);
+                              updatePageStyle(i, 'mR', newRight);
+                            });
+                          } else if (activeEditIdx !== null) {
+                            updatePageStyle(activeEditIdx, 'mL', newLeft);
+                            updatePageStyle(activeEditIdx, 'mR', newRight);
+                          } else {
+                            setPrintSettings((p: any) => ({ ...p, marginLeft: newLeft, marginRight: newRight }));
+                            paginatedPages.forEach((_, i) => {
+                              updatePageStyle(i, 'mL', newLeft);
+                              updatePageStyle(i, 'mR', newRight);
+                            });
+                          }
+                        }}
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+              <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
+                {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, pageSize: 'a4' };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
                  const isLandscape = style.orientation === 'landscape';
@@ -2183,6 +2694,7 @@ function CreateLectureSheetContent() {
                )})}
                <div className="no-print pt-4 pb-10"><Button onClick={() => setPaginatedPages(prev => [...prev, ""])} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
             </main>
+            </div>
           </div>
         </div>
       )}
