@@ -410,6 +410,7 @@ interface WordRulerProps {
   tabStops?: number[];
   onTabStopsChange?: (stops: number[]) => void;
   activeLineIndent?: number; // কারসর থাকা লাইনের ইন্ডেন্ট (ইঞ্চি)
+  activeCursorPos?: number | null; // ডকুমেন্টে কারসর যেখানে আছে তার এক্সাক্ট ইঞ্চি অবস্থান
   onLineIndentChange?: (newIndentInches: number) => void;
 }
 
@@ -422,6 +423,7 @@ function WordRuler({
   tabStops = [],
   onTabStopsChange = () => {},
   activeLineIndent = 0,
+  activeCursorPos = null,
   onLineIndentChange = () => {},
 }: WordRulerProps) {
   const rulerRef = useRef<HTMLDivElement>(null);
@@ -677,7 +679,20 @@ function WordRuler({
           ))}
         </div>
 
-        {/* 5. User-placed 'L' Tab Stop Points (শুধুমাত্র ব্যবহারকারী ক্লিক করে তৈরি করলে দেখা যাবে) */}
+        {/* 5. Live Cursor Position 'L' Marker (কারসর যেখানে থাকবে ঠিক সেখানে 'L' চিহ্ন অবস্থান করবে) */}
+        {activeCursorPos !== null && activeCursorPos > 0 && (
+          <div
+            onMouseDown={handleMouseDownLineIndent}
+            className="absolute bottom-0 z-40 cursor-ew-resize group -ml-1 w-4 h-5 flex items-end justify-center"
+            style={{ left: `${activeCursorPos}in` }}
+            title={`কারসর অবস্থান 'L': ${activeCursorPos.toFixed(2)}" (টেনে কারসর থাকা লাইনটি সামনে/পিছনে সরান)`}
+          >
+            {/* Iconic 'L' mark directly over the cursor */}
+            <div className="w-3 h-3.5 border-l-[2.5px] border-b-[2.5px] border-amber-300 drop-shadow-md group-hover:scale-125 transition-transform" />
+          </div>
+        )}
+
+        {/* 5.1 User-placed 'L' Tab Stop Points (ব্যবহারকারী রুলারে ক্লিক করে তৈরি করলে দেখা যাবে) */}
         {tabStops.map((pos, idx) => (
           <div
             key={idx}
@@ -1272,27 +1287,47 @@ function EditableContentArea({
   const updateActiveLineIndent = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
-    let node: Node | null = sel.anchorNode;
     const el = ref.current;
     if (!el) return;
-    let targetBlock: HTMLElement | null = null;
-    while (node && node !== el) {
-      if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement === el) {
-        targetBlock = node as HTMLElement;
-        break;
+
+    try {
+      const range = sel.getRangeAt(0);
+      let rect = range.getBoundingClientRect();
+      let cursorLeft = rect.left;
+
+      // Collapsed range এর ক্ষেত্রে rect.left ০ হতে পারে, তখন ডামি নোড দিয়ে এক্সাক্ট পজিশন নেওয়া
+      if ((cursorLeft === 0 || rect.width === 0) && range.startContainer) {
+        const dummy = document.createElement('span');
+        dummy.textContent = '\uFEFF';
+        const clone = range.cloneRange();
+        clone.insertNode(dummy);
+        cursorLeft = dummy.getBoundingClientRect().left;
+        dummy.remove();
       }
-      node = node.parentNode;
+
+      const paperEl = el.closest('.paper') as HTMLElement | null;
+      if (paperEl && cursorLeft > 0) {
+        const paperRect = paperEl.getBoundingClientRect();
+        const zoom = (style.zoom || 100) / 100;
+        const rawInches = (cursorLeft - paperRect.left) / (96 * zoom);
+        const cursorInches = Math.max(0.1, Math.round(rawInches * 100) / 100);
+        window.dispatchEvent(new CustomEvent('active-cursor-pos-detected', { detail: { cursorInches } }));
+      }
+    } catch (err) {
+      console.warn('Error detecting cursor pos:', err);
     }
-    if (targetBlock) {
-      const ml = targetBlock.style.marginLeft || '';
-      let inches = 0;
-      if (ml.endsWith('in')) inches = parseFloat(ml) || 0;
-      else if (ml.endsWith('px')) inches = (parseFloat(ml) || 0) / 96;
-      window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: inches } }));
-    } else {
-      window.dispatchEvent(new CustomEvent('active-line-indent-detected', { detail: { indent: 0 } }));
-    }
-  }, []);
+  }, [style.zoom]);
+
+  useEffect(() => {
+    const handleSelChange = () => {
+      const el = ref.current;
+      if (el && (document.activeElement === el || el.contains(document.activeElement))) {
+        updateActiveLineIndent();
+      }
+    };
+    document.addEventListener('selectionchange', handleSelChange);
+    return () => document.removeEventListener('selectionchange', handleSelChange);
+  }, [updateActiveLineIndent]);
 
   const moveParagraph = useCallback((fromIdx: number, direction: 'up' | 'down') => {
     const el = ref.current;
@@ -1320,6 +1355,7 @@ function EditableContentArea({
           onClick();
           updateActiveLineIndent();
         }}
+        onMouseUp={updateActiveLineIndent}
         onKeyUp={updateActiveLineIndent}
         onKeyDown={handleKeyDown}
         onInput={handleInput}
@@ -1501,16 +1537,17 @@ function CreateLectureSheetContent() {
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
   const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
+  const [activeCursorPos, setActiveCursorPos] = useState<number | null>(null);
 
-  // Listen to active line indent detected from content areas
+  // Listen to active cursor position detected from content areas
   useEffect(() => {
-    const handleIndentDetected = (e: any) => {
-      if (typeof e.detail?.indent === 'number') {
-        setActiveLineIndent(e.detail.indent);
+    const handleCursorDetected = (e: any) => {
+      if (typeof e.detail?.cursorInches === 'number') {
+        setActiveCursorPos(e.detail.cursorInches);
       }
     };
-    window.addEventListener('active-line-indent-detected', handleIndentDetected);
-    return () => window.removeEventListener('active-line-indent-detected', handleIndentDetected);
+    window.addEventListener('active-cursor-pos-detected', handleCursorDetected);
+    return () => window.removeEventListener('active-cursor-pos-detected', handleCursorDetected);
   }, []);
 
   useEffect(() => {
@@ -2619,6 +2656,7 @@ function CreateLectureSheetContent() {
                         tabStops={tabStops}
                         onTabStopsChange={setTabStops}
                         activeLineIndent={activeLineIndent}
+                        activeCursorPos={activeCursorPos}
                         onLineIndentChange={handleLineIndentChange}
                         onMarginChange={(newLeft, newRight) => {
                           if (applyScope === 'all') {
