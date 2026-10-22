@@ -51,7 +51,12 @@ import {
   Copy,
   TableProperties,
   ArrowRight,
-  Maximize2
+  Maximize2,
+  Ruler,
+  Split,
+  Sliders,
+  ArrowUpDown,
+  ArrowLeftRight
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -87,9 +92,20 @@ export interface WordToolbarProps {
   currentColumnRule?: boolean;
   onOrientationChange?: (orientation: 'portrait' | 'landscape') => void;
   currentOrientation?: 'portrait' | 'landscape';
-  onMarginPresetChange?: (preset: 'normal' | 'narrow' | 'wide') => void;
+  onMarginPresetChange?: (preset: 'normal' | 'narrow' | 'wide' | 'moderate') => void;
   onPageBorderChange?: (borderStyle: 'none' | 'thin' | 'double' | 'box') => void;
   currentPageBorder?: string;
+  onPageSizeChange?: (size: 'a4' | 'letter' | 'legal') => void;
+  currentPageSize?: string;
+  onInsertPageBreak?: () => void;
+  showRuler?: boolean;
+  onToggleRuler?: () => void;
+  indentLeft?: number;
+  indentRight?: number;
+  onIndentChange?: (direction: 'left' | 'right', delta: number) => void;
+  spacingBefore?: number;
+  spacingAfter?: number;
+  onSpacingChange?: (type: 'before' | 'after', delta: number) => void;
   className?: string;
 }
 
@@ -108,6 +124,17 @@ export function WordToolbar({
   onMarginPresetChange,
   onPageBorderChange,
   currentPageBorder = 'none',
+  onPageSizeChange,
+  currentPageSize = 'a4',
+  onInsertPageBreak,
+  showRuler = true,
+  onToggleRuler,
+  indentLeft = 0,
+  indentRight = 0,
+  onIndentChange,
+  spacingBefore = 0,
+  spacingAfter = 4,
+  onSpacingChange,
   className
 }: WordToolbarProps) {
   const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
@@ -1413,180 +1440,363 @@ export function WordToolbar({
         {/* ═══════════ TAB 3: PAGE LAYOUT (পেজ লেআউট) ═══════════ */}
         {activeTab === 'layout' && (
           <>
-            {/* 1. Multi-Column Controls (কলাম যোগ করুন - ১ কলাম, ২ কলাম, ৩ কলাম ও মাঝে দাগ) */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={e => e.preventDefault()}
-                  className="h-8 gap-1.5 font-bold text-xs bg-white border-indigo-400 text-indigo-700 hover:bg-indigo-50 shadow-xs"
-                  title="পৃষ্ঠার লেখাগুলো একাধিক কলামে বিভক্ত করুন"
-                >
-                  <Columns2 className="w-4 h-4 text-indigo-600" />
-                  <span>কলাম ({currentColumns === 2 ? '২টি' : currentColumns === 3 ? '৩টি' : '১টি'})</span>
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
-                <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের সংখ্যা নির্বাচন:</div>
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onColumnsChange?.(1, false)} 
-                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 1 && "bg-indigo-50 text-indigo-700")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Square className="w-4 h-4 text-slate-500" />
-                    <span>১টি কলাম (সাধারণ / ফুল পেজ)</span>
-                  </div>
-                  {currentColumns === 1 && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onColumnsChange?.(2, currentColumnRule)} 
-                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 2 && "bg-indigo-50 text-indigo-700")}
-                >
-                  <div className="flex items-center gap-2">
+            {/* GROUP 1: PAGE SETUP (পৃষ্ঠা সেটআপ) */}
+            <div className="flex items-center gap-1.5 pr-2 border-r border-slate-300">
+              <span className="text-[10px] font-black text-slate-400 uppercase hidden xl:inline">সেটআপ:</span>
+
+              {/* 1. Margins */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                    title="পৃষ্ঠার মার্জিন নির্ধারণ করুন"
+                  >
+                    <Square className="w-3.5 h-3.5 text-slate-600" />
+                    <span>মার্জিন</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200">
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('normal')} className="text-xs font-bold cursor-pointer">
+                    সাধারণ (Normal - ০.৫ ইঞ্চি)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('narrow')} className="text-xs font-bold cursor-pointer">
+                    ন্যারো / টাইট (Narrow - ০.২৫ ইঞ্চি)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('moderate')} className="text-xs font-bold cursor-pointer">
+                    মডারেট (Moderate - ০.৭৫ ইঞ্চি)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('wide')} className="text-xs font-bold cursor-pointer">
+                    চওড়া (Wide - ১.০ ইঞ্চি)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* 2. Orientation */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                    title="কাগজের দিকবিন্যাস (Orientation)"
+                  >
+                    {currentOrientation === 'landscape' ? <RectangleHorizontal className="w-4 h-4 text-blue-600" /> : <RectangleVertical className="w-4 h-4 text-blue-600" />}
+                    <span>{currentOrientation === 'landscape' ? 'ল্যান্ডস্কেপ' : 'পোর্ট্রেট'}</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onOrientationChange?.('portrait')} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'portrait' && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <RectangleVertical className="w-4 h-4" />
+                      <span>পোর্ট্রেট (খাড়া পাতা)</span>
+                    </div>
+                    {currentOrientation === 'portrait' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onOrientationChange?.('landscape')} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'landscape' && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <RectangleHorizontal className="w-4 h-4" />
+                      <span>ল্যান্ডস্কেপ (আড়াআড়ি)</span>
+                    </div>
+                    {currentOrientation === 'landscape' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* 3. Page Size */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                    title="কাগজের সাইজ নির্বাচন করুন"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>সাইজ ({currentPageSize.toUpperCase()})</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200">
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onPageSizeChange?.('a4')} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageSize === 'a4' && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div>
+                      <div>A4 (সাধারণ)</div>
+                      <div className="text-[10px] text-slate-400">৮.২৭" × ১১.৬৯"</div>
+                    </div>
+                    {currentPageSize === 'a4' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onPageSizeChange?.('letter')} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageSize === 'letter' && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div>
+                      <div>Letter (লেটার)</div>
+                      <div className="text-[10px] text-slate-400">৮.৫" × ১১.০"</div>
+                    </div>
+                    {currentPageSize === 'letter' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onPageSizeChange?.('legal')} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageSize === 'legal' && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div>
+                      <div>Legal (লিগ্যাল)</div>
+                      <div className="text-[10px] text-slate-400">৮.৫" × ১৪.০"</div>
+                    </div>
+                    {currentPageSize === 'legal' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* 4. Columns */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-indigo-400 text-indigo-700 hover:bg-indigo-50 shadow-xs"
+                    title="পৃষ্ঠার লেখাগুলো একাধিক কলামে বিভক্ত করুন"
+                  >
                     <Columns2 className="w-4 h-4 text-indigo-600" />
-                    <span>২টি কলাম (প্রশ্নপত্র ও লেকচার শিট)</span>
-                  </div>
-                  {currentColumns === 2 && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onColumnsChange?.(3, currentColumnRule)} 
-                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 3 && "bg-indigo-50 text-indigo-700")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Columns3 className="w-4 h-4 text-indigo-600" />
-                    <span>৩টি কলাম (নিউজলেটার / তিন সারি)</span>
-                  </div>
-                  {currentColumns === 3 && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
+                    <span>কলাম ({currentColumns === 2 ? '২টি' : currentColumns === 3 ? '৩টি' : '১টি'})</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-56 bg-white border border-slate-200">
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের সংখ্যা নির্বাচন:</div>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onColumnsChange?.(1, false)} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 1 && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Square className="w-4 h-4 text-slate-500" />
+                      <span>১টি কলাম (সাধারণ / ফুল পেজ)</span>
+                    </div>
+                    {currentColumns === 1 && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onColumnsChange?.(2, currentColumnRule)} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 2 && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Columns2 className="w-4 h-4 text-indigo-600" />
+                      <span>২টি কলাম (প্রশ্নপত্র ও লেকচার শিট)</span>
+                    </div>
+                    {currentColumns === 2 && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onColumnsChange?.(3, currentColumnRule)} 
+                    className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentColumns === 3 && "bg-indigo-50 text-indigo-700")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Columns3 className="w-4 h-4 text-indigo-600" />
+                      <span>৩টি কলাম (নিউজলেটার / তিন সারি)</span>
+                    </div>
+                    {currentColumns === 3 && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
 
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের মাঝে বিভাজক দাগ:</div>
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onColumnsChange?.(currentColumns || 2, !currentColumnRule)} 
-                  className="text-xs font-bold cursor-pointer flex items-center justify-between"
-                >
-                  <span>কলামের মাঝে কালো দাগ (Line Between)</span>
-                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", currentColumnRule ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
-                    {currentColumnRule ? 'চালু আছে' : 'বন্ধ'}
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-[10px] font-black text-slate-500 uppercase">কলামের মাঝে বিভাজক দাগ:</div>
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => onColumnsChange?.(currentColumns || 2, !currentColumnRule)} 
+                    className="text-xs font-bold cursor-pointer flex items-center justify-between"
+                  >
+                    <span>কলামের মাঝে কালো দাগ (Line Between)</span>
+                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", currentColumnRule ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+                      {currentColumnRule ? 'চালু আছে' : 'বন্ধ'}
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* 2. Orientation (পোর্ট্রেট / ল্যান্ডস্কেপ) */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={e => e.preventDefault()}
-                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
-                >
-                  {currentOrientation === 'landscape' ? <RectangleHorizontal className="w-4 h-4 text-blue-600" /> : <RectangleVertical className="w-4 h-4 text-blue-600" />}
-                  <span>{currentOrientation === 'landscape' ? 'ল্যান্ডস্কেপ' : 'পোর্ট্রেট'}</span>
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onOrientationChange?.('portrait')} 
-                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'portrait' && "bg-indigo-50 text-indigo-700")}
-                >
-                  <div className="flex items-center gap-2">
-                    <RectangleVertical className="w-4 h-4" />
-                    <span>পোর্ট্রেট (খাড়া পাতা)</span>
-                  </div>
-                  {currentOrientation === 'portrait' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onMouseDown={e => e.preventDefault()} 
-                  onClick={() => onOrientationChange?.('landscape')} 
-                  className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentOrientation === 'landscape' && "bg-indigo-50 text-indigo-700")}
-                >
-                  <div className="flex items-center gap-2">
-                    <RectangleHorizontal className="w-4 h-4" />
-                    <span>ল্যান্ডস্কেপ (আড়াআড়ি)</span>
-                  </div>
-                  {currentOrientation === 'landscape' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* 5. Breaks (ব্রেক) */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                    title="পেজ বা কলাম ব্রেক যোগ করুন"
+                  >
+                    <Split className="w-3.5 h-3.5 text-purple-600" />
+                    <span>ব্রেক</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200">
+                  <DropdownMenuItem 
+                    onMouseDown={e => e.preventDefault()} 
+                    onClick={() => {
+                      if (onInsertPageBreak) {
+                        onInsertPageBreak();
+                      } else if (onAddPage) {
+                        onAddPage();
+                      }
+                    }} 
+                    className="text-xs font-bold cursor-pointer flex items-center gap-2"
+                  >
+                    <CornerDownLeft className="w-4 h-4 text-purple-600" />
+                    <div>
+                      <div>পৃষ্ঠা ব্রেক (Page Break)</div>
+                      <div className="text-[10px] text-slate-400">কার্সর থেকে নতুন পাতা শুরু করুন</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
-            {/* 3. Margin Presets */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={e => e.preventDefault()}
-                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
-                >
-                  <Square className="w-3.5 h-3.5 text-slate-600" />
-                  <span>মার্জিন প্রিসেট</span>
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-52 bg-white border border-slate-200">
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('normal')} className="text-xs font-bold cursor-pointer">
-                  সাধারণ (Normal - ০.৫ ইঞ্চি)
-                </DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('narrow')} className="text-xs font-bold cursor-pointer">
-                  ন্যারো / টাইট (Narrow - ০.২৫ ইঞ্চি)
-                </DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onMarginPresetChange?.('wide')} className="text-xs font-bold cursor-pointer">
-                  চওড়া (Wide - ১.০ ইঞ্চি)
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1 text-[10px] text-slate-400">
-                  * নির্দিষ্ট পাতার মার্জিন পরিবর্তন করতে বাম সাইডবার ব্যবহার করুন।
+            {/* GROUP 2: PARAGRAPH (প্যারাগ্রাফ ইন্ডেন্ট ও স্পেসিং) */}
+            <div className="flex items-center gap-2 px-2 border-r border-slate-300">
+              <span className="text-[10px] font-black text-slate-400 uppercase hidden xl:inline">প্যারাগ্রাফ:</span>
+              
+              {/* Indent Left & Right */}
+              <div className="flex flex-col gap-0.5 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-600">
+                  <ArrowLeftRight className="w-3 h-3 text-slate-500" />
+                  <span>ইন্ডেন্ট:</span>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => {
+                      exec('outdent');
+                      onIndentChange?.('left', -0.25);
+                    }}
+                    className="h-4 w-4 flex items-center justify-center rounded bg-white hover:bg-slate-200 border border-slate-200 font-black text-xs"
+                    title="বাম ইন্ডেন্ট কমান"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono text-[10px] px-0.5">বাম</span>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => {
+                      exec('indent');
+                      onIndentChange?.('left', 0.25);
+                    }}
+                    className="h-4 w-4 flex items-center justify-center rounded bg-white hover:bg-slate-200 border border-slate-200 font-black text-xs"
+                    title="বাম ইন্ডেন্ট বাড়ান"
+                  >
+                    +
+                  </button>
                 </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </div>
 
-            {/* 4. Page Border Style */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={e => e.preventDefault()}
-                  className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
-                >
-                  <Square className="w-3.5 h-3.5 text-purple-600" />
-                  <span>পেজ বর্ডার</span>
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('none')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'none' && "bg-indigo-50")}>
-                  <span>বর্ডার ছাড়া (None)</span>
-                  {currentPageBorder === 'none' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('thin')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'thin' && "bg-indigo-50")}>
-                  <span>চিকন বর্ডার (Thin)</span>
-                  {currentPageBorder === 'thin' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('double')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'double' && "bg-indigo-50")}>
-                  <span>ডাবল বর্ডার (Double)</span>
-                  {currentPageBorder === 'double' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('box')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'box' && "bg-indigo-50")}>
-                  <span>বক্স ফ্রেম (Box)</span>
-                  {currentPageBorder === 'box' && <Check className="w-3.5 h-3.5" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* Spacing Before & After */}
+              <div className="flex flex-col gap-0.5 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-600">
+                  <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                  <span>স্পেসিং:</span>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => onSpacingChange?.('after', -2)}
+                    className="h-4 w-4 flex items-center justify-center rounded bg-white hover:bg-slate-200 border border-slate-200 font-black text-xs"
+                    title="প্যারাগ্রাফের পরে ফাঁকা জায়গা কমান"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono text-[10px] px-0.5">ফাঁকা</span>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => onSpacingChange?.('after', 2)}
+                    className="h-4 w-4 flex items-center justify-center rounded bg-white hover:bg-slate-200 border border-slate-200 font-black text-xs"
+                    title="প্যারাগ্রাফের পরে ফাঁকা জায়গা বাড়ান"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* GROUP 3: VIEW & RULER (ভিউ ও রুলার) */}
+            <div className="flex items-center gap-1.5 px-2 border-r border-slate-300">
+              {/* Ruler Toggle Button */}
+              <Button
+                type="button"
+                variant={showRuler ? "default" : "outline"}
+                size="sm"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => onToggleRuler?.()}
+                className={cn(
+                  "h-8 gap-1.5 font-bold text-xs shadow-xs",
+                  showRuler ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
+                )}
+                title="কাগজের উপরে অনুভূমিক রুলার চালু বা বন্ধ করুন"
+              >
+                <Ruler className="w-3.5 h-3.5" />
+                <span>রুলার</span>
+                {showRuler && <span className="text-[10px] bg-white/20 px-1 rounded">অন</span>}
+              </Button>
+
+              {/* Page Border Style */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onMouseDown={e => e.preventDefault()}
+                    className="h-8 gap-1.5 font-bold text-xs bg-white border-slate-300 hover:bg-slate-100 shadow-xs"
+                    title="কাগজের বর্ডার বা ফ্রেম নির্ধারণ করুন"
+                  >
+                    <Square className="w-3.5 h-3.5 text-purple-600" />
+                    <span>পেজ বর্ডার</span>
+                    <ChevronDown className="w-3 h-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="font-kalpurush w-44 bg-white border border-slate-200">
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('none')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'none' && "bg-indigo-50")}>
+                    <span>বর্ডার ছাড়া (None)</span>
+                    {currentPageBorder === 'none' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('thin')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'thin' && "bg-indigo-50")}>
+                    <span>চিকন বর্ডার (Thin)</span>
+                    {currentPageBorder === 'thin' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('double')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'double' && "bg-indigo-50")}>
+                    <span>ডাবল বর্ডার (Double)</span>
+                    {currentPageBorder === 'double' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onMouseDown={e => e.preventDefault()} onClick={() => onPageBorderChange?.('box')} className={cn("text-xs font-bold cursor-pointer flex items-center justify-between", currentPageBorder === 'box' && "bg-indigo-50")}>
+                    <span>বক্স ফ্রেম (Box)</span>
+                    {currentPageBorder === 'box' && <Check className="w-3.5 h-3.5" />}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Table Layout Controls */}
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">

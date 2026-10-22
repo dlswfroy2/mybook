@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback, Fragment } from 'react';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -146,7 +146,10 @@ function formatMath(text: string): string {
     return text;
   }
 
-  // Convert $$ ... $$ (display math) with output: 'html' (prevents unstyled MathML stacking)
+  // Decode common HTML entities that might interfere with LaTeX math (<, >, &)
+  text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+  // 1. Convert $$ ... $$ (display math) with output: 'html' (prevents unstyled MathML stacking)
   text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
@@ -155,7 +158,7 @@ function formatMath(text: string): string {
     }
   });
 
-  // Convert $ ... $ (inline math) with output: 'html'
+  // 2. Convert $ ... $ (inline math) with output: 'html'
   text = text.replace(/\$([^$\n]+?)\$/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
@@ -164,7 +167,7 @@ function formatMath(text: string): string {
     }
   });
 
-  // Convert \[ ... \] and \( ... \)
+  // 3. Convert \[ ... \] and \( ... \)
   text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
@@ -180,34 +183,70 @@ function formatMath(text: string): string {
     }
   });
 
-  // Convert standalone \frac{...}{...}
-  if (/\\frac\{/.test(text)) {
-    text = text.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (_, num, den) => {
-      try {
-        return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
-      } catch {
-        return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
-      }
-    });
-  }
+  // 4. Convert \left( ... \right) with exponents and operators without $
+  const leftRightRegex = /\\left\([\s\S]*?\\right\)(?:\^\{[^}]+\}|\^[\w\d-]+)?(?:\s*(?:\\times|\\cdot|\+|-|\/|\*|=)\s*(?:\\left\([\s\S]*?\\right\)(?:\^\{[^}]+\}|\^[\w\d-]+)?|[0-9a-zA-Z\\]+))*(?:\s*=\s*[0-9a-zA-Z]+)?/g;
+  text = text.replace(leftRightRegex, (math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return math;
+    }
+  });
 
-  // Convert standalone \sqrt
-  if (/\\sqrt/.test(text)) {
-    text = text.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, (_, root, val) => {
-      try {
-        return katex.renderToString(`\\sqrt[${root}]{${val}}`, { throwOnError: false, displayMode: false, output: 'html' });
-      } catch {
-        return `<sup>${root}</sup>√<span>${val}</span>`;
-      }
-    });
-    text = text.replace(/\\sqrt\{([^}]+)\}/g, (_, val) => {
-      try {
-        return katex.renderToString(`\\sqrt{${val}}`, { throwOnError: false, displayMode: false, output: 'html' });
-      } catch {
-        return `√<span>${val}</span>`;
-      }
-    });
-  }
+  // 5. Letter with complex exponent, e.g. A^{\frac{1}{pq}} \times B^{\frac{1}{qr}} \times C^{\frac{1}{rp}} = 1
+  const letterFracExpRegex = /[A-Za-z]\^\{[^{}]*(?:\\frac\{[^{}]+\}\{[^{}]+\}[^{}]*)*\}(?:\s*(?:\\times|\\cdot|\+|-|\*|=)\s*[A-Za-z]\^\{[^{}]*(?:\\frac\{[^{}]+\}\{[^{}]+\}[^{}]*)*\})*(?:\s*=\s*[0-9a-zA-Z]+)?/g;
+  text = text.replace(letterFracExpRegex, (math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return math;
+    }
+  });
+
+  // 6. Standalone or chained \sqrt expressions, e.g. \sqrt[3]{7^2} \cdot \sqrt[3]{7}
+  const sqrtChainedRegex = /\\sqrt(?:\[[^\]]+\])?\{[^}]+\}(?:\s*(?:\\cdot|\\times|\+|-|\/|\*|=)\s*\\sqrt(?:\[[^\]]+\])?\{[^}]+\})*/g;
+  text = text.replace(sqrtChainedRegex, (math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return math;
+    }
+  });
+
+  // 7. Convert standalone \frac{...}{...}
+  text = text.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (match, num, den) => {
+    try {
+      return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
+    }
+  });
+
+  // 8. Standalone \log expressions: \log_a M, \log_a(M \times N), etc.
+  const logRegex = /\\log(?:_[a-zA-Z0-9]+|_\{[^}]+\})?(?:\s*(?:\([^)]+\)|[a-zA-Z0-9]+))?(?:\s*(?:=|\+|-|\*|\/|\\times|\\cdot)\s*\\log(?:_[a-zA-Z0-9]+|_\{[^}]+\})?(?:\s*(?:\([^)]+\)|[a-zA-Z0-9]+))?)*/g;
+  text = text.replace(logRegex, (match) => {
+    if (!match.includes('\\log')) return match;
+    try {
+      return katex.renderToString(match.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return match;
+    }
+  });
+
+  // 9. Clean up any leftover standalone LaTeX commands so raw code never leaks to the UI
+  text = text
+    .replace(/\\times/g, ' × ')
+    .replace(/\\cdot/g, ' · ')
+    .replace(/\\div/g, ' ÷ ')
+    .replace(/\\pm/g, ' ± ')
+    .replace(/\\neq/g, ' ≠ ')
+    .replace(/\\ne(?![a-zA-Z])/g, ' ≠ ')
+    .replace(/\\ge(?![a-zA-Z])/g, ' ≥ ')
+    .replace(/\\le(?![a-zA-Z])/g, ' ≤ ')
+    .replace(/\\in(?![a-zA-Z])/g, ' ∈ ')
+    .replace(/\\mathbb\{N\}/g, 'ℕ')
+    .replace(/\\mathbb\{R\}/g, 'ℝ')
+    .replace(/\\mathbb\{Z\}/g, 'ℤ');
 
   return text;
 }
@@ -288,6 +327,184 @@ function setCursor(el: HTMLElement, position: 'start' | 'end') {
   sel.addRange(range);
 }
 
+// Accurately measure the bottom of content inside a container (works even when clientHeight is fixed)
+function getContentBottom(el: HTMLElement): number {
+  if (el.childNodes.length === 0) return 0;
+  let maxBottom = 0;
+  for (let i = 0; i < el.children.length; i++) {
+    const child = el.children[i] as HTMLElement;
+    const childRect = child.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const bottom = childRect.bottom - elRect.top;
+    if (bottom > maxBottom) maxBottom = bottom;
+  }
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const rect = range.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const rangeBottom = rect.bottom - elRect.top;
+    if (rangeBottom > maxBottom) maxBottom = rangeBottom;
+  } catch {}
+  return maxBottom;
+}
+
+interface WordRulerProps {
+  paperWidthInches: number;
+  marginLeft: number;
+  marginRight: number;
+  zoomLevel: number;
+  onMarginChange: (left: number, right: number) => void;
+}
+
+function WordRuler({
+  paperWidthInches,
+  marginLeft,
+  marginRight,
+  zoomLevel,
+  onMarginChange,
+}: WordRulerProps) {
+  const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+
+  const totalInches = Math.floor(paperWidthInches);
+
+  const handleMouseDown = (type: 'left' | 'right', e: React.MouseEvent) => {
+    e.preventDefault();
+    setDragging(type);
+
+    const startX = e.clientX;
+    const startLeft = marginLeft;
+    const startRight = marginRight;
+
+    const handleMouseMove = (moveEvt: MouseEvent) => {
+      const zoomFactor = (zoomLevel || 100) / 100;
+      const deltaX = (moveEvt.clientX - startX) / zoomFactor;
+      const deltaInches = deltaX / 96;
+
+      if (type === 'left') {
+        const rawNewLeft = Math.round((startLeft + deltaInches) * 16) / 16;
+        const newLeft = Math.max(0.125, Math.min(paperWidthInches - marginRight - 1.0, rawNewLeft));
+        onMarginChange(newLeft, marginRight);
+      } else {
+        const rawNewRight = Math.round((startRight - deltaInches) * 16) / 16;
+        const newRight = Math.max(0.125, Math.min(paperWidthInches - marginLeft - 1.0, rawNewRight));
+        onMarginChange(marginLeft, newRight);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDragging(null);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <div
+      className="relative h-7 bg-slate-200 border border-slate-300 select-none shadow-xs text-slate-700 font-mono text-[9px] overflow-hidden rounded-t"
+      style={{ width: `${paperWidthInches}in` }}
+    >
+      {/* 1. Left Margin Shaded Area */}
+      <div
+        className="absolute top-0 bottom-0 left-0 bg-slate-300 border-r border-slate-400"
+        style={{ width: `${marginLeft}in` }}
+      />
+
+      {/* 2. Printable Center Area (White) */}
+      <div
+        className="absolute top-0 bottom-0 bg-white"
+        style={{ left: `${marginLeft}in`, right: `${marginRight}in` }}
+      />
+
+      {/* 3. Right Margin Shaded Area */}
+      <div
+        className="absolute top-0 bottom-0 right-0 bg-slate-300 border-l border-slate-400"
+        style={{ width: `${marginRight}in` }}
+      />
+
+      {/* 4. Inch Marks & Subdivisions */}
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: totalInches + 1 }).map((_, inch) => (
+          <React.Fragment key={inch}>
+            {/* Major 1-inch tick mark */}
+            <div
+              className="absolute top-0 w-px bg-slate-500 h-3"
+              style={{ left: `${inch}in` }}
+            />
+            {inch < totalInches && (
+              <span
+                className="absolute top-3 font-bold -translate-x-1/2 text-slate-700 text-[9px]"
+                style={{ left: `${inch + 1}in` }}
+              >
+                {inch + 1}
+              </span>
+            )}
+            {/* 1/2 inch */}
+            {inch + 0.5 < paperWidthInches && (
+              <div
+                className="absolute top-0 w-px bg-slate-400 h-2"
+                style={{ left: `${inch + 0.5}in` }}
+              />
+            )}
+            {/* 1/4 and 3/4 inch */}
+            {inch + 0.25 < paperWidthInches && (
+              <div
+                className="absolute top-0 w-px bg-slate-300 h-1.5"
+                style={{ left: `${inch + 0.25}in` }}
+              />
+            )}
+            {inch + 0.75 < paperWidthInches && (
+              <div
+                className="absolute top-0 w-px bg-slate-300 h-1.5"
+                style={{ left: `${inch + 0.75}in` }}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* 5. Left Margin Interactive Slider Marker */}
+      <div
+        onMouseDown={(e) => handleMouseDown('left', e)}
+        className="absolute top-0 bottom-0 z-20 cursor-ew-resize group -ml-2 w-4 flex flex-col items-center justify-between"
+        style={{ left: `${marginLeft}in` }}
+        title={`বাম মার্জিন: ${marginLeft.toFixed(2)} ইঞ্চি (টেনে মার্জিন পরিবর্তন করুন)`}
+      >
+        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-indigo-700 drop-shadow-xs" />
+        <div className="w-0.5 h-2 bg-indigo-600 rounded-full" />
+        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-indigo-700 drop-shadow-xs" />
+
+        {dragging === 'left' && (
+          <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[10px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 pointer-events-none">
+            বাম: {marginLeft.toFixed(2)}"
+          </div>
+        )}
+      </div>
+
+      {/* 6. Right Margin Interactive Slider Marker */}
+      <div
+        onMouseDown={(e) => handleMouseDown('right', e)}
+        className="absolute top-0 bottom-0 z-20 cursor-ew-resize group -mr-2 w-4 flex flex-col items-center justify-between"
+        style={{ right: `${marginRight}in` }}
+        title={`ডান মার্জিন: ${marginRight.toFixed(2)} ইঞ্চি (টেনে মার্জিন পরিবর্তন করুন)`}
+      >
+        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[6px] border-t-indigo-700 drop-shadow-xs" />
+        <div className="w-0.5 h-2 bg-indigo-600 rounded-full" />
+        <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px] border-b-indigo-700 drop-shadow-xs" />
+
+        {dragging === 'right' && (
+          <div className="absolute top-7 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[10px] px-1.5 py-0.5 rounded shadow whitespace-nowrap z-50 pointer-events-none">
+            ডান: {marginRight.toFixed(2)}"
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface EditableContentAreaProps {
   initialHtml: string;
   style: any;
@@ -351,11 +568,12 @@ function EditableContentArea({
       }
 
       // 1. OVERFLOW: content exceeds available page clientHeight
-      if (el.scrollHeight > maxH + 3) {
+      const currentBottom = getContentBottom(el);
+      if (el.scrollHeight > maxH + 3 || currentBottom > maxH + 3) {
         const overflowNodes: Node[] = [];
 
         // Remove last child nodes until content fits inside maxH
-        while (el.scrollHeight > maxH + 3 && el.childNodes.length > 1) {
+        while ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && el.childNodes.length > 1) {
           const last = el.lastChild;
           if (!last) break;
           el.removeChild(last);
@@ -363,11 +581,11 @@ function EditableContentArea({
         }
 
         // If single large child remains and still overflows (e.g. a large div or table), extract its child nodes
-        if (el.scrollHeight > maxH + 3 && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
+        if ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
           const onlyChild = el.firstChild as HTMLElement;
           if (onlyChild.childNodes.length > 1) {
             const innerOverflow: Node[] = [];
-            while (el.scrollHeight > maxH + 3 && onlyChild.childNodes.length > 1) {
+            while ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && onlyChild.childNodes.length > 1) {
               const last = onlyChild.lastChild;
               if (!last) break;
               onlyChild.removeChild(last);
@@ -405,33 +623,55 @@ function EditableContentArea({
           }
         }
       }
-      // 2. UNDERFLOW: empty space available in this page, pull up from next page (ONLY when allowed, e.g. after Backspace/Delete)
-      else if (allowUnderflow && maxH - el.scrollHeight > 35) {
-        const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
-        if (nextEl && nextEl.childNodes.length > 0) {
-          let movedCount = 0;
-          while (nextEl.childNodes.length > 0 && maxH - el.scrollHeight > 15) {
-            const firstNode = nextEl.firstChild!;
-            el.appendChild(firstNode);
-            if (el.scrollHeight > maxH + 2) {
-              // Exceeded, put back
-              nextEl.insertBefore(firstNode, nextEl.firstChild);
-              break;
-            }
-            movedCount++;
-          }
-          if (movedCount > 0) {
-            onSyncPageContent(pageIndex, el.innerHTML);
-            onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
-            // If next page is completely empty and it is the last page, remove it
-            if (nextEl.innerText.trim() === '' && nextEl.innerHTML.replace(/<[^>]*>/g, '').trim() === '') {
-              if (pageIndex + 1 === totalPages - 1 && totalPages > 1) {
-                onRemoveEmptyPage(pageIndex + 1);
+      // 2. UNDERFLOW: empty space available in this page, pull up from next page
+      else if (allowUnderflow) {
+        const curBottom = getContentBottom(el);
+        const availableSpace = maxH - curBottom;
+        if (availableSpace > 30) {
+          const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
+          if (nextEl && nextEl.childNodes.length > 0) {
+            // If nextEl content is wrapped in a single container element, unwrap it first
+            if (nextEl.childNodes.length === 1 && nextEl.firstChild && nextEl.firstChild.nodeType === Node.ELEMENT_NODE) {
+              const wrapper = nextEl.firstChild as HTMLElement;
+              if (wrapper.tagName === 'DIV' || wrapper.tagName === 'SECTION' || wrapper.tagName === 'ARTICLE') {
+                if (wrapper.childNodes.length > 1) {
+                  while (wrapper.firstChild) {
+                    nextEl.insertBefore(wrapper.firstChild, wrapper);
+                  }
+                  nextEl.removeChild(wrapper);
+                }
               }
-            } else {
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
-              }, 30);
+            }
+
+            let movedCount = 0;
+            while (nextEl.childNodes.length > 0) {
+              const firstNode = nextEl.firstChild!;
+              el.appendChild(firstNode);
+              const newBottom = getContentBottom(el);
+              if (newBottom > maxH + 2 || el.scrollHeight > maxH + 2) {
+                // Exceeded page capacity, put back to nextEl
+                nextEl.insertBefore(firstNode, nextEl.firstChild);
+                break;
+              }
+              movedCount++;
+              if (maxH - newBottom < 15) {
+                break;
+              }
+            }
+            if (movedCount > 0) {
+              onSyncPageContent(pageIndex, el.innerHTML);
+              onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
+              const nextText = nextEl.innerText?.trim() || '';
+              const nextHtmlClean = nextEl.innerHTML.replace(/<[^>]*>/g, '').trim();
+              if (nextText === '' && nextHtmlClean === '' && nextEl.querySelectorAll('img, table').length === 0) {
+                if (totalPages > 1) {
+                  onRemoveEmptyPage(pageIndex + 1);
+                }
+              } else {
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
+                }, 30);
+              }
             }
           }
         }
@@ -468,7 +708,6 @@ function EditableContentArea({
 
   // plain text থেকে LaTeX সহ HTML তৈরি করে (KaTeX render সহ, output: 'html')
   const renderMathInText = (text: string): string => {
-    // Clean any broken artifacts from text
     let clean = text
       .replace(/<=""\s*span="">/gi, '')
       .replace(/<\/span">/gi, '')
@@ -477,48 +716,8 @@ function EditableContentArea({
     const lines = clean.split('\n');
     const htmlLines = lines.map((line) => {
       if (line.trim() === '') return '<p style="margin:0 0 4px 0;padding:0"><br/></p>';
-      // $$ ... $$ (display math)
-      line = line.replace(/\$\$(.+?)\$\$/g, (_, math) => {
-        try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
-        } catch {
-          return `<span>$$${math}$$</span>`;
-        }
-      });
-      // $ ... $ (inline math)
-      line = line.replace(/\$([^$\n]+?)\$/g, (_, math) => {
-        try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
-        } catch {
-          return `<span>$${math}$</span>`;
-        }
-      });
-      // \[ ... \] and \( ... \)
-      line = line.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
-        try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
-        } catch {
-          return math;
-        }
-      });
-      line = line.replace(/\\\(([\s\S]+?)\\\)/g, (_, math) => {
-        try {
-          return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
-        } catch {
-          return math;
-        }
-      });
-      // Standalone \frac without $
-      if (/\\frac\{/.test(line)) {
-        line = line.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (_, num, den) => {
-          try {
-            return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
-          } catch {
-            return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
-          }
-        });
-      }
-      return `<p style="margin:0 0 4px 0;padding:0">${line}</p>`;
+      const formatted = formatMath(line);
+      return `<p style="margin:0 0 4px 0;padding:0">${formatted}</p>`;
     });
     return htmlLines.join('');
   };
@@ -536,16 +735,17 @@ function EditableContentArea({
     range.deleteContents();
 
     const isGemini = htmlData && (htmlData.includes('data-index-in-node') || htmlData.includes('line-height: 1.15'));
+    const hasMath = /\$|\\frac|\\sqrt|\\left|\\right|\\times|\\cdot|\\log|\\pm|\\ge|\\le|\\ne|\\in|\\mathbb|\^[0-9a-zA-Z{]/.test(plainText || '');
 
-    // 1. If text has LaTeX ($...$ or \[...\] or \frac) OR is from Gemini: ALWAYS use plainText + KaTeX
-    if (plainText && (isGemini || /\$/.test(plainText) || /\\frac\{/.test(plainText) || /\\sqrt/.test(plainText) || /\\times/.test(plainText))) {
+    // 1. If text has LaTeX ($...$ or \[...\] or \frac, \left, etc.) OR is from Gemini: ALWAYS use plainText + KaTeX
+    if (plainText && (isGemini || hasMath)) {
       const renderedHtml = renderMathInText(plainText);
       const fragment = range.createContextualFragment(renderedHtml);
       range.insertNode(fragment);
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(false), 40);
+      setTimeout(() => checkAndReflow(true), 40);
       return;
     }
 
@@ -557,7 +757,7 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(false), 40);
+      setTimeout(() => checkAndReflow(true), 40);
       return;
     }
 
@@ -575,15 +775,15 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(false), 40);
+      setTimeout(() => checkAndReflow(true), 40);
     }
   };
 
   const handleInput = () => {
     if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
     inputTimerRef.current = setTimeout(() => {
-      checkAndReflow();
-    }, 150);
+      checkAndReflow(true);
+    }, 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -710,12 +910,18 @@ function EditableContentArea({
         }
         return;
       }
-      setTimeout(() => checkAndReflow(true), 100);
+      setTimeout(() => checkAndReflow(true), 60);
       return;
     }
 
+    // 6. Delete key -> pull up text if at end of page or deleting content
     if (e.key === 'Delete') {
-      setTimeout(() => checkAndReflow(true), 100);
+      if (isCursorAtEnd(el) && pageIndex < totalPages - 1) {
+        e.preventDefault();
+        checkAndReflow(true);
+        return;
+      }
+      setTimeout(() => checkAndReflow(true), 60);
     }
   };
 
@@ -728,6 +934,9 @@ function EditableContentArea({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onInput={handleInput}
+      onCut={() => {
+        setTimeout(() => checkAndReflow(true), 60);
+      }}
       onPaste={handlePaste}
       onBlur={(e) => {
         const val = e.currentTarget.innerHTML;
@@ -894,6 +1103,7 @@ function CreateLectureSheetContent() {
   const [fontSizeDraft, setFontSizeDraft] = useState("");
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [showRuler, setShowRuler] = useState(true);
 
   useEffect(() => {
     if (!editId) {
@@ -1797,6 +2007,25 @@ function CreateLectureSheetContent() {
                 });
               }
             }}
+            showRuler={showRuler}
+            onToggleRuler={() => setShowRuler(prev => !prev)}
+            currentPageSize={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.pageSize || 'a4'}
+            onPageSizeChange={(size) => {
+              if (activeEditIdx !== null) {
+                updatePageStyle(activeEditIdx, 'pageSize', size);
+              } else {
+                paginatedPages.forEach((_, i) => {
+                  updatePageStyle(i, 'pageSize', size);
+                });
+              }
+            }}
+            onInsertPageBreak={() => {
+              handleAddNextPage('<p><br/></p>');
+              setTimeout(() => {
+                const nextIdx = (activeEditIdx !== null ? activeEditIdx : 0) + 1;
+                handleFocusPage(nextIdx, 'start');
+              }, 60);
+            }}
           />
           <div className="flex-1 flex overflow-hidden">
             <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
@@ -1870,13 +2099,51 @@ function CreateLectureSheetContent() {
                  </div>
                </div>
             </aside>
-            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-12 pb-12 flex flex-col items-center gap-10 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
+            <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 pt-6 pb-12 flex flex-col items-center gap-8 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
+               {/* Horizontal Interactive Word Ruler */}
+               {showRuler && (
+                 <div className="no-print sticky top-0 z-30 pb-2 flex justify-center w-full">
+                   {(() => {
+                     const curStyle = pageStyles[activeEditIdx !== null ? activeEditIdx : 0] || {};
+                     const isLand = curStyle.orientation === 'landscape';
+                     const pSize = curStyle.pageSize || 'a4';
+                     const bW = pSize === 'letter' ? 8.5 : pSize === 'legal' ? 8.5 : 8.27;
+                     const bH = pSize === 'letter' ? 11.0 : pSize === 'legal' ? 14.0 : 11.69;
+                     const rulerWidth = isLand ? bH : bW;
+                     const curL = parseFloat(String(curStyle.mL ?? printSettings.marginLeft)) || 0.5;
+                     const curR = parseFloat(String(curStyle.mR ?? printSettings.marginRight)) || 0.5;
+                     return (
+                       <WordRuler
+                         paperWidthInches={rulerWidth}
+                         marginLeft={curL}
+                         marginRight={curR}
+                         zoomLevel={previewZoom}
+                         onMarginChange={(newLeft, newRight) => {
+                           if (activeEditIdx !== null) {
+                             updatePageStyle(activeEditIdx, 'mL', newLeft);
+                             updatePageStyle(activeEditIdx, 'mR', newRight);
+                           } else {
+                             setPrintSettings((p: any) => ({ ...p, marginLeft: newLeft, marginRight: newRight }));
+                             paginatedPages.forEach((_, i) => {
+                               updatePageStyle(i, 'mL', newLeft);
+                               updatePageStyle(i, 'mR', newRight);
+                             });
+                           }
+                         }}
+                       />
+                     );
+                   })()}
+                 </div>
+               )}
                {paginatedPages.map((pageHtml, idx) => {
-                 const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5 };
+                 const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, pageSize: 'a4' };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
                  const isLandscape = style.orientation === 'landscape';
-                 const pWidth = isLandscape ? '11.69in' : '8.27in';
-                 const pHeight = isLandscape ? '8.27in' : '11.69in';
+                 const pSize = style.pageSize || 'a4';
+                 const baseWidth = pSize === 'letter' ? 8.5 : pSize === 'legal' ? 8.5 : 8.27;
+                 const baseHeight = pSize === 'letter' ? 11.0 : pSize === 'legal' ? 14.0 : 11.69;
+                 const pWidth = isLandscape ? `${baseHeight}in` : `${baseWidth}in`;
+                 const pHeight = isLandscape ? `${baseWidth}in` : `${baseHeight}in`;
                  const borderCss = style.border === 'thin' ? '1.5px solid #000' :
                                    style.border === 'double' ? '3.5px double #000' :
                                    style.border === 'box' ? '2.5px solid #1e293b' : undefined;
