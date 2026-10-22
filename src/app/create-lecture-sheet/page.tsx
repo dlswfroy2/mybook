@@ -160,7 +160,119 @@ function stripDirtyHtml(html: string): string {
     }
   });
 
+  // 5. Convert <li> inside lists to independent controllable <p> with margin-left
+  tmp.querySelectorAll('ul, ol').forEach((list) => {
+    if (list.closest('table')) return;
+    const frag = document.createDocumentFragment();
+    list.querySelectorAll('li').forEach((li) => {
+      const p = document.createElement('p');
+      p.style.margin = '0 0 4px 0';
+      p.style.marginLeft = '0.35in';
+      p.innerHTML = li.innerHTML;
+      frag.appendChild(p);
+    });
+    if (frag.childNodes.length > 0) {
+      list.parentNode?.replaceChild(frag, list);
+    }
+  });
+
+  // 6. Convert blockquotes to independent <p> with margin-left
+  tmp.querySelectorAll('blockquote').forEach((bq) => {
+    const frag = document.createDocumentFragment();
+    Array.from(bq.childNodes).forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        (child as HTMLElement).style.marginLeft = '0.35in';
+        frag.appendChild(child);
+      } else if (child.textContent?.trim()) {
+        const p = document.createElement('p');
+        p.style.margin = '0 0 4px 0';
+        p.style.marginLeft = '0.35in';
+        p.textContent = child.textContent;
+        frag.appendChild(p);
+      }
+    });
+    if (frag.childNodes.length > 0) {
+      bq.parentNode?.replaceChild(frag, bq);
+    }
+  });
+
+  // 7. Convert Gemini leading non-breaking spaces or tabs into clean, adjustable margin-left
+  tmp.querySelectorAll('p, div').forEach((block) => {
+    if (block.closest('table') || block.closest('.katex') || block.closest('.math-frac')) return;
+    const match = block.innerHTML.match(/^([\s\t]|&nbsp;|&emsp;|&ensp;|\u00A0|\u2003)+/i);
+    if (match && match[0].length >= 2) {
+      const currentMl = parseFloat((block as HTMLElement).style.marginLeft || '0') || 0;
+      if (currentMl === 0) {
+        (block as HTMLElement).style.marginLeft = '0.35in';
+      }
+      block.innerHTML = block.innerHTML.replace(/^([\s\t]|&nbsp;|&emsp;|&ensp;|\u00A0|\u2003)+/i, '');
+    }
+  });
+
   return tmp.innerHTML;
+}
+
+// যে-কোনো প্যারাগ্রাফ বা ব্লককে সব ধরণের স্পেস, মার্জিন ও প্যাডিং মুছে ০ মার্জিনে রিসেট করার পাওয়ারফুল হেল্পার
+function resetBlockToZero(block: HTMLElement, contentArea?: HTMLElement | null): HTMLElement {
+  let target = block;
+
+  // ১. যদি ব্লকটি <li> হয়, সেটিকে মুক্ত ও স্বাধীন <p> ট্যাগে রূপান্তর করুন
+  if (target.tagName === 'LI') {
+    const parentList = target.closest('ul, ol');
+    const p = document.createElement('p');
+    p.style.margin = '0 0 4px 0';
+    p.innerHTML = target.innerHTML;
+    if (parentList) {
+      if (contentArea && parentList.parentElement === contentArea && parentList.children.length === 1) {
+        contentArea.replaceChild(p, parentList);
+      } else {
+        parentList.parentNode?.insertBefore(p, parentList);
+        target.remove();
+      }
+    } else {
+      target.parentNode?.replaceChild(p, target);
+    }
+    target = p;
+  }
+
+  // ২. ইনলাইন সব মার্জিন ও প্যাডিং ০ করুন
+  target.style.marginLeft = '';
+  target.style.paddingLeft = '';
+  target.style.textIndent = '';
+  target.style.marginInlineStart = '';
+  target.style.paddingInlineStart = '';
+
+  // ৩. প্যারেন্ট কোনো র‍্যাপার থাকলে (যেমন blockquote বা div) তারও মার্জিন ০ করুন
+  let pNode = target.parentElement;
+  while (pNode && pNode !== contentArea && pNode.tagName !== 'BODY') {
+    pNode.style.marginLeft = '';
+    pNode.style.paddingLeft = '';
+    pNode.style.textIndent = '';
+    pNode.style.marginInlineStart = '';
+    pNode.style.paddingInlineStart = '';
+    pNode = pNode.parentElement;
+  }
+
+  // ৪. সব ধরণের ইউনিকোড স্পেস, &nbsp;, &emsp;, ট্যাব, ফাঁকা স্প্যান মুছে ফেলুন
+  const spaceRegex = /^([\s\t\r\n]|&nbsp;|&emsp;|&ensp;|&#160;|&#8195;|&#8194;|\u00A0|\u2000|\u2001|\u2002|\u2003|\u2004|\u2005|\u2006|\u2007|\u2008|\u2009|\u200A|\u3000)+/gi;
+  target.innerHTML = target.innerHTML
+    .replace(spaceRegex, '')
+    .replace(/^<span[^>]*>([\s\t]|&nbsp;|&emsp;|\u00A0)*<\/span>/gi, '')
+    .replace(spaceRegex, '');
+
+  // ৫. চাইল্ড নোডগুলোতেও মার্জিন সাফ করুন
+  target.querySelectorAll('*').forEach((child) => {
+    const cel = child as HTMLElement;
+    if (cel.style) {
+      if (cel.style.marginLeft) cel.style.marginLeft = '';
+      if (cel.style.paddingLeft) cel.style.paddingLeft = '';
+      if (cel.style.textIndent) cel.style.textIndent = '';
+      if (cel.style.marginInlineStart) cel.style.marginInlineStart = '';
+      if (cel.style.paddingInlineStart) cel.style.paddingInlineStart = '';
+    }
+  });
+
+  return target;
 }
 
 function repairLatex(math: string): string {
@@ -434,6 +546,7 @@ interface WordRulerProps {
   tabStops?: number[];
   onTabStopsChange?: (stops: number[]) => void;
   activeLineIndent?: number; // কারসর থাকা লাইনের ইন্ডেন্ট (ইঞ্চি)
+  activeRulerPos?: number; // ডকুমেন্টে কারসর লাইনের এক্সাক্ট রুলার অবস্থান (ইঞ্চি)
   onLineIndentChange?: (newIndentInches: number) => void;
 }
 
@@ -446,6 +559,7 @@ function WordRuler({
   tabStops = [],
   onTabStopsChange = () => {},
   activeLineIndent = 0,
+  activeRulerPos,
   onLineIndentChange = () => {},
 }: WordRulerProps) {
   const rulerRef = useRef<HTMLDivElement>(null);
@@ -454,6 +568,9 @@ function WordRuler({
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const totalInches = Math.floor(paperWidthInches);
+  const effectiveRulerPos = (typeof activeRulerPos === 'number' && activeRulerPos > 0)
+    ? activeRulerPos
+    : (marginLeft + activeLineIndent);
 
   // Click on ruler to add a new Tab Stop 'L' point & move current line to that point
   const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -522,6 +639,7 @@ function WordRuler({
     setDragging('lineIndent');
 
     const startX = e.clientX;
+    const startRulerPos = effectiveRulerPos;
     const startIndent = activeLineIndent;
 
     const onMove = (moveEvt: MouseEvent) => {
@@ -534,7 +652,8 @@ function WordRuler({
       const newIndent = Math.max(0, Math.min(maxAllowed, rawNewIndent));
 
       onLineIndentChange(newIndent);
-      setActiveTooltip(`কারসর লাইন ইন্ডেন্ট: ${newIndent.toFixed(2)}"`);
+      const displayPos = Math.max(marginLeft, Math.round((startRulerPos + (newIndent - startIndent)) * 16) / 16);
+      setActiveTooltip(`কারসর লাইনের 'L' অবস্থান: ${displayPos.toFixed(2)}"`);
       setGuideX(moveEvt.clientX);
     };
 
@@ -723,8 +842,8 @@ function WordRuler({
         <div
           onMouseDown={handleMouseDownLineIndent}
           className="absolute bottom-0 z-40 cursor-ew-resize group -ml-2 w-5 h-6 flex flex-col items-center justify-end select-none"
-          style={{ left: `${marginLeft + activeLineIndent}in` }}
-          title={`কারসর লাইনের 'L' অবস্থান: ${(marginLeft + activeLineIndent).toFixed(2)}" (টেনে কারসর থাকা লাইনটি সামনে/পিছনে সরান)`}
+          style={{ left: `${effectiveRulerPos}in` }}
+          title={`কারসর লাইনের 'L' অবস্থান: ${effectiveRulerPos.toFixed(2)}" (টেনে কারসর থাকা লাইনটি সামনে/পিছনে সরান)`}
         >
           {/* Top Downward pointer */}
           <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[5px] border-t-amber-300 drop-shadow group-hover:border-t-amber-400 mb-0.5" />
@@ -1060,8 +1179,21 @@ function EditableContentArea({
     const lines = clean.split('\n');
     const htmlLines = lines.map((line) => {
       if (line.trim() === '') return '<p style="margin:0 0 4px 0;padding:0"><br/></p>';
-      const formatted = formatMath(line);
-      return `<p style="margin:0 0 4px 0;padding:0">${formatted}</p>`;
+
+      const leadingMatch = line.match(/^([\s\t]|&nbsp;|&emsp;)+/);
+      let indentStyle = '';
+      let contentLine = line;
+      if (leadingMatch && leadingMatch[0].length >= 2) {
+        const spaceCount = leadingMatch[0].replace(/\t/g, '    ').length;
+        const indentInches = Math.min(2.0, Math.round((spaceCount * 0.08) * 16) / 16);
+        if (indentInches > 0) {
+          indentStyle = `margin-left:${indentInches}in;`;
+        }
+        contentLine = line.slice(leadingMatch[0].length);
+      }
+
+      const formatted = formatMath(contentLine);
+      return `<p style="margin:0 0 4px 0;padding:0;${indentStyle}">${formatted}</p>`;
     });
     return htmlLines.join('');
   };
@@ -1273,16 +1405,19 @@ function EditableContentArea({
     }
 
     // 5. Backspace -> মাইক্রোসফট ওয়ার্ডের মতো পারফেক্ট আচরণ:
-    // ইনডেন্টেড লাইনের শুরুতে ব্যাকস্পেস দিলে লাইন কিছুতেই উপরে জোড়া লাগবে না, বরং সোজা বাম মার্জিনে (পাতার শুরুতে) চলে আসবে!
+    // ইনডেন্টেড লাইনের শুরুতে ব্যাকস্পেস দিলে লাইন কিছুতেই উপরে জোড়া লাগবে না, বরং সোজা বাম মার্জিনে (০ মার্জিনে) চলে আসবে!
     if (e.key === 'Backspace') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
         let blockNode: HTMLElement | null = null;
         let curr: Node | null = sel.anchorNode;
         while (curr && curr !== el) {
-          if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).parentElement === el) {
-            blockNode = curr as HTMLElement;
-            break;
+          if (curr.nodeType === Node.ELEMENT_NODE) {
+            const tag = (curr as HTMLElement).tagName;
+            if (/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|TR)$/i.test(tag)) {
+              blockNode = curr as HTMLElement;
+              if (curr.parentElement === el) break;
+            }
           }
           curr = curr.parentNode;
         }
@@ -1312,25 +1447,24 @@ function EditableContentArea({
           }
 
           // যদি লাইনের শুরুতে থাকে (পূর্বে শুধুমাত্র স্পেস, nbsp বা কিছু নেই)
-          const isAtStartOfText = /^[\s\u00A0\t]*$/.test(textBefore);
+          const isAtStartOfText = /^([\s\t\r\n]|&nbsp;|&emsp;|\u00A0)*$/.test(textBefore);
 
-          // চেক করি ব্লকে কি কোনো মার্জিন/ইনডেন্ট বা লিডিং স্পেস আছে?
+          // চেক করি ব্লকে কি কোনো মার্জিন/ইনডেন্ট, লিডিং স্পেস, বা প্যারেন্ট ইনডেন্ট আছে?
           const hasInlineIndent = (parseFloat(blockNode.style.marginLeft || '0') > 0) ||
                                   (parseFloat(blockNode.style.paddingLeft || '0') > 0) ||
-                                  (parseFloat(blockNode.style.textIndent || '0') > 0);
-          const hasLeadingSpaces = /^(\s|&nbsp;|\u00A0|\t)+/i.test(blockNode.innerHTML);
+                                  (parseFloat(blockNode.style.textIndent || '0') > 0) ||
+                                  blockNode.tagName === 'LI' ||
+                                  blockNode.closest('blockquote, ul, ol') !== null;
+          const hasLeadingSpaces = /^([\s\t]|&nbsp;|&emsp;|\u00A0)+/i.test(blockNode.innerHTML);
 
           if (isAtStartOfText && (hasInlineIndent || hasLeadingSpaces || textBefore.length > 0)) {
-            // ওয়ার্ডের মতো লাইনটিকে সোজা বাম মার্জিনে (পাতার শুরুতে) নিয়ে আসুন
+            // ওয়ার্ডের মতো লাইনটিকে সোজা বাম মার্জিনে (০ মার্জিনে) নিয়ে আসুন!
             e.preventDefault();
-            blockNode.style.marginLeft = '';
-            blockNode.style.paddingLeft = '';
-            blockNode.style.textIndent = '';
-            blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
+            const cleanedBlock = resetBlockToZero(blockNode, el);
 
             // কারসরকে লেখার শুরুতে সেট করি
             const newRange = document.createRange();
-            newRange.selectNodeContents(blockNode);
+            newRange.selectNodeContents(cleanedBlock);
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
@@ -1354,7 +1488,7 @@ function EditableContentArea({
               parts.forEach((part, pIdx) => {
                 const p = document.createElement('p');
                 p.style.margin = '0 0 4px 0';
-                p.innerHTML = part.replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
+                p.innerHTML = part.replace(/^([\s\t]|&nbsp;|&emsp;|\u00A0)+/gi, '');
                 frag.appendChild(p);
                 if (pIdx === 1) targetP = p;
               });
@@ -1414,22 +1548,50 @@ function EditableContentArea({
     if (!el) return;
 
     try {
-      // Find the block element containing the cursor
+      // Find the innermost block element containing the cursor
       let blockNode: HTMLElement | null = null;
       let curr: Node | null = sel.anchorNode;
       while (curr && curr !== el) {
-        if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).parentElement === el) {
-          blockNode = curr as HTMLElement;
-          break;
+        if (curr.nodeType === Node.ELEMENT_NODE) {
+          const tag = (curr as HTMLElement).tagName;
+          if (/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|TR)$/i.test(tag)) {
+            blockNode = curr as HTMLElement;
+            if (curr.parentElement === el) break;
+          }
         }
         curr = curr.parentNode;
       }
 
       if (!blockNode) return;
 
-      const zoom = (style.zoom || 100) / 100;
+      const paperEl = el.closest('.paper') as HTMLElement | null;
+      if (!paperEl) return;
 
-      // 1. First check explicit inline CSS indent
+      const zoom = (style.zoom || 100) / 100;
+      const paperRect = paperEl.getBoundingClientRect();
+
+      // Find where this line's first character/content physically starts on screen:
+      let startX = 0;
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(blockNode);
+        range.collapse(true); // start of line
+        const rRect = range.getBoundingClientRect();
+        if (rRect.left > 0) {
+          startX = rRect.left;
+        }
+      } catch {}
+
+      if (startX === 0) {
+        const firstChild = blockNode.firstElementChild || blockNode;
+        startX = firstChild.getBoundingClientRect().left;
+      }
+
+      // Exact horizontal position on ruler in inches:
+      const rawInches = (startX - paperRect.left) / (96 * zoom);
+      const rulerPos = Math.max(0.1, Math.round(rawInches * 16) / 16);
+
+      // Relative indent from block or paper marginLeft:
       let indentInches = 0;
       if (blockNode.style.marginLeft) {
         const ml = blockNode.style.marginLeft.trim();
@@ -1439,35 +1601,20 @@ function EditableContentArea({
           indentInches = (parseFloat(ml) || 0) / 96;
         }
       }
-
-      // 2. If no explicit inline margin, measure rendered DOM indent
       if (indentInches === 0) {
-        const blockRect = blockNode.getBoundingClientRect();
-        const contentRect = el.getBoundingClientRect();
-        const diffPx = blockRect.left - contentRect.left;
-        if (diffPx > 4) {
-          indentInches = diffPx / (96 * zoom);
-        } else {
-          // Check leading spaces or text start
-          const text = blockNode.innerText || '';
-          const match = text.match(/^(\s|\u00A0)+/);
-          if (match && match[0].length > 0) {
-            indentInches = Math.min(2.0, match[0].length * 0.08);
-          }
-        }
+        const pageML = parseFloat(String(style.mL || 0.5)) || 0.5;
+        indentInches = Math.max(0, Math.round((rulerPos - pageML) * 16) / 16);
       }
-
-      indentInches = Math.max(0, Math.round(indentInches * 16) / 16);
 
       window.dispatchEvent(
         new CustomEvent('active-line-indent-detected', {
-          detail: { indentInches, pageIndex },
+          detail: { indentInches, rulerPosInches: rulerPos, pageIndex },
         })
       );
     } catch (err) {
       console.warn('Error detecting line indent:', err);
     }
-  }, [style.zoom, pageIndex]);
+  }, [style.zoom, style.mL, pageIndex]);
 
   useEffect(() => {
     const handleSelChange = () => {
@@ -1691,6 +1838,7 @@ function CreateLectureSheetContent() {
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
   const [activeLineIndent, setActiveLineIndent] = useState<number>(0);
+  const [activeRulerPos, setActiveRulerPos] = useState<number | undefined>(undefined);
   const lastTargetBlockRef = useRef<HTMLElement | null>(null);
   const lastRangeRef = useRef<Range | null>(null);
 
@@ -1700,6 +1848,9 @@ function CreateLectureSheetContent() {
       if (typeof e.detail?.indentInches === 'number') {
         setActiveLineIndent(e.detail.indentInches);
       }
+      if (typeof e.detail?.rulerPosInches === 'number') {
+        setActiveRulerPos(e.detail.rulerPosInches);
+      }
     };
     const handleSelTrack = () => {
       const sel = window.getSelection();
@@ -1707,9 +1858,12 @@ function CreateLectureSheetContent() {
         lastRangeRef.current = sel.getRangeAt(0).cloneRange();
         let node: Node | null = sel.anchorNode;
         while (node) {
-          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement?.classList.contains('content-area')) {
-            lastTargetBlockRef.current = node as HTMLElement;
-            break;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = (node as HTMLElement).tagName;
+            if (/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|TR)$/i.test(tag) && (node as HTMLElement).closest('.content-area')) {
+              lastTargetBlockRef.current = node as HTMLElement;
+              break;
+            }
           }
           node = node.parentNode;
         }
@@ -1907,28 +2061,6 @@ function CreateLectureSheetContent() {
     }); 
   }, [globalFontSize, globalLineHeight]);
 
-  // ব্লকের ইনডেন্ট, প্যাডিং ও লিডিং স্পেস মুছে পাতার শুরুতে নেওয়ার হেল্পার
-  const cleanBlockIndent = (block: HTMLElement, indentStr: string) => {
-    block.style.marginLeft = indentStr;
-    if (!indentStr) {
-      block.style.paddingLeft = '';
-      block.style.textIndent = '';
-      // লিডিং স্পেস, &nbsp;, ট্যাব ও খালি স্প্যান রিমুভ
-      block.innerHTML = block.innerHTML
-        .replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '')
-        .replace(/^<span[^>]*>(\s|&nbsp;|\u00A0|\t)*<\/span>/gi, '')
-        .replace(/^(\s|&nbsp;|\u00A0|\t|&#160;)+/gi, '');
-      block.querySelectorAll('*').forEach((child) => {
-        const cel = child as HTMLElement;
-        if (cel.style) {
-          if (cel.style.marginLeft) cel.style.marginLeft = '';
-          if (cel.style.paddingLeft) cel.style.paddingLeft = '';
-          if (cel.style.textIndent) cel.style.textIndent = '';
-        }
-      });
-    }
-  };
-
   // রুলারের 'L' পয়েন্ট বা ইন্ডেন্ট মার্কার ড্র্যাগ করলে কারসরের লাইনে সরাসরি মার্জিন প্রয়োগ
   const handleLineIndentChange = useCallback((newIndentInches: number) => {
     setActiveLineIndent(newIndentInches);
@@ -1944,7 +2076,11 @@ function CreateLectureSheetContent() {
         const ca = document.querySelector(`.paper-idx-${pIdx} .content-area`) as HTMLElement | null;
         if (ca) {
           Array.from(ca.children).forEach((child) => {
-            cleanBlockIndent(child as HTMLElement, indentStr);
+            if (!indentStr) {
+              resetBlockToZero(child as HTMLElement, ca);
+            } else {
+              (child as HTMLElement).style.marginLeft = indentStr;
+            }
           });
           handleSyncPageContent(pIdx, ca.innerHTML);
         }
@@ -1966,9 +2102,12 @@ function CreateLectureSheetContent() {
       if (targetBlocks.length === 0 && sel && sel.rangeCount > 0 && sel.anchorNode) {
         let node: Node | null = sel.anchorNode;
         while (node && node !== contentArea) {
-          if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).parentElement === contentArea) {
-            targetBlocks.push(node as HTMLElement);
-            break;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tag = (node as HTMLElement).tagName;
+            if (/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|TR)$/i.test(tag)) {
+              targetBlocks.push(node as HTMLElement);
+              break;
+            }
           }
           node = node.parentNode;
         }
@@ -1985,7 +2124,11 @@ function CreateLectureSheetContent() {
       }
 
       targetBlocks.forEach((tb) => {
-        cleanBlockIndent(tb, indentStr);
+        if (!indentStr) {
+          resetBlockToZero(tb, contentArea);
+        } else {
+          tb.style.marginLeft = indentStr;
+        }
       });
 
       handleSyncPageContent(activePaperIdx, contentArea.innerHTML);
@@ -1994,8 +2137,10 @@ function CreateLectureSheetContent() {
     if (!indentStr) {
       try { document.execCommand('outdent', false); } catch {}
       setActiveLineIndent(0);
+      const curL = parseFloat(String(pageStyles[activePaperIdx]?.mL ?? printSettings.marginLeft)) || 0.5;
+      setActiveRulerPos(curL);
     }
-  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent]);
+  }, [activeEditIdx, applyScope, paginatedPages, handleSyncPageContent, pageStyles, printSettings.marginLeft]);
 
   const handleFormatting = useCallback((command: string, value: string | null = null) => {
     const selection = window.getSelection();
@@ -2884,6 +3029,7 @@ function CreateLectureSheetContent() {
                         tabStops={tabStops}
                         onTabStopsChange={setTabStops}
                         activeLineIndent={activeLineIndent}
+                        activeRulerPos={activeRulerPos}
                         onLineIndentChange={handleLineIndentChange}
                         onMarginChange={(newLeft, newRight) => {
                           if (applyScope === 'all') {
