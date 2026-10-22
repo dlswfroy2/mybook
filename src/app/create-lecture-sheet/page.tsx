@@ -136,6 +136,30 @@ function stripDirtyHtml(html: string): string {
   });
 
   tmp.querySelectorAll('meta, script').forEach((el) => el.remove());
+
+  // 4. Convert inline <br> within paragraphs into independent <p> blocks (Word-like paragraph separation)
+  tmp.querySelectorAll('p, div').forEach((block) => {
+    if (block.closest('table') || block.closest('.katex') || block.closest('.math-frac')) return;
+    if (block.querySelector('br')) {
+      const parts = block.innerHTML.split(/<br\s*\/?>/i);
+      if (parts.length > 1) {
+        const frag = document.createDocumentFragment();
+        parts.forEach((part) => {
+          const trimmed = part.trim();
+          if (trimmed !== '') {
+            const newP = document.createElement('p');
+            newP.style.margin = '0 0 4px 0';
+            newP.innerHTML = part;
+            frag.appendChild(newP);
+          }
+        });
+        if (frag.childNodes.length > 0) {
+          block.parentNode?.replaceChild(frag, block);
+        }
+      }
+    }
+  });
+
   return tmp.innerHTML;
 }
 
@@ -1281,33 +1305,49 @@ function EditableContentArea({
 
         if (blockNode) {
           try {
+            const range = sel.getRangeAt(0);
+            let prevNode = range.startContainer.previousSibling;
+            if (!prevNode && range.startContainer.parentNode !== blockNode) {
+              prevNode = (range.startContainer.parentNode as Node)?.previousSibling || null;
+            }
+            const isJustAfterBr = prevNode && (prevNode.nodeName === 'BR');
+
             const preRange = document.createRange();
             preRange.selectNodeContents(blockNode);
-            preRange.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
+            preRange.setEnd(range.startContainer, range.startOffset);
             const isAtBlockStart = preRange.toString().trim().length === 0;
 
-            if (isAtBlockStart) {
-              let hasIndent = false;
-              if (blockNode.style.marginLeft || blockNode.style.paddingLeft || blockNode.style.textIndent) {
-                blockNode.style.marginLeft = '';
-                blockNode.style.paddingLeft = '';
-                blockNode.style.textIndent = '';
-                hasIndent = true;
+            if (isAtBlockStart || isJustAfterBr) {
+              e.preventDefault();
+              blockNode.style.marginLeft = '';
+              blockNode.style.paddingLeft = '';
+              blockNode.style.textIndent = '';
+              blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0|\t)+/, '');
+
+              // যদি ব্লকে একাধিক লাইন <br> দিয়ে যুক্ত থাকে, আলাদা প্যারাগ্রাফে ভেঙে দিন যাতে জোড়া না লাগে
+              if (blockNode.querySelector('br')) {
+                const parts = blockNode.innerHTML.split(/<br\s*\/?>/i);
+                if (parts.length > 1) {
+                  const frag = document.createDocumentFragment();
+                  let focusTarget: HTMLElement | null = null;
+                  parts.forEach((part, pIdx) => {
+                    const p = document.createElement('p');
+                    p.style.margin = '0 0 4px 0';
+                    p.innerHTML = part.replace(/^(\s|&nbsp;|\u00A0|\t)+/, '');
+                    frag.appendChild(p);
+                    if (pIdx === 1) focusTarget = p;
+                  });
+                  blockNode.parentNode?.replaceChild(frag, blockNode);
+                  if (focusTarget) setCursor(focusTarget, 'start');
+                }
               }
-              if (/^(\s|&nbsp;|\u00A0)+/.test(blockNode.innerHTML)) {
-                blockNode.innerHTML = blockNode.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
-                hasIndent = true;
-              }
-              if (hasIndent) {
-                e.preventDefault();
-                onSyncPageContent(pageIndex, el.innerHTML);
-                setCursor(blockNode, 'start');
-                setTimeout(() => {
-                  checkAndReflow(true);
-                  updateActiveLineIndent();
-                }, 40);
-                return;
-              }
+
+              onSyncPageContent(pageIndex, el.innerHTML);
+              setTimeout(() => {
+                checkAndReflow(true);
+                updateActiveLineIndent();
+              }, 40);
+              return;
             }
           } catch {}
         }
