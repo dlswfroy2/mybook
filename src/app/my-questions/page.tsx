@@ -347,10 +347,18 @@ function MyLibraryContent() {
     return { questions: qs, sheets: ss, pdfSheets: ps };
   }, [libraryData, selectedClass, selectedSubject, selectedChapter, activeCategory, activeFileType]);
 
+  const toDate = (ts: any): Date | null => {
+    if (!ts) return null;
+    if (typeof ts.toDate === 'function') return ts.toDate();
+    if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
+    if (ts instanceof Date) return ts;
+    return null;
+  };
+
   const combinedItems = useMemo(() => {
     const all = [
       ...currentItemsRaw.sheets.map(i => {
-        const date = i.updatedAt?.toDate?.() || new Date(0);
+        const date = toDate(i.updatedAt) || toDate((i as any).createdAt) || null;
         return { 
           ...i, 
           source: 'lecture-sheets' as const, 
@@ -360,7 +368,7 @@ function MyLibraryContent() {
         };
       }),
       ...currentItemsRaw.pdfSheets.map(i => {
-        const date = i.uploadedAt?.toDate?.() || new Date(0);
+        const date = toDate(i.uploadedAt) || toDate((i as any).createdAt) || null;
         const url = (i.pdfUrl || '').toLowerCase();
         const fName = (i.fileName || '').toLowerCase();
         const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
@@ -374,7 +382,7 @@ function MyLibraryContent() {
         };
       }),
       ...currentItemsRaw.questions.map(i => {
-        const date = i.updatedAt?.toDate?.() || new Date(0);
+        const date = toDate(i.updatedAt) || toDate((i as any).createdAt) || null;
         return { 
           ...i, 
           source: 'questions' as const, 
@@ -385,7 +393,7 @@ function MyLibraryContent() {
       })
     ];
     return all.sort((a: any, b: any) => {
-      return b.date.getTime() - a.date.getTime();
+      return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
     });
   }, [currentItemsRaw]);
 
@@ -740,7 +748,7 @@ function MyLibraryContent() {
                           {item.source === 'pdf-sheets' ? item.fileName : (item.source === 'lecture-sheets' ? item.topic : item.exam) || '-'}
                         </span>
                         <span className="text-red-600 text-[10px] font-black">
-                          ({format(item.date, 'dd/MM/yy, hh:mm a')})
+                          {item.date ? `(${format(item.date, 'dd/MM/yy, hh:mm a')})` : ''}
                         </span>
                       </div>
                     </TableCell>
