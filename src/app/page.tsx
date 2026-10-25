@@ -87,6 +87,18 @@ const toBengaliNumber = (n: number | string | undefined | null): string => {
   return String(n).replace(/[0-9]/g, (w) => bengaliDigits[parseInt(w, 10)]);
 };
 
+const parseBengaliNumber = (n: any): number => {
+  if (typeof n === 'number') return isNaN(n) ? NaN : n;
+  if (!n && n !== 0) return NaN;
+  const bengaliMap: Record<string, string> = {
+    '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+    '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+  };
+  const converted = String(n).trim().replace(/[০-৯]/g, (d) => bengaliMap[d] || d);
+  const parsed = parseInt(converted, 10);
+  return isNaN(parsed) ? NaN : parsed;
+};
+
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
@@ -565,63 +577,88 @@ function resolveIndividualAttendance(
   const matchedByClass: Record<string, IndividualAttendanceMatch[]> = {};
 
   extractedList.forEach(item => {
-    const rollNum = Number(item.roll);
+    const rollNum = parseBengaliNumber(item.roll);
     const normItemClass = normalizeClassId(item.className);
 
-    // 1. Search candidates with matching roll
-    const candidates = !isNaN(rollNum) ? allStudents.filter(s => Number(s.roll) === rollNum) : [];
+    // Candidates across all students matching roll number
+    const candidates = !isNaN(rollNum) ? allStudents.filter(s => parseBengaliNumber(s.roll) === rollNum) : [];
 
     let matched: Student | null = null;
 
-    if (item.name) {
-      let bestCand: Student | null = null;
-      let maxScore = 0;
+    // 1. If class is identified, prioritize students within that class
+    if (normItemClass) {
+      const classCandidates = allStudents.filter(s => normalizeClassId(s.className) === normItemClass);
 
-      // First check roll candidates
-      candidates.forEach(cand => {
-        const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
-        const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
-        let totalScore = Math.max(scoreBn, scoreEn);
+      // 1A. Exact roll match in that specific class
+      const exactRollInClass = !isNaN(rollNum)
+        ? classCandidates.find(s => parseBengaliNumber(s.roll) === rollNum)
+        : null;
 
-        // Class match bonus
-        if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
-          totalScore += 5;
+      if (exactRollInClass) {
+        // We have exact roll and class match
+        matched = exactRollInClass;
+      } else if (item.name) {
+        // Name match strictly within that class
+        let bestCand: Student | null = null;
+        let maxScore = 0;
+        classCandidates.forEach(cand => {
+          const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+          const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+          const totalScore = Math.max(scoreBn, scoreEn);
+          if (totalScore > maxScore && totalScore >= 3) {
+            maxScore = totalScore;
+            bestCand = cand;
+          }
+        });
+        if (bestCand) {
+          matched = bestCand;
         }
+      }
+    }
 
-        if (totalScore > maxScore && totalScore >= 3) {
-          maxScore = totalScore;
-          bestCand = cand;
-        }
-      });
+    // 2. If class was not detected or no match found yet
+    if (!matched) {
+      if (item.name) {
+        let bestCand: Student | null = null;
+        let maxScore = 0;
 
-      // If no roll candidate had a strong name match (score >= 6),
-      // search all students in the school by name in case roll was misread (e.g. '1s' read as 28)
-      if (maxScore < 6) {
-        allStudents.forEach(cand => {
+        // First check roll candidates
+        candidates.forEach(cand => {
           const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
           const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
           let totalScore = Math.max(scoreBn, scoreEn);
           if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
             totalScore += 5;
           }
-          if (totalScore > maxScore && totalScore >= 10) {
+          if (totalScore > maxScore && totalScore >= 3) {
             maxScore = totalScore;
             bestCand = cand;
           }
         });
+
+        // Search across all students by name if no roll candidate had a high score
+        if (maxScore < 6) {
+          allStudents.forEach(cand => {
+            const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+            const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+            let totalScore = Math.max(scoreBn, scoreEn);
+            if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
+              totalScore += 5;
+            }
+            if (totalScore > maxScore && totalScore >= 10) {
+              maxScore = totalScore;
+              bestCand = cand;
+            }
+          });
+        }
+
+        if (bestCand) {
+          matched = bestCand;
+        }
       }
 
-      if (bestCand) {
-        matched = bestCand;
-      }
-    }
-
-    // If no name match was possible but roll matches and class matches
-    if (!matched && candidates.length > 0) {
-      if (normItemClass) {
-        const clsCand = candidates.find(s => normalizeClassId(s.className) === normItemClass);
-        if (clsCand) matched = clsCand;
-      } else if (candidates.length === 1) {
+      // If only one candidate with this roll exists across the entire school
+      if (!matched && candidates.length === 1) {
         matched = candidates[0];
       }
     }
@@ -1115,44 +1152,45 @@ export default function Home() {
 
       if (aiTask === 'attendance') {
         let rawStudentsList: ExtractedStudentItem[] = [];
+        const defaultClass = normalizeClassId(result.className);
 
         // 1. If result.students is populated, use it as the primary authoritative list
         if (Array.isArray(result.students) && result.students.length > 0) {
           result.students.forEach((s: any) => {
             rawStudentsList.push({
               ...s,
-              roll: Number(s.roll),
-              className: normalizeClassId(s.className)
+              roll: parseBengaliNumber(s.roll),
+              className: normalizeClassId(s.className) || defaultClass
             });
           });
         } else if (Array.isArray(result.classesAttendance) && result.classesAttendance.length > 0) {
           result.classesAttendance.forEach((ca: any) => {
-            const classId = normalizeClassId(ca.className);
+            const classId = normalizeClassId(ca.className) || defaultClass;
             if (Array.isArray(ca.students) && ca.students.length > 0) {
               ca.students.forEach((st: any) => {
                 rawStudentsList.push({
                   ...st,
-                  roll: Number(st.roll),
+                  roll: parseBengaliNumber(st.roll),
                   className: normalizeClassId(st.className) || classId
                 });
               });
             } else {
-              (ca.presentRolls || []).forEach((r: number) => {
-                rawStudentsList.push({ roll: Number(r), className: classId, status: 'present' });
+              (ca.presentRolls || []).forEach((r: any) => {
+                rawStudentsList.push({ roll: parseBengaliNumber(r), className: classId, status: 'present' });
               });
-              (ca.absentRolls || []).forEach((r: number) => {
-                rawStudentsList.push({ roll: Number(r), className: classId, status: 'absent' });
+              (ca.absentRolls || []).forEach((r: any) => {
+                rawStudentsList.push({ roll: parseBengaliNumber(r), className: classId, status: 'absent' });
               });
             }
           });
         } else {
           // Fallback to root presentRolls / absentRolls if neither students nor classesAttendance exist
-          const rootClass = normalizeClassId(result.className);
-          (result.presentRolls || []).forEach((r: number) => {
-            rawStudentsList.push({ roll: Number(r), className: rootClass, status: 'present' });
+          const rootClass = defaultClass || normalizeClassId(result.className);
+          (result.presentRolls || []).forEach((r: any) => {
+            rawStudentsList.push({ roll: parseBengaliNumber(r), className: rootClass, status: 'present' });
           });
-          (result.absentRolls || []).forEach((r: number) => {
-            rawStudentsList.push({ roll: Number(r), className: rootClass, status: 'absent' });
+          (result.absentRolls || []).forEach((r: any) => {
+            rawStudentsList.push({ roll: parseBengaliNumber(r), className: rootClass, status: 'absent' });
           });
         }
 

@@ -156,8 +156,11 @@ GENERAL RULES:
 
     const availableKeys = getAvailableApiKeys();
     const candidateModels = [
-      'googleai/gemini-flash-latest',
       'googleai/gemini-3.5-flash',
+      'googleai/gemini-3.6-flash',
+      'googleai/gemini-3.5-flash-lite',
+      'googleai/gemini-3.1-flash-lite',
+      'googleai/gemini-flash-latest',
     ];
 
     let lastError: any = null;
@@ -172,7 +175,7 @@ GENERAL RULES:
         const client = createAiClient(currentKey, targetModel);
 
         try {
-          const response = await client.generate({
+          const generatePromise = client.generate({
             model: targetModel,
             prompt: parts,
             config: {
@@ -181,6 +184,10 @@ GENERAL RULES:
               temperature: 0.1,
             },
           });
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout after 30s with model ${targetModel}`)), 30000)
+          );
+          const response: any = await Promise.race([generatePromise, timeoutPromise]);
 
           text = response.text?.trim() || '';
           if (text) {
