@@ -57,7 +57,11 @@ export const multiTaskAiFlow = ai.defineFlow(
          { date: "YYYY-MM-DD", year: "YYYY", month: "MM", presentRolls: [1, 2, ...], absentRolls: [...] }
        ]
 
-2. MULTI-CLASS & 100+ STUDENTS RECOGNITION (একসাথে একাধিক শ্রেণি ও ১০০+ শিক্ষার্থী নিখুঁত শনাক্তকরণ):
+2. MULTI-PAGE & MULTI-CLASS 100+ STUDENTS RECOGNITION:
+   - MULTI-PAGE DOCUMENTS (একাধিক পৃষ্ঠার ডকুমেন্ট):
+     * If the uploaded PDF or document has multiple pages (Page 1, Page 2, Page 3, etc.), you MUST read and extract attendance from EVERY SINGLE PAGE!
+     * Each page may contain a separate class or section starting from Roll 1 to 28. Extract all students from page 1, page 2, page 3 without omitting any page.
+   - MULTI-CLASS SUPPORT (একসাথে একাধিক শ্রেণি): (একসাথে একাধিক শ্রেণি ও ১০০+ শিক্ষার্থী নিখুঁত শনাক্তকরণ):
    - HANDWRITING & MASSIVE DOCUMENTS: Accurately read handwritten Bengali rolls (১, ২, ৩...), handwritten names, and attendance marks (টিক চিহ্ন ✓, P, উপস্থিত, cross ✗, A, অনুপস্থিত, বা ফাঁকা ঘর)।
    - MULTIPLE CLASSES SUPPORT (একসাথে একাধিক শ্রেণি):
      * A document or uploaded file can contain 100+ students belonging to MULTIPLE CLASSES (e.g. ৬ষ্ঠ, ৭ম, ৮ম, ৯ম, ১০ম শ্রেণি একসাথে বা আলাদা আলাদা পৃষ্ঠায়/সেকশনে)।

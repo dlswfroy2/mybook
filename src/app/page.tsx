@@ -472,13 +472,27 @@ function normalizeClassId(raw?: string | number | null): string | null {
   return str;
 }
 
+function levenshteinDistance(s1: string, s2: string): number {
+  const m = s1.length, n = s2.length;
+  const d: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  return d[m][n];
+}
+
 function cleanBengaliText(str?: string): string {
   if (!str) return '';
   return str
     .normalize('NFC')
     .toLowerCase()
     .replace(/[.\-_,:;!?|~`"'/\\()[\]{}<>@#$%^&*+=]/g, ' ')
-    .replace(/(^|\s+)(মো[ঃ:]?|মোঃ|মোহাম্মদ|মোসা[ঃ:]?|মোছা[ঃ:]?|মোসাম্মৎ|মোসাম্মত|মোছাম্মৎ|মোহা|শ্রী|শ্রীমতি|শ্রীমতী|md|mst|mohammad|mohammed)(?=\s+|$)/gi, ' ')
+    .replace(/(^|\s+)(মোসাম্মৎ|মোসাম্মত|মোছাম্মৎ|মোহাম্মদ|মোহা|মোসা[ঃ:]?|মোছা[ঃ:]?|মোঃ|মো[ঃ:]?|শ্রীমতি|শ্রীমতী|শ্রী|mohammad|mohammed|mst|md)[\s:.]*/gi, ' ')
     .replace(/র্/g, '')
     .replace(/[য়য]/g, 'য')
     .replace(/[ড়ঢ়]/g, 'র')
@@ -522,14 +536,13 @@ function getBengaliNameSimilarity(extractedName: string, dbName: string): number
       if (w1 === w2) {
         wordMatch = 10;
       } else if (w1.includes(w2) || w2.includes(w1)) {
-        wordMatch = 6;
+        wordMatch = 7;
       } else {
-        const w1NoReph = w1.replace(/র্/g, '');
-        const w2NoReph = w2.replace(/র্/g, '');
-        if (w1NoReph === w2NoReph) {
-          wordMatch = 8;
-        } else if (w1NoReph.includes(w2NoReph) || w2NoReph.includes(w1NoReph)) {
-          wordMatch = 5;
+        const maxLen = Math.max(w1.length, w2.length);
+        const dist = levenshteinDistance(w1, w2);
+        const sim = (maxLen - dist) / maxLen;
+        if (sim >= 0.5) {
+          wordMatch = Math.round(sim * 8);
         }
       }
 
@@ -542,12 +555,16 @@ function getBengaliNameSimilarity(extractedName: string, dbName: string): number
     }
   }
 
-  // Reject match if only generic surnames/titles matched with no distinctive name
-  if (!hasDistinctiveMatch) {
-    return 0;
+  // If only generic suffix matched, check whole cleaned string fuzzy similarity
+  if (!hasDistinctiveMatch && score > 0) {
+    const maxLen = Math.max(c1.length, c2.length);
+    const dist = levenshteinDistance(c1, c2);
+    if ((maxLen - dist) / maxLen >= 0.4) {
+      hasDistinctiveMatch = true;
+    }
   }
 
-  return score;
+  return hasDistinctiveMatch ? score : 0;
 }
 interface ExtractedStudentItem {
   roll: number;
@@ -566,7 +583,8 @@ interface IndividualAttendanceMatch {
 
 function resolveIndividualAttendance(
   extractedList: ExtractedStudentItem[],
-  allStudents: Student[]
+  allStudents: Student[],
+  preferredClass?: string | null
 ): {
   matchedList: IndividualAttendanceMatch[];
   unmatchedList: IndividualAttendanceMatch[];
@@ -576,110 +594,135 @@ function resolveIndividualAttendance(
   const unmatchedList: IndividualAttendanceMatch[] = [];
   const matchedByClass: Record<string, IndividualAttendanceMatch[]> = {};
 
+  // Split into section blocks if roll numbers restart (e.g. Page 1: 1..27, Page 2: 1..28)
+  const sections: ExtractedStudentItem[][] = [];
+  let currentSection: ExtractedStudentItem[] = [];
+  let prevRoll = -1;
+
   extractedList.forEach(item => {
-    const rollNum = parseBengaliNumber(item.roll);
-    const normItemClass = normalizeClassId(item.className);
-
-    // Candidates across all students matching roll number
-    const candidates = !isNaN(rollNum) ? allStudents.filter(s => parseBengaliNumber(s.roll) === rollNum) : [];
-
-    let matched: Student | null = null;
-
-    // 1. If class is identified, prioritize students within that class
-    if (normItemClass) {
-      const classCandidates = allStudents.filter(s => normalizeClassId(s.className) === normItemClass);
-
-      // 1A. Exact roll match in that specific class
-      const exactRollInClass = !isNaN(rollNum)
-        ? classCandidates.find(s => parseBengaliNumber(s.roll) === rollNum)
-        : null;
-
-      if (exactRollInClass) {
-        // We have exact roll and class match
-        matched = exactRollInClass;
-      } else if (item.name) {
-        // Name match strictly within that class
-        let bestCand: Student | null = null;
-        let maxScore = 0;
-        classCandidates.forEach(cand => {
-          const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
-          const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
-          const totalScore = Math.max(scoreBn, scoreEn);
-          if (totalScore > maxScore && totalScore >= 3) {
-            maxScore = totalScore;
-            bestCand = cand;
-          }
-        });
-        if (bestCand) {
-          matched = bestCand;
-        }
-      }
+    const r = parseBengaliNumber(item.roll);
+    if (!isNaN(r) && r <= prevRoll && currentSection.length >= 10) {
+      sections.push(currentSection);
+      currentSection = [];
     }
+    currentSection.push(item);
+    if (!isNaN(r)) prevRoll = r;
+  });
+  if (currentSection.length > 0) {
+    sections.push(currentSection);
+  }
 
-    // 2. If class was not detected or no match found yet
-    if (!matched) {
-      if (item.name) {
-        let bestCand: Student | null = null;
-        let maxScore = 0;
+  // Process each section with Pass 1 + Pass 2 (Dominant Class Context Resolution)
+  sections.forEach(sectionItems => {
+    const sectionMatched: IndividualAttendanceMatch[] = [];
+    const sectionUnresolved: ExtractedStudentItem[] = [];
+    const sectionClassCounts: Record<string, number> = {};
 
-        // First check roll candidates
+    // PASS 1: High-confidence matching
+    sectionItems.forEach(item => {
+      const rollNum = parseBengaliNumber(item.roll);
+      const normItemClass = normalizeClassId(item.className) || normalizeClassId(preferredClass);
+
+      const candidates = !isNaN(rollNum) ? allStudents.filter(s => parseBengaliNumber(s.roll) === rollNum) : [];
+
+      let matched: Student | null = null;
+
+      if (normItemClass) {
+        const classCandidates = allStudents.filter(s => normalizeClassId(s.className) === normItemClass);
+        const exactRoll = !isNaN(rollNum) ? classCandidates.find(s => parseBengaliNumber(s.roll) === rollNum) : null;
+        if (exactRoll) {
+          matched = exactRoll;
+        } else if (item.name) {
+          let best: Student | null = null, maxScore = 0;
+          classCandidates.forEach(cand => {
+            const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
+            if (s > maxScore && s >= 3) { maxScore = s; best = cand; }
+          });
+          if (best) matched = best;
+        }
+      } else if (item.name) {
+        let best: Student | null = null, maxScore = 0;
         candidates.forEach(cand => {
-          const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
-          const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
-          let totalScore = Math.max(scoreBn, scoreEn);
-          if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
-            totalScore += 5;
-          }
-          if (totalScore > maxScore && totalScore >= 3) {
-            maxScore = totalScore;
-            bestCand = cand;
-          }
+          const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
+          if (s > maxScore && s >= 3) { maxScore = s; best = cand; }
         });
 
-        // Search across all students by name if no roll candidate had a high score
+        // Search all students by name if no roll candidate had a high score
         if (maxScore < 6) {
           allStudents.forEach(cand => {
-            const scoreBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
-            const scoreEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
-            let totalScore = Math.max(scoreBn, scoreEn);
-            if (normItemClass && normalizeClassId(cand.className) === normItemClass && totalScore >= 3) {
-              totalScore += 5;
-            }
-            if (totalScore > maxScore && totalScore >= 10) {
-              maxScore = totalScore;
-              bestCand = cand;
-            }
+            const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
+            if (s > maxScore && s >= 10) { maxScore = s; best = cand; }
           });
         }
 
-        if (bestCand) {
-          matched = bestCand;
-        }
+        if (best) matched = best;
       }
 
-      // If only one candidate with this roll exists across the entire school
       if (!matched && candidates.length === 1) {
         matched = candidates[0];
       }
+
+      if (matched) {
+        const cls = matched.className;
+        const rec: IndividualAttendanceMatch = { extractedStudent: item, dbStudent: matched, resolvedClass: cls, isMatched: true };
+        sectionMatched.push(rec);
+        sectionClassCounts[cls] = (sectionClassCounts[cls] || 0) + 1;
+      } else {
+        sectionUnresolved.push(item);
+      }
+    });
+
+    // Determine dominant class for this section
+    let dominantClass: string | null = null;
+    let maxCount = 0;
+    Object.entries(sectionClassCounts).forEach(([cls, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantClass = cls;
+      }
+    });
+    if (!dominantClass && preferredClass && preferredClass !== 'all') {
+      dominantClass = normalizeClassId(preferredClass);
     }
 
-    if (matched) {
-      const cls = matched.className;
-      const record: IndividualAttendanceMatch = {
-        extractedStudent: item,
-        dbStudent: matched,
-        resolvedClass: cls,
-        isMatched: true
-      };
-      matchedList.push(record);
+    // PASS 2: Contextual resolution for unresolved students in this section
+    sectionUnresolved.forEach(item => {
+      const rollNum = parseBengaliNumber(item.roll);
+      let matched: Student | null = null;
+
+      if (dominantClass && !isNaN(rollNum)) {
+        const domStudents = allStudents.filter(s => normalizeClassId(s.className) === dominantClass);
+        const rollMatch = domStudents.find(s => parseBengaliNumber(s.roll) === rollNum);
+        if (rollMatch) {
+          matched = rollMatch;
+        }
+      }
+
+      if (!matched && item.name) {
+        let best: Student | null = null, maxScore = 0;
+        allStudents.forEach(cand => {
+          const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
+          if (s > maxScore && s >= 6) { maxScore = s; best = cand; }
+        });
+        if (best) matched = best;
+      }
+
+      if (matched) {
+        const cls = matched.className;
+        const rec: IndividualAttendanceMatch = { extractedStudent: item, dbStudent: matched, resolvedClass: cls, isMatched: true };
+        sectionMatched.push(rec);
+      } else {
+        unmatchedList.push({ extractedStudent: item, isMatched: false });
+      }
+    });
+
+    // Merge section matches into main record
+    sectionMatched.forEach(rec => {
+      matchedList.push(rec);
+      const cls = rec.resolvedClass || rec.dbStudent?.className || 'unknown';
       if (!matchedByClass[cls]) matchedByClass[cls] = [];
-      matchedByClass[cls].push(record);
-    } else {
-      unmatchedList.push({
-        extractedStudent: item,
-        isMatched: false
-      });
-    }
+      matchedByClass[cls].push(rec);
+    });
   });
 
   return { matchedList, unmatchedList, matchedByClass };
@@ -1208,7 +1251,8 @@ export default function Home() {
 
         const { matchedList, unmatchedList, matchedByClass } = resolveIndividualAttendance(
           uniqueStudents,
-          studentsForYear
+          studentsForYear,
+          selectedAiClass !== 'all' ? selectedAiClass : null
         );
 
         result.matchedList = matchedList;
