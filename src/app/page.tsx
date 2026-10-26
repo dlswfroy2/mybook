@@ -594,139 +594,140 @@ function resolveIndividualAttendance(
   const unmatchedList: IndividualAttendanceMatch[] = [];
   const matchedByClass: Record<string, IndividualAttendanceMatch[]> = {};
 
-  // Split into section blocks if roll numbers restart (e.g. Page 1: 1..27, Page 2: 1..28)
-  const sections: ExtractedStudentItem[][] = [];
-  let currentSection: ExtractedStudentItem[] = [];
-  let prevRoll = -1;
+  // Track matched student IDs to prevent assigning the same DB student multiple times
+  const matchedStudentIds = new Set<string>();
 
   extractedList.forEach(item => {
-    const r = parseBengaliNumber(item.roll);
-    if (!isNaN(r) && r <= prevRoll && currentSection.length >= 10) {
-      sections.push(currentSection);
-      currentSection = [];
-    }
-    currentSection.push(item);
-    if (!isNaN(r)) prevRoll = r;
-  });
-  if (currentSection.length > 0) {
-    sections.push(currentSection);
-  }
+    const rollNum = parseBengaliNumber(item.roll);
+    const hasValidRoll = !isNaN(rollNum) && rollNum > 0;
+    const cleanItemName = cleanBengaliText(item.name || '');
+    const statedClass = normalizeClassId(item.className);
 
-  // Process each section with Pass 1 + Pass 2 (Dominant Class Context Resolution)
-  sections.forEach(sectionItems => {
-    const sectionMatched: IndividualAttendanceMatch[] = [];
-    const sectionUnresolved: ExtractedStudentItem[] = [];
-    const sectionClassCounts: Record<string, number> = {};
+    let matched: Student | null = null;
+    let bestScore = 0;
 
-    // PASS 1: High-confidence matching
-    sectionItems.forEach(item => {
-      const rollNum = parseBengaliNumber(item.roll);
-      const normItemClass = normalizeClassId(item.className) || normalizeClassId(preferredClass);
+    // Helper to evaluate a candidate DB student against this extracted item
+    const evaluateCandidate = (cand: Student): number => {
+      if (matchedStudentIds.has(cand.id)) return -1;
+      let score = 0;
 
-      const candidates = !isNaN(rollNum) ? allStudents.filter(s => parseBengaliNumber(s.roll) === rollNum) : [];
+      const candRoll = parseBengaliNumber(cand.roll);
+      const isRollMatch = hasValidRoll && candRoll === rollNum;
 
-      let matched: Student | null = null;
+      if (cleanItemName) {
+        const sBn = getBengaliNameSimilarity(item.name || '', cand.studentNameBn || '');
+        const sEn = getBengaliNameSimilarity(item.name || '', cand.studentNameEn || '');
+        const nameScore = Math.max(sBn, sEn);
 
-      if (normItemClass) {
-        const classCandidates = allStudents.filter(s => normalizeClassId(s.className) === normItemClass);
-        const exactRoll = !isNaN(rollNum) ? classCandidates.find(s => parseBengaliNumber(s.roll) === rollNum) : null;
-        if (exactRoll) {
-          matched = exactRoll;
-        } else if (item.name) {
-          let best: Student | null = null, maxScore = 0;
-          classCandidates.forEach(cand => {
-            const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
-            if (s > maxScore && s >= 3) { maxScore = s; best = cand; }
-          });
-          if (best) matched = best;
-        }
-      } else if (item.name) {
-        let best: Student | null = null, maxScore = 0;
-        candidates.forEach(cand => {
-          const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
-          if (s > maxScore && s >= 3) { maxScore = s; best = cand; }
-        });
-
-        // Search all students by name if no roll candidate had a high score
-        if (maxScore < 6) {
-          allStudents.forEach(cand => {
-            const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
-            if (s > maxScore && s >= 10) { maxScore = s; best = cand; }
-          });
+        // Substring / fuzzy match on cleaned Bengali text
+        const candBnClean = cleanBengaliText(cand.studentNameBn || '');
+        let fuzzyScore = 0;
+        if (candBnClean && cleanItemName) {
+          if (candBnClean === cleanItemName) {
+            fuzzyScore = 100;
+          } else if (candBnClean.includes(cleanItemName) || cleanItemName.includes(candBnClean)) {
+            fuzzyScore = 50;
+          } else {
+            const maxL = Math.max(cleanItemName.length, candBnClean.length);
+            const dist = levenshteinDistance(cleanItemName, candBnClean);
+            const sim = (maxL - dist) / maxL;
+            if (sim >= 0.5) fuzzyScore = Math.round(sim * 40);
+          }
         }
 
-        if (best) matched = best;
+        const totalNameScore = Math.max(nameScore, fuzzyScore);
+
+        if (isRollMatch) {
+          // Both roll and name match: verify positive name similarity
+          if (totalNameScore >= 3 || fuzzyScore >= 20) {
+            score = 1000 + totalNameScore;
+          } else {
+            // Roll matched, but extracted name had ZERO similarity with candidate name.
+            // Do NOT match to wrong student or class!
+            score = 0;
+          }
+        } else {
+          // Roll did not match (or missing), but name has high similarity
+          if (totalNameScore >= 20 || fuzzyScore >= 40) {
+            score = 500 + totalNameScore;
+          }
+        }
+      } else if (isRollMatch) {
+        // No name extracted from document, only roll was available
+        if (statedClass && normalizeClassId(cand.className) === statedClass) {
+          score = 100;
+        } else if (preferredClass && preferredClass !== 'all' && normalizeClassId(cand.className) === normalizeClassId(preferredClass)) {
+          score = 50;
+        }
       }
 
-      if (!matched && candidates.length === 1) {
-        matched = candidates[0];
+      // Bonus if stated class matches candidate's class
+      if (score > 0 && statedClass && normalizeClassId(cand.className) === statedClass) {
+        score += 50;
       }
 
-      if (matched) {
-        const cls = matched.className;
-        const rec: IndividualAttendanceMatch = { extractedStudent: item, dbStudent: matched, resolvedClass: cls, isMatched: true };
-        sectionMatched.push(rec);
-        sectionClassCounts[cls] = (sectionClassCounts[cls] || 0) + 1;
-      } else {
-        sectionUnresolved.push(item);
-      }
-    });
+      return score;
+    };
 
-    // Determine dominant class for this section
-    let dominantClass: string | null = null;
-    let maxCount = 0;
-    Object.entries(sectionClassCounts).forEach(([cls, count]) => {
-      if (count > maxCount) {
-        maxCount = count;
-        dominantClass = cls;
+    // 1. If stated class exists, search in that class first
+    if (statedClass) {
+      const classStudents = allStudents.filter(s => normalizeClassId(s.className) === statedClass);
+      for (const cand of classStudents) {
+        const sc = evaluateCandidate(cand);
+        if (sc > bestScore && sc > 0) {
+          bestScore = sc;
+          matched = cand;
+        }
       }
-    });
-    if (!dominantClass && preferredClass && preferredClass !== 'all') {
-      dominantClass = normalizeClassId(preferredClass);
     }
 
-    // PASS 2: Contextual resolution for unresolved students in this section
-    sectionUnresolved.forEach(item => {
-      const rollNum = parseBengaliNumber(item.roll);
-      let matched: Student | null = null;
-
-      if (dominantClass && !isNaN(rollNum)) {
-        const domStudents = allStudents.filter(s => normalizeClassId(s.className) === dominantClass);
-        const rollMatch = domStudents.find(s => parseBengaliNumber(s.roll) === rollNum);
-        if (rollMatch) {
-          matched = rollMatch;
+    // 2. Search roll-matching candidates across ALL classes
+    if (!matched && hasValidRoll) {
+      const rollCandidates = allStudents.filter(s => parseBengaliNumber(s.roll) === rollNum);
+      for (const cand of rollCandidates) {
+        const sc = evaluateCandidate(cand);
+        if (sc > bestScore && sc > 0) {
+          bestScore = sc;
+          matched = cand;
         }
       }
+    }
 
-      if (!matched && item.name) {
-        let best: Student | null = null, maxScore = 0;
-        allStudents.forEach(cand => {
-          const s = Math.max(getBengaliNameSimilarity(item.name || '', cand.studentNameBn || ''), getBengaliNameSimilarity(item.name || '', cand.studentNameEn || ''));
-          if (s > maxScore && s >= 6) { maxScore = s; best = cand; }
-        });
-        if (best) matched = best;
+    // 3. If still no match and item has a meaningful name, search all students across all classes
+    if (!matched && cleanItemName && cleanItemName.length >= 3) {
+      for (const cand of allStudents) {
+        const sc = evaluateCandidate(cand);
+        if (sc > bestScore && sc >= 520) {
+          bestScore = sc;
+          matched = cand;
+        }
       }
+    }
 
-      if (matched) {
-        const cls = matched.className;
-        const rec: IndividualAttendanceMatch = { extractedStudent: item, dbStudent: matched, resolvedClass: cls, isMatched: true };
-        sectionMatched.push(rec);
-      } else {
-        unmatchedList.push({ extractedStudent: item, isMatched: false });
-      }
-    });
-
-    // Merge section matches into main record
-    sectionMatched.forEach(rec => {
+    // Individual Result: Each student is resolved to THEIR OWN class or marked unmatched!
+    if (matched) {
+      matchedStudentIds.add(matched.id);
+      const cls = matched.className;
+      const rec: IndividualAttendanceMatch = {
+        extractedStudent: item,
+        dbStudent: matched,
+        resolvedClass: cls,
+        isMatched: true
+      };
       matchedList.push(rec);
-      const cls = rec.resolvedClass || rec.dbStudent?.className || 'unknown';
       if (!matchedByClass[cls]) matchedByClass[cls] = [];
       matchedByClass[cls].push(rec);
-    });
+    } else {
+      unmatchedList.push({
+        extractedStudent: item,
+        isMatched: false
+      });
+    }
   });
 
   return { matchedList, unmatchedList, matchedByClass };
 }
+
 export default function Home() {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -1237,12 +1238,12 @@ export default function Home() {
           });
         }
 
-        // De-duplicate items by roll + cleaned Bengali name
+        // De-duplicate items by class + roll + cleaned Bengali name
         const uniqueStudents: ExtractedStudentItem[] = [];
         const seenKeys = new Set<string>();
         rawStudentsList.forEach(st => {
           const cName = cleanBengaliText(st.name || '');
-          const key = cName ? `${st.roll}_${cName}` : `${st.roll}_${st.className || ''}`;
+          const key = `${st.className || ''}_${st.roll}_${cName}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             uniqueStudents.push(st);
@@ -1269,6 +1270,31 @@ export default function Home() {
           result.autoResolved = true;
         } else if (result.className) {
           setSelectedAiClass(normalizeClassId(result.className) || '6');
+        }
+
+        // Collect and consolidate all dates across months from result.dates, attendanceByDate, and dailyAttendance
+        const detectedDatesSet = new Set<string>();
+        if (Array.isArray(result.dates)) {
+          result.dates.forEach((d: string) => { if (typeof d === 'string' && d.trim()) detectedDatesSet.add(d.trim()); });
+        }
+        if (Array.isArray(result.attendanceByDate)) {
+          result.attendanceByDate.forEach((abd: any) => { if (typeof abd?.date === 'string' && abd.date.trim()) detectedDatesSet.add(abd.date.trim()); });
+        }
+        uniqueStudents.forEach(st => {
+          if (Array.isArray(st.dailyAttendance)) {
+            st.dailyAttendance.forEach(da => { if (typeof da?.date === 'string' && da.date.trim()) detectedDatesSet.add(da.date.trim()); });
+          }
+        });
+        if (result.date && typeof result.date === 'string' && result.date.trim()) {
+          detectedDatesSet.add(result.date.trim());
+        }
+        const allSortedDates = Array.from(detectedDatesSet).sort();
+        if (allSortedDates.length > 0) {
+          result.dates = allSortedDates;
+          setSelectedAiDate(allSortedDates[0]);
+          if (allSortedDates.length > 1) {
+            setApplyToAllDates(true);
+          }
         }
       } else if (result.className) {
         setSelectedAiClass(normalizeClassId(result.className) || '6');
