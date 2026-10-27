@@ -49,10 +49,14 @@ import {
   FileUp,
   FileType,
   BrainCircuit,
-  Sparkles
+  Sparkles,
+  Mic,
+  MicOff,
+  QrCode,
+  LayoutTemplate
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
+import { generateLectureSheet, expandLectureContent } from '@/ai/flows/generate-lecture-sheet-flow';
 import { useFirestore, useUser, useDoc, useStorage } from '@/firebase';
 import { collection, setDoc, doc, getDoc, serverTimestamp, addDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -1901,6 +1905,278 @@ function CreateLectureSheetContent() {
   const [pageStyles, setPageStyles] = useState<Record<number, any>>({});
   const [activeEditIdx, setActiveEditIdx] = useState<number | null>(0);
   const [manualPages, setManualPages] = useState<Record<number, string>>({});
+
+  // New Lecture Sheet Editor Features: Voice, Templates, QR, AI Assistant
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const speechRecognitionRef = useRef<any>(null);
+
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrUrl, setQrUrl] = useState('');
+  const [qrCaption, setQrCaption] = useState('ক্লাসের ভিডিও ও সমাধান দেখতে স্ক্যান করুন');
+  const [qrSize, setQrSize] = useState('110');
+
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [aiAssistantPrompt, setAiAssistantPrompt] = useState('');
+  const [aiAssistantType, setAiAssistantType] = useState<'bullet_points' | 'detailed' | 'qa' | 'formula_examples'>('bullet_points');
+  const [isAiExpanding, setIsAiExpanding] = useState(false);
+
+  const insertLectureSnippet = useCallback((snippet: string) => {
+    const targetIdx = activeEditIdx !== null ? activeEditIdx : 0;
+    setPaginatedPages(prev => {
+      const updated = [...prev];
+      const current = updated[targetIdx] || '';
+      updated[targetIdx] = current ? current + '\n\n' + snippet : snippet;
+      return updated;
+    });
+    setManualPages(prev => {
+      const current = prev[targetIdx] || '';
+      return { ...prev, [targetIdx]: current ? current + '\n\n' + snippet : snippet };
+    });
+    setData(prev => ({
+      ...prev,
+      content: prev.content ? prev.content + '\n\n' + snippet : snippet
+    }));
+  }, [activeEditIdx]);
+
+  const toggleVoiceTyping = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (isVoiceListening) {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+      }
+      setIsVoiceListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({
+        variant: 'destructive',
+        title: 'ভয়েস টাইপিং সমর্থিত নয়',
+        description: 'আপনার ব্রাউজারে স্পিচ রিকগনিশন সুবিধা নেই। অনুগ্রহ করে Chrome বা Edge ব্যবহার করুন।'
+      });
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'bn-BD';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsVoiceListening(true);
+        toast({
+          title: 'মাইক্রোফোন চালু হয়েছে 🎙️',
+          description: 'স্পষ্ট বাংলায় কথা বলুন, আপনার কথা সরাসরি এডিটরে টাইপ হবে।'
+        });
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join(' ')
+          .trim();
+        if (transcript) {
+          insertLectureSnippet(` ${transcript} `);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        setIsVoiceListening(false);
+        if (event.error !== 'no-speech') {
+          toast({
+            variant: 'destructive',
+            title: 'মাইক্রোফোন সংযোগ ত্রুটি',
+            description: event.error === 'not-allowed' ? 'মাইক্রোফোনের অনুমতি দেওয়া হয়নি।' : 'ভয়েস টাইপিং বন্ধ হয়েছে।'
+          });
+        }
+      };
+
+      recognition.onend = () => {
+        setIsVoiceListening(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (e: any) {
+      console.error(e);
+      setIsVoiceListening(false);
+    }
+  }, [isVoiceListening, insertLectureSnippet, toast]);
+
+  const handleInsertQrCode = useCallback(() => {
+    if (!qrUrl.trim()) {
+      toast({ variant: 'destructive', title: 'লিংক দিন', description: 'QR কোডের জন্য লিংক বা টেক্সট লিখুন।' });
+      return;
+    }
+    const cleanUrl = encodeURIComponent(qrUrl.trim());
+    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${cleanUrl}`;
+    const qrHtml = `<div style="text-align: center; margin: 10px auto; display: inline-block; padding: 8px; border: 1.5px dashed #4f46e5; border-radius: 8px; background-color: #ffffff;" contenteditable="false">
+  <img src="${qrSrc}" alt="QR Code" style="width: ${qrSize}px; height: ${qrSize}px; display: block; margin: 0 auto;" />
+  ${qrCaption ? `<p style="font-size: 10px; font-weight: bold; color: #4338ca; margin-top: 4px; margin-bottom: 0;">${qrCaption}</p>` : ''}
+</div>`;
+    insertLectureSnippet(qrHtml);
+    setQrModalOpen(false);
+    setQrUrl('');
+    toast({ title: 'QR কোড যুক্ত হয়েছে! 📱', description: 'শিটে QR কোড সফলভাবে যুক্ত করা হয়েছে।' });
+  }, [qrUrl, qrSize, qrCaption, insertLectureSnippet, toast]);
+
+  const handleAiExpandContent = useCallback(async () => {
+    if (!aiAssistantPrompt.trim()) return;
+    setIsAiExpanding(true);
+    try {
+      const generated = await expandLectureContent({
+        topicPrompt: aiAssistantPrompt.trim(),
+        className: data.classId,
+        subject: data.subject,
+        type: aiAssistantType
+      });
+      if (generated) {
+        insertLectureSnippet(`<div class="ai-generated-block" style="margin: 8px 0;">${generated.replace(/\n/g, '<br/>')}</div>`);
+        toast({ title: 'AI কন্টেন্ট তৈরি হয়েছে! ✨', description: 'সফলভাবে এডিটরে কন্টেন্ট যুক্ত করা হয়েছে।' });
+        setAiAssistantOpen(false);
+        setAiAssistantPrompt('');
+      }
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'ত্রুটি', description: e.message || 'কন্টেন্ট তৈরি করা সম্ভব হয়নি।' });
+    } finally {
+      setIsAiExpanding(false);
+    }
+  }, [aiAssistantPrompt, data.classId, data.subject, aiAssistantType, insertLectureSnippet, toast]);
+
+  const LECTURE_TEMPLATES = useMemo(() => [
+    {
+      id: 'summary_handout',
+      title: '📖 সারসংক্ষেপ ও মূল আলোচনা শিট',
+      desc: 'অধ্যায় পরিচিতি, মূল বক্তব্য, গুরুত্বপূর্ণ সংজ্ঞা ও বিশেষ টিপস',
+      content: `<div class="template-section">
+<h3 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px;">📌 পাঠের মূল বিষয়বস্তু ও সারসংক্ষেপ</h3>
+<p><strong>অধ্যায়ের মূল বক্তব্য:</strong> এখানে অধ্যায়ের মূল প্রতিপাদ্য বিষয় সহজ ও সাবলীল ভাষায় ব্যাখ্যা করা হলো।</p>
+
+<h4 style="color: #065f46; margin-top: 12px; margin-bottom: 6px;">🔑 গুরুত্বপূর্ণ সংজ্ঞাসমূহ:</h4>
+<ul>
+  <li><strong>সংজ্ঞা ১:</strong> এই বিষয়ের সুনির্দিষ্ট ও মানসম্মত সংজ্ঞা এখানে লিখুন।</li>
+  <li><strong>সংজ্ঞা ২:</strong> প্রাসঙ্গিক দ্বিতীয় বিষয়ের সংজ্ঞা ও বৈজ্ঞানিক তাৎপর্য।</li>
+</ul>
+
+<h4 style="color: #92400e; margin-top: 12px; margin-bottom: 6px;">💡 শিক্ষকের বিশেষ পরামর্শ ও সতর্কতা:</h4>
+<div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; font-size: 0.95em;">
+  পরীক্ষায় এই টপিক থেকে প্রায়ই প্রশ্ন আসে। বিশেষ করে সূত্র ও উদাহরণের পার্থক্য ভালো করে মনে রাখবে।
+</div>
+</div>`
+    },
+    {
+      id: 'qa_handout',
+      title: '❓ প্রশ্নোত্তর হ্যান্ডআউট (জ্ঞান ও অনুধাবনমূলক)',
+      desc: 'বোর্ড স্ট্যান্ডার্ড জ্ঞানমূলক ও অনুধাবনমূলক প্রশ্ন ও নির্ভুল উত্তর',
+      content: `<div class="template-section">
+<h3 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px;">📝 জ্ঞানমূলক ও অনুধাবনমূলক প্রশ্নোত্তর</h3>
+
+<div style="margin-bottom: 12px;">
+  <p><strong>প্রশ্ন ১ (জ্ঞানমূলক):</strong> নির্দিষ্ট বৈজ্ঞানিক/পাঠ্য বিষয় কাকে বলে?</p>
+  <p style="color: #1f2937; padding-left: 16px;"><strong>উত্তর:</strong> বইয়ের প্রমিত ভাষা অনুযায়ী সুনির্দিষ্ট এক লাইনের সংজ্ঞা লিখুন।</p>
+</div>
+
+<div style="margin-bottom: 12px;">
+  <p><strong>প্রশ্ন ২ (জ্ঞানমূলক):</strong> এই রাশির এস.আই (S.I) একক কী?</p>
+  <p style="color: #1f2937; padding-left: 16px;"><strong>উত্তর:</strong> এই রাশির এস.আই একক হলো নিউটন/জুল/প্যাসকেল ইত্যাদি।</p>
+</div>
+
+<div style="margin-bottom: 12px;">
+  <p><strong>প্রশ্ন ৩ (অনুধাবনমূলক):</strong> উক্তিটির তাৎপর্য ব্যাখ্যা করো।</p>
+  <p style="color: #1f2937; padding-left: 16px;"><strong>উত্তর:</strong> প্রথমে মূল পয়েন্ট উল্লেখ করুন। এরপর দুই বা তিন বাক্যে কারণ ও প্রভাব ব্যাখ্যা করুন।</p>
+</div>
+</div>`
+    },
+    {
+      id: 'cq_practice',
+      title: '🎯 সৃজনশীল প্রশ্নপত্র (CQ)',
+      desc: 'বোর্ড স্ট্যান্ডার্ড উদ্দীপক ও ক, খ, গ, ঘ প্রশ্ন কাঠামো',
+      content: `<div class="template-section">
+<h3 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px;">🎯 সৃজনশীল অনুশীলন প্রশ্ন</h3>
+
+<div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+  <p><strong>উদ্দীপক:</strong> একটি গতিশীল বস্তুর ক্ষেত্রে পর্যবেক্ষণে দেখা গেল যে, আদিবেগ ২০ মি./সে. থেকে সমত্বরণে ৫ সেকেন্ডে বেগ ৪০ মি./সে. হলো। বস্তুর ভর ছিল ৫০ কেজি।</p>
+</div>
+
+<ol type="a" style="padding-left: 20px; line-height: 1.8;">
+  <li><strong>ক.</strong> ত্বরণ কাকে বলে? <span style="float: right; font-weight: bold;">[১]</span></li>
+  <li><strong>খ.</strong> সুষম বেগ ও সমত্বরণের মধ্যে পার্থক্য লিখো। <span style="float: right; font-weight: bold;">[২]</span></li>
+  <li><strong>গ.</strong> উদ্দীপকের বস্তুটির ত্বরণ ও অতিক্রান্ত দূরত্ব নির্ণয় করো। <span style="float: right; font-weight: bold;">[৩]</span></li>
+  <li><strong>ঘ.</strong> উদ্দীপকের তথ্যানুযায়ী বলের মান পরিবর্তন হলে কী ঘটবে তা গাণিতিকভাবে বিশ্লেষণ করো। <span style="float: right; font-weight: bold;">[৪]</span></li>
+</ol>
+</div>`
+    },
+    {
+      id: 'mcq_practice',
+      title: '🔘 বহুনির্বাচনী প্র্যাকটিস শিট (MCQ)',
+      desc: '৪টি অপশনসহ সাজানো বহুনির্বাচনী প্রশ্নের নমুনা গ্রিড',
+      content: `<div class="template-section">
+<h3 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px;">🔘 বহুনির্বাচনী অনুশীলন (MCQ)</h3>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+  <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+    <p><strong>১. মৌলিক রাশি কোনটি?</strong></p>
+    <p style="font-size: 0.9em; margin-top: 4px;">(ক) বেগ &nbsp;&nbsp;&nbsp; (খ) ত্বরণ<br/>(গ) দৈর্ঘ্য &nbsp;&nbsp;&nbsp; (ঘ) বল</p>
+  </div>
+  <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+    <p><strong>২. কাজের এস.আই একক কী?</strong></p>
+    <p style="font-size: 0.9em; margin-top: 4px;">(ক) জুল &nbsp;&nbsp;&nbsp; (খ) ওয়াট<br/>(গ) নিউটন &nbsp;&nbsp;&nbsp; (ঘ) ক্যালরি</p>
+  </div>
+  <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+    <p><strong>৩. শক্তির সাধারণ রূপ কোনটি?</strong></p>
+    <p style="font-size: 0.9em; margin-top: 4px;">(ক) আলোক শক্তি &nbsp;&nbsp;&nbsp; (খ) যান্ত্রিক শক্তি<br/>(গ) শব্দ শক্তি &nbsp;&nbsp;&nbsp; (ঘ) তাপ শক্তি</p>
+  </div>
+  <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;">
+    <p><strong>৪. বল ও সরণের গুণফলকে কী বলে?</strong></p>
+    <p style="font-size: 0.9em; margin-top: 4px;">(ক) ক্ষমতা &nbsp;&nbsp;&nbsp; (খ) কাজ<br/>(গ) শক্তি &nbsp;&nbsp;&nbsp; (ঘ) ভরবেগ</p>
+  </div>
+</div>
+</div>`
+    },
+    {
+      id: 'math_science',
+      title: '📐 গণিত ও বিজ্ঞান সূত্রমালা ও প্র্যাকটিস',
+      desc: 'প্রয়োজনীয় সূত্র তালিকা, উদাহরণ সমাধান ও হোমওয়ার্ক বক্স',
+      content: `<div class="template-section">
+<h3 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px;">📐 প্রয়োজনীয় সূত্রাবলী ও গাণিতিক উদাহরণ</h3>
+
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 0.95em;">
+  <thead>
+    <tr style="background-color: #f1f5f9; text-align: left;">
+      <th style="border: 1px solid #cbd5e1; padding: 6px 10px;">সূত্র</th>
+      <th style="border: 1px solid #cbd5e1; padding: 6px 10px;">বর্ণনা</th>
+      <th style="border: 1px solid #cbd5e1; padding: 6px 10px;">একক</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;"><strong>v = u + at</strong></td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">শেষ বেগ নির্ণয়</td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">মি./সে. (m/s)</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;"><strong>s = ut + ½at²</strong></td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">দূরত্ব নির্ণয়</td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">মিটার (m)</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;"><strong>F = ma</strong></td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">প্রযুক্ত বল</td>
+      <td style="border: 1px solid #cbd5e1; padding: 6px 10px;">নিউটন (N)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 8px 12px; border-radius: 4px; margin-top: 10px;">
+  <strong>বাড়ির কাজ (Homework):</strong> উপরের সূত্রগুলো ব্যবহার করে পাঠ্যবইয়ের উদাহরণ ১ ও অনুশীলনীর ৩নং অংক সম্পন্ন করে আনবে।
+</div>
+</div>`
+    }
+  ], []);
   const [globalFontSize, setGlobalFontSize] = useState(10.5);
   const [globalLineHeight, setGlobalLineHeight] = useState(1.2);
   const [fontSizeDraft, setFontSizeDraft] = useState("");
@@ -2632,6 +2908,141 @@ function CreateLectureSheetContent() {
                   <BrainCircuit className="w-4 h-4 mr-2 text-amber-300 animate-pulse" /> AI দিয়ে লেকচার শিট তৈরি করুন
                 </Button>
 
+                {/* Template Library Dialog */}
+                <Dialog open={templateModalOpen} onOpenChange={setTemplateModalOpen}>
+                  <DialogContent className="font-kalpurush max-w-2xl bg-white border-2 border-emerald-200">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-black flex items-center gap-2 text-emerald-950">
+                        <LayoutTemplate className="h-5 w-5 text-emerald-600" /> রেডিমেড লেকচার শিট টেমপ্লেট
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-1">
+                      <p className="text-xs text-slate-600 font-bold">
+                        যেকোনো একটি রেডিমেড টেমপ্লেট বেছে নিন। এটি বর্তমান পাতায় সুন্দরভাবে ফরম্যাট আকারে যুক্ত হবে।
+                      </p>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {LECTURE_TEMPLATES.map(tmpl => (
+                          <div
+                            key={tmpl.id}
+                            className="p-3 border-2 border-slate-200 hover:border-emerald-500 rounded-xl transition-all cursor-pointer bg-slate-50/50 hover:bg-emerald-50/30 flex items-center justify-between"
+                            onClick={() => {
+                              insertLectureSnippet(tmpl.content);
+                              setTemplateModalOpen(false);
+                              toast({ title: 'টেমপ্লেট যুক্ত হয়েছে! 📑', description: `${tmpl.title} সফলভাবে যুক্ত হয়েছে।` });
+                            }}
+                          >
+                            <div>
+                              <p className="font-black text-sm text-slate-900">{tmpl.title}</p>
+                              <p className="text-xs text-slate-500 font-bold mt-0.5">{tmpl.desc}</p>
+                            </div>
+                            <Button size="sm" className="font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 ml-3">
+                              যুক্ত করুন
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* QR Code Dialog */}
+                <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
+                  <DialogContent className="font-kalpurush max-w-md bg-white border-2 border-indigo-200">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
+                        <QrCode className="h-5 w-5 text-indigo-600" /> শিটে QR কোড যুক্ত করুন
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">লিংক বা ইউআরএল (URL) *</label>
+                        <Input
+                          placeholder="যেমন: https://youtube.com/watch?v=... বা ড্রাইভ লিংক"
+                          value={qrUrl}
+                          onChange={e => setQrUrl(e.target.value)}
+                          className="h-9 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">ক্যাপশন / শিরোনাম</label>
+                        <Input
+                          placeholder="যেমন: ক্লাসের ভিডিও দেখতে স্ক্যান করুন"
+                          value={qrCaption}
+                          onChange={e => setQrCaption(e.target.value)}
+                          className="h-9 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">সাইজ</label>
+                        <Select value={qrSize} onValueChange={setQrSize}>
+                          <SelectTrigger className="h-9 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="90" className="font-bold text-xs">ছোট (90px)</SelectItem>
+                            <SelectItem value="110" className="font-bold text-xs">মাঝারি (110px)</SelectItem>
+                            <SelectItem value="140" className="font-bold text-xs">বড় (140px)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button variant="outline" size="sm" onClick={() => setQrModalOpen(false)}>বাতিল</Button>
+                      <Button onClick={handleInsertQrCode} className="font-bold bg-indigo-600 hover:bg-indigo-700 text-white">QR কোড বসান</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* AI Assistant Content Expander Dialog */}
+                <Dialog open={aiAssistantOpen} onOpenChange={setAiAssistantOpen}>
+                  <DialogContent className="font-kalpurush max-w-lg bg-white border-2 border-purple-200">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-black flex items-center gap-2 text-purple-950">
+                        <Sparkles className="h-5 w-5 text-purple-600" /> AI কন্টেন্ট সহকারী
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                      <p className="text-xs text-slate-600 font-bold">
+                        যেকোনো টপিক বা ধারণা লিখুন, AI তাৎক্ষণিকভাবে লেকচার শিট উপযোগী পরিচ্ছন্ন বাংলা নোট তৈরি করে দেবে।
+                      </p>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">টপিক বা প্রম্পট *</label>
+                        <Textarea
+                          placeholder="যেমন: আর্কিমিডিসের সূত্র ও প্লবতার বিস্তারিত ব্যাখ্যা..."
+                          value={aiAssistantPrompt}
+                          onChange={e => setAiAssistantPrompt(e.target.value)}
+                          className="min-h-[80px] text-xs font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">কন্টেন্টের ধরণ</label>
+                        <Select value={aiAssistantType} onValueChange={(v: any) => setAiAssistantType(v)}>
+                          <SelectTrigger className="h-9 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="bullet_points" className="font-bold text-xs">📌 গুরুত্বপূর্ণ বুলেট পয়েন্ট ও সারসংক্ষেপ</SelectItem>
+                            <SelectItem value="detailed" className="font-bold text-xs">📖 বিস্তারিত সহজ আলোচনা</SelectItem>
+                            <SelectItem value="qa" className="font-bold text-xs">❓ জ্ঞান ও অনুধাবনমূলক প্রশ্নোত্তর</SelectItem>
+                            <SelectItem value="formula_examples" className="font-bold text-xs">📐 গাণিতিক সূত্র ও উদাহরণ সমস্যা</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button variant="outline" size="sm" onClick={() => setAiAssistantOpen(false)}>বাতিল</Button>
+                      <Button
+                        onClick={handleAiExpandContent}
+                        disabled={isAiExpanding || !aiAssistantPrompt.trim()}
+                        className="font-bold bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                      >
+                        {isAiExpanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+                        {isAiExpanding ? "জেনারেট হচ্ছে..." : "এডিটরে যুক্ত করুন"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 {/* AI Lecture Sheet Dialog */}
                 <Dialog open={aiModalOpen} onOpenChange={setAiModalOpen}>
                   <DialogContent className="font-kalpurush max-w-md bg-white border-2 border-emerald-200">
@@ -2868,6 +3279,58 @@ function CreateLectureSheetContent() {
                           সোর্স কোড (HTML)
                         </button>
                       </div>
+
+                                            {/* Voice Typing */}
+                      <Button
+                        type="button"
+                        onClick={toggleVoiceTyping}
+                        size="sm"
+                        className={cn(
+                          "h-8 gap-1.5 font-bold transition-all",
+                          isVoiceListening
+                            ? "bg-rose-600 hover:bg-rose-700 text-white animate-pulse shadow-md"
+                            : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300"
+                        )}
+                        title="মাইক্রোফোনে বাংলায় কথা বলে সরাসরি টাইপ করুন"
+                      >
+                        {isVoiceListening ? <Mic className="w-3.5 h-3.5 text-white animate-ping" /> : <Mic className="w-3.5 h-3.5 text-rose-600" />}
+                        {isVoiceListening ? "রেকর্ডিং হচ্ছে..." : "ভয়েস টাইপিং"}
+                      </Button>
+
+                      {/* Ready Template Library */}
+                      <Button
+                        type="button"
+                        onClick={() => setTemplateModalOpen(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 font-bold border-emerald-600 text-emerald-800 hover:bg-emerald-50"
+                        title="রেডিমেড শিট টেমপ্লেট বেছে নিন"
+                      >
+                        <LayoutTemplate className="w-3.5 h-3.5 text-emerald-600" /> টেমপ্লেট
+                      </Button>
+
+                      {/* QR Code Insert */}
+                      <Button
+                        type="button"
+                        onClick={() => setQrModalOpen(true)}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 font-bold border-indigo-600 text-indigo-800 hover:bg-indigo-50"
+                        title="শিটে QR কোড যুক্ত করুন"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-indigo-600" /> QR কোড
+                      </Button>
+
+                      {/* AI Assistant */}
+                      <Button
+                        type="button"
+                        onClick={() => setAiAssistantOpen(true)}
+                        size="sm"
+                        className="h-8 gap-1.5 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
+                        title="টপিক অনুযায়ী AI দিয়ে কন্টেন্ট সম্প্রসারণ করুন"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> AI সহকারী
+                      </Button>
 
                       <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
                       <Button onClick={() => ocrInputRef.current?.click()} disabled={isScanning} variant="outline" size="sm" className="h-8 gap-1.5 border-indigo-600 text-indigo-700 font-bold">

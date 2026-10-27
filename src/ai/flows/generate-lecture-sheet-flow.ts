@@ -116,3 +116,63 @@ Output must be in JSON format only (no markdown backticks):
     };
   }
 }
+
+export interface ExpandLectureContentInput {
+  topicPrompt: string;
+  className?: string;
+  subject?: string;
+  type?: 'bullet_points' | 'detailed' | 'qa' | 'formula_examples';
+}
+
+export async function expandLectureContent(
+  input: ExpandLectureContentInput
+): Promise<string> {
+  const typeDescriptions: Record<string, string> = {
+    bullet_points: 'গুরুত্বপূর্ণ বুলেট পয়েন্ট ও সারসংক্ষেপ',
+    detailed: 'বিস্তারিত প্রাঞ্জল আলোচনা ও উদাহরণ',
+    qa: 'জ্ঞানমূলক ও অনুধাবনমূলক প্রশ্ন এবং নির্ভুল উত্তর',
+    formula_examples: 'গাণিতিক সূত্র, একক ও সমাধানকৃত সমস্যা'
+  };
+
+  const styleDesc = typeDescriptions[input.type || 'bullet_points'] || 'সংক্ষিপ্ত ও সাজানো পয়েন্ট';
+
+  const prompt = `তুমি একজন অভিজ্ঞ শিক্ষক। নিচের বিষয়ের ওপর ভিত্তি করে শিক্ষার্থীদের জন্য লেকচার শিটে ব্যবহারযোগ্য পরিচ্ছন্ন বাংলা কন্টেন্ট তৈরি করো।
+শ্রেণি: ${input.className || 'সাধারণ'} শ্রেণি
+বিষয়: ${input.subject || 'সাধারণ'}
+টপিক/নির্দেশনা: "${input.topicPrompt}"
+কন্টেন্টের ধরণ: ${styleDesc}
+
+নির্দেশনা:
+১. সরাসরি লেকচার শিটে বসানোর উপযোগী পরিচ্ছন্ন টেক্সট প্রদান করো।
+২. কোনো অপ্রয়োজনীয় ভূমিকা বা সম্ভাষণ রাখবে না, সরাসরি পাঠ্য বিষয় শুরু করো।
+৩. প্রমিত বাংলা এবং বৈজ্ঞানিক/গাণিতিক চিহ্নের সঠিক রূপ ব্যবহার করো।`;
+
+  const availableKeys = getAvailableApiKeys();
+  const candidateModels = [
+    'googleai/gemini-flash-lite-latest',
+    'googleai/gemini-flash-latest',
+    'googleai/gemini-3.5-flash',
+  ];
+
+  let rawText = '';
+  for (const key of availableKeys) {
+    for (const model of candidateModels) {
+      try {
+        const client = createAiClient(key, model);
+        const resp = await client.generate({
+          model,
+          prompt,
+        });
+        rawText = resp.text?.trim() || '';
+        if (rawText) break;
+      } catch (err) {}
+    }
+    if (rawText) break;
+  }
+
+  if (!rawText) {
+    throw new Error('কন্টেন্ট জেনারেট করা সম্ভব হয়নি। পুনরায় চেষ্টা করুন।');
+  }
+
+  return rawText;
+}
