@@ -789,6 +789,8 @@ function MyLibraryContent() {
                                 <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-primary border-2 border-primary/20 hover:bg-primary/5" title="দেখুন"><Eye className="h-4 w-4" /></Button></Link>
                                 <Link href={`/create-question?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-blue-600 border-2 border-blue-200 hover:bg-blue-50" title="এডিট"><Edit className="w-4 h-4" /></Button></Link>
                                 <Link href={`/create-question?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-orange-600 border-2 border-orange-200 hover:bg-orange-50" title="প্রিন্ট"><Printer className="h-4 w-4" /></Button></Link>
+                                <Link href={`/online-exam?id=${item.id}`}><Button variant="outline" size="icon" className="h-9 w-9 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-50" title="অনলাইন পরীক্ষা"><GraduationCap className="h-4 w-4" /></Button></Link>
+                                <Link href={`/omr-sheet?id=${item.id}&print=true`}><Button variant="outline" size="icon" className="h-9 w-9 text-purple-600 border-2 border-purple-200 hover:bg-purple-50" title="OMR শিট প্রিন্ট"><CheckCircle2 className="h-4 w-4" /></Button></Link>
                               </>
                             )}
                           </div>

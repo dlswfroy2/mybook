@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Printer, 
+  Shuffle,
+  GraduationCap,
   Plus, 
   Trash2, 
   BookOpen, 
@@ -140,6 +142,59 @@ function CreateQuestionContent() {
   const [aiType, setAiType] = useState<'creative' | 'short' | 'mcq' | 'mixed'>('creative');
   const [aiCount, setAiCount] = useState<number>(3);
   const [aiTopic, setAiTopic] = useState('');
+
+  // Random Question Paper Generator State
+  const [randomGenerating, setRandomGenerating] = useState(false);
+
+  const handleGenerateRandomPaper = async () => {
+    if (!meta.classId || !meta.subject) {
+      toast({
+        variant: 'destructive',
+        title: 'তথ্য দিন',
+        description: 'র‍্যান্ডম প্রশ্নপত্র তৈরির জন্য শ্রেণি এবং বিষয় নির্বাচন করুন।'
+      });
+      return;
+    }
+    setRandomGenerating(true);
+    try {
+      const count = meta.examType === 'mcq' ? 20 : 5;
+      const result = await generatePracticeQuestions({
+        classId: meta.classId,
+        subject: meta.subject,
+        chapter: meta.chapter || 'সম্পূর্ণ বইয়ের গুরুত্বপূর্ণ অধ্যায়সমূহ',
+        type: meta.examType === 'mcq' ? 'mcq' : 'mixed',
+        count: count,
+        institutionName: meta.institution,
+      });
+
+      if (!result.questions || result.questions.length === 0) {
+        throw new Error('র‍্যান্ডম প্রশ্ন জেনারেট করা সম্ভব হয়নি।');
+      }
+
+      const generatedList = result.questions.map((q) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        type: q.type,
+        content: q.formattedText,
+        imageUrl: '',
+        isFromBank: false,
+        section: meta.currentSection,
+      }));
+
+      setQuestions(generatedList);
+      toast({
+        title: 'র‍্যান্ডম প্রশ্নপত্র প্রস্তুত! 🎲',
+        description: `মোট ${generatedList.length}টি প্রশ্ন দিয়ে সম্পূর্ণ প্রশ্নপত্র তৈরি করা হয়েছে।`
+      });
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'ত্রুটি',
+        description: err.message || 'র‍্যান্ডম প্রশ্নপত্র তৈরি ব্যর্থ হয়েছে।'
+      });
+    } finally {
+      setRandomGenerating(false);
+    }
+  };
 
   // Set A / Set B States
   const [questionSet, setQuestionSet] = useState<'A' | 'B' | 'both'>('A');
@@ -291,7 +346,15 @@ function CreateQuestionContent() {
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         <header className="flex items-center gap-4 border-b pb-4">
           <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-sm"><FileText className="w-7 h-7" /></div><h2 className="text-2xl font-bold text-primary">প্রশ্নপত্র নির্মাতা</h2></div>
-          <div className="flex gap-2"><Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button><Button variant="secondary" onClick={() => { const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} className="gap-2 font-bold"><Printer className="w-4 h-4" /> প্রিন্ট</Button></div>
+          <div className="flex gap-2"><Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button><Button variant="secondary" onClick={() => { const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} className="gap-2 font-bold"><Printer className="w-4 h-4" /> প্রিন্ট</Button>
+            {editId && (
+              <Button variant="outline" onClick={() => router.push(`/online-exam?id=${editId}`)} className="gap-2 font-bold border-emerald-500 text-emerald-700 hover:bg-emerald-50">
+                <GraduationCap className="w-4 h-4" /> অনলাইন পরীক্ষা
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => router.push(editId ? `/omr-sheet?id=${editId}` : `/omr-sheet?count=${questions.length || 25}`)} className="gap-2 font-bold border-purple-500 text-purple-700 hover:bg-purple-50">
+              <CheckCircle2 className="w-4 h-4" /> OMR শিট
+            </Button></div>
         </header>
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary/50 p-1 h-12"><TabsTrigger value="sample" className="gap-2 font-bold h-10"><FileText className="w-4 h-4" /> নমুনা প্রশ্ন</TabsTrigger><TabsTrigger value="exam" className="gap-2 font-bold h-10"><BrainCircuit className="w-4 h-4" /> ব্যাংক থেকে প্রশ্ন</TabsTrigger></TabsList>
@@ -354,6 +417,14 @@ function CreateQuestionContent() {
                 className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs h-9 shadow-md"
               >
                 <BrainCircuit className="w-4 h-4 mr-1.5 text-amber-300 animate-pulse" /> AI দিয়ে প্রশ্ন তৈরি করুন
+              </Button>
+              <Button
+                type="button"
+                onClick={handleGenerateRandomPaper}
+                disabled={randomGenerating}
+                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black text-xs h-9 shadow-md gap-1.5"
+              >
+                {randomGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shuffle className="w-4 h-4 text-white" />} র‍্যান্ডম প্রশ্ন তৈরি
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleAddQuestion('creative')} className="border-primary text-primary font-bold">
                 <Plus className="w-3 h-3 mr-1" /> সৃজনশীল
