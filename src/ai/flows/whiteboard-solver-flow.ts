@@ -47,10 +47,9 @@ const SOLVER_PROMPT = `তুমি একজন শীর্ষস্থান�
 এই সমস্যা সহজে মনে রাখার বা দ্রুত সমাধানের বিশেষ কৌশল।`;
 
 const CANDIDATE_MODELS = [
-  'googleai/gemini-flash-latest',
-  'googleai/gemini-2.0-flash',
-  'googleai/gemini-3.5-flash',
   'googleai/gemini-flash-lite-latest',
+  'googleai/gemini-3.5-flash-lite',
+  'googleai/gemini-3.1-flash-lite',
 ];
 
 export interface WhiteboardOcrResult {
@@ -80,13 +79,17 @@ export async function performWhiteboardVisionOcr(imageDataUri: string): Promise<
     for (const model of CANDIDATE_MODELS) {
       try {
         const client = createAiClient(key, model);
-        const resp = await client.generate({
+        const generatePromise = client.generate({
           model,
           prompt: [
             { text: OCR_PROMPT },
             { media: { url: imageDataUri } },
           ],
         });
+        const resp = await Promise.race([
+          generatePromise,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_15S')), 15000))
+        ]) as any;
 
         const text = resp.text?.trim();
         if (text && text.length > 0) {
@@ -124,13 +127,17 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
     for (const model of CANDIDATE_MODELS) {
       try {
         const client = createAiClient(key, model);
-        const resp = await client.generate({
+        const generatePromise = client.generate({
           model,
           prompt: [
             { text: promptText },
             { media: { url: imageDataUri } },
           ],
         });
+        const resp = await Promise.race([
+          generatePromise,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_15S')), 15000))
+        ]) as any;
 
         const solution = resp.text?.trim();
         if (solution && solution.length > 10) {

@@ -742,11 +742,31 @@ export default function WhiteboardPage() {
       saveState();
     }
 
+    function getOptimizedCanvasDataUrl(sourceCanvas: HTMLCanvasElement): string {
+      const maxDim = 1600;
+      let w = sourceCanvas.width;
+      let h = sourceCanvas.height;
+      if (w > maxDim || h > maxDim) {
+        const scale = Math.min(maxDim / w, maxDim / h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = w;
+      tempCanvas.height = h;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.drawImage(sourceCanvas, 0, 0, w, h);
+        return tempCanvas.toDataURL('image/jpeg', 0.82);
+      }
+      return sourceCanvas.toDataURL('image/jpeg', 0.82);
+    }
+
     // High-Power Gemini Vision OCR
     ocrBtn.onclick = async () => {
       ocrBtn.textContent = '⏳ স্ক্যান হচ্ছে...';
       try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        const dataUrl = getOptimizedCanvasDataUrl(canvas);
         aiModal.classList.remove('hidden');
         aiModalTitle.innerHTML = '<span class="flex items-center gap-2">📝 এআই ভিশন OCR (অটো-শনাক্তকরণ)</span>';
         aiBody.innerHTML = `
@@ -822,7 +842,7 @@ export default function WhiteboardPage() {
     aiSolveBtn.onclick = async () => {
       aiSolveBtn.textContent = '🤖 এআই সলভ...';
       try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        const dataUrl = getOptimizedCanvasDataUrl(canvas);
         aiModal.classList.remove('hidden');
         aiModalTitle.innerHTML = '<span class="flex items-center gap-2">🧠 সুপার এআই অ্যাকাডেমিক সমাধান (জেমিনি ভিশন)</span>';
         aiBody.innerHTML = `

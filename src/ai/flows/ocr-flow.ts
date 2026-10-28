@@ -33,8 +33,9 @@ const OCR_PROMPT = `তুমি একজন বিশ্বমানের OCR
 async function ocrSingleDocument(dataUri: string): Promise<string> {
   const availableKeys = getAvailableApiKeys();
   const candidateModels = [
-    'googleai/gemini-flash-latest',
     'googleai/gemini-flash-lite-latest',
+    'googleai/gemini-3.5-flash-lite',
+    'googleai/gemini-3.1-flash-lite',
   ];
 
   let lastError: any = null;
