@@ -113,8 +113,8 @@ export default function WhiteboardPage() {
     let currentBoardPage = 0;
 
     const sidebarsWidth = 380;
-    canvas.width = Math.max(760, window.innerWidth - sidebarsWidth);
-    canvas.height = Math.max(650, window.innerHeight - 130);
+    canvas.width = Math.max(900, window.innerWidth - sidebarsWidth);
+    canvas.height = 3000;
 
     function saveState() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
@@ -451,31 +451,46 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
 
-    const adjustScrollWrapperPadding = () => {
+    const adjustScrollWrapperLayout = () => {
       const leftCol = toolbar.classList.contains('collapsed');
       const rightCol = rightToolbar.classList.contains('collapsed');
       const scrollWrapper = document.getElementById('scroll-wrapper');
       if (scrollWrapper) {
-        scrollWrapper.style.paddingLeft = leftCol ? '30px' : '185px';
-        scrollWrapper.style.paddingRight = rightCol ? '30px' : '185px';
+        scrollWrapper.style.left = leftCol ? '35px' : '180px';
+        scrollWrapper.style.right = rightCol ? '35px' : '175px';
       }
     };
 
     const toggleSidebarHandler = () => {
       toolbar.classList.toggle('collapsed');
       toggleSidebarBtn.textContent = toolbar.classList.contains('collapsed') ? '▶' : '◀';
-      adjustScrollWrapperPadding();
+      adjustScrollWrapperLayout();
     };
     toggleSidebarBtn.addEventListener('click', toggleSidebarHandler);
 
     const toggleRightSidebarHandler = () => {
       rightToolbar.classList.toggle('collapsed');
       toggleRightSidebarBtn.textContent = rightToolbar.classList.contains('collapsed') ? '◀' : '▶';
-      adjustScrollWrapperPadding();
+      adjustScrollWrapperLayout();
     };
     toggleRightSidebarBtn.addEventListener('click', toggleRightSidebarHandler);
 
-    adjustScrollWrapperPadding();
+    adjustScrollWrapperLayout();
+
+    canvas.addEventListener('wheel', (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) currentScale = Math.min(3, currentScale + 0.1);
+        else if (currentScale > 0.3) currentScale = Math.max(0.3, currentScale - 0.1);
+        updateCanvasTransform();
+      } else {
+        const scrollWrapper = document.getElementById('scroll-wrapper');
+        if (scrollWrapper) {
+          scrollWrapper.scrollTop += e.deltaY;
+          if (e.deltaX) scrollWrapper.scrollLeft += e.deltaX;
+        }
+      }
+    }, { passive: false });
 
     clearBtn.onclick = () => { saveState(); drawBackground(); };
     undoBtn.onclick = () => {
