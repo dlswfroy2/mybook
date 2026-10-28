@@ -171,14 +171,17 @@ The user will provide a name or description of a diagram. Create a detailed, acc
 STRICT RULES:
 1. Return ONLY valid SVG code - starting with <svg ...> and ending with </svg>.
 2. No markdown backticks, no explanation, no introduction - ONLY SVG code.
-3. SVG must have viewBox="0 0 800 600" and width="800" height="600".
-4. CRITICAL: Background must be WHITE (#ffffff) or very light color. NEVER use black, dark grey, or any dark background. The SVG root element must have style="background:#ffffff" or fill the background with a white rect.
-5. ALL labels and part names MUST be written in Bengali (Bangla script). Use <text> elements with font-family="sans-serif" for Bengali text.
-6. Every important part of the diagram must be clearly labeled with an arrow or line pointing to it, with the Bengali name written next to it.
-7. Make the diagram as detailed, accurate and professional as possible.
-8. Use bright, vibrant colors for diagram parts (not dark colors) so they are visible on white background.
-9. Can draw any subject: biology, physics, chemistry, math, geography, history, architecture, etc.
-10. Add a title in Bengali at the top of the diagram using a large <text> element.`;
+3. SVG must have viewBox="0 0 900 650" and width="900" height="650".
+4. CRITICAL: Background must be WHITE (#ffffff). Always start with <rect width="900" height="650" fill="#ffffff"/>.
+5. LAYOUT: Draw the main diagram in the CENTER of the SVG (roughly 250,80 to 650,520). Leave margins of at least 200px on left and right, and 80px on top and bottom for labels.
+6. ALL labels MUST be placed OUTSIDE the diagram drawing — in the left margin, right margin, top margin, or bottom margin. NO label text should overlap or appear on top of the diagram itself.
+7. Use leader lines (thin lines or polylines) with arrowheads to connect each label text (in the margin) to the corresponding part inside the diagram. Use <line> or <polyline> with marker-end="url(#arrow)" for arrows.
+8. ALL label text must be in Bengali (Bangla script). Each part of the diagram must have a Bengali label.
+9. Make the diagram as detailed, accurate and professional as possible.
+10. Use bright, vibrant colors for diagram parts so they are visible on white background.
+11. Add a Bengali title at the very top center using a large <text> element.
+12. Define an arrowhead marker in <defs>: <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/></marker>
+13. Label placement strategy: place labels alternately on LEFT side and RIGHT side of the diagram, evenly spaced vertically. Draw a leader line from label to the part.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;
