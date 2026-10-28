@@ -533,65 +533,159 @@ export default function WhiteboardPage() {
         (note.querySelector('.close-note') as HTMLElement).onclick = () => note.remove();
     };
 
+    /**
+     * Sanitizes raw LaTeX and markdown artifacts completely out of mathematical/academic text
+     * so it reads naturally like a textbook without $$, \mathbf, \qquad, \dots, etc.
+     */
+    function cleanMathText(text: string): string {
+      if (!text) return '';
+      return text
+        .replace(/\r\n/g, '\n')
+        // Clean LaTeX tags
+        .replace(/\$\$\s*\\mathbf\{([^}]+)\}\s*\$\$/g, '$1')
+        .replace(/\\mathbf\{([^}]+)\}/g, '$1')
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\textbf\{([^}]+)\}/g, '$1')
+        .replace(/\\mathrm\{([^}]+)\}/g, '$1')
+        .replace(/\\mathit\{([^}]+)\}/g, '$1')
+        .replace(/\\qquad/g, '   ')
+        .replace(/\\quad/g, '  ')
+        .replace(/\\dots/g, '...')
+        .replace(/\\cdots/g, '...')
+        .replace(/\\ldots/g, '...')
+        .replace(/\\cdot/g, ' × ')
+        .replace(/\\times/g, ' × ')
+        .replace(/\\div/g, ' ÷ ')
+        .replace(/\\pm/g, ' ± ')
+        .replace(/\\leq/g, ' ≤ ')
+        .replace(/\\geq/g, ' ≥ ')
+        .replace(/\\neq/g, ' ≠ ')
+        .replace(/\\approx/g, ' ≈ ')
+        .replace(/\\therefore/g, ' ∴ ')
+        .replace(/\\because/g, ' ∵ ')
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)')
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\sqrt\[(\d+)\]\{([^}]+)\}/g, '$1√($2)')
+        // Superscripts
+        .replace(/\^2\b/g, '²')
+        .replace(/\^3\b/g, '³')
+        .replace(/\^4\b/g, '⁴')
+        .replace(/\^n\b/g, 'ⁿ')
+        // Strip $$ and $
+        .replace(/\$\$/g, '')
+        .replace(/\$/g, '')
+        // Strip markdown formatting symbols
+        .replace(/\*\*/g, '')
+        .replace(/###/g, '')
+        .replace(/##/g, '')
+        .replace(/^#\s*/gm, '')
+        .replace(/\\/g, '') // strip any remaining escape backslashes
+        .trim();
+    }
+
     function escapeHtml(str: string): string {
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    function formatInline(text: string): string {
-      return escapeHtml(text)
-        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-slate-950">$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-        .replace(/`([^`]+)`/g, '<code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700 font-mono text-[11px]">$1</code>');
-    }
-
     function renderAcademicSolutionHtml(markdown: string): string {
-      const lines = markdown.split('\n');
+      const cleaned = cleanMathText(markdown);
+      const lines = cleaned.split('\n');
       const htmlParts: string[] = [];
 
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        if (trimmed.startsWith('### ') || trimmed.startsWith('## ') || trimmed.startsWith('# ')) {
-          const title = trimmed.replace(/^#+\s*/, '');
-          htmlParts.push(`<h4 class="text-sm md:text-base font-black text-indigo-900 border-b pb-1.5 mt-3.5 flex items-center gap-1.5">${escapeHtml(title)}</h4>`);
+        const isHeading = trimmed.startsWith('১.') || trimmed.startsWith('২.') || trimmed.startsWith('৩.') || trimmed.startsWith('৪.') || trimmed.startsWith('৫.') || trimmed.includes('চিহ্নিত প্রশ্ন') || trimmed.includes('সূত্র ও তত্ত্ব') || trimmed.includes('ধারাবাহিক') || trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('টিপস');
+        const isAnswer = trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('উত্তর:');
+
+        if (isHeading) {
+          htmlParts.push(`<h4 class="text-sm md:text-base font-black text-indigo-900 border-b pb-1.5 mt-3.5 flex items-center gap-1.5">${escapeHtml(trimmed)}</h4>`);
         } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           const item = trimmed.substring(2);
-          htmlParts.push(`<li class="text-xs font-bold text-slate-800 ml-4 list-disc">${formatInline(item)}</li>`);
-        } else if (trimmed.includes('**চূড়ান্ত উত্তর') || trimmed.includes('🎯 চূড়ান্ত') || trimmed.includes('Final Answer') || trimmed.includes('ফলাফল:')) {
-          htmlParts.push(`<div class="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl my-2.5 text-emerald-950 font-black text-xs md:text-sm shadow-sm">${formatInline(trimmed)}</div>`);
-        } else if (trimmed.startsWith('$$') || trimmed.startsWith('\\\[') || trimmed.startsWith('```')) {
-          htmlParts.push(`<div class="p-2.5 bg-slate-100 rounded-lg font-mono text-xs text-slate-900 my-1 overflow-x-auto border">${escapeHtml(trimmed)}</div>`);
+          htmlParts.push(`<li class="text-xs font-bold text-slate-800 ml-4 list-disc">${escapeHtml(item)}</li>`);
+        } else if (isAnswer) {
+          htmlParts.push(`<div class="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl my-2.5 text-emerald-950 font-black text-xs md:text-sm shadow-sm">${escapeHtml(trimmed)}</div>`);
         } else {
-          htmlParts.push(`<p class="text-xs font-bold text-slate-800 leading-relaxed">${formatInline(trimmed)}</p>`);
+          htmlParts.push(`<p class="text-xs font-bold text-slate-800 leading-relaxed">${escapeHtml(trimmed)}</p>`);
         }
       }
 
       return htmlParts.join('\n');
     }
 
-    function insertTextLinesOnCanvas(rawText: string) {
-      const lines = rawText.split('\n');
-      let currentY = canvas.height * 0.15;
-      const startX = canvas.width * 0.12;
-      const maxWidth = canvas.width * 0.76;
+    /**
+     * Inserts the cleaned text cleanly onto the canvas.
+     * If onNewPage is true, creates a fresh page so the student question and solution never overlap!
+     * If on current board, draws a clean white card backdrop so it never clashes with handwritten ink.
+     */
+    function insertTextLinesOnCanvas(rawText: string, onNewPage = false) {
+      const cleaned = cleanMathText(rawText);
+      const lines = cleaned.split('\n');
+
+      if (onNewPage) {
+        pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        pagesData.push({ imageData: null, pdfDoc: null, pageNum: 1, numPages: 0 });
+        currentBoardPage = pagesData.length - 1;
+        updateUIForPage();
+      }
+
+      const startX = onNewPage ? 80 : 70;
+      let currentY = onNewPage ? 80 : Math.max(100, canvas.height * 0.22);
+      const maxWidth = canvas.width - startX * 2;
+
+      saveState();
+
+      // If on existing page with drawings, draw a clean semi-transparent white card backdrop
+      if (!onNewPage) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+        ctx.strokeStyle = '#4338ca';
+        ctx.lineWidth = 2;
+        const estimatedHeight = Math.min(canvas.height - currentY - 40, lines.length * 34 + 60);
+        const r = 16;
+        const x = startX - 25;
+        const y = currentY - 25;
+        const w = maxWidth + 50;
+        const h = estimatedHeight;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
 
       ctx.textBaseline = 'top';
 
       for (const rawLine of lines) {
-        const line = rawLine.replace(/^[#* \-_]+/, '').trim();
+        const line = rawLine.trim();
         if (!line) {
-          currentY += 14;
+          currentY += 12;
           continue;
         }
 
-        const isHeading = rawLine.startsWith('#');
+        const isHeading = line.startsWith('১.') || line.startsWith('২.') || line.startsWith('৩.') || line.startsWith('৪.') || line.startsWith('৫.') || line.includes('চিহ্নিত প্রশ্ন') || line.includes('সূত্র ও তত্ত্ব') || line.includes('ধারাবাহিক') || line.includes('চূড়ান্ত ফলাফল') || line.includes('টিপস');
+        const isAnswer = line.includes('চূড়ান্ত ফলাফল') || line.includes('উত্তর:');
+
         if (isHeading) {
-          ctx.font = 'bold 24px Kalpurush, sans-serif';
-          ctx.fillStyle = '#4338ca';
+          ctx.font = 'bold 22px Kalpurush, sans-serif';
+          ctx.fillStyle = '#312e81';
+          currentY += 8;
+        } else if (isAnswer) {
+          ctx.font = 'bold 22px Kalpurush, sans-serif';
+          ctx.fillStyle = '#065f46';
         } else {
-          ctx.font = '20px Kalpurush, sans-serif';
-          ctx.fillStyle = colorPicker.value || '#0f172a';
+          ctx.font = '19px Kalpurush, sans-serif';
+          ctx.fillStyle = '#0f172a';
         }
 
         const words = line.split(' ');
@@ -612,8 +706,10 @@ export default function WhiteboardPage() {
           currentY += isHeading ? 34 : 28;
         }
 
-        if (currentY > canvas.height - 80) break;
+        if (currentY > canvas.height - 60) break;
       }
+
+      saveState();
     }
 
     // High-Power Gemini Vision OCR
@@ -642,7 +738,7 @@ export default function WhiteboardPage() {
           return;
         }
 
-        const recognizedText = res.text;
+        const recognizedText = cleanMathText(res.text);
         aiBody.innerHTML = `
           <div class="space-y-4 font-kalpurush">
             <div class="flex items-center justify-between pb-2 border-b">
@@ -677,8 +773,7 @@ export default function WhiteboardPage() {
         const insertBtn = document.getElementById('insert-ocr-text-btn');
         if (insertBtn) {
           insertBtn.onclick = () => {
-            saveState();
-            insertTextLinesOnCanvas(recognizedText);
+            insertTextLinesOnCanvas(recognizedText, false);
             aiModal.classList.add('hidden');
           };
         }
@@ -719,21 +814,24 @@ export default function WhiteboardPage() {
           return;
         }
 
-        const solutionText = res.solution;
+        const solutionText = cleanMathText(res.solution);
         const renderedHtml = renderAcademicSolutionHtml(solutionText);
 
         aiBody.innerHTML = `
           <div class="space-y-4 font-kalpurush">
-            <div class="flex items-center justify-between pb-3 border-b">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b">
               <span class="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                 ✓ সম্পূর্ণ নির্ভুল সমাধান প্রস্তুত
               </span>
-              <div class="flex gap-2">
-                <button id="copy-ai-solution-btn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm">
-                  📋 সমাধান কপি
+              <div class="flex flex-wrap gap-2">
+                <button id="copy-ai-solution-btn" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm">
+                  📋 কপি
                 </button>
-                <button id="insert-ai-solution-btn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm">
-                  ✍️ বোর্ডে সমাধান লিখুন
+                <button id="insert-ai-solution-newpage-btn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm" title="প্রশ্ন অক্ষত রেখে পেজ ২ এ সম্পূর্ণ সমাধান লিখবে">
+                  📄 নতুন পেজে লিখুন
+                </button>
+                <button id="insert-ai-solution-btn" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm" title="বর্তমান বোর্ডের ওপর পরিচ্ছন্ন কার্ডে লিখবে">
+                  ✍️ বর্তমান বোর্ডে
                 </button>
               </div>
             </div>
@@ -749,15 +847,24 @@ export default function WhiteboardPage() {
           copySolBtn.onclick = () => {
             navigator.clipboard.writeText(solutionText);
             copySolBtn.textContent = '✓ কপি হয়েছে!';
-            setTimeout(() => { copySolBtn.textContent = '📋 সমাধান কপি'; }, 2000);
+            setTimeout(() => { copySolBtn.textContent = '📋 কপি'; }, 2000);
           };
         }
 
+        // Insert on a clean NEW page (Best experience: Question on Page 1, Solution on Page 2)
+        const insertNewPageBtn = document.getElementById('insert-ai-solution-newpage-btn');
+        if (insertNewPageBtn) {
+          insertNewPageBtn.onclick = () => {
+            insertTextLinesOnCanvas(solutionText, true);
+            aiModal.classList.add('hidden');
+          };
+        }
+
+        // Insert on current page (Clean white card, no clash with question ink)
         const insertSolBtn = document.getElementById('insert-ai-solution-btn');
         if (insertSolBtn) {
           insertSolBtn.onclick = () => {
-            saveState();
-            insertTextLinesOnCanvas(solutionText);
+            insertTextLinesOnCanvas(solutionText, false);
             aiModal.classList.add('hidden');
           };
         }
@@ -840,7 +947,7 @@ export default function WhiteboardPage() {
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
             img.onload = () => { ctx.drawImage(img, 150, 150); saveState(); };
         } else {
-            const formula = mathLatexInput.value.trim();
+            const formula = cleanMathText(mathLatexInput.value.trim());
             if (formula) {
               ctx.font = '24px Kalpurush, sans-serif';
               ctx.fillStyle = colorPicker.value;
