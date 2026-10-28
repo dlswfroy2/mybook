@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -402,24 +402,24 @@ export default function AcademicCalendarPage() {
   return (
     <div className="space-y-6 pb-12 font-kalpurush">
       {/* Top Banner & Title */}
-      <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white p-6 md:p-8 rounded-[28px] shadow-xl border border-white/20 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white px-5 py-3 rounded-[14px] shadow-xl border border-white/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 backdrop-blur-3xl transform skew-x-12 pointer-events-none" />
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-bold mb-2 backdrop-blur-md">
-              <School className="w-3.5 h-3.5 text-yellow-300" />
+            <div className="inline-flex items-center gap-1.5 bg-white/15 px-2.5 py-0.5 rounded-full text-[11px] font-bold mb-1 backdrop-blur-md">
+              <School className="w-3 h-3 text-yellow-300" />
               <span>মাধ্যমিক ও নিম্ন মাধ্যমিক বিদ্যালয় একাডেমি প্রশাসন</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black drop-shadow-md flex items-center gap-2.5">
-              <CalendarIcon className="w-8 h-8 text-yellow-400" />
+            <h1 className="text-base md:text-lg font-black drop-shadow-md flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-yellow-400" />
               বাৎসরিক একাডেমিক ক্যালেন্ডার ও ছুটির তালিকা
             </h1>
-            <p className="text-white/80 text-xs md:text-sm mt-1 max-w-xl font-medium">
+            <p className="text-white/80 text-[11px] mt-0.5 max-w-xl font-medium">
               {schoolInfo?.name || 'টপ গ্রেড একাডেমি'} - শিক্ষা মন্ত্রণালয় ও মাউশি অনুমোদিত মাধ্যমিক স্তরের ছুটির তালিকা (৭৬ দিন) ও পরীক্ষা সময়সূচি {toBengaliNumber(currentYearNum)}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Year Selector */}
             <div className="flex items-center gap-1.5 bg-black/30 border border-white/20 rounded-xl px-3 py-1.5 text-white">
               <span className="text-xs font-black">শিক্ষাবর্ষ:</span>
@@ -521,22 +521,22 @@ export default function AcademicCalendarPage() {
         </div>
 
         {/* Real Statistics Badges for Secondary Schools */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/15">
-          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-white/80">বার্ষিক কর্মদিবস (মাধ্যমিক)</p>
-            <p className="text-xl md:text-2xl font-black text-white mt-0.5">{toBengaliNumber(stats.workingDays)} দিন</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-white/15">
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+            <p className="text-[10px] font-bold text-white/80">বার্ষিক কর্মদিবস (মাধ্যমিক)</p>
+            <p className="text-sm md:text-base font-black text-white mt-0">{toBengaliNumber(stats.workingDays)} দিন</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-white/80">অনুমোদিত ছুটি (মাউশি তালিকা)</p>
-            <p className="text-xl md:text-2xl font-black text-yellow-300 mt-0.5">{toBengaliNumber(stats.totalHolidays)} দিন</p>
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+            <p className="text-[10px] font-bold text-white/80">অনুমোদিত ছুটি (মাউশি তালিকা)</p>
+            <p className="text-sm md:text-base font-black text-yellow-300 mt-0">{toBengaliNumber(stats.totalHolidays)} দিন</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-white/80">পরীক্ষা ও মূল্যায়ন পর্ব</p>
-            <p className="text-xl md:text-2xl font-black text-cyan-300 mt-0.5">{toBengaliNumber(stats.examCount)} টি পর্ব</p>
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+            <p className="text-[10px] font-bold text-white/80">পরীক্ষা ও মূল্যায়ন পর্ব</p>
+            <p className="text-sm md:text-base font-black text-cyan-300 mt-0">{toBengaliNumber(stats.examCount)} টি পর্ব</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-white/80">সাপ্তাহিক ছুটি</p>
-            <p className="text-xl md:text-2xl font-black text-emerald-300 mt-0.5">শুক্রবার ও শনিবার</p>
+          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+            <p className="text-[10px] font-bold text-white/80">সাপ্তাহিক ছুটি</p>
+            <p className="text-sm md:text-base font-black text-emerald-300 mt-0">শুক্রবার ও শনিবার</p>
           </div>
         </div>
       </div>
