@@ -21,6 +21,17 @@ export interface Holiday {
   type?: 'govt' | 'exam' | 'event';
 }
 
+export interface SecondaryExam {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  classes: string;
+  totalDays: number;
+  resultDate?: string;
+  notes?: string;
+}
+
 export type NewHolidayData = Omit<Holiday, 'id'>;
 
 const HOLIDAYS_COLLECTION_PATH = 'holidays';
@@ -30,27 +41,28 @@ export const createInitialHolidays = async (db?: Firestore | null): Promise<Holi
 };
 
 /**
- * Automatically generates standard Bangladesh government & school academic calendar holidays
- * for any academic year (fixed national days + religious festivals + school vacations + exams).
+ * শিক্ষা মন্ত্রণালয় ও মাধ্যমিক ও উচ্চশিক্ষা অধিদপ্তর (মাউশি) অনুমোদিত
+ * মাধ্যমিক ও নিম্ন মাধ্যমিক বিদ্যালয়ের সরকারি বাৎসরিক ছুটির তালিকা (মোট ৭৬ দিন ছুটি)।
+ * এতে কোনো পরীক্ষা অন্তর্ভুক্ত নয় - পরীক্ষা সম্পূর্ণ আলাদা একাডেমিক সময়সূচি।
  */
 export const getDefaultHolidaysForYear = (year: number): NewHolidayData[] => {
   const holidays: NewHolidayData[] = [];
 
-  // Helper to add date range
-  const addRange = (startStr: string, endStr: string, description: string, type: 'govt' | 'exam' | 'event' = 'govt') => {
+  // Helper to add date range for secondary school vacations
+  const addVacationRange = (startStr: string, endStr: string, description: string) => {
     const cur = new Date(`${startStr}T12:00:00Z`);
     const end = new Date(`${endStr}T12:00:00Z`);
     while (cur <= end) {
       holidays.push({
         date: cur.toISOString().split('T')[0],
         description,
-        type
+        type: 'govt'
       });
       cur.setUTCDate(cur.getUTCDate() + 1);
     }
   };
 
-  // 1. জাতীয় ও ঐতিহাসিক দিবসসমূহ (Fixed National Days)
+  // ১. জাতীয় দিবসসমূহ (মাধ্যমিক বিদ্যালয়)
   holidays.push(
     { date: `${year}-02-21`, description: 'শহিদ দিবস ও আন্তর্জাতিক মাতৃভাষা দিবস', type: 'govt' },
     { date: `${year}-03-26`, description: 'স্বাধীনতা ও জাতীয় দিবস', type: 'govt' },
@@ -61,7 +73,7 @@ export const getDefaultHolidaysForYear = (year: number): NewHolidayData[] => {
     { date: `${year}-12-25`, description: 'যিশু খ্রিস্টের জন্মদিন (বড় দিন)', type: 'govt' }
   );
 
-  // 2. ধর্মীয় উৎসব ও সরকার নির্ধারিত দীর্ঘ স্কুল অবকাশ (Government & School Vacation Ranges)
+  // ২. ধর্মীয় ও অন্যান্য সরকারি ছুটি (মাধ্যমিক বিদ্যালয়ের মাউশি গেজেট অনুযায়ী)
   if (year === 2026) {
     holidays.push(
       { date: '2026-01-17', description: 'পবিত্র শব-ই-মিরাজ', type: 'govt' },
@@ -84,11 +96,11 @@ export const getDefaultHolidaysForYear = (year: number): NewHolidayData[] => {
       { date: '2026-10-25', description: 'শ্রী শ্রী লক্ষ্মীপূজা ও প্রবারণা পূর্ণিমা', type: 'govt' },
       { date: '2026-11-08', description: 'শ্রী শ্রী শ্যামাপূজা', type: 'govt' }
     );
-    // স্কুল অবকাশসমূহ ২০২৬
-    addRange('2026-02-19', '2026-03-26', 'পবিত্র রমজান, শব-ই-কদর ও ঈদ-উল-ফিতর অবকাশ', 'govt');
-    addRange('2026-05-24', '2026-06-04', 'ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ', 'govt');
-    addRange('2026-10-18', '2026-10-22', 'শ্রী শ্রী দুর্গাপূজা অবকাশ (বিজয়া দশমী সহ)', 'govt');
-    addRange('2026-12-20', '2026-12-31', 'শীতকালীন অবকাশ', 'govt');
+    // মাধ্যমিক বিদ্যালয়ের প্রধান অবকাশসমূহ (মাউশি নির্ধারিত)
+    addVacationRange('2026-02-19', '2026-03-26', 'পবিত্র রমজান, শব-ই-কদর, জুমাতুল বিদা ও ঈদ-উল-ফিতর অবকাশ');
+    addVacationRange('2026-05-24', '2026-06-04', 'পবিত্র ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ');
+    addVacationRange('2026-10-18', '2026-10-22', 'শ্রী শ্রী দুর্গাপূজা (বিজয়া দশমী সহ) অবকাশ');
+    addVacationRange('2026-12-20', '2026-12-31', 'শীতকালীন অবকাশ');
   } else if (year === 2025) {
     holidays.push(
       { date: '2025-01-27', description: 'পবিত্র শব-ই-মিরাজ', type: 'govt' },
@@ -99,37 +111,32 @@ export const getDefaultHolidaysForYear = (year: number): NewHolidayData[] => {
       { date: '2025-08-16', description: 'শুভ জন্মাষ্টমী', type: 'govt' },
       { date: '2025-09-05', description: 'ঈদ-ই-মিলাদুন্নবী (সা.)', type: 'govt' }
     );
-    addRange('2025-03-01', '2025-04-05', 'পবিত্র রমজান, শব-ই-কদর ও ঈদ-উল-ফিতর অবকাশ', 'govt');
-    addRange('2025-06-05', '2025-06-16', 'ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ', 'govt');
-    addRange('2025-09-28', '2025-10-02', 'শ্রী শ্রী দুর্গাপূজা অবকাশ', 'govt');
-    addRange('2025-12-20', '2025-12-31', 'শীতকালীন অবকাশ', 'govt');
+    addVacationRange('2025-03-01', '2025-04-05', 'পবিত্র রমজান, শব-ই-কদর ও ঈদ-উল-ফিতর অবকাশ');
+    addVacationRange('2025-06-05', '2025-06-16', 'পবিত্র ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ');
+    addVacationRange('2025-09-28', '2025-10-02', 'শ্রী শ্রী দুর্গাপূজা অবকাশ');
+    addVacationRange('2025-12-20', '2025-12-31', 'শীতকালীন অবকাশ');
   } else {
-    // For other future/past years: auto-generate standard school vacation blocks
+    // অন্যান্য শিক্ষাবর্ষের সাধারণ মাধ্যমিক ছুটি
     holidays.push(
       { date: `${year}-02-10`, description: 'শ্রী শ্রী সরস্বতী পূজা', type: 'govt' },
       { date: `${year}-03-05`, description: 'পবিত্র শব-ই-বরাত', type: 'govt' },
       { date: `${year}-09-05`, description: 'শুভ জন্মাষ্টমী', type: 'govt' },
       { date: `${year}-09-20`, description: 'ঈদ-ই-মিলাদুন্নবী (সা.)', type: 'govt' }
     );
-    addRange(`${year}-03-01`, `${year}-04-02`, 'পবিত্র রমজান, শব-ই-কদর ও ঈদ-উল-ফিতর অবকাশ', 'govt');
-    addRange(`${year}-06-01`, `${year}-06-12`, 'ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ', 'govt');
-    addRange(`${year}-10-15`, `${year}-10-19`, 'শ্রী শ্রী দুর্গাপূজা অবকাশ', 'govt');
-    addRange(`${year}-12-20`, `${year}-12-31`, 'শীতকালীন অবকাশ', 'govt');
+    addVacationRange(`${year}-03-01`, `${year}-04-02`, 'পবিত্র রমজান, শব-ই-কদর ও ঈদ-উল-ফিতর অবকাশ');
+    addVacationRange(`${year}-06-01`, `${year}-06-12`, 'পবিত্র ঈদ-উল-আযহা ও গ্রীষ্মকালীন অবকাশ');
+    addVacationRange(`${year}-10-15`, `${year}-10-19`, 'শ্রী শ্রী দুর্গাপূজা অবকাশ');
+    addVacationRange(`${year}-12-20`, `${year}-12-31`, 'শীতকালীন অবকাশ');
   }
 
-  // 3. একাডেমিক কার্যক্রম ও পরীক্ষা শিডিউল (Academic Exams & School Events)
+  // ৩. প্রধান শিক্ষকের সংরক্ষিত ছুটি (মাধ্যমিক বিদ্যালয়ের সরকারি নীতিমালায় ৩ দিন)
   holidays.push(
-    { date: `${year}-01-01`, description: 'নতুন শিক্ষাবর্ষ শুরু ও পাঠ্যপুস্তক উৎসব', type: 'event' },
-    { date: `${year}-01-15`, description: 'অভিভাবক সমাবেশ ও নবীনবরণ', type: 'event' }
-  );
-  addRange(`${year}-04-16`, `${year}-04-26`, '১ম সাময়িক মূল্যায়ন পরীক্ষা', 'exam');
-  addRange(`${year}-07-06`, `${year}-07-19`, 'অর্ধ-বার্ষিক পরীক্ষা ও ফলাফল প্রস্তুত', 'exam');
-  addRange(`${year}-11-20`, `${year}-12-05`, 'বার্ষিক মূল্যায়ন পরীক্ষা', 'exam');
-  holidays.push(
-    { date: `${year}-12-30`, description: 'বার্ষিক পরীক্ষার ফলাফল প্রকাশ ও পুরস্কার বিতরণ', type: 'event' }
+    { date: `${year}-08-20`, description: 'প্রধান শিক্ষকের সংরক্ষিত ছুটি (১ম দিন)', type: 'govt' },
+    { date: `${year}-09-15`, description: 'প্রধান শিক্ষকের সংরক্ষিত ছুটি (২য় দিন)', type: 'govt' },
+    { date: `${year}-11-10`, description: 'প্রধান শিক্ষকের সংরক্ষিত ছুটি (৩য় দিন)', type: 'govt' }
   );
 
-  // Return strictly deduplicated by date
+  // তারিখ অনুযায়ী কঠোরভাবে অনন্যকরণ (Deduplication)
   const uniqueMap = new Map<string, NewHolidayData>();
   holidays.forEach(h => {
     uniqueMap.set(h.date, h);
@@ -139,25 +146,62 @@ export const getDefaultHolidaysForYear = (year: number): NewHolidayData[] => {
 };
 
 /**
- * Fetches all holidays, cleanly deduplicated by date.
- * If Firestore has saved custom holidays or modifications, they are merged cleanly.
+ * মাধ্যমিক ও নিম্ন মাধ্যমিক বিদ্যালয়ের অফিশিয়াল পরীক্ষা ও মূল্যায়ন সময়সূচি।
+ * এটি সম্পূর্ণ আলাদা একাডেমিক কার্যক্রম (পরীক্ষার দিনগুলো স্কুল কর্মদিবসের অন্তর্ভুক্ত)।
+ */
+export const getSecondarySchoolExamSchedule = (year: number): SecondaryExam[] => {
+  return [
+    {
+      id: `exam-${year}-halfyearly`,
+      title: 'ষাণ্মাসিক / অর্ধ-বার্ষিক মূল্যায়ন পরীক্ষা ও প্রাক-নির্বাচনী পরীক্ষা',
+      startDate: `${year}-06-08`,
+      endDate: `${year}-06-25`,
+      classes: '৬ষ্ঠ হতে ১০ম শ্রেণি',
+      totalDays: 15,
+      resultDate: `${year}-07-10`,
+      notes: '১০ম শ্রেণির শিক্ষার্থীদের প্রাক-নির্বাচনী পরীক্ষা এই সময়ে অনুষ্ঠিত হবে।'
+    },
+    {
+      id: `exam-${year}-annual`,
+      title: 'বার্ষিক মূল্যায়ন পরীক্ষা ও নির্বাচনী পরীক্ষা (এসএসসি টেস্ট)',
+      startDate: `${year}-11-18`,
+      endDate: `${year}-12-06`,
+      classes: '৬ষ্ঠ হতে ১০ম শ্রেণি',
+      totalDays: 16,
+      resultDate: `${year}-12-28`,
+      notes: '১০ম শ্রেণির নির্বাচনী (টেস্ট) পরীক্ষা ও ৬ষ্ঠ-৯ম শ্রেণির চূড়ান্ত বার্ষিক মূল্যায়ন।'
+    },
+    {
+      id: `exam-${year}-bookfest`,
+      title: 'জাতীয় পাঠ্যপুস্তক উৎসব ও ওরিয়েন্টেশন',
+      startDate: `${year}-01-01`,
+      endDate: `${year}-01-01`,
+      classes: '৬ষ্ঠ হতে ১০ম শ্রেণি',
+      totalDays: 1,
+      notes: 'নতুন বছরের পাঠ্যপুস্তক বিতরণ ও শিক্ষার্থীদের ক্লাস পরিচিতি।'
+    }
+  ];
+};
+
+/**
+ * মাধ্যমিক বিদ্যালয়ের ছুটির তালিকা লোড করার ফাংশন (অনন্যকরণ সহ)।
  */
 export const getHolidays = async (db?: Firestore | null, targetYear?: number): Promise<Holiday[]> => {
   const currentYear = targetYear || new Date().getFullYear();
   const defaultList = getDefaultHolidaysForYear(currentYear);
   const holidayMap = new Map<string, Holiday>();
 
-  // 1. Populate default holidays for the year
+  // ১. মাধ্যমিক বিদ্যালয়ের স্ট্যান্ডার্ড ডিফল্ট ছুটি লোড
   defaultList.forEach((dh, idx) => {
     holidayMap.set(dh.date, {
       id: `default-${currentYear}-${idx}`,
       date: dh.date,
       description: dh.description,
-      type: dh.type
+      type: 'govt'
     });
   });
 
-  // 2. If Firestore db is available, merge custom holidays/modifications
+  // ২. ফায়ারস্টোরে কাস্টম কোনো ছুটি থাকলে তা মার্জ করা (যদি তা পরীক্ষা না হয়)
   if (db) {
     try {
       const q = query(collection(db, HOLIDAYS_COLLECTION_PATH), orderBy('date'));
@@ -166,13 +210,16 @@ export const getHolidays = async (db?: Firestore | null, targetYear?: number): P
       snapshot.docs.forEach((docSnap) => {
         const data = docSnap.data() as NewHolidayData;
         if (data.date) {
-          // Firestore document overrides or adds to calendar
-          holidayMap.set(data.date, {
-            id: docSnap.id,
-            date: data.date,
-            description: data.description || 'ছুটি',
-            type: data.type || (data.description?.includes('পরীক্ষা') ? 'exam' : 'govt')
-          });
+          // কোনো পরীক্ষা যদি পূর্বে ফায়ারস্টোরে সেভ হয়েও থাকে, তা ছুটির তালিকায় রাখা যাবে না
+          const isExam = data.type === 'exam' || data.description?.includes('পরীক্ষা') || data.description?.includes('মূল্যায়ন');
+          if (!isExam) {
+            holidayMap.set(data.date, {
+              id: docSnap.id,
+              date: data.date,
+              description: data.description || 'ছুটি',
+              type: 'govt'
+            });
+          }
         }
       });
     } catch (err) {
@@ -180,14 +227,12 @@ export const getHolidays = async (db?: Firestore | null, targetYear?: number): P
     }
   }
 
-  // Convert to sorted array
   return Array.from(holidayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 };
 
 export const addHoliday = async (db: Firestore, holidayData: NewHolidayData) => {
   const holidaysCollection = collection(db, HOLIDAYS_COLLECTION_PATH);
   
-  // Check for duplicate on the exact date and update if already exists
   const q = query(holidaysCollection, where('date', '==', holidayData.date));
   const existing = await getDocs(q);
   
