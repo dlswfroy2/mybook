@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -402,15 +402,36 @@ export default function AcademicCalendarPage() {
   return (
     <div className="space-y-6 pb-12 font-kalpurush">
       {/* Top Banner & Title */}
-      <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white px-5 py-3 rounded-[14px] shadow-xl border border-white/20 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white px-3 py-1.5 rounded-xl shadow-md border border-white/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 backdrop-blur-3xl transform skew-x-12 pointer-events-none" />
-        <div className="flex flex-wrap justify-end items-center gap-2 relative z-10">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 relative z-10">
+          {/* Real Statistics Badges */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+              <span className="text-[10px] font-bold text-white/70">কর্মদিবস:</span>
+              <span className="text-[11px] font-black text-white">{toBengaliNumber(stats.workingDays)} দিন</span>
+            </div>
+            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+              <span className="text-[10px] font-bold text-white/70">অনুমোদিত ছুটি:</span>
+              <span className="text-[11px] font-black text-yellow-300">{toBengaliNumber(stats.totalHolidays)} দিন</span>
+            </div>
+            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+              <span className="text-[10px] font-bold text-white/70">পরীক্ষা পর্ব:</span>
+              <span className="text-[11px] font-black text-cyan-300">{toBengaliNumber(stats.examCount)} টি</span>
+            </div>
+            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+              <span className="text-[10px] font-bold text-white/70">সাপ্তাহিক ছুটি:</span>
+              <span className="text-[11px] font-black text-emerald-300">শুক্র ও শনিবার</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5">
             {/* Year Selector */}
-            <div className="flex items-center gap-1.5 bg-black/30 border border-white/20 rounded-xl px-3 py-1.5 text-white">
-              <span className="text-xs font-black">শিক্ষাবর্ষ:</span>
+            <div className="flex items-center gap-1 bg-black/30 border border-white/20 rounded-md px-2 py-0.5 text-white h-7">
+              <span className="text-[11px] font-black">শিক্ষাবর্ষ:</span>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="h-7 w-[90px] bg-transparent border-0 text-white font-black text-xs focus:ring-0 p-0 shadow-none cursor-pointer">
+                <SelectTrigger className="h-5 w-[72px] bg-transparent border-0 text-white font-black text-[11px] focus:ring-0 p-0 shadow-none cursor-pointer">
                   <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="font-kalpurush font-bold bg-white text-slate-900">
@@ -428,10 +449,11 @@ export default function AcademicCalendarPage() {
               onClick={handleSyncGovernmentGazette}
               disabled={syncing}
               variant="outline"
-              className="font-black text-xs gap-1.5 shadow-lg h-9 bg-white/10 hover:bg-white/20 text-white border-white/30"
+              size="sm"
+              className="font-black text-[11px] gap-1 shadow-sm h-7 px-2.5 bg-white/10 hover:bg-white/20 text-white border-white/30"
               title="মাউশি মাধ্যমিক ছুটির তালিকা অনুযায়ী স্বয়ংক্রিয় ছুটি সিঙ্ক করুন"
             >
-              <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+              <RefreshCw className={cn("w-3 h-3", syncing && "animate-spin")} />
               মাউশি গেজেট সিঙ্ক
             </Button>
 
@@ -439,17 +461,18 @@ export default function AcademicCalendarPage() {
             <Button
               onClick={() => window.print()}
               variant="secondary"
-              className="font-black text-xs gap-1.5 shadow-lg h-9 bg-white text-primary hover:bg-slate-100"
+              size="sm"
+              className="font-black text-[11px] gap-1 shadow-sm h-7 px-2.5 bg-white text-primary hover:bg-slate-100"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-3 h-3" />
               ক্যালেন্ডার প্রিন্ট
             </Button>
 
             {/* Add Event Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black text-xs gap-1.5 shadow-lg h-9">
-                  <Plus className="w-4 h-4" />
+                <Button size="sm" className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black text-[11px] gap-1 shadow-sm h-7 px-2.5">
+                  <Plus className="w-3.5 h-3.5" />
                   নতুন ছুটি যোগ করুন
                 </Button>
               </DialogTrigger>
@@ -498,31 +521,11 @@ export default function AcademicCalendarPage() {
                     disabled={savingEvent}
                     className="w-full bg-primary font-black"
                   >
-                    {savingEvent ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন'}
+                    {savingEvent ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
-
-        {/* Real Statistics Badges for Secondary Schools */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-white/15">
-          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-            <p className="text-[10px] font-bold text-white/80">বার্ষিক কর্মদিবস (মাধ্যমিক)</p>
-            <p className="text-sm md:text-base font-black text-white mt-0">{toBengaliNumber(stats.workingDays)} দিন</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-            <p className="text-[10px] font-bold text-white/80">অনুমোদিত ছুটি (মাউশি তালিকা)</p>
-            <p className="text-sm md:text-base font-black text-yellow-300 mt-0">{toBengaliNumber(stats.totalHolidays)} দিন</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-            <p className="text-[10px] font-bold text-white/80">পরীক্ষা ও মূল্যায়ন পর্ব</p>
-            <p className="text-sm md:text-base font-black text-cyan-300 mt-0">{toBengaliNumber(stats.examCount)} টি পর্ব</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-            <p className="text-[10px] font-bold text-white/80">সাপ্তাহিক ছুটি</p>
-            <p className="text-sm md:text-base font-black text-emerald-300 mt-0">শুক্রবার ও শনিবার</p>
           </div>
         </div>
       </div>
