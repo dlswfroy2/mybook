@@ -404,21 +404,7 @@ export default function AcademicCalendarPage() {
       {/* Top Banner & Title */}
       <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white px-5 py-3 rounded-[14px] shadow-xl border border-white/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 backdrop-blur-3xl transform skew-x-12 pointer-events-none" />
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 relative z-10">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-white/15 px-2.5 py-0.5 rounded-full text-[11px] font-bold mb-1 backdrop-blur-md">
-              <School className="w-3 h-3 text-yellow-300" />
-              <span>মাধ্যমিক ও নিম্ন মাধ্যমিক বিদ্যালয় একাডেমি প্রশাসন</span>
-            </div>
-            <h1 className="text-base md:text-lg font-black drop-shadow-md flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-yellow-400" />
-              বাৎসরিক একাডেমিক ক্যালেন্ডার ও ছুটির তালিকা
-            </h1>
-            <p className="text-white/80 text-[11px] mt-0.5 max-w-xl font-medium">
-              {schoolInfo?.name || 'টপ গ্রেড একাডেমি'} - শিক্ষা মন্ত্রণালয় ও মাউশি অনুমোদিত মাধ্যমিক স্তরের ছুটির তালিকা (৭৬ দিন) ও পরীক্ষা সময়সূচি {toBengaliNumber(currentYearNum)}
-            </p>
-          </div>
-
+        <div className="flex flex-wrap justify-end items-center gap-2 relative z-10">
           <div className="flex flex-wrap items-center gap-2">
             {/* Year Selector */}
             <div className="flex items-center gap-1.5 bg-black/30 border border-white/20 rounded-xl px-3 py-1.5 text-white">
