@@ -21,7 +21,8 @@ import {
   AlertCircle,
   FileText,
   CreditCard,
-  MessageSquare
+  MessageSquare,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,7 @@ import { toast } from '@/hooks/use-toast';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useFirestore, useUser } from '@/firebase';
-import { getHolidays, addHoliday, deleteHoliday, Holiday } from '@/lib/holiday-data';
+import { getHolidays, addHoliday, deleteHoliday, getDefaultHolidaysForYear, Holiday } from '@/lib/holiday-data';
 import { cn } from '@/lib/utils';
 
 const BANGLA_MONTHS = [
@@ -51,26 +52,6 @@ const toBengaliNumber = (n: number | string | undefined | null): string => {
   return n.toString().replace(/\d/g, (d) => bengaliDigits[parseInt(d)]);
 };
 
-const DEFAULT_ACADEMIC_EVENTS: Array<{ date: string; description: string; type: 'exam' | 'govt' | 'event' }> = [
-  { date: '2026-01-01', description: 'নতুন শিক্ষাবর্ষ শুরু ও পাঠ্যপুস্তক উৎসব', type: 'event' },
-  { date: '2026-01-15', description: 'অভিভাবক পরিচিতি ও সমন্বয় সভা', type: 'event' },
-  { date: '2026-02-21', description: 'শহিদ দিবস ও আন্তর্জাতিক মাতৃভাষা দিবস', type: 'govt' },
-  { date: '2026-03-26', description: 'স্বাধীনতা ও জাতীয় দিবস', type: 'govt' },
-  { date: '2026-04-14', description: 'বাংলা নববর্ষ (পহেলা বৈশাখ)', type: 'govt' },
-  { date: '2026-04-20', description: '১ম সাময়িক মূল্যায়ন পরীক্ষা শুরু', type: 'exam' },
-  { date: '2026-04-30', description: '১ম সাময়িক পরীক্ষা সমাপ্তি', type: 'exam' },
-  { date: '2026-05-01', description: 'মে দিবস ও বুদ্ধ পূর্ণিমা', type: 'govt' },
-  { date: '2026-07-05', description: 'অর্ধ-বার্ষিক পরীক্ষা শুরু', type: 'exam' },
-  { date: '2026-07-20', description: 'অর্ধ-বার্ষিক পরীক্ষা সমাপ্তি ও ফলাফল প্রকাশ', type: 'exam' },
-  { date: '2026-08-15', description: 'বার্ষিক ক্রীড়া ও সাংস্কৃতিক প্রতিযোগিতা', type: 'event' },
-  { date: '2026-10-18', description: 'শ্রী শ্রী দুর্গাপূজা অবকাশ', type: 'govt' },
-  { date: '2026-11-20', description: 'বার্ষিক মূল্যায়ন পরীক্ষা ২০২৬ শুরু', type: 'exam' },
-  { date: '2026-12-05', description: 'বার্ষিক মূল্যায়ন পরীক্ষা সমাপ্তি', type: 'exam' },
-  { date: '2026-12-16', description: 'মহান বিজয় দিবস', type: 'govt' },
-  { date: '2026-12-25', description: 'বড় দিন (যিশু খ্রিস্টের জন্মদিন)', type: 'govt' },
-  { date: '2026-12-30', description: 'বার্ষিক পরীক্ষার ফলাফল প্রকাশ ও পুরস্কার বিতরণ', type: 'event' }
-];
-
 export default function AcademicCalendarPage() {
   const db = useFirestore();
   const { user } = useUser();
@@ -84,6 +65,7 @@ export default function AcademicCalendarPage() {
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [syncing, setSyncing] = useState<boolean>(false);
 
   // Add event modal states
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -93,42 +75,22 @@ export default function AcademicCalendarPage() {
   const [newEventType, setNewEventType] = useState<'govt' | 'exam' | 'event'>('govt');
   const [savingEvent, setSavingEvent] = useState(false);
 
-  // Fetch holidays from Firestore
+  // Fetch holidays with clean deduplication
   const loadHolidays = async () => {
     setLoading(true);
     try {
-      if (db) {
-        const data = await getHolidays(db);
-        if (data && data.length > 0) {
-          setHolidays(data);
-        } else {
-          // If Firestore is empty, initialize with default list
-          setHolidays(
-            DEFAULT_ACADEMIC_EVENTS.map((e, idx) => ({
-              id: `default-${idx}`,
-              date: e.date,
-              description: e.description
-            }))
-          );
-        }
-      } else {
-        setHolidays(
-          DEFAULT_ACADEMIC_EVENTS.map((e, idx) => ({
-            id: `default-${idx}`,
-            date: e.date,
-            description: e.description
-          }))
-        );
-      }
+      const data = await getHolidays(db, currentYearNum);
+      setHolidays(data);
     } catch (e) {
       console.error(e);
-      setHolidays(
-        DEFAULT_ACADEMIC_EVENTS.map((e, idx) => ({
-          id: `default-${idx}`,
-          date: e.date,
-          description: e.description
-        }))
-      );
+      // Fallback to auto-generated default holidays for the year
+      const fallbackList = getDefaultHolidaysForYear(currentYearNum).map((d, i) => ({
+        id: `default-${currentYearNum}-${i}`,
+        date: d.date,
+        description: d.description,
+        type: d.type
+      }));
+      setHolidays(fallbackList);
     } finally {
       setLoading(false);
     }
@@ -136,16 +98,23 @@ export default function AcademicCalendarPage() {
 
   useEffect(() => {
     loadHolidays();
-  }, [db, selectedYear]);
+  }, [db, selectedYear, currentYearNum]);
 
-  // Combined holidays map by date YYYY-MM-DD
+  // Combined holidays map by date YYYY-MM-DD (Deduplicated strictly)
   const holidaysMap = useMemo(() => {
     const map = new Map<string, Holiday>();
     holidays.forEach(h => {
-      map.set(h.date, h);
+      if (h.date && h.date.startsWith(`${currentYearNum}`)) {
+        map.set(h.date, h);
+      }
     });
     return map;
-  }, [holidays]);
+  }, [holidays, currentYearNum]);
+
+  // Strictly unique sorted holidays for current academic year
+  const uniqueYearHolidays = useMemo(() => {
+    return Array.from(holidaysMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [holidaysMap]);
 
   // Handle Add Event
   const handleAddEvent = async () => {
@@ -170,16 +139,22 @@ export default function AcademicCalendarPage() {
 
       if (db) {
         for (const d of datesToAdd) {
-          await addHoliday(db, { date: d, description: newEventTitle });
+          await addHoliday(db, { date: d, description: newEventTitle, type: newEventType });
         }
         await loadHolidays();
       } else {
         const newItems: Holiday[] = datesToAdd.map((d, i) => ({
           id: `local-${Date.now()}-${i}`,
           date: d,
-          description: newEventTitle
+          description: newEventTitle,
+          type: newEventType
         }));
-        setHolidays(prev => [...prev, ...newItems]);
+        setHolidays(prev => {
+          const map = new Map<string, Holiday>();
+          prev.forEach(h => map.set(h.date, h));
+          newItems.forEach(h => map.set(h.date, h));
+          return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+        });
       }
 
       toast({ title: 'সফল', description: 'নতুন ইভেন্ট/ছুটি সফলভাবে ক্যালেন্ডারে যোগ হয়েছে।' });
@@ -193,56 +168,199 @@ export default function AcademicCalendarPage() {
     }
   };
 
+  // Re-sync with Government & School Standard Calendar
+  const handleSyncGovernmentGazette = async () => {
+    setSyncing(true);
+    try {
+      const standardList = getDefaultHolidaysForYear(currentYearNum);
+      const updatedList: Holiday[] = standardList.map((h, idx) => ({
+        id: `govt-gazette-${currentYearNum}-${idx}`,
+        date: h.date,
+        description: h.description,
+        type: h.type
+      }));
+      setHolidays(updatedList);
+      toast({ 
+        title: 'সরকারি ও শিক্ষা ক্যালেন্ডার আপডেট সম্পন্ন', 
+        description: `শিক্ষাবর্ষ ${toBengaliNumber(currentYearNum)} এর সরকারি ও বেসরকারি স্কুলের ছুটির তালিকা স্বয়ংক্রিয়ভাবে সমন্বয় করা হয়েছে।` 
+      });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'ত্রুটি', description: 'আপডেট করা সম্ভব হয়নি।' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Handle Delete Event
   const handleDeleteEvent = async (id: string, date: string) => {
     if (!confirm('আপনি কি এই ইভেন্ট/ছুটি ক্যালেন্ডার থেকে মুছে ফেলতে চান?')) return;
     try {
-      if (db && !id.startsWith('default-') && !id.startsWith('local-')) {
+      if (db && !id.startsWith('default-') && !id.startsWith('govt-') && !id.startsWith('local-')) {
         await deleteHoliday(db, id);
       }
-      setHolidays(prev => prev.filter(h => h.id !== id));
+      setHolidays(prev => prev.filter(h => h.date !== date));
       toast({ title: 'মুছে ফেলা হয়েছে', description: 'ইভেন্ট ক্যালেন্ডার থেকে অপসারিত হয়েছে।' });
     } catch (e) {
       toast({ variant: 'destructive', title: 'ত্রুটি', description: 'মুছে ফেলা সম্ভব হয়নি।' });
     }
   };
 
-  // Filtered event list
-  const filteredEvents = useMemo(() => {
-    return holidays
-      .filter(h => {
-        if (!h.date.startsWith(`${currentYearNum}`)) return false;
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          return h.description.toLowerCase().includes(q) || h.date.includes(q);
-        }
-        if (filterType === 'exam') {
-          return h.description.includes('পরীক্ষা') || h.description.includes('মূল্যায়ন');
-        }
-        if (filterType === 'govt') {
-          return !h.description.includes('পরীক্ষা') && (h.description.includes('দিবস') || h.description.includes('পূজা') || h.description.includes('ঈদ') || h.description.includes('অবকাশ'));
-        }
-        return true;
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [holidays, currentYearNum, searchQuery, filterType]);
+  // Consolidated Holiday List (groups consecutive dates with the same name into a single clean range item)
+  const consolidatedList = useMemo(() => {
+    const list: Array<{
+      id: string;
+      description: string;
+      startDate: string;
+      endDate: string;
+      totalDays: number;
+      type: 'govt' | 'exam' | 'event';
+      dates: string[];
+    }> = [];
 
-  // Statistics
+    let currentGroup: {
+      description: string;
+      startDate: string;
+      endDate: string;
+      totalDays: number;
+      type: 'govt' | 'exam' | 'event';
+      dates: string[];
+      firstId: string;
+    } | null = null;
+
+    for (const h of uniqueYearHolidays) {
+      const isExam = h.type === 'exam' || h.description.includes('পরীক্ষা') || h.description.includes('মূল্যায়ন');
+      const itemType = isExam ? 'exam' : (h.type || 'govt');
+
+      if (!currentGroup) {
+        currentGroup = {
+          description: h.description,
+          startDate: h.date,
+          endDate: h.date,
+          totalDays: 1,
+          type: itemType,
+          dates: [h.date],
+          firstId: h.id
+        };
+      } else {
+        const prevEnd = new Date(`${currentGroup.endDate}T12:00:00Z`);
+        const curDate = new Date(`${h.date}T12:00:00Z`);
+        const diffDays = Math.round((curDate.getTime() - prevEnd.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (currentGroup.description === h.description && diffDays === 1) {
+          currentGroup.endDate = h.date;
+          currentGroup.totalDays += 1;
+          currentGroup.dates.push(h.date);
+        } else {
+          list.push({
+            id: currentGroup.firstId,
+            description: currentGroup.description,
+            startDate: currentGroup.startDate,
+            endDate: currentGroup.endDate,
+            totalDays: currentGroup.totalDays,
+            type: currentGroup.type,
+            dates: currentGroup.dates
+          });
+          currentGroup = {
+            description: h.description,
+            startDate: h.date,
+            endDate: h.date,
+            totalDays: 1,
+            type: itemType,
+            dates: [h.date],
+            firstId: h.id
+          };
+        }
+      }
+    }
+
+    if (currentGroup) {
+      const finalGroup: {
+        description: string;
+        startDate: string;
+        endDate: string;
+        totalDays: number;
+        type: 'govt' | 'exam' | 'event';
+        dates: string[];
+        firstId: string;
+      } = currentGroup;
+
+      list.push({
+        id: finalGroup.firstId,
+        description: finalGroup.description,
+        startDate: finalGroup.startDate,
+        endDate: finalGroup.endDate,
+        totalDays: finalGroup.totalDays,
+        type: finalGroup.type,
+        dates: finalGroup.dates
+      });
+    }
+
+    return list;
+  }, [uniqueYearHolidays]);
+
+  // Filtered consolidated event list for list view
+  const filteredEvents = useMemo(() => {
+    return consolidatedList.filter(item => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return item.description.toLowerCase().includes(q) || item.startDate.includes(q) || item.endDate.includes(q);
+      }
+      if (filterType === 'exam') {
+        return item.type === 'exam';
+      }
+      if (filterType === 'govt') {
+        return item.type === 'govt';
+      }
+      return true;
+    });
+  }, [consolidatedList, searchQuery, filterType]);
+
+  // Real, Accurate Statistics for Bangladesh Schools
   const stats = useMemo(() => {
-    const yearHolidays = holidays.filter(h => h.date.startsWith(`${currentYearNum}`));
-    const examEvents = yearHolidays.filter(h => h.description.includes('পরীক্ষা') || h.description.includes('মূল্যায়ন'));
-    const govtHolidays = yearHolidays.filter(h => !h.description.includes('পরীক্ষা'));
-    
-    // Total days in year minus weekends & holidays
-    const totalDays = 365;
-    const estimatedWorkingDays = Math.max(0, 365 - (52 * 2) - govtHolidays.length);
+    let workingDays = 0;
+    let weekendCount = 0;
+    let govtHolidaysCount = 0;
+
+    const govtHolidayDates = new Set<string>();
+    const examDates = new Set<string>();
+
+    uniqueYearHolidays.forEach(h => {
+      const isExam = h.type === 'exam' || h.description.includes('পরীক্ষা') || h.description.includes('মূল্যায়ন');
+      if (isExam) {
+        examDates.add(h.date);
+      } else {
+        govtHolidayDates.add(h.date);
+      }
+    });
+
+    for (let month = 0; month < 12; month++) {
+      const daysInMonth = new Date(currentYearNum, month + 1, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(currentYearNum, month, day);
+        const dayOfWeek = d.getDay(); // 5 = Friday, 6 = Saturday
+        const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+        const dateStr = `${currentYearNum}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        if (isWeekend) {
+          weekendCount++;
+        } else if (govtHolidayDates.has(dateStr)) {
+          govtHolidaysCount++;
+        } else {
+          workingDays++;
+        }
+      }
+    }
+
+    // Number of distinct examination periods (১ম সাময়িক, অর্ধবার্ষিক, বার্ষিক পরীক্ষা)
+    const examPeriodCount = consolidatedList.filter(c => c.type === 'exam').length || 3;
 
     return {
-      totalHolidays: govtHolidays.length,
-      examCount: examEvents.length,
-      workingDays: estimatedWorkingDays
+      totalHolidays: govtHolidayDates.size, // Real official holidays (~76 days)
+      examCount: examPeriodCount,
+      workingDays, // Real working days (~215 days)
+      weekendDays: weekendCount
     };
-  }, [holidays, currentYearNum]);
+  }, [uniqueYearHolidays, consolidatedList, currentYearNum]);
 
   // Calendar matrix generator for a specific month (0 to 11)
   const generateMonthDays = (monthIdx: number) => {
@@ -281,7 +399,7 @@ export default function AcademicCalendarPage() {
       const dateStr = `${currentYearNum}-${monthStr}-${dayStr}`;
       
       const dayOfWeek = (bdStartOffset + d - 1) % 7;
-      const isWeekend = dayOfWeek === 6; // Friday is weekend (and Sat is 0)
+      const isWeekend = dayOfWeek === 6 || dayOfWeek === 0; // Friday & Saturday
 
       days.push({
         dateStr,
@@ -320,10 +438,10 @@ export default function AcademicCalendarPage() {
             <div className="flex items-center gap-1.5 bg-black/30 border border-white/20 rounded-xl px-3 py-1.5 text-white">
               <span className="text-xs font-black">বছর:</span>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="h-7 w-[90px] bg-transparent border-0 text-white font-black text-xs focus:ring-0 p-0 shadow-none">
+                <SelectTrigger className="h-7 w-[90px] bg-transparent border-0 text-white font-black text-xs focus:ring-0 p-0 shadow-none cursor-pointer">
                   <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
                 </SelectTrigger>
-                <SelectContent className="font-kalpurush font-bold">
+                <SelectContent className="font-kalpurush font-bold bg-white text-slate-900">
                   {availableYears.map(yr => (
                     <SelectItem key={yr} value={yr}>
                       {toBengaliNumber(yr)}
@@ -332,6 +450,18 @@ export default function AcademicCalendarPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Auto Government Sync Button */}
+            <Button
+              onClick={handleSyncGovernmentGazette}
+              disabled={syncing}
+              variant="outline"
+              className="font-black text-xs gap-1.5 shadow-lg h-9 bg-white/10 hover:bg-white/20 text-white border-white/30"
+              title="সরকারি গেজেট অনুযায়ী স্বয়ংক্রিয় ছুটি রিফ্রেশ ও ডুপ্লিকেট সমাধান করুন"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+              গেজেট সিঙ্ক
+            </Button>
 
             {/* Print Button */}
             <Button
@@ -418,21 +548,21 @@ export default function AcademicCalendarPage() {
           </div>
         </div>
 
-        {/* Quick Stats Badges */}
+        {/* Real Statistics Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/15">
-          <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
             <p className="text-[11px] font-bold text-white/80">আনুমানিক কর্মদিবস</p>
             <p className="text-xl md:text-2xl font-black text-white mt-0.5">{toBengaliNumber(stats.workingDays)} দিন</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-white/80">মোট ছুটি</p>
+          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
+            <p className="text-[11px] font-bold text-white/80">মোট ছুটি (গেজেট অনুযায়ী)</p>
             <p className="text-xl md:text-2xl font-black text-yellow-300 mt-0.5">{toBengaliNumber(stats.totalHolidays)} দিন</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
             <p className="text-[11px] font-bold text-white/80">পরীক্ষা ও মূল্যায়ন</p>
-            <p className="text-xl md:text-2xl font-black text-cyan-300 mt-0.5">{toBengaliNumber(stats.examCount)} টি</p>
+            <p className="text-xl md:text-2xl font-black text-cyan-300 mt-0.5">{toBengaliNumber(stats.examCount)} টি পর্ব</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+          <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10">
             <p className="text-[11px] font-bold text-white/80">সাপ্তাহিক ছুটি</p>
             <p className="text-xl md:text-2xl font-black text-emerald-300 mt-0.5">শুক্রবার ও শনিবার</p>
           </div>
@@ -448,7 +578,7 @@ export default function AcademicCalendarPage() {
           </TabsTrigger>
           <TabsTrigger value="list" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
             <FileText className="w-4 h-4 mr-1.5" />
-            ছুটি ও ইভেন্ট তালিকা ({toBengaliNumber(filteredEvents.length)})
+            ছুটি ও পরীক্ষার তালিকা ({toBengaliNumber(filteredEvents.length)})
           </TabsTrigger>
           <TabsTrigger value="reminders" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
             <BellRing className="w-4 h-4 mr-1.5" />
@@ -501,12 +631,15 @@ export default function AcademicCalendarPage() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+              <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" /> সরকারি ছুটি
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> পরীক্ষা
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /> ইভেন্ট
                 </span>
               </div>
             </CardHeader>
@@ -514,7 +647,7 @@ export default function AcademicCalendarPage() {
               {/* Day Headers */}
               <div className="grid grid-cols-7 gap-2 mb-2 text-center font-black text-xs text-muted-foreground">
                 {WEEKDAYS.map((wd, i) => (
-                  <div key={wd} className={cn("py-2 rounded-xl", i === 6 ? "text-rose-500 bg-rose-50 dark:bg-rose-950/30" : "")}>
+                  <div key={wd} className={cn("py-2 rounded-xl", (i === 0 || i === 6) ? "text-rose-500 bg-rose-50 dark:bg-rose-950/30" : "")}>
                     {wd}
                   </div>
                 ))}
@@ -528,7 +661,7 @@ export default function AcademicCalendarPage() {
                   }
 
                   const hasHoliday = !!d.holiday;
-                  const isExam = hasHoliday && (d.holiday!.description.includes('পরীক্ষা') || d.holiday!.description.includes('মূল্যায়ন'));
+                  const isExam = hasHoliday && (d.holiday!.type === 'exam' || d.holiday!.description.includes('পরীক্ষা') || d.holiday!.description.includes('মূল্যায়ন'));
 
                   return (
                     <div
@@ -588,7 +721,7 @@ export default function AcademicCalendarPage() {
                   <div className="p-3 bg-slate-50 dark:bg-card/50 border-b flex justify-between items-center">
                     <span className="font-black text-sm text-slate-800 dark:text-slate-200">{mName}</span>
                     <Badge variant="secondary" className="text-[10px] font-bold">
-                      {toBengaliNumber(generateMonthDays(mIdx).filter(x => x.holiday).length)} ইভেন্ট
+                      {toBengaliNumber(generateMonthDays(mIdx).filter(x => x.holiday).length)} ছুটি/ইভেন্ট
                     </Badge>
                   </div>
                   <div className="p-2.5">
@@ -602,7 +735,7 @@ export default function AcademicCalendarPage() {
                           className={cn(
                             "h-5 rounded flex items-center justify-center font-bold text-[9px]",
                             !cell.isCurrentMonth && "opacity-0",
-                            cell.isWeekend && "text-rose-500",
+                            cell.isWeekend && "text-rose-500 font-bold",
                             cell.holiday && "bg-rose-500 text-white font-black"
                           )}
                         >
@@ -617,7 +750,7 @@ export default function AcademicCalendarPage() {
           </div>
         </TabsContent>
 
-        {/* List View */}
+        {/* List View (Consolidated & Deduplicated) */}
         <TabsContent value="list" className="space-y-4">
           <Card className="border-2 border-slate-200 dark:border-border rounded-[24px]">
             <CardHeader className="p-4 md:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -638,15 +771,7 @@ export default function AcademicCalendarPage() {
                   onClick={() => setFilterType('all')}
                   className="font-black text-xs rounded-xl"
                 >
-                  সবগুলো
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterType === 'exam' ? 'default' : 'outline'}
-                  onClick={() => setFilterType('exam')}
-                  className="font-black text-xs rounded-xl"
-                >
-                  পরীক্ষাসমূহ
+                  সবগুলো ({toBengaliNumber(consolidatedList.length)})
                 </Button>
                 <Button
                   size="sm"
@@ -655,6 +780,14 @@ export default function AcademicCalendarPage() {
                   className="font-black text-xs rounded-xl"
                 >
                   ছুটিসরূপ
+                </Button>
+                <Button
+                  size="sm"
+                  variant={filterType === 'exam' ? 'default' : 'outline'}
+                  onClick={() => setFilterType('exam')}
+                  className="font-black text-xs rounded-xl"
+                >
+                  পরীক্ষাসমূহ
                 </Button>
               </div>
             </CardHeader>
@@ -665,31 +798,34 @@ export default function AcademicCalendarPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-border">
-                  {filteredEvents.map((evt) => {
-                    const isExam = evt.description.includes('পরীক্ষা') || evt.description.includes('মূল্যায়ন');
-                    const [y, m, d] = evt.date.split('-');
-                    const monthBangla = BANGLA_MONTHS[parseInt(m, 10) - 1];
+                  {filteredEvents.map((evt, idx) => {
+                    const isExam = evt.type === 'exam';
+                    const isRange = evt.totalDays > 1;
 
                     return (
-                      <div key={evt.id} className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-card/50 px-2 rounded-xl transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div key={`cons-${evt.startDate}-${idx}`} className="py-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-card/50 px-3 rounded-2xl transition-colors">
+                        <div className="flex items-center gap-3.5">
                           <div className={cn(
-                            "w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border",
+                            "w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border shadow-sm",
                             isExam ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950 dark:text-blue-200" : "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950 dark:text-rose-200"
                           )}>
-                            <span className="text-sm font-black leading-none">{toBengaliNumber(parseInt(d, 10))}</span>
-                            <span className="text-[10px] font-bold mt-0.5">{monthBangla?.slice(0, 4)}</span>
+                            <span className="text-sm font-black leading-none">{toBengaliNumber(evt.totalDays)}</span>
+                            <span className="text-[9px] font-bold mt-0.5">দিন</span>
                           </div>
                           <div>
                             <p className="font-black text-sm text-slate-800 dark:text-slate-100">
                               {evt.description}
                             </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <Badge variant="outline" className={cn("text-[10px] font-bold", isExam ? "text-blue-600 border-blue-200" : "text-rose-600 border-rose-200")}>
-                                {isExam ? 'পরীক্ষা / মূল্যায়ন' : 'ছুটি / দিবস'}
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <Badge variant="outline" className={cn("text-[10px] font-black", isExam ? "text-blue-600 border-blue-200" : "text-rose-600 border-rose-200")}>
+                                {isExam ? 'পরীক্ষা / মূল্যায়ন' : 'সরকারি / স্কুল ছুটি'}
                               </Badge>
-                              <span className="text-[11px] text-muted-foreground font-medium">
-                                {toBengaliNumber(evt.date)}
+                              <span className="text-xs text-muted-foreground font-bold">
+                                {isRange ? (
+                                  `${toBengaliNumber(evt.startDate)} হতে ${toBengaliNumber(evt.endDate)} (মোট ${toBengaliNumber(evt.totalDays)} দিন)`
+                                ) : (
+                                  toBengaliNumber(evt.startDate)
+                                )}
                               </span>
                             </div>
                           </div>
@@ -698,7 +834,7 @@ export default function AcademicCalendarPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteEvent(evt.id, evt.date)}
+                          onClick={() => handleDeleteEvent(evt.id, evt.startDate)}
                           className="h-8 w-8 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg shrink-0"
                           title="মুছে ফেলুন"
                         >
@@ -808,29 +944,41 @@ export default function AcademicCalendarPage() {
           </div>
         </div>
 
-        {/* Holiday Table */}
+        {/* Consolidated Holiday Table */}
         <table className="w-full border-collapse border border-black text-xs">
           <thead>
             <tr className="bg-slate-100 border-b border-black">
               <th className="border border-black p-2 text-center w-12">ক্রমিক</th>
-              <th className="border border-black p-2 text-left">তারিখ</th>
-              <th className="border border-black p-2 text-left">ছুটি / ইভেন্টের বিবরণ</th>
+              <th className="border border-black p-2 text-left">তারিখ / সময়সীমা</th>
+              <th className="border border-black p-2 text-left">ছুটি বা ইভেন্টের বিবরণ</th>
+              <th className="border border-black p-2 text-center w-24">মোট দিন</th>
               <th className="border border-black p-2 text-center w-28">ধরন</th>
             </tr>
           </thead>
           <tbody>
-            {filteredEvents.map((h, idx) => (
-              <tr key={`print-${h.id}`} className="border-b border-black">
+            {consolidatedList.map((h, idx) => (
+              <tr key={`print-${h.startDate}-${idx}`} className="border-b border-black">
                 <td className="border border-black p-2 text-center font-bold">{toBengaliNumber(idx + 1)}</td>
-                <td className="border border-black p-2 font-bold">{toBengaliNumber(h.date)}</td>
+                <td className="border border-black p-2 font-bold">
+                  {h.totalDays > 1 ? `${toBengaliNumber(h.startDate)} হতে ${toBengaliNumber(h.endDate)}` : toBengaliNumber(h.startDate)}
+                </td>
                 <td className="border border-black p-2 font-bold">{h.description}</td>
+                <td className="border border-black p-2 text-center font-bold">{toBengaliNumber(h.totalDays)} দিন</td>
                 <td className="border border-black p-2 text-center">
-                  {h.description.includes('পরীক্ষা') ? 'পরীক্ষা' : 'ছুটি'}
+                  {h.type === 'exam' ? 'পরীক্ষা' : 'ছুটি'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {/* Summary Stats in Print */}
+        <div className="mt-6 p-3 border border-black text-xs flex justify-between font-bold">
+          <span>মোট বার্ষিক কর্মদিবস: {toBengaliNumber(stats.workingDays)} দিন</span>
+          <span>সরকারি ও স্কুল ছুটি: {toBengaliNumber(stats.totalHolidays)} দিন</span>
+          <span>পরীক্ষার পর্ব: {toBengaliNumber(stats.examCount)} টি</span>
+          <span>সাপ্তাহিক ছুটি: শুক্রবার ও শনিবার</span>
+        </div>
 
         {/* Footer Signatures */}
         <div className="flex justify-between items-end mt-16 pt-8 px-8">

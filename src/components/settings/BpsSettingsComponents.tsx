@@ -588,19 +588,22 @@ export function HolidaySettings() {
 
 const permissionGroups = [
     { title: 'ড্যাশবোর্ড', ids: ['view:dashboard'] },
+    { title: 'বার্ষিক একাডেমি ক্যালেন্ডার', ids: ['view:calendar', 'manage:calendar'] },
+    { title: 'প্রশ্নপত্র ও পরীক্ষা শাখা', ids: ['create:questions', 'view:my-questions', 'manage:questions', 'manage:online-exams', 'manage:omr-sheets'] },
+    { title: 'লেকচার শিট ও বোর্ড বই', ids: ['create:lecture-sheets', 'manage:lecture-sheets', 'view:board-books', 'manage:board-books'] },
+    { title: 'হোয়াইটবোর্ড ও টিচার্স ডায়েরি', ids: ['view:whiteboard', 'view:diary', 'manage:diary'] },
     { title: 'ভর্তি আবেদন', ids: ['manage:admissions'] },
     { title: 'শিক্ষার্থী ও প্রোফাইল', ids: ['view:students', 'manage:students', 'special:edit-student', 'special:delete-student', 'upload:students', 'view:student-profile'] },
-    { title: 'শিক্ষকর ও কর্মচারী', ids: ['view:staff', 'manage:staff', 'manage:staff-attendance', 'manage:staff-attendance-delete', 'view:staff-attendance-report'] },
-    { title: 'হাজিরা ও উপস্থিতি', ids: ['manage:attendance', 'input:quick-roll-attendance', 'view:missed-attendance', 'input:missed-attendance', 'view:absent-student-list'] },
+    { title: 'শিক্ষক ও কর্মচারী', ids: ['view:staff', 'manage:staff', 'manage:staff-attendance', 'manage:staff-attendance-delete', 'view:staff-attendance-report'] },
+    { title: 'হাজিরা ও উপস্থিতি', ids: ['manage:attendance', 'manage:digital-attendance', 'input:quick-roll-attendance', 'view:missed-attendance', 'input:missed-attendance', 'view:absent-student-list', 'view:attendance-report'] },
     { title: 'লেসন প্ল্যান ও সিলেবাস', ids: ['manage:lesson-plans', 'view:syllabus-mgmt', 'manage:syllabus', 'view:syllabus-tracker'] },
     { title: 'নোটিশ বোর্ড', ids: ['view:notices', 'manage:notices'] },
     { title: 'ফলাফল ও প্রমোশন', ids: ['input:results', 'manage:results', 'manage:full-marks', 'upload:marks', 'view:merit-list', 'promote:students', 'manage:special-results', 'view:public-records', 'manage:public-records'] },
-    { title: 'হিসাব ও ফি', ids: ['view:accounts', 'collect:fees', 'manage:fee-setup', 'special:edit-transaction', 'special:delete-transaction', 'view:collection-report', 'view:expense-report', 'view:accounts-monthly-report', 'view:cashbook-ledger', 'manage:transactions'] },
+    { title: 'হিসাব ও ফি শাখা', ids: ['view:accounts', 'collect:fees', 'manage:fee-setup', 'view:fee-due-report', 'special:edit-transaction', 'special:delete-transaction', 'view:collection-report', 'view:expense-report', 'view:accounts-monthly-report', 'view:cashbook-ledger', 'manage:transactions'] },
     { title: 'রুটিন ও বদলি ক্লাস', ids: ['view:routines', 'manage:routines', 'view:proxy-classes', 'manage:proxy-classes'] },
-    { title: 'ডকুমেন্ট', ids: ['manage:documents'] },
-    { title: 'নথিপত্র ও আর্কাইভ', ids: ['view:archive', 'manage:archive'] },
-    { title: 'মেসেজিং', ids: ['send:messaging', 'manage:messaging'] },
-    { title: 'সিস্টেম সেটিংস', ids: ['manage:settings'] },
+    { title: 'ডকুমেন্ট ও আর্কাইভ', ids: ['manage:documents', 'view:archive', 'manage:archive'] },
+    { title: 'মেসেজিং শাখা', ids: ['send:messaging', 'manage:messaging'] },
+    { title: 'সিস্টেম ও ব্যাকআপ সেটিংস', ids: ['manage:settings', 'manage:backup-export', 'manage:gallery'] },
 ];
 
 function PermissionDialog({ user, open, onOpenChange, onPermissionsUpdate }: { user: SystemUser, open: boolean, onOpenChange: (open: boolean) => void, onPermissionsUpdate: () => void }) {

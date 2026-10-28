@@ -1,10 +1,10 @@
-
 'use client';
 
 // This is a list of available permissions in the system.
 export const availablePermissions = [
   { id: 'view:dashboard', label: 'ড্যাশবোর্ড দেখুন' },
   
+  // শিক্ষার্থী ও প্রোফাইল
   { id: 'view:students', label: 'শিক্ষার্থী তালিকা দেখুন' },
   { id: 'manage:students', label: 'শিক্ষার্থী যোগ করার অনুমতি' },
   { id: 'special:edit-student', label: 'স্পেশাল পারমিশন: শিক্ষার্থী এডিট করুন' },
@@ -12,28 +12,58 @@ export const availablePermissions = [
   { id: 'upload:students', label: 'এক্সেল দিয়ে শিক্ষার্থী আপলোড (ভর্তি)' },
   { id: 'view:student-profile', label: 'শিক্ষার্থী প্রোফাইল সার্চ করুন' },
 
+  // ভর্তি আবেদন
   { id: 'manage:admissions', label: 'অনলাইন ভর্তি আবেদন ম্যানেজ করুন' },
 
+  // শিক্ষক ও কর্মচারী
   { id: 'view:staff', label: 'শিক্ষক ও কর্মচারী তালিকা দেখুন' },
   { id: 'manage:staff', label: 'শিক্ষক ও কর্মচারী ম্যানেজ করুন' },
   { id: 'manage:staff-attendance', label: 'স্টাফ হাজিরা ও ছুটি ম্যানেজ (ইনপুট)' },
   { id: 'manage:staff-attendance-delete', label: 'স্টাফ হাজিরা রেকর্ড ডিলিট করার অনুমতি' },
   { id: 'view:staff-attendance-report', label: 'স্টাফ হাজিরা ও ছুটির রিপোর্ট দেখুন' },
 
+  // হাজিরা ও উপস্থিতি
   { id: 'manage:attendance', label: 'শিক্ষার্থীর হাজিরা ম্যানেজ করুন' },
   { id: 'input:quick-roll-attendance', label: 'রোল ইনপুট দিয়ে দ্রুত হাজিরা' },
   { id: 'view:missed-attendance', label: 'বকেয়া হাজিরা দেখুন' },
   { id: 'input:missed-attendance', label: 'বকেয়া হাজিরা গ্রহণ করুন' },
   { id: 'view:absent-student-list', label: 'অনুপস্থিত শিক্ষার্থীর তালিকা দেখুন' },
+  { id: 'manage:digital-attendance', label: 'ডিজিটাল হাজিরা (স্মার্ট হাজিরা) পরিচালনা' },
+  { id: 'view:attendance-report', label: 'হাজিরা রিপোর্ট ও মাসিক পরিসংখ্যান দেখুন' },
 
+  // একাডেমি ও সিলেবাস
   { id: 'manage:lesson-plans', label: 'লেসন প্ল্যান ও প্রগ্রেস ম্যানেজ করুন' },
   { id: 'view:syllabus-mgmt', label: 'সিলেবাস ব্যবস্থাপনা দেখুন' },
   { id: 'manage:syllabus', label: 'সিলেবাস তৈরি ও পরিবর্তন করুন' },
   { id: 'view:syllabus-tracker', label: 'সিলেবাস ট্র্যাকার (মনিটরিং) দেখুন' },
 
+  // বার্ষিক একাডেমি ক্যালেন্ডার
+  { id: 'view:calendar', label: 'বার্ষিক ক্যালেন্ডার ও ছুটির তালিকা দেখুন' },
+  { id: 'manage:calendar', label: 'ক্যালেন্ডারে নতুন ইভেন্ট ও ছুটি যোগ/ম্যানেজ করুন' },
+
+  // হোয়াইটবোর্ড ও টিচার্স ডায়েরি
+  { id: 'view:whiteboard', label: 'ডিজিটাল হোয়াইটবোর্ড ব্যবহার করুন' },
+  { id: 'view:diary', label: 'টিচার্স ডায়েরি দেখুন' },
+  { id: 'manage:diary', label: 'টিচার্স ডায়েরি এন্ট্রি ও পরিচালনা' },
+
+  // প্রশ্ন ও পরীক্ষা
+  { id: 'create:questions', label: 'প্রশ্ন তৈরি করুন' },
+  { id: 'view:my-questions', label: 'আমার লাইব্রেরি (প্রশ্নব্যাংক) দেখুন' },
+  { id: 'manage:questions', label: 'প্রশ্নব্যাংক ও প্রশ্নপত্র নিয়ন্ত্রণ করুন' },
+  { id: 'manage:online-exams', label: 'অনলাইন পরীক্ষা ও মূল্যায়ন পরিচালনা' },
+  { id: 'manage:omr-sheets', label: 'ওএমআর (OMR) শিট তৈরি ও ডাউনলোড' },
+
+  // লেকচার শিট ও বোর্ড বই
+  { id: 'create:lecture-sheets', label: 'লেকচার শিট তৈরি করুন' },
+  { id: 'manage:lecture-sheets', label: 'লেকচার শিট ও ফাইল আপলোড নিয়ন্ত্রণ' },
+  { id: 'view:board-books', label: 'বোর্ড বই ও গাইড বই দেখুন' },
+  { id: 'manage:board-books', label: 'বোর্ড বই ও গাইড বই আপলোড/ম্যানেজ করুন' },
+
+  // নোটিশ বোর্ড
   { id: 'view:notices', label: 'নোটিশ বোর্ড দেখুন' },
   { id: 'manage:notices', label: 'নোটিশ বোর্ড ব্যবস্থাপনা (প্রকাশ ও নিয়ন্ত্রণ)' },
 
+  // ফলাফল ও প্রমোশন
   { id: 'input:results', label: 'ফলাফল ও নম্বর ইনপুট (নির্ধারিত বিষয়)' },
   { id: 'manage:results', label: 'ফলাফল ও নম্বর ম্যানেজ (সকল বিষয় ও নিয়ন্ত্রণ)' },
   { id: 'manage:full-marks', label: 'বিষয় ও পূর্ণমান ব্যবস্থাপনা' },
@@ -42,12 +72,15 @@ export const availablePermissions = [
   { id: 'promote:students', label: 'প্রমোশন ম্যানেজ করুন' },
   { id: 'manage:special-results', label: 'বিশেষ পরীক্ষা ম্যানেজ করুন' },
   
+  // পাবলিক রেকর্ড
   { id: 'view:public-records', label: 'রেকর্ড শাখা দেখুন' },
   { id: 'manage:public-records', label: 'রেকর্ড শাখা ম্যানেজ করুন' },
   
+  // হিসাব ও ফি
   { id: 'view:accounts', label: 'হিসাব শাখা দেখুন' },
   { id: 'collect:fees', label: 'বেতন আদায় করুন' },
   { id: 'manage:fee-setup', label: 'শিক্ষার্থীর ফি নির্ধারণ (সেটআপ)' },
+  { id: 'view:fee-due-report', label: 'বকেয়া ফি ও বেতন রিমাইন্ডার রিপোর্ট দেখুন' },
   { id: 'special:edit-transaction', label: 'স্পেশাল পারমিশন: আদায়/আয়-ব্যয় এডিট করুন' },
   { id: 'special:delete-transaction', label: 'স্পেশাল পারমিশন: আদায়/আয়-ব্যয় ডিলিট করুন' },
   { id: 'view:collection-report', label: 'বেতন আদায়ের রিপোর্ট দেখুন' },
@@ -56,6 +89,7 @@ export const availablePermissions = [
   { id: 'view:cashbook-ledger', label: 'ক্যাশবুক ও খতিয়ান দেখুন' },
   { id: 'manage:transactions', label: 'সাধারণ লেনদেন ম্যানেজ করুন' },
   
+  // রুটিন ও ডকুমেন্ট
   { id: 'manage:documents', label: 'ডকুমেন্ট ম্যানেজ করুন' },
   { id: 'view:archive', label: 'নথিপত্র (ডিজিটাল আর্কাইভ) দেখুন' },
   { id: 'manage:archive', label: 'ডিজিটাল আর্কাইভ (নথিপত্র) ম্যানেজ করুন' },
@@ -64,10 +98,14 @@ export const availablePermissions = [
   { id: 'view:proxy-classes', label: 'বদলি ক্লাস দেখুন' },
   { id: 'manage:proxy-classes', label: 'বদলি ক্লাস ম্যানেজ করুন' },
 
+  // মেসেজিং
   { id: 'send:messaging', label: 'মেসেজ পাঠানো' },
   { id: 'manage:messaging', label: 'মেসেজ ম্যানেজ করুন' },
 
+  // সিস্টেম, ব্যাকআপ ও সেটিংস
   { id: 'manage:settings', label: 'সেটিংস ম্যানেজ করুন' },
+  { id: 'manage:backup-export', label: 'সিস্টেম ব্যাকআপ ও ডাটা এক্সপোর্ট করুন' },
+  { id: 'manage:gallery', label: 'স্কুলের ফটো গ্যালারি ম্যানেজ করুন' },
 ];
 
 export const defaultPermissions: { [key: string]: string[] } = {
@@ -81,11 +119,21 @@ export const defaultPermissions: { [key: string]: string[] } = {
     'manage:staff-attendance',
     'view:staff-attendance-report',
     'manage:attendance',
+    'manage:digital-attendance',
     'input:quick-roll-attendance',
     'view:missed-attendance',
     'view:absent-student-list',
+    'view:attendance-report',
     'manage:lesson-plans',
     'view:syllabus-mgmt',
+    'view:calendar',
+    'view:whiteboard',
+    'view:diary',
+    'manage:diary',
+    'create:questions',
+    'view:my-questions',
+    'create:lecture-sheets',
+    'view:board-books',
     'view:notices',
     'manage:notices',
     'input:results', 
@@ -96,6 +144,7 @@ export const defaultPermissions: { [key: string]: string[] } = {
     'view:accounts',
     'collect:fees',
     'manage:fee-setup',
+    'view:fee-due-report',
     'view:collection-report',
     'view:expense-report',
     'view:accounts-monthly-report',
