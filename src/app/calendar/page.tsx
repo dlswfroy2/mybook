@@ -127,6 +127,20 @@ export default function AcademicCalendarPage() {
     return getSecondarySchoolExamSchedule(currentYearNum);
   }, [currentYearNum]);
 
+  // Build a Set of all exam dates for fast lookup (for green coloring in calendar)
+  const examDatesSet = useMemo(() => {
+    const set = new Set<string>();
+    examSchedule.forEach(exam => {
+      const cur = new Date(`${exam.startDate}T12:00:00Z`);
+      const end = new Date(`${exam.endDate}T12:00:00Z`);
+      while (cur <= end) {
+        set.add(cur.toISOString().split('T')[0]);
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    });
+    return set;
+  }, [examSchedule]);
+
   // Handle Add Event
   const handleAddEvent = async () => {
     if (!newEventTitle.trim() || !newEventDate) {
@@ -350,6 +364,7 @@ export default function AcademicCalendarPage() {
       isCurrentMonth: boolean;
       isWeekend: boolean;
       holiday?: Holiday;
+      isExamDay?: boolean;
     }> = [];
 
     // Empty slots before month start
@@ -376,7 +391,8 @@ export default function AcademicCalendarPage() {
         dayNum: d,
         isCurrentMonth: true,
         isWeekend,
-        holiday: holidaysMap.get(dateStr)
+        holiday: holidaysMap.get(dateStr),
+        isExamDay: examDatesSet.has(dateStr)
       });
     }
 
@@ -598,6 +614,9 @@ export default function AcademicCalendarPage() {
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" /> সাপ্তাহিক ছুটি (শুক্র-শনি)
                 </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /> পরীক্ষার দিন
+                </span>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6">
@@ -618,6 +637,7 @@ export default function AcademicCalendarPage() {
                   }
 
                   const hasHoliday = !!d.holiday;
+                  const isExam = !!d.isExamDay && !hasHoliday;
 
                   return (
                     <div
@@ -625,19 +645,24 @@ export default function AcademicCalendarPage() {
                       className={cn(
                         "h-20 md:h-24 p-2 rounded-2xl border transition-all flex flex-col justify-between relative group",
                         d.isWeekend ? "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-900/40" : "bg-white dark:bg-card border-slate-200 dark:border-border",
-                        hasHoliday && "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300"
+                        hasHoliday && "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300",
+                        isExam && "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300"
                       )}
                     >
                       <div className="flex items-center justify-between">
                         <span className={cn(
                           "w-6 h-6 rounded-full flex items-center justify-center text-xs font-black",
                           d.isWeekend ? "text-rose-600 bg-rose-100 dark:bg-rose-900/50" : "text-slate-800 dark:text-slate-200",
-                          hasHoliday && "bg-rose-600 text-white"
+                          hasHoliday && "bg-rose-600 text-white",
+                          isExam && "bg-emerald-600 text-white"
                         )}>
                           {toBengaliNumber(d.dayNum)}
                         </span>
-                        {d.isWeekend && !hasHoliday && (
+                        {d.isWeekend && !hasHoliday && !isExam && (
                           <span className="text-[10px] text-rose-500 font-bold hidden sm:inline">সাপ্তাহিক ছুটি</span>
+                        )}
+                        {isExam && (
+                          <span className="text-[10px] text-emerald-600 font-bold hidden sm:inline">পরীক্ষা</span>
                         )}
                       </div>
 
@@ -645,6 +670,13 @@ export default function AcademicCalendarPage() {
                         <div className="mt-1">
                           <p className="text-[10px] leading-tight font-black line-clamp-2 p-1 rounded-lg bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
                             {d.holiday!.description}
+                          </p>
+                        </div>
+                      )}
+                      {isExam && (
+                        <div className="mt-1">
+                          <p className="text-[10px] leading-tight font-black line-clamp-2 p-1 rounded-lg bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100">
+                            পরীক্ষা চলছে
                           </p>
                         </div>
                       )}
@@ -689,6 +721,7 @@ export default function AcademicCalendarPage() {
                             "h-5 rounded flex items-center justify-center font-bold text-[9px]",
                             !cell.isCurrentMonth && "opacity-0",
                             cell.isWeekend && "text-rose-500 font-bold",
+                            cell.isExamDay && !cell.holiday && "bg-emerald-500 text-white font-black",
                             cell.holiday && "bg-rose-500 text-white font-black"
                           )}
                         >
