@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, Suspense } from 'react';
@@ -63,6 +62,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
     if (!str && str !== 0) return '';
@@ -113,6 +113,7 @@ function NavbarContent() {
 
   const navItems = [
     { label: 'হোম', icon: LayoutDashboard, href: '/', color: 'from-cyan-400 via-cyan-500 to-cyan-800 shadow-cyan-500/40 text-white', activeBg: 'bg-cyan-500/20 border-cyan-400/30' },
+    { label: 'বার্ষিক ক্যালেন্ডার', icon: Calendar, href: '/calendar', color: 'from-amber-400 via-amber-500 to-amber-800 shadow-amber-500/40 text-white', activeBg: 'bg-amber-500/20 border-amber-400/30' },
     { label: 'হোয়াইটবোর্ড', icon: Edit3, href: '/whiteboard', color: 'from-orange-400 via-orange-500 to-orange-800 shadow-orange-500/40 text-white', activeBg: 'bg-orange-500/20 border-orange-400/30' },
     { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books', color: 'from-sky-400 via-sky-500 to-sky-800 shadow-sky-500/40 text-white', activeBg: 'bg-sky-500/20 border-sky-400/30' },
     { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', color: 'from-lime-400 via-lime-500 to-lime-800 shadow-lime-500/40 text-white', activeBg: 'bg-lime-500/20 border-lime-400/30' },
@@ -218,7 +219,7 @@ function NavbarContent() {
         </div>
       </Link>
       
-      <div className="ml-auto flex items-center gap-2 md:gap-4">
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
         {/* Academic Year Selector */}
         <div className="flex items-center gap-1.5 bg-black/25 hover:bg-black/35 border border-white/20 rounded-xl px-2.5 py-1 text-white shadow-inner">
           <Calendar className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
@@ -237,6 +238,9 @@ function NavbarContent() {
           </Select>
         </div>
 
+        {/* Dark Mode Theme Toggle */}
+        <ThemeToggle />
+
         {!loading && (
           user ? (
             <DropdownMenu>
@@ -250,7 +254,7 @@ function NavbarContent() {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent className="w-56 font-kalpurush" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-bold leading-none">{userName}</p>
@@ -262,6 +266,12 @@ function NavbarContent() {
                    <Link href="/settings" className="cursor-pointer">
                     <SettingsIcon className="mr-2 h-4 w-4" />
                     <span>সেটিংস</span>
+                   </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                   <Link href="/calendar" className="cursor-pointer">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    <span>বার্ষিক ক্যালেন্ডার</span>
                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">

@@ -10,6 +10,7 @@ import { SchoolInfoProvider } from '@/context/SchoolInfoContext';
 import { AcademicYearProvider } from '@/context/AcademicYearContext';
 import { GlobalAiAssistant } from '@/components/GlobalAiAssistant';
 import { GlobalCommandPalette } from '@/components/GlobalCommandPalette';
+import { PwaRegister } from '@/components/PwaRegister';
 
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
@@ -30,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bn">
+    <html lang="bn" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/icon.png" type="image/png" />
         <link rel="shortcut icon" href="/icon.png" type="image/png" />
@@ -59,6 +60,7 @@ export default function RootLayout({
                 <GlobalAiAssistant />
                 <GlobalCommandPalette />
                 <Toaster />
+                <PwaRegister />
               </AcademicYearProvider>
             </SchoolInfoProvider>
           </AuthProvider>
