@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit, Sparkles, Copy, Check, CheckCircle2 } from 'lucide-react';
-import { performWhiteboardVisionOcr, solveWhiteboardProblem } from '@/ai/flows/whiteboard-solver-flow';
+import { performWhiteboardVisionOcr, solveWhiteboardProblem, generateWhiteboardDiagram } from '@/ai/flows/whiteboard-solver-flow';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -87,6 +87,9 @@ export default function WhiteboardPage() {
     const aiModalTitle = document.getElementById('ai-modal-title')!;
     const aiBody = document.getElementById('ai-solution-body')!;
     const closeAiBtn = document.getElementById('close-ai-modal')!;
+
+    const aiDrawBtn = document.getElementById('ai-draw-btn')!;
+    const aiDrawWidget = document.getElementById('ai-draw-widget')!;
 
     let currentTool = 'pen';
     let currentBgStyle = 'blank';
@@ -932,6 +935,59 @@ export default function WhiteboardPage() {
 
     closeAiBtn.onclick = () => aiModal.classList.add('hidden');
 
+    // AI Diagram Draw: Generate SVG from text description and render on canvas
+    aiDrawBtn.onclick = () => aiDrawWidget.classList.toggle('hidden');
+
+    const aiDrawDoBtn = document.getElementById('ai-draw-do-btn')!;
+    const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
+    const aiDrawStatus = document.getElementById('ai-draw-status')!;
+
+    aiDrawDoBtn.onclick = async () => {
+      const desc = aiDrawInput.value.trim();
+      if (!desc) { aiDrawStatus.textContent = '⚠️ চিত্রের নাম বা বর্ণনা লিখুন।'; return; }
+      aiDrawDoBtn.textContent = '⏳ তৈরি হচ্ছে...';
+      aiDrawDoBtn.setAttribute('disabled', 'true');
+      aiDrawStatus.textContent = '🤖 AI চিত্র তৈরি করছে, অনুগ্রহ করে অপেক্ষা করুন...';
+      try {
+        const result = await generateWhiteboardDiagram(desc);
+        if (!result.success || !result.svg) {
+          aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
+          return;
+        }
+        // Render SVG onto canvas
+        const svgBlob = new Blob([result.svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+          saveState();
+          const maxW = canvas.width * 0.85;
+          const maxH = canvas.height * 0.85;
+          const naturalW = img.naturalWidth || 800;
+          const naturalH = img.naturalHeight || 600;
+          const scale = Math.min(maxW / naturalW, maxH / naturalH, 1);
+          const drawW = naturalW * scale;
+          const drawH = naturalH * scale;
+          const drawX = (canvas.width - drawW) / 2;
+          const drawY = (canvas.height - drawH) / 2;
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          saveState();
+          URL.revokeObjectURL(url);
+          aiDrawStatus.textContent = '✅ চিত্র বোর্ডে যোগ হয়েছে!';
+          setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 1800);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          aiDrawStatus.textContent = '⚠️ SVG রেন্ডার করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।';
+        };
+        img.src = url;
+      } catch (err: any) {
+        aiDrawStatus.textContent = `⚠️ ${err?.message || 'অজানা সমস্যা হয়েছে।'}`;
+      } finally {
+        aiDrawDoBtn.textContent = '🎨 আঁকুন';
+        aiDrawDoBtn.removeAttribute('disabled');
+      }
+    };
+
     speechBtn.onclick = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) return alert('আপনার ব্রাউজার ভয়েস টাইপিং সাপোর্ট করে না। ক্রোম ব্রাউজার ব্যবহার করুন।');
@@ -1415,6 +1471,7 @@ export default function WhiteboardPage() {
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
         <button id="ai-solve-btn">🤖 এআই সলভ</button>
+        <button id="ai-draw-btn" style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)', color: 'white', fontWeight: 'bold' }}>🎨 AI চিত্র</button>
         <button id="math-tool-btn">{"∑math LaTeX"}</button>
         <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
@@ -1501,6 +1558,31 @@ export default function WhiteboardPage() {
           <button id="start-timer" style={{flex: 1, padding:'5px', background:'#22c55e', color:'white', borderRadius:'4px'}}>শুরু</button>
           <button id="stop-timer" style={{flex: 1, padding:'5px', background:'#ef4444', color:'white', borderRadius:'4px'}}>বন্ধ</button>
           <button id="reset-timer" style={{flex: 1, padding:'5px', background:'#64748b', color:'white', borderRadius:'4px'}}>রিসেট</button>
+        </div>
+      </div>
+
+      {/* AI Diagram Draw Widget */}
+      <div id="ai-draw-widget" className="widget hidden" style={{ width: '320px', padding: '0', overflow: 'hidden', borderRadius: '14px', boxShadow: '0 8px 32px rgba(124,58,237,0.25)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: 'white', fontWeight: 'bold', fontSize: '14px' }}>🎨 AI দিয়ে চিত্র আঁকুন</span>
+          <span className="close-widget" title="বন্ধ করুন" style={{ color: 'white', fontSize: '20px', cursor: 'pointer', lineHeight: 1 }}>&times;</span>
+        </div>
+        <div style={{ padding: '14px', background: '#fff' }}>
+          <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontWeight: 600 }}>
+            যেকোনো চিত্রের নাম বা বর্ণনা লিখুন (বাংলা বা ইংরেজিতে)
+          </p>
+          <textarea
+            id="ai-draw-input"
+            placeholder="উদাহরণ: মানব হৃদয়ের চিত্র, বৈদ্যুতিক বর্তনী, পানি চক্র, সমকোণী ত্রিভুজ, DNA গঠন..."
+            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1.5px solid #7c3aed', fontSize: '12px', color: '#0f172a', minHeight: '80px', resize: 'vertical', fontFamily: 'Kalpurush, sans-serif', outline: 'none', boxSizing: 'border-box' }}
+          />
+          <button
+            id="ai-draw-do-btn"
+            style={{ width: '100%', marginTop: '10px', padding: '10px', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+          >
+            🎨 আঁকুন
+          </button>
+          <p id="ai-draw-status" style={{ marginTop: '8px', fontSize: '11px', color: '#7c3aed', fontWeight: 700, minHeight: '16px', textAlign: 'center' }}></p>
         </div>
       </div>
 

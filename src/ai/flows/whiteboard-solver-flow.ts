@@ -64,6 +64,12 @@ export interface WhiteboardSolutionResult {
   error?: string;
 }
 
+export interface WhiteboardDiagramResult {
+  success: boolean;
+  svg?: string;
+  error?: string;
+}
+
 /**
  * Perform high-accuracy AI Vision OCR on the whiteboard canvas image.
  */
@@ -156,5 +162,69 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
   return {
     success: false,
     error: lastErrorMsg || 'AI দ্বারা সমস্যা সমাধান করা সম্ভব হয়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে পুনরায় চেষ্টা করুন।'
+  };
+}
+
+const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator.
+The user will provide a name or description of a diagram. Create a detailed, accurate, and educational SVG diagram for it.
+
+STRICT RULES:
+1. Return ONLY valid SVG code - starting with <svg ...> and ending with </svg>.
+2. No markdown backticks, no explanation, no introduction - ONLY SVG code.
+3. SVG must have viewBox="0 0 800 600" and width="800" height="600".
+4. Add necessary labels (Bengali or English) so the diagram is clear for students.
+5. Make the diagram as detailed, accurate and professional as possible.
+6. Use colors to make the diagram attractive and easy to understand.
+7. Can draw any subject: biology, physics, chemistry, math, geography, history, architecture, etc.`;
+
+export interface WhiteboardDiagramResult {
+  success: boolean;
+  svg?: string;
+  error?: string;
+}
+
+export async function generateWhiteboardDiagram(description: string): Promise<WhiteboardDiagramResult> {
+  if (!description || description.trim().length < 2) {
+    return { success: false, error: 'Please provide a description for the diagram.' };
+  }
+
+  const availableKeys = getAvailableApiKeys();
+  let lastErrorMsg = '';
+
+  for (const key of availableKeys) {
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const client = createAiClient(key, model);
+        const generatePromise = client.generate({
+          model,
+          prompt: [
+            { text: `${DIAGRAM_PROMPT}\n\nDiagram subject: ${description.trim()}` },
+          ],
+        });
+        const resp = await Promise.race([
+          generatePromise,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_20S')), 20000))
+        ]) as any;
+
+        const rawText = resp.text?.trim();
+        if (!rawText) continue;
+
+        let svg = rawText;
+        const svgMatch = rawText.match(/<svg[\s\S]*<\/svg>/i);
+        if (svgMatch) svg = svgMatch[0];
+
+        if (svg && svg.includes('<svg')) {
+          return { success: true, svg };
+        }
+      } catch (err: any) {
+        lastErrorMsg = err?.message || String(err);
+        console.warn(`[Whiteboard Diagram Failover] ${model} failed: ${lastErrorMsg}`);
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error: lastErrorMsg || 'AI could not generate the diagram. Please try again.'
   };
 }
