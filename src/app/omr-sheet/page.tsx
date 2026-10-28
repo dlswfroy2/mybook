@@ -93,9 +93,21 @@ function OmrSheetContent() {
           </div>
         </div>
 
-        <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-2 shadow-md">
-          <Printer className="w-4 h-4" /> OMR শিট প্রিন্ট করুন
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            type="button"
+            onClick={() => {
+              alert('OMR মূল্যায়ন নির্দেশনা:\n১. বলপয়েন্ট কলম দ্বারা বৃত্ত সম্পূর্ণ ভরাট করতে হবে।\n২. প্রতিটি সঠিক উত্তরের জন্য ১ নম্বর যোগ হবে।\n৩. ভুল উত্তর বা একাধিক বৃত্ত ভরাটের ক্ষেত্রে নম্বর কর্তন হবে।');
+            }}
+            className="font-bold gap-1.5 border-slate-300 text-xs text-slate-700"
+          >
+            📋 মূল্যায়ন নির্দেশিকা
+          </Button>
+          <Button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-2 shadow-md">
+            <Printer className="w-4 h-4" /> OMR শিট প্রিন্ট করুন
+          </Button>
+        </div>
       </div>
 
       {/* Standard A4 Printable OMR Sheet */}

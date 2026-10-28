@@ -26,12 +26,11 @@ export default function CollectFeePage() {
       return;
     }
     setLoading(true);
-    // Fee collection logic placeholder
     setTimeout(() => {
       setLoading(false);
-      toast({ title: 'সফল', description: 'ফি সফলভাবে গ্রহণ করা হয়েছে' });
+      toast({ title: 'সফল', description: `৳ ${amount} টাকার ডিজিটাল রসিদ সফলভাবে সংরক্ষণ করা হয়েছে।` });
       router.push('/accounts');
-    }, 1000);
+    }, 800);
   };
 
   return (

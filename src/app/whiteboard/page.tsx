@@ -958,7 +958,16 @@ export default function WhiteboardPage() {
             recordBtn.textContent = '🎥 রেকর্ড';
         } else {
             try {
-              const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+              let stream: MediaStream;
+              if ((canvas as any).captureStream) {
+                try {
+                  stream = (canvas as any).captureStream(30);
+                } catch {
+                  stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                }
+              } else {
+                stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+              }
               mediaRecorder = new MediaRecorder(stream);
               chunks = [];
               mediaRecorder.ondataavailable = (e: any) => chunks.push(e.data);

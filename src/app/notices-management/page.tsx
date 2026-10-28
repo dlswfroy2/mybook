@@ -511,6 +511,20 @@ export default function NoticeManagementPage() {
                                                     <Button 
                                                         variant="outline" 
                                                         size="sm" 
+                                                        onClick={() => {
+                                                            const dateStr = n.date ? format(n.date, "dd MMMM yyyy", { locale: bn }) : '';
+                                                            const text = `📢 *${n.title}*\n${institutionName}\n\n${n.content}${dateStr ? `\n\nতারিখ: ${dateStr}` : ''}`;
+                                                            navigator.clipboard.writeText(text);
+                                                            toast({ title: "সফল", description: "নোটিশটি শেয়ারের জন্য কপি করা হয়েছে।" });
+                                                        }}
+                                                        className="h-8 px-2.5 bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold text-xs"
+                                                        title="হোয়াটসঅ্যাপ বা মেসেজে পাঠানোর জন্য কপি করুন"
+                                                    >
+                                                        📋 কপি
+                                                    </Button>
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
                                                         onClick={() => handlePrint(n)}
                                                         className="h-8 px-2.5 bg-white border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs"
                                                         title="প্রিন্ট করুন"
