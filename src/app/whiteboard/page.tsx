@@ -954,8 +954,15 @@ export default function WhiteboardPage() {
           aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
           return;
         }
+        // Force white background: inject a white rect at the start of SVG body
+        let safeSvg = result.svg.replace(
+          /(<svg[^>]*>)/i,
+          '$1<rect width="100%" height="100%" fill="#ffffff"/>'
+        );
+        // Remove any dark fill on the root svg element
+        safeSvg = safeSvg.replace(/style="[^"]*background\s*:\s*(#[01][0-9a-fA-F]{5}|black|#000000|rgb\(0,0,0\))[^"]*"/gi, 'style="background:#ffffff"');
         // Render SVG onto canvas
-        const svgBlob = new Blob([result.svg], { type: 'image/svg+xml;charset=utf-8' });
+        const svgBlob = new Blob([safeSvg], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
         const img = new Image();
         img.onload = () => {

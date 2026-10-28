@@ -165,17 +165,20 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
   };
 }
 
-const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator.
+const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator for Bangladeshi students.
 The user will provide a name or description of a diagram. Create a detailed, accurate, and educational SVG diagram for it.
 
 STRICT RULES:
 1. Return ONLY valid SVG code - starting with <svg ...> and ending with </svg>.
 2. No markdown backticks, no explanation, no introduction - ONLY SVG code.
 3. SVG must have viewBox="0 0 800 600" and width="800" height="600".
-4. Add necessary labels (Bengali or English) so the diagram is clear for students.
-5. Make the diagram as detailed, accurate and professional as possible.
-6. Use colors to make the diagram attractive and easy to understand.
-7. Can draw any subject: biology, physics, chemistry, math, geography, history, architecture, etc.`;
+4. CRITICAL: Background must be WHITE (#ffffff) or very light color. NEVER use black, dark grey, or any dark background. The SVG root element must have style="background:#ffffff" or fill the background with a white rect.
+5. ALL labels and part names MUST be written in Bengali (Bangla script). Use <text> elements with font-family="sans-serif" for Bengali text.
+6. Every important part of the diagram must be clearly labeled with an arrow or line pointing to it, with the Bengali name written next to it.
+7. Make the diagram as detailed, accurate and professional as possible.
+8. Use bright, vibrant colors for diagram parts (not dark colors) so they are visible on white background.
+9. Can draw any subject: biology, physics, chemistry, math, geography, history, architecture, etc.
+10. Add a title in Bengali at the top of the diagram using a large <text> element.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;
