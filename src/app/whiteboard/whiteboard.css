@@ -535,12 +535,13 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 520px;
-  max-width: 92vw;
-  max-height: 82vh;
+  width: 680px;
+  max-width: 94vw;
+  height: 580px;
+  max-height: 88vh;
   z-index: 10020;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
-  border-radius: 16px;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.6);
+  border-radius: 18px;
   overflow: hidden;
   background: white;
 }

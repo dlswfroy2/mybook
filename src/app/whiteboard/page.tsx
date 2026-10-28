@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, XCircle, BrainCircuit } from 'lucide-react';
+import { ArrowLeft, XCircle, BrainCircuit, Sparkles, Copy, Check, CheckCircle2 } from 'lucide-react';
+import { performWhiteboardVisionOcr, solveWhiteboardProblem } from '@/ai/flows/whiteboard-solver-flow';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -80,6 +81,12 @@ export default function WhiteboardPage() {
 
     const speechBtn = document.getElementById('speech-btn')!;
     const recordBtn = document.getElementById('record-btn')!;
+
+    const aiSolveBtn = document.getElementById('ai-solve-btn')!;
+    const aiModal = document.getElementById('ai-modal')!;
+    const aiModalTitle = document.getElementById('ai-modal-title')!;
+    const aiBody = document.getElementById('ai-solution-body')!;
+    const closeAiBtn = document.getElementById('close-ai-modal')!;
 
     let currentTool = 'pen';
     let currentBgStyle = 'blank';
@@ -526,21 +533,247 @@ export default function WhiteboardPage() {
         (note.querySelector('.close-note') as HTMLElement).onclick = () => note.remove();
     };
 
+    function escapeHtml(str: string): string {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function formatInline(text: string): string {
+      return escapeHtml(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-slate-950">$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
+        .replace(/`([^`]+)`/g, '<code class="bg-slate-200 px-1 py-0.5 rounded text-indigo-700 font-mono text-[11px]">$1</code>');
+    }
+
+    function renderAcademicSolutionHtml(markdown: string): string {
+      const lines = markdown.split('\n');
+      const htmlParts: string[] = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('### ') || trimmed.startsWith('## ') || trimmed.startsWith('# ')) {
+          const title = trimmed.replace(/^#+\s*/, '');
+          htmlParts.push(`<h4 class="text-sm md:text-base font-black text-indigo-900 border-b pb-1.5 mt-3.5 flex items-center gap-1.5">${escapeHtml(title)}</h4>`);
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const item = trimmed.substring(2);
+          htmlParts.push(`<li class="text-xs font-bold text-slate-800 ml-4 list-disc">${formatInline(item)}</li>`);
+        } else if (trimmed.includes('**চূড়ান্ত উত্তর') || trimmed.includes('🎯 চূড়ান্ত') || trimmed.includes('Final Answer') || trimmed.includes('ফলাফল:')) {
+          htmlParts.push(`<div class="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl my-2.5 text-emerald-950 font-black text-xs md:text-sm shadow-sm">${formatInline(trimmed)}</div>`);
+        } else if (trimmed.startsWith('$$') || trimmed.startsWith('\\\[') || trimmed.startsWith('```')) {
+          htmlParts.push(`<div class="p-2.5 bg-slate-100 rounded-lg font-mono text-xs text-slate-900 my-1 overflow-x-auto border">${escapeHtml(trimmed)}</div>`);
+        } else {
+          htmlParts.push(`<p class="text-xs font-bold text-slate-800 leading-relaxed">${formatInline(trimmed)}</p>`);
+        }
+      }
+
+      return htmlParts.join('\n');
+    }
+
+    function insertTextLinesOnCanvas(rawText: string) {
+      const lines = rawText.split('\n');
+      let currentY = canvas.height * 0.15;
+      const startX = canvas.width * 0.12;
+      const maxWidth = canvas.width * 0.76;
+
+      ctx.textBaseline = 'top';
+
+      for (const rawLine of lines) {
+        const line = rawLine.replace(/^[#* \-_]+/, '').trim();
+        if (!line) {
+          currentY += 14;
+          continue;
+        }
+
+        const isHeading = rawLine.startsWith('#');
+        if (isHeading) {
+          ctx.font = 'bold 24px Kalpurush, sans-serif';
+          ctx.fillStyle = '#4338ca';
+        } else {
+          ctx.font = '20px Kalpurush, sans-serif';
+          ctx.fillStyle = colorPicker.value || '#0f172a';
+        }
+
+        const words = line.split(' ');
+        let currentLine = '';
+        for (const w of words) {
+          const testLine = currentLine ? `${currentLine} ${w}` : w;
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && currentLine) {
+            ctx.fillText(currentLine, startX, currentY);
+            currentY += isHeading ? 32 : 28;
+            currentLine = w;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) {
+          ctx.fillText(currentLine, startX, currentY);
+          currentY += isHeading ? 34 : 28;
+        }
+
+        if (currentY > canvas.height - 80) break;
+      }
+    }
+
+    // High-Power Gemini Vision OCR
     ocrBtn.onclick = async () => {
-        if (!(window as any).Tesseract) {
-          alert('OCR ইঞ্জিন লোড হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড পর আবার চেষ্টা করুন।');
+      ocrBtn.textContent = '⏳ স্ক্যান হচ্ছে...';
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        aiModal.classList.remove('hidden');
+        aiModalTitle.innerHTML = '<span class="flex items-center gap-2">📝 এআই ভিশন OCR (অটো-শনাক্তকরণ)</span>';
+        aiBody.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="font-bold text-slate-800 text-sm">হোয়াইটবোর্ডের লেখা ও সমীকরণগুলো স্ক্যান ও ডিজিটালাইজ করা হচ্ছে...</p>
+            <p class="text-xs text-muted-foreground mt-1">জেমিনি ভিশন এআই দিয়ে নিখুঁতভাবে শনাক্ত করা হচ্ছে</p>
+          </div>
+        `;
+
+        const res = await performWhiteboardVisionOcr(dataUrl);
+
+        if (!res.success || !res.text) {
+          aiBody.innerHTML = `
+            <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm font-bold">
+              ⚠️ ${res.error || 'বোর্ডে কোনো স্পষ্ট লেখা বা সূত্র পাওয়া যায়নি। অনুগ্রহ করে বোর্ডে লিখে পুনরায় চেষ্টা করুন।'}
+            </div>
+          `;
           return;
         }
-        ocrBtn.textContent = '⏳...';
-        try {
-          const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
-          alert(result.data.text ? `শনাক্তকৃত লেখা:\n${result.data.text}` : 'কোনো লেখা শনাক্ত করা যায়নি');
-        } catch (e) {
-          alert('OCR সম্পন্ন করা যায়নি।');
-        } finally {
-          ocrBtn.textContent = '📝 OCR';
+
+        const recognizedText = res.text;
+        aiBody.innerHTML = `
+          <div class="space-y-4 font-kalpurush">
+            <div class="flex items-center justify-between pb-2 border-b">
+              <span class="text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
+                ✓ সফলভাবে শনাক্ত হয়েছে
+              </span>
+              <div class="flex gap-2">
+                <button id="copy-ocr-text-btn" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-black transition-colors flex items-center gap-1">
+                  📋 কপি করুন
+                </button>
+                <button id="insert-ocr-text-btn" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1">
+                  ✍️ বোর্ডে লিখুন
+                </button>
+              </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-2 border-slate-200 rounded-xl max-h-[360px] overflow-y-auto">
+              <pre class="font-kalpurush text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-bold">${escapeHtml(recognizedText)}</pre>
+            </div>
+          </div>
+        `;
+
+        const copyBtn = document.getElementById('copy-ocr-text-btn');
+        if (copyBtn) {
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(recognizedText);
+            copyBtn.textContent = '✓ কপি হয়েছে!';
+            setTimeout(() => { copyBtn.textContent = '📋 কপি করুন'; }, 2000);
+          };
         }
+
+        const insertBtn = document.getElementById('insert-ocr-text-btn');
+        if (insertBtn) {
+          insertBtn.onclick = () => {
+            saveState();
+            insertTextLinesOnCanvas(recognizedText);
+            aiModal.classList.add('hidden');
+          };
+        }
+      } catch (err: any) {
+        aiBody.innerHTML = `
+          <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm font-bold">
+            ⚠️ ত্রুটি: ${err?.message || 'OCR ব্যর্থ হয়েছে।'}
+          </div>
+        `;
+      } finally {
+        ocrBtn.textContent = '📝 OCR';
+      }
     };
+
+    // Super AI Academic Problem Solver (Deep Step-by-Step Solutions)
+    aiSolveBtn.onclick = async () => {
+      aiSolveBtn.textContent = '🤖 এআই সলভ...';
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        aiModal.classList.remove('hidden');
+        aiModalTitle.innerHTML = '<span class="flex items-center gap-2">🧠 সুপার এআই অ্যাকাডেমিক সমাধান (জেমিনি ভিশন)</span>';
+        aiBody.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="font-black text-slate-800 text-base">হোয়াইটবোর্ডের সমস্যা বিশ্লেষণ ও সম্পূর্ণ নির্ভুল সমাধান তৈরি হচ্ছে...</p>
+            <p class="text-xs text-muted-foreground mt-1.5 max-w-sm">বোর্ডে থাকা অংক, জ্যামিতি, পদার্থবিজ্ঞান, রসায়ন বা যেকোনো জটিল প্রশ্ন ধাপে ধাপে সমাধান করা হচ্ছে</p>
+          </div>
+        `;
+
+        const res = await solveWhiteboardProblem(dataUrl);
+
+        if (!res.success || !res.solution) {
+          aiBody.innerHTML = `
+            <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm font-bold">
+              ⚠️ ${res.error || 'সমস্যা সমাধান করা সম্ভব হয়নি। অনুগ্রহ করে বোর্ডে পরিষ্কারভাবে প্রশ্ন লিখে পুনরায় চেষ্টা করুন।'}
+            </div>
+          `;
+          return;
+        }
+
+        const solutionText = res.solution;
+        const renderedHtml = renderAcademicSolutionHtml(solutionText);
+
+        aiBody.innerHTML = `
+          <div class="space-y-4 font-kalpurush">
+            <div class="flex items-center justify-between pb-3 border-b">
+              <span class="text-xs font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                ✓ সম্পূর্ণ নির্ভুল সমাধান প্রস্তুত
+              </span>
+              <div class="flex gap-2">
+                <button id="copy-ai-solution-btn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm">
+                  📋 সমাধান কপি
+                </button>
+                <button id="insert-ai-solution-btn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-sm">
+                  ✍️ বোর্ডে সমাধান লিখুন
+                </button>
+              </div>
+            </div>
+
+            <div class="p-5 bg-slate-50/70 border-2 border-slate-200 rounded-2xl max-h-[460px] overflow-y-auto space-y-3 leading-relaxed text-slate-800">
+              ${renderedHtml}
+            </div>
+          </div>
+        `;
+
+        const copySolBtn = document.getElementById('copy-ai-solution-btn');
+        if (copySolBtn) {
+          copySolBtn.onclick = () => {
+            navigator.clipboard.writeText(solutionText);
+            copySolBtn.textContent = '✓ কপি হয়েছে!';
+            setTimeout(() => { copySolBtn.textContent = '📋 সমাধান কপি'; }, 2000);
+          };
+        }
+
+        const insertSolBtn = document.getElementById('insert-ai-solution-btn');
+        if (insertSolBtn) {
+          insertSolBtn.onclick = () => {
+            saveState();
+            insertTextLinesOnCanvas(solutionText);
+            aiModal.classList.add('hidden');
+          };
+        }
+
+      } catch (err: any) {
+        aiBody.innerHTML = `
+          <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm font-bold">
+            ⚠️ সমাধান তৈরিতে সমস্যা হয়েছে: ${err?.message || 'পুনরায় চেষ্টা করুন।'}
+          </div>
+        `;
+      } finally {
+        aiSolveBtn.textContent = '🤖 এআই সলভ';
+      }
+    };
+
+    closeAiBtn.onclick = () => aiModal.classList.add('hidden');
 
     speechBtn.onclick = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -607,7 +840,6 @@ export default function WhiteboardPage() {
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
             img.onload = () => { ctx.drawImage(img, 150, 150); saveState(); };
         } else {
-            // Fallback: draw directly with text
             const formula = mathLatexInput.value.trim();
             if (formula) {
               ctx.font = '24px Kalpurush, sans-serif';
@@ -886,31 +1118,6 @@ export default function WhiteboardPage() {
         }
     };
 
-    const aiSolveBtn = document.getElementById('ai-solve-btn')!;
-    const aiModal = document.getElementById('ai-modal')!;
-    const aiBody = document.getElementById('ai-solution-body')!;
-    const closeAiBtn = document.getElementById('close-ai-modal')!;
-
-    aiSolveBtn.onclick = async () => {
-        aiSolveBtn.textContent = '⏳...';
-        try {
-            if (!(window as any).Tesseract) {
-              alert('AI ইঞ্জিন লোড হচ্ছে, অনুগ্রহ করে একটু অপেক্ষা করুন...');
-              return;
-            }
-            const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
-            const mathText = result.data.text;
-            if (!mathText.trim()) { alert('বোর্ডে কোনো লেখা শনাক্ত হয়নি। কিছু লিখে আবার চেষ্টা করুন।'); }
-            else {
-                aiModal.classList.remove('hidden');
-                aiBody.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border border-dashed"><p class="font-black text-indigo-700">শনাক্তকৃত প্রশ্ন:</p><p class="font-bold text-sm mt-1">${mathText}</p><hr class="my-3"/><p class="font-black text-emerald-700">AI বিশ্লেষণ:</p><p class="text-xs text-slate-700 leading-relaxed mt-1">প্রশ্নটি সফলভাবে প্রসেস করা হয়েছে। একাডেমিক সমাধান ডাটাবেজের সাথে মেলানো হচ্ছে...</p></div>`;
-            }
-        } catch (e) { alert('AI বিশ্লেষণে সমস্যা হয়েছে'); }
-        finally { aiSolveBtn.textContent = '🤖 এআই সলভ'; }
-    };
-
-    closeAiBtn.onclick = () => aiModal.classList.add('hidden');
-
     // Restore autosaved data if available, or draw fresh background
     try {
       const saved = localStorage.getItem('whiteboard_autosave_data');
@@ -1089,12 +1296,17 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      <div id="ai-modal" className="widget hidden h-[400px] flex flex-col p-0">
-          <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
-              <h4 className="font-black text-lg flex items-center gap-2"><BrainCircuit /> এআই সমাধান</h4>
-              <button id="close-ai-modal" className="text-white hover:text-red-200 transition-colors"><XCircle /></button>
+      {/* High-Power AI Modal (OCR & Deep Academic Solution) */}
+      <div id="ai-modal" className="widget hidden flex flex-col p-0">
+          <div className="bg-gradient-to-r from-indigo-700 via-primary to-indigo-800 p-4 text-white flex justify-between items-center shadow-md">
+              <h4 id="ai-modal-title" className="font-black text-base md:text-lg flex items-center gap-2">
+                <BrainCircuit className="w-5 h-5 text-yellow-300" /> এআই সমাধান ও বিশ্লেষণ
+              </h4>
+              <button id="close-ai-modal" className="text-white hover:text-rose-200 transition-colors p-1 rounded-lg">
+                <XCircle className="w-6 h-6" />
+              </button>
           </div>
-          <div id="ai-solution-body" className="p-6 overflow-y-auto flex-1 bg-white text-black"></div>
+          <div id="ai-solution-body" className="p-5 overflow-y-auto flex-1 bg-white text-slate-900"></div>
       </div>
 
       <div id="calc-widget" className="widget hidden">
