@@ -12,10 +12,11 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, Timestamp } from 'firebase/firestore';
 import { Student, studentFromDoc, isFemale, getStudentPlaceholderImage, sanitizePhotoUrl } from '@/lib/student-data';
 import { DailyAttendance } from '@/lib/attendance-data';
+import { logMessage } from '@/lib/messaging-data';
 import { FeeCollection, feeCollectionFromDoc } from '@/lib/fees-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Search, User, Banknote, CalendarCheck, AlertTriangle, Printer, LayoutGrid, Info, MapPin, Loader2, TrendingUp, Award, Target, Star, Wallet, ListChecks, CheckCircle2, XCircle, ListTodo, GraduationCap, UserRound, Users, Phone, FileText } from 'lucide-react';
+import { BarChart3, MessageSquare, Send, Smartphone, IdCard, Search, User, Banknote, CalendarCheck, AlertTriangle, Printer, LayoutGrid, Info, MapPin, Loader2, TrendingUp, Award, Target, Star, Wallet, ListChecks, CheckCircle2, XCircle, ListTodo, GraduationCap, UserRound, Users, Phone, FileText } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -190,6 +191,79 @@ function StudentProfileSearchContent() {
     const [academicProgress, setAcademicProgress] = useState<any[]>([]);
     const [isProgressLoading, setIsProgressLoading] = useState(false);
     const [activeProfileTab, setActiveProfileTab] = useState('details');
+
+    // Parent SMS State
+    const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+    const [smsPhone, setSmsPhone] = useState('');
+    const [smsMessage, setSmsMessage] = useState('');
+    const [isSendingSms, setIsSendingSms] = useState(false);
+
+    useEffect(() => {
+        if (studentData) {
+            setSmsPhone(studentData.guardianMobile || studentData.studentMobile || '');
+        }
+    }, [studentData]);
+
+    const handleSelectSmsTemplate = (templateType: 'absent' | 'fee' | 'result') => {
+        if (!studentData) return;
+        const name = studentData.studentNameBn;
+        if (templateType === 'absent') {
+            setSmsMessage(`সম্মানিত অভিভাবক, আপনার সন্তান ${name} আজ বিদ্যালয়ে অনুপস্থিত রয়েছে। অনুপস্থিতির কারণ জানাতে অনুরোধ করা হলো। - প্রধান শিক্ষক`);
+        } else if (templateType === 'fee') {
+            setSmsMessage(`সম্মানিত অভিভাবক, আপনার সন্তান ${name}-এর চলতি মাসের বিদ্যালয় বেতন/ফি বকেয়া রয়েছে। অনুগ্রহ করে দ্রুত পরিশোধের অনুরোধ করা হলো। - প্রধান শিক্ষক`);
+        } else if (templateType === 'result') {
+            setSmsMessage(`সম্মানিত অভিভাবক, আপনার সন্তান ${name}-এর পরীক্ষার ফলাফল প্রকাশিত হয়েছে। বিদ্যালয়ে এসে রিপোর্ট কার্ড সংগ্রহের অনুরোধ করা হলো। - প্রধান শিক্ষক`);
+        }
+    };
+
+    const handleSendSms = async () => {
+        if (!smsPhone.trim() || !smsMessage.trim()) {
+            toast({ variant: 'destructive', title: 'তথ্য দিন', description: 'মোবাইল নম্বর ও মেসেজ লিখুন।' });
+            return;
+        }
+        if (!db) return;
+        setIsSendingSms(true);
+        try {
+            await logMessage(db, {
+                recipientsCount: 1,
+                type: 'individual',
+                className: studentData?.className || 'general',
+                content: smsMessage,
+                notes: `শিক্ষার্থী: ${studentData?.studentNameBn} (${smsPhone})`,
+                senderUid: user?.uid || 'admin',
+                senderName: user?.displayName || 'শিক্ষক/প্রশাসন'
+            });
+            toast({
+                title: 'SMS সফলভাবে পাঠানো ও লগ হয়েছে! 📩',
+                description: `${studentData?.studentNameBn}-এর অভিভাবকের মেসেজ রেকর্ড সংরক্ষিত হয়েছে।`
+            });
+            setIsSmsModalOpen(false);
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'ত্রুটি', description: 'মেসেজ রেকর্ড সেভ করা যায়নি।' });
+        } finally {
+            setIsSendingSms(false);
+        }
+    };
+
+    const monthlyAttendanceData = useMemo(() => {
+        return BENGALI_MONTHS.map((mName, mIdx) => {
+            let presentCount = 0;
+            let totalDays = 0;
+            attendanceRecords.forEach(r => {
+                if (!r.date) return;
+                const d = new Date(r.date);
+                if (d.getMonth() === mIdx) {
+                    const st = r.attendance?.find((a: any) => a.studentId === studentData?.id);
+                    if (st) {
+                        totalDays++;
+                        if (st.status === 'present') presentCount++;
+                    }
+                }
+            });
+            const pct = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : null;
+            return { month: mName, percent: pct, totalDays, presentCount };
+        });
+    }, [attendanceRecords, studentData]);
 
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
 
@@ -529,11 +603,12 @@ function StudentProfileSearchContent() {
                                 </div>
                                 
                                 <Tabs value={activeProfileTab} onValueChange={setActiveProfileTab} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-4 h-12 bg-muted/30 p-1 mb-0 rounded-b-none border-b-0">
-                                        <TabsTrigger value="details" className="font-black text-[10px] sm:text-sm data-[state=active]:shadow-md"><Info className="h-4 w-4 mr-1.5" /> তথ্য</TabsTrigger>
-                                        <TabsTrigger value="academic_stats" className="font-black text-[10px] sm:text-sm data-[state=active]:shadow-md"><Award className="h-4 w-4 mr-1.5" /> প্রগতি</TabsTrigger>
-                                        <TabsTrigger value="attendance_stats" className="font-black text-[10px] sm:text-sm data-[state=active]:shadow-md"><CalendarCheck className="h-4 w-4 mr-1.5" /> হাজিরা</TabsTrigger>
-                                        <TabsTrigger value="fees_stats" className="font-black text-[10px] sm:text-sm data-[state=active]:shadow-md"><Banknote className="h-4 w-4 mr-1.5" /> বেতন</TabsTrigger>
+                                    <TabsList className="grid w-full grid-cols-5 h-12 bg-muted/30 p-1 mb-0 rounded-b-none border-b-0">
+                                        <TabsTrigger value="details" className="font-black text-[9px] sm:text-xs data-[state=active]:shadow-md"><Info className="h-3.5 w-3.5 mr-1" /> তথ্য</TabsTrigger>
+                                        <TabsTrigger value="academic_stats" className="font-black text-[9px] sm:text-xs data-[state=active]:shadow-md"><Award className="h-3.5 w-3.5 mr-1" /> প্রগতি</TabsTrigger>
+                                        <TabsTrigger value="performance_charts" className="font-black text-[9px] sm:text-xs data-[state=active]:shadow-md"><BarChart3 className="h-3.5 w-3.5 mr-1 text-emerald-600" /> গ্রাফ ও চার্ট</TabsTrigger>
+                                        <TabsTrigger value="attendance_stats" className="font-black text-[9px] sm:text-xs data-[state=active]:shadow-md"><CalendarCheck className="h-3.5 w-3.5 mr-1" /> হাজিরা</TabsTrigger>
+                                        <TabsTrigger value="fees_stats" className="font-black text-[9px] sm:text-xs data-[state=active]:shadow-md"><Banknote className="h-3.5 w-3.5 mr-1" /> বেতন</TabsTrigger>
                                     </TabsList>
                                 </Tabs>
                             </div>
@@ -701,6 +776,111 @@ function StudentProfileSearchContent() {
                                             </Accordion>
                                         </div>
                                     )}
+                                </TabsContent>
+
+                                <TabsContent value="performance_charts" className="mt-0 space-y-8 animate-in fade-in duration-500 pb-16">
+                                    {/* 1. Monthly Attendance Bar Graph */}
+                                    <Card className="border-[4px] border-black rounded-2xl bg-white p-6 shadow-[6px_6px_0px_rgba(0,0,0,0.1)]">
+                                        <CardHeader className="p-0 pb-4 border-b">
+                                            <CardTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
+                                                <TrendingUp className="w-5 h-5 text-indigo-600" /> মাসিক উপস্থিতির হার পর্যালোচনা (Attendance Analytics Graph)
+                                            </CardTitle>
+                                            <CardDescription className="font-bold text-xs">
+                                                বছরব্যাপী মাসভিত্তিক উপস্থিতির তুলনামূলক পারফরম্যান্স চার্ট
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="p-0 pt-6">
+                                            <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 text-center">
+                                                {monthlyAttendanceData.map((m, mIdx) => {
+                                                    const pct = m.percent !== null ? m.percent : 0;
+                                                    const barHeight = m.percent !== null ? Math.max(12, Math.round(pct * 1.2)) : 6;
+                                                    const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+                                                    return (
+                                                        <div key={mIdx} className="flex flex-col items-center justify-end h-44 space-y-1.5 p-1 bg-slate-50/50 rounded-lg border border-slate-100">
+                                                            <span className="text-[10px] font-black text-slate-700">
+                                                                {m.percent !== null ? `${toBengaliNumber(pct)}%` : '-'}
+                                                            </span>
+                                                            <div className="w-full max-w-[28px] bg-slate-200 rounded-t-md overflow-hidden flex items-end justify-center h-28">
+                                                                <div 
+                                                                    className={cn("w-full transition-all duration-700 rounded-t-md", barColor)}
+                                                                    style={{ height: `${barHeight}px` }}
+                                                                    title={`${m.month}: ${m.presentCount} / ${m.totalDays} দিন`}
+                                                                />
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-slate-800 truncate w-full">
+                                                                {m.month.slice(0, 4)}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="flex flex-wrap items-center justify-center gap-4 pt-4 mt-4 border-t text-xs font-bold">
+                                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500" /> ৮০%+ চমৎকার</span>
+                                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500" /> ৬০-৭৯% সাধারণ</span>
+                                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500" /> ৬০% এর নিচে সর্তকতা</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* 2. Exam GPA Progression Trend */}
+                                    <Card className="border-[4px] border-black rounded-2xl bg-white p-6 shadow-[6px_6px_0px_rgba(0,0,0,0.1)]">
+                                        <CardHeader className="p-0 pb-4 border-b">
+                                            <CardTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
+                                                <Award className="w-5 h-5 text-indigo-600" /> পরীক্ষাভিত্তিক জিপিএ ও অগ্রগতি ট্রেন্ড (Exam GPA Progression)
+                                            </CardTitle>
+                                            <CardDescription className="font-bold text-xs">
+                                                বিভিন্ন টার্ম পরীক্ষায় জিপিএ এবং মার্কসের ধারাবাহিকতা
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="p-0 pt-6">
+                                            {academicProgress.length > 0 ? (
+                                                <div className="space-y-6">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                        {academicProgress.map((p, idx) => {
+                                                            const gpaPercent = Math.min(100, Math.round((p.gpa / 5.0) * 100));
+                                                            return (
+                                                                <div key={idx} className="p-4 rounded-xl border-2 border-slate-200 bg-slate-50/50 space-y-2 text-center">
+                                                                    <p className="text-xs font-black text-indigo-700 uppercase">{p.exam}</p>
+                                                                    <p className="text-3xl font-black text-slate-900">GPA {toBengaliNumber(p.gpa.toFixed(2))}</p>
+                                                                    <Progress value={gpaPercent} className="h-2 bg-slate-200" />
+                                                                    <p className="text-xs font-bold text-slate-500">মোট মার্কস: {toBengaliNumber(p.marks)}</p>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* Subject Mastery Matrix */}
+                                                    {academicProgress[academicProgress.length - 1]?.subjectStats && (
+                                                        <div className="space-y-3 pt-4 border-t">
+                                                            <p className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                                                                <Target className="w-4 h-4 text-emerald-600" /> বিষয়ভিত্তিক পারফরম্যান্স ম্যাট্রিক্স (সর্বশেষ পরীক্ষা):
+                                                            </p>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                {academicProgress[academicProgress.length - 1].subjectStats.map((sub: any, sI: number) => {
+                                                                    const pCent = Math.round((sub.obtained / sub.fullMarks) * 100);
+                                                                    return (
+                                                                        <div key={sI} className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                                                                            <div className="flex justify-between items-center text-xs font-black">
+                                                                                <span>{sub.subjectName}</span>
+                                                                                <span className={cn(pCent >= 60 ? "text-emerald-700" : "text-rose-700")}>
+                                                                                    {toBengaliNumber(pCent)}% ({toBengaliNumber(sub.obtained)}/{toBengaliNumber(sub.fullMarks)})
+                                                                                </span>
+                                                                            </div>
+                                                                            <Progress value={pCent} className="h-2 bg-slate-100" />
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="py-10 text-center text-slate-500 font-bold">
+                                                    পরীক্ষার ফলাফল এন্ট্রি হলে এখানে স্বয়ংক্রিয় প্রগ্রেস চার্ট প্রদর্শিত হবে।
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
                                 </TabsContent>
 
                                 <TabsContent value="attendance_stats" className="mt-0 space-y-8 animate-in fade-in duration-500">
