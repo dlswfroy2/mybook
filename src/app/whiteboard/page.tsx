@@ -112,8 +112,9 @@ export default function WhiteboardPage() {
     }];
     let currentBoardPage = 0;
 
-    canvas.width = Math.min(window.innerWidth - 60, 2000);
-    canvas.height = Math.max(window.innerHeight - 120, 1200);
+    const sidebarsWidth = 380;
+    canvas.width = Math.max(760, window.innerWidth - sidebarsWidth);
+    canvas.height = Math.max(650, window.innerHeight - 130);
 
     function saveState() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
@@ -450,17 +451,31 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
 
+    const adjustScrollWrapperPadding = () => {
+      const leftCol = toolbar.classList.contains('collapsed');
+      const rightCol = rightToolbar.classList.contains('collapsed');
+      const scrollWrapper = document.getElementById('scroll-wrapper');
+      if (scrollWrapper) {
+        scrollWrapper.style.paddingLeft = leftCol ? '30px' : '185px';
+        scrollWrapper.style.paddingRight = rightCol ? '30px' : '185px';
+      }
+    };
+
     const toggleSidebarHandler = () => {
       toolbar.classList.toggle('collapsed');
       toggleSidebarBtn.textContent = toolbar.classList.contains('collapsed') ? '▶' : '◀';
+      adjustScrollWrapperPadding();
     };
     toggleSidebarBtn.addEventListener('click', toggleSidebarHandler);
 
     const toggleRightSidebarHandler = () => {
       rightToolbar.classList.toggle('collapsed');
       toggleRightSidebarBtn.textContent = rightToolbar.classList.contains('collapsed') ? '◀' : '▶';
+      adjustScrollWrapperPadding();
     };
     toggleRightSidebarBtn.addEventListener('click', toggleRightSidebarHandler);
+
+    adjustScrollWrapperPadding();
 
     clearBtn.onclick = () => { saveState(); drawBackground(); };
     undoBtn.onclick = () => {

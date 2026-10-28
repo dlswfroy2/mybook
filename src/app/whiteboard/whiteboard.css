@@ -274,15 +274,16 @@
   width: 100vw;
   height: 100vh;
   overflow: auto;
-  padding: 60px 180px 60px 180px;
+  padding: 60px 185px 40px 185px;
   box-sizing: border-box;
-  transition: all 0.4s ease;
+  transition: padding 0.3s ease;
 }
 
 .whiteboard-body #canvas-container {
   position: relative;
   margin: 0 auto;
-  display: inline-block;
+  display: block;
+  width: fit-content;
   transform-origin: center top;
   transition: transform 0.1s ease-out;
 }
