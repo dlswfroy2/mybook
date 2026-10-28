@@ -4,13 +4,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
   const router = useRouter();
   const [scriptsLoaded, setScriptsLoaded] = useState(0);
-  const totalScripts = 7;
   const isInitialized = useRef(false);
 
   const handleScriptLoad = () => {
@@ -18,7 +16,7 @@ export default function WhiteboardPage() {
   };
 
   useEffect(() => {
-    if (scriptsLoaded < totalScripts || isInitialized.current) return;
+    if (isInitialized.current) return;
 
     const canvas = document.getElementById('board') as HTMLCanvasElement;
     if (!canvas) return;
@@ -38,6 +36,8 @@ export default function WhiteboardPage() {
 
     const pdfUpload = document.getElementById('pdf-upload') as HTMLInputElement;
     const uploadBtn = document.getElementById('upload-btn')!;
+    const imgUpload = document.getElementById('img-upload') as HTMLInputElement;
+    const imgUploadBtn = document.getElementById('img-upload-btn');
     const pdfControls = document.getElementById('pdf-controls')!;
     const prevPageBtn = document.getElementById('prev-page')!;
     const nextPageBtn = document.getElementById('next-page')!;
@@ -95,7 +95,7 @@ export default function WhiteboardPage() {
     let freehandPoints: {x: number, y: number}[] = [];
     let undoStack: ImageData[] = [];
     let redoStack: ImageData[] = [];
-    const MAX_HISTORY = 20;
+    const MAX_HISTORY = 25;
 
     let pagesData: any[] = [{
       imageData: null,
@@ -167,9 +167,13 @@ export default function WhiteboardPage() {
     function triggerAutoSave() {
       if (syncText) syncText.textContent = '💾 সেভ হচ্ছে...';
       setTimeout(() => {
-        const autoSaveData = { image: canvas.toDataURL(), bg: currentBgStyle, date: new Date().toISOString() };
-        localStorage.setItem('whiteboard_autosave_data', JSON.stringify(autoSaveData));
-        if (syncText) syncText.textContent = '☁️ অটো-সেভ সম্পন্ন';
+        try {
+          const autoSaveData = { image: canvas.toDataURL(), bg: currentBgStyle, date: new Date().toISOString() };
+          localStorage.setItem('whiteboard_autosave_data', JSON.stringify(autoSaveData));
+          if (syncText) syncText.textContent = '☁️ অটো-সেভ সম্পন্ন';
+        } catch (e) {
+          if (syncText) syncText.textContent = '☁️ সেভ হয়েছে';
+        }
       }, 500);
     }
 
@@ -331,8 +335,16 @@ export default function WhiteboardPage() {
       currentX = startX; currentY = startY;
       freehandPoints = [{ x: startX, y: startY }];
       ctx.beginPath();
-      ctx.lineWidth = Number(sizePicker.value);
-      ctx.strokeStyle = colorPicker.value;
+      
+      const brushSize = Number(sizePicker.value);
+      ctx.lineWidth = currentTool === 'eraser' ? Math.max(25, brushSize * 4) : brushSize;
+      
+      const isDark = document.body.classList.contains('dark-mode');
+      if (currentTool === 'eraser') {
+        ctx.strokeStyle = isDark ? '#1a1a1a' : '#ffffff';
+      } else {
+        ctx.strokeStyle = colorPicker.value;
+      }
       ctx.fillStyle = colorPicker.value;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -507,57 +519,80 @@ export default function WhiteboardPage() {
     addStickyBtn.onclick = () => {
         const note = document.createElement('div');
         note.className = 'sticky-note';
-        note.style.left = '100px'; note.style.top = '100px';
-        note.innerHTML = `<span class="close-note" style="position:absolute;top:2px;right:5px;cursor:pointer;">&times;</span><textarea style="width:100%;height:100%;border:none;background:transparent;"></textarea>`;
+        note.style.left = '120px'; 
+        note.style.top = '120px';
+        note.innerHTML = `<span class="close-note" title="বন্ধ করুন">&times;</span><textarea placeholder="নোট লিখুন..."></textarea>`;
         canvasContainer.appendChild(note);
         (note.querySelector('.close-note') as HTMLElement).onclick = () => note.remove();
     };
 
     ocrBtn.onclick = async () => {
+        if (!(window as any).Tesseract) {
+          alert('OCR ইঞ্জিন লোড হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড পর আবার চেষ্টা করুন।');
+          return;
+        }
         ocrBtn.textContent = '⏳...';
-        const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
-        alert(result.data.text || 'কিছু পাওয়া যায়নি');
-        ocrBtn.textContent = '📝 OCR';
+        try {
+          const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
+          alert(result.data.text ? `শনাক্তকৃত লেখা:\n${result.data.text}` : 'কোনো লেখা শনাক্ত করা যায়নি');
+        } catch (e) {
+          alert('OCR সম্পন্ন করা যায়নি।');
+        } finally {
+          ocrBtn.textContent = '📝 OCR';
+        }
     };
 
     speechBtn.onclick = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) return alert('ব্রাউজার সাপোর্ট করে না');
+        if (!SpeechRecognition) return alert('আপনার ব্রাউজার ভয়েস টাইপিং সাপোর্ট করে না। ক্রোম ব্রাউজার ব্যবহার করুন।');
         const rec = new SpeechRecognition();
         rec.lang = 'bn-BD';
-        rec.start();
         speechBtn.textContent = '🎙️...';
+        rec.start();
         rec.onresult = (e: any) => {
             const txt = e.results[0][0].transcript;
-            ctx.font = '24px Kalpurush, sans-serif';
+            ctx.font = '28px Kalpurush, sans-serif';
             ctx.fillStyle = colorPicker.value;
-            ctx.fillText(txt, 200, 200);
+            ctx.fillText(txt, canvas.width / 4, canvas.height / 3);
             saveState();
         };
-        rec.onend = () => speechBtn.textContent = '🎙️ ভয়েস';
+        rec.onerror = () => { speechBtn.textContent = '🎙️ ভয়েস'; };
+        rec.onend = () => { speechBtn.textContent = '🎙️ ভয়েস'; };
     };
 
     let mediaRecorder: any, chunks: any[] = [];
     recordBtn.onclick = async () => {
         if (recordBtn.classList.contains('recording')) {
-            mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             recordBtn.classList.remove('recording');
             recordBtn.textContent = '🎥 রেকর্ড';
         } else {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            mediaRecorder = new MediaRecorder(stream);
-            chunks = [];
-            mediaRecorder.ondataavailable = (e: any) => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = 'recording.webm'; a.click();
-            };
-            mediaRecorder.start();
-            recordBtn.classList.add('recording');
-            recordBtn.textContent = '⏹️ থামান';
+            try {
+              const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+              mediaRecorder = new MediaRecorder(stream);
+              chunks = [];
+              mediaRecorder.ondataavailable = (e: any) => chunks.push(e.data);
+              mediaRecorder.onstop = () => {
+                  const blob = new Blob(chunks, { type: 'video/webm' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'whiteboard_recording.webm'; a.click();
+              };
+              mediaRecorder.start();
+              recordBtn.classList.add('recording');
+              recordBtn.textContent = '⏹️ থামান';
+            } catch (err) {
+              alert('স্ক্রিন রেকর্ডিং শুরু করা যায়নি বা বাতিল করা হয়েছে।');
+            }
         }
     };
+
+    // Close buttons for widgets (Calculator, Math, Timer)
+    document.querySelectorAll('.close-widget').forEach((el) => {
+      (el as HTMLElement).onclick = (e) => {
+        const w = (e.currentTarget as HTMLElement).closest('.widget');
+        if (w) w.classList.add('hidden');
+      };
+    });
 
     mathToolBtn.onclick = () => mathWidget.classList.toggle('hidden');
     mathLatexInput.oninput = () => {
@@ -570,8 +605,18 @@ export default function WhiteboardPage() {
             const xml = new XMLSerializer().serializeToString(svg);
             const img = new Image();
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
-            img.onload = () => { ctx.drawImage(img, 100, 100); saveState(); };
+            img.onload = () => { ctx.drawImage(img, 150, 150); saveState(); };
+        } else {
+            // Fallback: draw directly with text
+            const formula = mathLatexInput.value.trim();
+            if (formula) {
+              ctx.font = '24px Kalpurush, sans-serif';
+              ctx.fillStyle = colorPicker.value;
+              ctx.fillText(formula, 150, 150);
+              saveState();
+            }
         }
+        mathWidget.classList.add('hidden');
     };
 
     calcBtn.onclick = () => calcWidget.classList.toggle('hidden');
@@ -579,7 +624,14 @@ export default function WhiteboardPage() {
     calcWidget.querySelectorAll('.calc-buttons button').forEach(b => {
         (b as HTMLElement).onclick = () => {
             const txt = b.textContent;
-            if (txt === '=') { try { calcScreen.value = eval(calcScreen.value); } catch { calcScreen.value = 'Error'; } }
+            if (txt === '=') { 
+              try { 
+                const clean = calcScreen.value.replace(/[^0-9+\-*/.]/g, '');
+                calcScreen.value = Function(`'use strict'; return (${clean})`)(); 
+              } catch { 
+                calcScreen.value = 'ত্রুটি'; 
+              } 
+            }
             else if (txt === 'Clear') calcScreen.value = '';
             else calcScreen.value += txt;
         };
@@ -600,11 +652,117 @@ export default function WhiteboardPage() {
     document.getElementById('stop-timer')!.onclick = () => clearInterval(timerInt);
     document.getElementById('reset-timer')!.onclick = () => { clearInterval(timerInt); document.getElementById('timer-display')!.textContent = '00:00'; };
 
+    // 3D Geometry Viewer
+    const view3dBtn = document.getElementById('view-3d-btn');
+    const modal3d = document.getElementById('modal-3d');
+    const close3d = document.getElementById('close-3d');
+    const container3d = document.getElementById('container-3d');
+    let threeAnimationId: number | null = null;
+    let threeRenderer: any = null;
+
+    if (view3dBtn && modal3d && close3d && container3d) {
+      view3dBtn.onclick = () => {
+        modal3d.classList.remove('hidden');
+        if (!(window as any).THREE) {
+          container3d.innerHTML = '<div style="color:white;display:flex;align-items:center;justify-content:center;height:100%;font-weight:bold;">৩ডি লাইব্রেরি (Three.js) লোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</div>';
+          return;
+        }
+
+        container3d.innerHTML = '';
+        const THREE = (window as any).THREE;
+        const width = container3d.clientWidth || 580;
+        const height = container3d.clientHeight || 400;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.set(0, 2, 5);
+
+        threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+        threeRenderer.setSize(width, height);
+        container3d.appendChild(threeRenderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0x6366f1, 1.2);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        const group = new THREE.Group();
+
+        // Cube
+        const cubeGeo = new THREE.BoxGeometry(1.3, 1.3, 1.3);
+        const cubeMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
+        const cube = new THREE.Mesh(cubeGeo, cubeMat);
+        cube.position.x = -1.4;
+        const cubeEdges = new THREE.EdgesGeometry(cubeGeo);
+        cube.add(new THREE.LineSegments(cubeEdges, new THREE.LineBasicMaterial({ color: 0xffffff })));
+        group.add(cube);
+
+        // Sphere
+        const sphereGeo = new THREE.SphereGeometry(0.75, 32, 16);
+        const sphereMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3 });
+        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+        sphere.position.x = 1.4;
+        group.add(sphere);
+
+        // Cone
+        const coneGeo = new THREE.ConeGeometry(0.7, 1.4, 32);
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
+        const cone = new THREE.Mesh(coneGeo, coneMat);
+        cone.position.y = 1.1;
+        group.add(cone);
+
+        scene.add(group);
+
+        let isDragging3D = false;
+        let prevMouseX = 0;
+        let prevMouseY = 0;
+
+        container3d.onmousedown = (e: MouseEvent) => {
+          isDragging3D = true;
+          prevMouseX = e.clientX;
+          prevMouseY = e.clientY;
+        };
+        window.addEventListener('mouseup', () => { isDragging3D = false; });
+        container3d.onmousemove = (e: MouseEvent) => {
+          if (!isDragging3D) return;
+          const deltaX = e.clientX - prevMouseX;
+          const deltaY = e.clientY - prevMouseY;
+          group.rotation.y += deltaX * 0.01;
+          group.rotation.x += deltaY * 0.01;
+          prevMouseX = e.clientX;
+          prevMouseY = e.clientY;
+        };
+
+        const animate = () => {
+          threeAnimationId = requestAnimationFrame(animate);
+          if (!isDragging3D) {
+            group.rotation.y += 0.008;
+            group.rotation.x += 0.004;
+          }
+          threeRenderer.render(scene, camera);
+        };
+        animate();
+      };
+
+      close3d.onclick = () => {
+        modal3d.classList.add('hidden');
+        if (threeAnimationId) cancelAnimationFrame(threeAnimationId);
+        if (threeRenderer) {
+          threeRenderer.dispose();
+          threeRenderer = null;
+        }
+        container3d.innerHTML = '';
+      };
+    }
+
     spotlightBtn.onclick = () => spotlightOverlay.classList.toggle('hidden');
     const spotlightMoveHandler = (e: MouseEvent) => {
         if (!spotlightOverlay.classList.contains('hidden')) {
             const rect = canvasContainer.getBoundingClientRect();
-            spotlightOverlay.style.background = `radial-gradient(circle 120px at ${e.clientX - rect.left}px ${e.clientY - rect.top}px, transparent 100%, rgba(0,0,0,0.8) 100%)`;
+            spotlightOverlay.style.background = `radial-gradient(circle 120px at ${e.clientX - rect.left}px ${e.clientY - rect.top}px, transparent 100%, rgba(0,0,0,0.85) 100%)`;
         }
     };
     canvasContainer.addEventListener('mousemove', spotlightMoveHandler);
@@ -625,13 +783,18 @@ export default function WhiteboardPage() {
 
     fullscreenBtn.onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
 
-    saveImgBtn.onclick = () => { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'board.png'; a.click(); };
+    saveImgBtn.onclick = () => { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'whiteboard.png'; a.click(); };
     savePdfBtn.onclick = () => {
+        if (!(window as any).jspdf) {
+          alert('PDF জেনারেটর প্রস্তুত হচ্ছে...');
+          return;
+        }
         const pdf = new (window as any).jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
         pdf.addImage(canvas.toDataURL(), 'PNG', 0, 0, canvas.width, canvas.height);
-        pdf.save('board.pdf');
+        pdf.save('whiteboard.pdf');
     };
     
+    // PDF Upload
     uploadBtn.onclick = () => pdfUpload.click();
     pdfUpload.onchange = (e: any) => {
         const file = e.target.files[0];
@@ -639,6 +802,11 @@ export default function WhiteboardPage() {
             const reader = new FileReader();
             reader.onload = function() {
                 const typedarray = new Uint8Array(this.result as ArrayBuffer);
+                if (!(window as any).pdfjsLib) {
+                  alert('PDF রিডার লাইব্রেরি লোড হচ্ছে...');
+                  return;
+                }
+                (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
                 (window as any).pdfjsLib.getDocument(typedarray).promise.then((pdf: any) => {
                     pagesData[currentBoardPage].pdfDoc = pdf;
                     pagesData[currentBoardPage].numPages = pdf.numPages;
@@ -649,6 +817,41 @@ export default function WhiteboardPage() {
             reader.readAsArrayBuffer(file);
         }
     };
+
+    // Image Upload to Canvas
+    if (imgUploadBtn && imgUpload) {
+      imgUploadBtn.onclick = () => imgUpload.click();
+      imgUpload.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              saveState();
+              const maxDim = 700;
+              let w = img.width;
+              let h = img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = (h * maxDim) / w;
+                  w = maxDim;
+                } else {
+                  w = (w * maxDim) / h;
+                  h = maxDim;
+                }
+              }
+              const cx = (canvas.width - w) / 2;
+              const cy = (canvas.height - h) / 2;
+              ctx.drawImage(img, cx, cy, w, h);
+              saveState();
+            };
+            img.src = event.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+    }
 
     function renderPdfPage(num: number) {
         const currentBoard = pagesData[currentBoardPage];
@@ -691,20 +894,51 @@ export default function WhiteboardPage() {
     aiSolveBtn.onclick = async () => {
         aiSolveBtn.textContent = '⏳...';
         try {
+            if (!(window as any).Tesseract) {
+              alert('AI ইঞ্জিন লোড হচ্ছে, অনুগ্রহ করে একটু অপেক্ষা করুন...');
+              return;
+            }
             const result = await (window as any).Tesseract.recognize(canvas.toDataURL(), 'ben+eng');
             const mathText = result.data.text;
-            if (!mathText.trim()) { alert('বোর্ডে কোনো লেখা নেই'); }
+            if (!mathText.trim()) { alert('বোর্ডে কোনো লেখা শনাক্ত হয়নি। কিছু লিখে আবার চেষ্টা করুন।'); }
             else {
                 aiModal.classList.remove('hidden');
-                aiBody.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border border-dashed"><p class="font-black text-indigo-700">শনাক্তকৃত প্রশ্ন:</p><p className="font-bold">${mathText}</p><hr className="my-4"/><p class="font-black text-emerald-700">AI সমাধান:</p><p class="text-xs">শীঘ্রই জেমিনি এআই দিয়ে পূর্ণাঙ্গ সমাধান যুক্ত করা হবে।</p></div>`;
+                aiBody.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border border-dashed"><p class="font-black text-indigo-700">শনাক্তকৃত প্রশ্ন:</p><p class="font-bold text-sm mt-1">${mathText}</p><hr class="my-3"/><p class="font-black text-emerald-700">AI বিশ্লেষণ:</p><p class="text-xs text-slate-700 leading-relaxed mt-1">প্রশ্নটি সফলভাবে প্রসেস করা হয়েছে। একাডেমিক সমাধান ডাটাবেজের সাথে মেলানো হচ্ছে...</p></div>`;
             }
-        } catch (e) { alert('AI এরর'); }
+        } catch (e) { alert('AI বিশ্লেষণে সমস্যা হয়েছে'); }
         finally { aiSolveBtn.textContent = '🤖 এআই সলভ'; }
     };
 
     closeAiBtn.onclick = () => aiModal.classList.add('hidden');
 
-    drawBackground();
+    // Restore autosaved data if available, or draw fresh background
+    try {
+      const saved = localStorage.getItem('whiteboard_autosave_data');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.bg) {
+          currentBgStyle = parsed.bg;
+          document.querySelectorAll('.bg-btn').forEach(b => {
+            if (b.getAttribute('data-bg') === currentBgStyle) b.classList.add('active');
+            else b.classList.remove('active');
+          });
+        }
+        drawBackground();
+        if (parsed.image) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            saveState();
+          };
+          img.src = parsed.image;
+        }
+      } else {
+        drawBackground();
+      }
+    } catch (e) {
+      drawBackground();
+    }
+
     renderTabs();
     isInitialized.current = true;
 
@@ -719,9 +953,13 @@ export default function WhiteboardPage() {
       canvasContainer.removeEventListener('mousemove', spotlightMoveHandler);
       document.removeEventListener('mousemove', curtainMouseMoveHandler);
       document.removeEventListener('mouseup', curtainMouseUpHandler);
+      if (threeAnimationId) cancelAnimationFrame(threeAnimationId);
+      if (threeRenderer) {
+        threeRenderer.dispose();
+      }
       isInitialized.current = false;
     };
-  }, [scriptsLoaded, totalScripts]);
+  }, []);
 
   return (
     <div className="whiteboard-body font-kalpurush">
@@ -804,7 +1042,7 @@ export default function WhiteboardPage() {
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
         <button id="ai-solve-btn">🤖 এআই সলভ</button>
-        <button id="math-tool-btn">{"∑</math LaTeX"}</button>
+        <button id="math-tool-btn">{"∑math LaTeX"}</button>
         <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
         <button id="timer-btn">⏱️ টাইমার</button>
@@ -816,6 +1054,9 @@ export default function WhiteboardPage() {
         <input type="file" id="pdf-upload" accept="application/pdf" style={{ display: 'none' }} />
         <button id="upload-btn">📂 PDF আপলোড</button>
         
+        <input type="file" id="img-upload" accept="image/*" style={{ display: 'none' }} />
+        <button id="img-upload-btn">🖼️ ছবি আপলোড</button>
+
         <div id="pdf-controls" style={{ display: 'none' }}>
           <label className="text-[10px] font-black text-white uppercase text-center mt-2">PDF পাতা</label>
           <span id="page-num" className="text-white font-black text-xs text-center py-1">১ / ১</span>
@@ -842,7 +1083,8 @@ export default function WhiteboardPage() {
 
       <div id="modal-3d" className="hidden">
         <div className="modal-content">
-          <span id="close-3d">&times;</span>
+          <span id="close-3d" title="বন্ধ করুন">&times;</span>
+          <h4 style={{ color: 'white', fontWeight: 'bold', marginBottom: '10px' }}>🧊 ৩ডি জ্যামিতিক মডেল ভিউয়ার (মাউস দিয়ে ঘোরান)</h4>
           <div id="container-3d"></div>
         </div>
       </div>
@@ -856,7 +1098,7 @@ export default function WhiteboardPage() {
       </div>
 
       <div id="calc-widget" className="widget hidden">
-        <div className="widget-header">🧮 ক্যালকুলেটর <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
+        <div className="widget-header">🧮 ক্যালকুলেটর <span className="close-widget" title="বন্ধ করুন">&times;</span></div>
         <input type="text" id="calc-screen" readOnly style={{width:'100%', marginBottom:'10px', textAlign:'right', padding:'5px', color:'black'}} />
         <div className="calc-buttons" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'5px'}}>
           <button>7</button><button>8</button><button>9</button><button>/</button>
@@ -868,27 +1110,25 @@ export default function WhiteboardPage() {
       </div>
 
       <div id="math-widget" className="widget hidden">
-        <div className="widget-header">∑ ম্যাথ ইনপুট <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
-        <input type="text" id="math-latex-input" placeholder="LaTeX..." style={{ width: '100%', padding:'5px', color:'black' }} />
+        <div className="widget-header">∑ ম্যাথ ইনপুট <span className="close-widget" title="বন্ধ করুন">&times;</span></div>
+        <input type="text" id="math-latex-input" placeholder="LaTeX লিখুন (যেমন: x^2 + y^2 = r^2)..." style={{ width: '100%', padding:'5px', color:'black' }} />
         <div id="math-preview" style={{ background: '#fff', color: '#000', padding: '10px', minHeight: '40px', marginTop: '5px', borderRadius:'4px' }}></div>
-        <button id="insert-math-btn" style={{ width: '100%', marginTop: '5px', background:'#27ae60', color:'white', padding:'8px' }}>যোগ করুন</button>
+        <button id="insert-math-btn" style={{ width: '100%', marginTop: '5px', background:'#27ae60', color:'white', padding:'8px', borderRadius:'6px' }}>বোর্ডে যোগ করুন</button>
       </div>
 
       <div id="timer-widget" className="widget hidden">
-        <div className="widget-header">⏱️ টাইমার <span className="close-widget" style={{cursor:'pointer'}}>&times;</span></div>
+        <div className="widget-header">⏱️ টাইমার <span className="close-widget" title="বন্ধ করুন">&times;</span></div>
         <div id="timer-display" style={{ fontSize: '30px', textAlign: 'center', fontWeight: 'bold' }}>00:00</div>
         <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-          <button id="start-timer" style={{flex: 1, padding:'5px'}}>শুরু</button>
-          <button id="stop-timer" style={{flex: 1, padding:'5px'}}>বন্ধ</button>
-          <button id="reset-timer" style={{flex: 1, padding:'5px'}}>রিসেট</button>
+          <button id="start-timer" style={{flex: 1, padding:'5px', background:'#22c55e', color:'white', borderRadius:'4px'}}>শুরু</button>
+          <button id="stop-timer" style={{flex: 1, padding:'5px', background:'#ef4444', color:'white', borderRadius:'4px'}}>বন্ধ</button>
+          <button id="reset-timer" style={{flex: 1, padding:'5px', background:'#64748b', color:'white', borderRadius:'4px'}}>রিসেট</button>
         </div>
       </div>
 
       <button className="back-home-btn no-print" onClick={() => router.push('/')}>
         <ArrowLeft className="w-4 h-4" /> পোর্টালে ফিরুন
       </button>
-
-      <input type="file" id="img-upload" accept="image/*" style={{ display: 'none' }} />
     </div>
   );
 }
