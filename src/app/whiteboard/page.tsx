@@ -1710,25 +1710,71 @@ export default function WhiteboardPage() {
       drawBackground();
     }
 
-    // Saved Boards Library Logic
+    // Saved Boards Library Logic (IndexedDB for quota-free storage)
     const savedBoardsBtn = document.getElementById('saved-boards-btn');
     const savedBoardsModal = document.getElementById('saved-boards-modal');
     const closeSavedBoardsBtn = document.getElementById('close-saved-boards-modal');
     const saveCurrentToLibBtn = document.getElementById('save-current-to-library-btn');
     const savedBoardsList = document.getElementById('saved-boards-list');
 
-    const STORAGE_KEY = 'mybook_saved_whiteboards_v1';
+    const DB_NAME = 'MyBookWhiteboardDB';
+    const STORE_NAME = 'saved_boards';
 
-    const getSavedBoards = (): any[] => {
-      try {
-        const d = localStorage.getItem(STORAGE_KEY);
-        return d ? JSON.parse(d) : [];
-      } catch { return []; }
+    const openDB = (): Promise<IDBDatabase> => {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
     };
 
-    const renderSavedBoardsList = () => {
+    const getSavedBoardsFromDB = async (): Promise<any[]> => {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.getAll();
+          req.onsuccess = () => resolve((req.result || []).reverse());
+          req.onerror = () => resolve([]);
+        });
+      } catch {
+        return [];
+      }
+    };
+
+    const saveBoardToDB = async (item: { title: string; image: string; thumb: string; date: string }): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.add(item);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    };
+
+    const deleteBoardFromDB = async (id: number): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    };
+
+    const renderSavedBoardsList = async () => {
       if (!savedBoardsList) return;
-      const list = getSavedBoards();
+      savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">লোড হচ্ছে...</p>';
+      const list = await getSavedBoardsFromDB();
       if (list.length === 0) {
         savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি। উপরের বাটন দিয়ে সংরক্ষণ করুন।</p>';
         return;
@@ -1746,10 +1792,10 @@ export default function WhiteboardPage() {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button class="load-board-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition-colors" data-idx="${idx}">
+            <button class="load-board-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition-colors" data-id="${item.id}">
               📂 খুলুন
             </button>
-            <button class="del-board-btn px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-md text-xs font-bold transition-colors" data-idx="${idx}">
+            <button class="del-board-btn px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-md text-xs font-bold transition-colors" data-id="${item.id}">
               🗑️
             </button>
           </div>
@@ -1758,10 +1804,10 @@ export default function WhiteboardPage() {
       });
 
       savedBoardsList.querySelectorAll('.load-board-btn').forEach(btn => {
-        (btn as HTMLElement).onclick = (e) => {
-          const idx = Number((e.currentTarget as HTMLElement).getAttribute('data-idx'));
-          const currentList = getSavedBoards();
-          const item = currentList[idx];
+        (btn as HTMLElement).onclick = async (e) => {
+          const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
+          const currentList = await getSavedBoardsFromDB();
+          const item = currentList.find(b => b.id === id);
           if (item && item.image) {
             const img = new Image();
             img.onload = () => {
@@ -1778,11 +1824,9 @@ export default function WhiteboardPage() {
       });
 
       savedBoardsList.querySelectorAll('.del-board-btn').forEach(btn => {
-        (btn as HTMLElement).onclick = (e) => {
-          const idx = Number((e.currentTarget as HTMLElement).getAttribute('data-idx'));
-          const currentList = getSavedBoards();
-          currentList.splice(idx, 1);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentList));
+        (btn as HTMLElement).onclick = async (e) => {
+          const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
+          await deleteBoardFromDB(id);
           renderSavedBoardsList();
         };
       });
@@ -1802,20 +1846,34 @@ export default function WhiteboardPage() {
     }
 
     if (saveCurrentToLibBtn) {
-      saveCurrentToLibBtn.onclick = () => {
+      saveCurrentToLibBtn.onclick = async () => {
         const titlePrompt = prompt('পেজের একটি নাম দিন:', 'লেকচার ' + new Date().toLocaleDateString('bn-BD'));
         if (!titlePrompt) return;
-        const currentList = getSavedBoards();
-        const dataUrl = canvas.toDataURL('image/png');
-        currentList.unshift({
-          title: titlePrompt.trim(),
-          image: dataUrl,
-          thumb: dataUrl,
-          date: new Date().toISOString()
-        });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentList));
-        renderSavedBoardsList();
-        alert('✓ পেজটি সফলভাবে সংরক্ষণ করা হয়েছে!');
+        
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          
+          // Generate small thumbnail for fast list rendering
+          const thumbCanvas = document.createElement('canvas');
+          thumbCanvas.width = 160;
+          thumbCanvas.height = 100;
+          const thumbCtx = thumbCanvas.getContext('2d');
+          if (thumbCtx) {
+            thumbCtx.drawImage(canvas, 0, 0, 160, 100);
+          }
+          const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+
+          await saveBoardToDB({
+            title: titlePrompt.trim(),
+            image: dataUrl,
+            thumb: thumbUrl,
+            date: new Date().toISOString()
+          });
+          renderSavedBoardsList();
+          alert('✓ পেজটি সফলভাবে সংরক্ষণ করা হয়েছে!');
+        } catch (err: any) {
+          alert('সংরক্ষণ ব্যর্থ হয়েছে: ' + (err?.message || err));
+        }
       };
     }
     renderTabs();
