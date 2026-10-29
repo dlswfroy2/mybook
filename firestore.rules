@@ -198,5 +198,12 @@ service cloud.firestore {
       allow create: if hasPermission('send:messaging') || isAdmin();
       allow update, delete: if hasPermission('manage:messaging') || isAdmin();
     }
+
+    match /whiteboard_boards/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
   }
 }

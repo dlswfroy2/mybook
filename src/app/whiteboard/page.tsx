@@ -5,7 +5,7 @@ import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit, Sparkles, Copy, Check, CheckCircle2 } from 'lucide-react';
 import { performWhiteboardVisionOcr, solveWhiteboardProblem, generateWhiteboardDiagram } from '@/ai/flows/whiteboard-solver-flow';
-import { saveWhiteboardToServer, getSavedWhiteboardsFromServer, deleteWhiteboardFromServer } from './whiteboard-storage-actions';
+import { getFirebaseApp } from '@/firebase/config';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -1711,23 +1711,73 @@ export default function WhiteboardPage() {
       drawBackground();
     }
 
-    // Saved Boards Library Logic (Dual Sync: Server + IndexedDB for offline)
+    // Saved Boards Library Logic (Firebase Firestore Cloud + IndexedDB offline backup)
     const savedBoardsBtn = document.getElementById('saved-boards-btn');
     const savedBoardsModal = document.getElementById('saved-boards-modal');
     const closeSavedBoardsBtn = document.getElementById('close-saved-boards-modal');
     const saveCurrentToLibBtn = document.getElementById('save-current-to-library-btn');
     const savedBoardsList = document.getElementById('saved-boards-list');
 
-    const DB_NAME = 'MyBookWhiteboardDB';
-    const STORE_NAME = 'saved_boards';
+    // ---- Firestore helpers (lazy-loaded to avoid SSR issues) ----
+    const getFirestoreDB = async () => {
+      const { getFirestore } = await import('firebase/firestore');
+      const app = getFirebaseApp();
+      return getFirestore(app);
+    };
 
-    const openDB = (): Promise<IDBDatabase> => {
+    const COLLECTION = 'whiteboard_boards';
+
+    const loadBoardsFromFirestore = async (): Promise<any[]> => {
+      try {
+        const { collection, getDocs, orderBy, query } = await import('firebase/firestore');
+        const db = await getFirestoreDB();
+        const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) {
+        console.warn('Firestore load error:', e);
+        return [];
+      }
+    };
+
+    const saveBoardToFirestore = async (item: { title: string; image: string; thumb: string }): Promise<string | null> => {
+      try {
+        const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+        const db = await getFirestoreDB();
+        const ref = await addDoc(collection(db, COLLECTION), {
+          title: item.title,
+          image: item.image,
+          thumb: item.thumb,
+          createdAt: serverTimestamp(),
+        });
+        return ref.id;
+      } catch (e) {
+        console.warn('Firestore save error:', e);
+        return null;
+      }
+    };
+
+    const deleteBoardFromFirestore = async (id: string): Promise<void> => {
+      try {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const db = await getFirestoreDB();
+        await deleteDoc(doc(db, COLLECTION, id));
+      } catch (e) {
+        console.warn('Firestore delete error:', e);
+      }
+    };
+
+    // ---- IndexedDB helpers (offline backup) ----
+    const IDB_NAME = 'MyBookWhiteboardDB';
+    const IDB_STORE = 'saved_boards';
+
+    const openIDB = (): Promise<IDBDatabase> => {
       return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
+        const req = indexedDB.open(IDB_NAME, 1);
         req.onupgradeneeded = () => {
           const db = req.result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE, { keyPath: 'id' });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -1735,45 +1785,59 @@ export default function WhiteboardPage() {
       });
     };
 
-    const getSavedBoards = async (): Promise<any[]> => {
-      // 1. Try server first
+    const saveToIDB = async (item: any) => {
       try {
-        const serverBoards = await getSavedWhiteboardsFromServer();
-        if (serverBoards && serverBoards.length > 0) {
-          return serverBoards.map((b: any) => ({
-            id: b.id,
-            title: b.title,
-            image: b.imageUrl,
-            thumb: b.thumbUrl,
-            date: b.createdAt,
-            isServer: true
-          }));
-        }
-      } catch (e) {
-        console.warn('Server boards fetch failed, falling back to local DB', e);
-      }
+        const db = await openIDB();
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(item);
+      } catch (e) { console.warn('IDB save error:', e); }
+    };
 
-      // 2. Fallback to IndexedDB
+    const deleteFromIDB = async (id: string) => {
       try {
-        const db = await openDB();
+        const db = await openIDB();
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete(id);
+      } catch (e) { console.warn('IDB delete error:', e); }
+    };
+
+    const loadFromIDB = async (): Promise<any[]> => {
+      try {
+        const db = await openIDB();
         return new Promise((resolve) => {
-          const tx = db.transaction(STORE_NAME, 'readonly');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.getAll();
+          const tx = db.transaction(IDB_STORE, 'readonly');
+          const req = tx.objectStore(IDB_STORE).getAll();
           req.onsuccess = () => resolve((req.result || []).reverse());
           req.onerror = () => resolve([]);
         });
-      } catch {
-        return [];
-      }
+      } catch { return []; }
     };
 
+    // ---- Unified board loader: Firestore first, IDB fallback ----
+    const getSavedBoards = async (): Promise<any[]> => {
+      const fsBoards = await loadBoardsFromFirestore();
+      if (fsBoards.length > 0) {
+        return fsBoards.map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          image: b.image,
+          thumb: b.thumb,
+          date: b.createdAt?.toDate ? b.createdAt.toDate().toISOString() : b.createdAt || new Date().toISOString(),
+          isCloud: true,
+        }));
+      }
+      // Firestore empty or offline — fall back to local
+      const localBoards = await loadFromIDB();
+      return localBoards.map((b: any) => ({ ...b, isCloud: false }));
+    };
+
+    // ---- Render the saved boards list ----
     const renderSavedBoardsList = async () => {
       if (!savedBoardsList) return;
       savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">লোড হচ্ছে...</p>';
       const list = await getSavedBoards();
       if (list.length === 0) {
-        savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি। উপরের বাটন দিয়ে সংরক্ষণ করুন।</p>';
+        savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি। উপরের বাটন দিয়ে সংরক্ষণ করুন।</p>';
         return;
       }
       savedBoardsList.innerHTML = '';
@@ -1786,8 +1850,8 @@ export default function WhiteboardPage() {
             <div>
               <div class="flex items-center gap-1.5">
                 <p class="font-bold text-xs text-slate-900">${item.title || 'হোয়াইটবোর্ড পেজ ' + (idx + 1)}</p>
-                <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.isServer ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-blue-100 text-blue-700'}">
-                  ${item.isServer ? '☁️ সার্ভার' : '💾 লোকাল'}
+                <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.isCloud ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-blue-100 text-blue-700'}">
+                  ${item.isCloud ? '☁️ ক্লাউড' : '💾 লোকাল'}
                 </span>
               </div>
               <p class="text-[10px] text-slate-500">${new Date(item.date).toLocaleString('bn-BD')}</p>
@@ -1797,7 +1861,7 @@ export default function WhiteboardPage() {
             <button class="load-board-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition-colors" data-id="${item.id}">
               📂 খুলুন
             </button>
-            <button class="del-board-btn px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-md text-xs font-bold transition-colors" data-id="${item.id}">
+            <button class="del-board-btn px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-md text-xs font-bold transition-colors" data-id="${item.id}" data-cloud="${item.isCloud}">
               🗑️
             </button>
           </div>
@@ -1827,18 +1891,15 @@ export default function WhiteboardPage() {
 
       savedBoardsList.querySelectorAll('.del-board-btn').forEach(btn => {
         (btn as HTMLElement).onclick = async (e) => {
-          const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
-          if (!id) return;
-          try {
-            await deleteWhiteboardFromServer(id);
-          } catch (e) {
-            console.warn(e);
+          const el = e.currentTarget as HTMLElement;
+          const id = el.getAttribute('data-id');
+          const isCloud = el.getAttribute('data-cloud') === 'true';
+          if (!id || !confirm('পেজটি মুছে ফেলবেন?')) return;
+          if (isCloud) {
+            await deleteBoardFromFirestore(id);
+          } else {
+            await deleteFromIDB(id);
           }
-          try {
-            const db = await openDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            tx.objectStore(STORE_NAME).delete(isNaN(Number(id)) ? id : Number(id));
-          } catch (e) {}
           renderSavedBoardsList();
         };
       });
@@ -1861,53 +1922,46 @@ export default function WhiteboardPage() {
       saveCurrentToLibBtn.onclick = async () => {
         const titlePrompt = prompt('পেজের একটি নাম দিন:', 'লেকচার ' + new Date().toLocaleDateString('bn-BD'));
         if (!titlePrompt) return;
-        
+
         try {
-          const dataUrl = canvas.toDataURL('image/png');
-          
-          // Generate small thumbnail for fast list rendering
+          // Compress image to JPEG for Firestore (keep under 900KB)
+          const compCanvas = document.createElement('canvas');
+          compCanvas.width = canvas.width;
+          compCanvas.height = canvas.height;
+          const compCtx = compCanvas.getContext('2d');
+          if (compCtx) compCtx.drawImage(canvas, 0, 0);
+          const imageData = compCanvas.toDataURL('image/jpeg', 0.5);
+
+          // Thumb: 160x100 JPEG
           const thumbCanvas = document.createElement('canvas');
-          thumbCanvas.width = 160;
-          thumbCanvas.height = 100;
+          thumbCanvas.width = 200;
+          thumbCanvas.height = 125;
           const thumbCtx = thumbCanvas.getContext('2d');
-          if (thumbCtx) {
-            thumbCtx.drawImage(canvas, 0, 0, 160, 100);
-          }
-          const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+          if (thumbCtx) thumbCtx.drawImage(canvas, 0, 0, 200, 125);
+          const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.6);
 
-          // 1. Save to server
-          let serverSuccess = false;
-          try {
-            const res = await saveWhiteboardToServer({
-              title: titlePrompt.trim(),
-              image: dataUrl,
-              thumb: thumbUrl
-            });
-            if (res && res.success) {
-              serverSuccess = true;
-            }
-          } catch (e) {
-            console.warn('Server save error:', e);
-          }
+          const localId = 'local_' + Date.now();
 
-          // 2. Also save to IndexedDB as offline backup
-          try {
-            const db = await openDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            store.put({
-              id: 'local_' + Date.now(),
-              title: titlePrompt.trim(),
-              image: dataUrl,
-              thumb: thumbUrl,
-              date: new Date().toISOString()
-            });
-          } catch (e) {
-            console.warn('Local DB save error:', e);
-          }
+          // 1. Save to Firestore (cloud)
+          const cloudId = await saveBoardToFirestore({
+            title: titlePrompt.trim(),
+            image: imageData,
+            thumb: thumbData,
+          });
+
+          // 2. Also save to IndexedDB (offline fallback)
+          await saveToIDB({
+            id: cloudId || localId,
+            title: titlePrompt.trim(),
+            image: imageData,
+            thumb: thumbData,
+            date: new Date().toISOString(),
+          });
 
           renderSavedBoardsList();
-          alert(serverSuccess ? '✓ পেজটি সফলভাবে সার্ভারে সংরক্ষণ করা হয়েছে!' : '✓ পেজটি সংরক্ষিত হয়েছে!');
+          alert(cloudId
+            ? '✓ পেজটি ক্লাউডে (Firebase) সফলভাবে সংরক্ষণ করা হয়েছে!'
+            : '✓ পেজটি লোকালে সংরক্ষিত হয়েছে (ক্লাউড সংযোগ ব্যর্থ)।');
         } catch (err: any) {
           alert('সংরক্ষণ ব্যর্থ হয়েছে: ' + (err?.message || err));
         }
