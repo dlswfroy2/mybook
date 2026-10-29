@@ -1034,7 +1034,7 @@ export default function WhiteboardPage() {
           const popX = Math.max(20, Math.min(canvasRect.width - 340, (clientX - canvasRect.left) / currentScale + 15));
           const popY = Math.max(20, Math.min(canvasRect.height - 240, (clientY - canvasRect.top) / currentScale + 15));
 
-          popup.style.cssText = `position:absolute;left:${popX}px;top:${popY}px;width:300px;background:#ffffff;border:2px solid #6366f1;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,0.25);z-index:10000;user-select:none;font-family:'Kalpurush',sans-serif;overflow:hidden;animation:fadeInWidget 0.2s ease-out;`;
+          popup.style.cssText = `position:absolute;left:${popX}px;top:${popY}px;width:300px;background:#ffffff;border:2px solid #6366f1;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,0.25);z-index:10000;user-select:none;font-family:'Kalpurush',sans-serif;overflow:hidden;animation:fadeInWidget 0.2s ease-out;pointer-events:auto;`;
 
           const popHeader = document.createElement('div');
           popHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #4f46e5, #7c3aed);padding:8px 12px;cursor:grab;color:#ffffff;';
@@ -1122,8 +1122,10 @@ export default function WhiteboardPage() {
             e.stopPropagation();
             popup.remove();
           };
-          popCloseBtn.onclick = handlePopClose;
-          popCloseBtn.onpointerdown = (e) => e.stopPropagation();
+          popCloseBtn.addEventListener('click', handlePopClose);
+          popCloseBtn.addEventListener('pointerup', handlePopClose);
+          popCloseBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+          popCloseBtn.addEventListener('mousedown', (e) => e.stopPropagation());
 
           // Stamp popup text as a clean card onto whiteboard canvas
           const handlePopStamp = (e: Event) => {
@@ -1183,8 +1185,10 @@ export default function WhiteboardPage() {
             saveState();
             popup.remove();
           };
-          popStampBtn.onclick = handlePopStamp;
-          popStampBtn.onpointerdown = (e) => e.stopPropagation();
+          popStampBtn.addEventListener('click', handlePopStamp);
+          popStampBtn.addEventListener('pointerup', handlePopStamp);
+          popStampBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+          popStampBtn.addEventListener('mousedown', (e) => e.stopPropagation());
         };
 
         // Click detection on interactive SVG elements or labels
