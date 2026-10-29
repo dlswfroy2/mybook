@@ -1623,7 +1623,7 @@ export default function WhiteboardPage() {
     document.getElementById('stop-timer')!.onclick = () => clearInterval(timerInt);
     document.getElementById('reset-timer')!.onclick = () => { clearInterval(timerInt); document.getElementById('timer-display')!.textContent = '00:00'; };
 
-    // 3D Geometry Viewer
+    // Realistic 3D Board Viewer (Generates 3D Relief / Realistic Depth Model of Current Board)
     const view3dBtn = document.getElementById('view-3d-btn');
     const modal3d = document.getElementById('modal-3d');
     const close3d = document.getElementById('close-3d');
@@ -1641,52 +1641,119 @@ export default function WhiteboardPage() {
 
         container3d.innerHTML = '';
         const THREE = (window as any).THREE;
-        const width = container3d.clientWidth || 580;
-        const height = container3d.clientHeight || 400;
+        const width = container3d.clientWidth || 620;
+        const height = container3d.clientHeight || 440;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0f172a);
+        scene.background = new THREE.Color(0x0b0f19);
 
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.set(0, 2, 5);
+        camera.position.set(0, 0, 4.2);
 
-        threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+        threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         threeRenderer.setSize(width, height);
+        threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        threeRenderer.shadowMap.enabled = true;
         container3d.appendChild(threeRenderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        // Lighting for realistic 3D depth and shadows
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
         scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0x6366f1, 1.2);
-        dirLight.position.set(5, 10, 7);
-        scene.add(dirLight);
 
-        const group = new THREE.Group();
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+        keyLight.position.set(4, 5, 6);
+        scene.add(keyLight);
 
-        // Cube
-        const cubeGeo = new THREE.BoxGeometry(1.3, 1.3, 1.3);
-        const cubeMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 });
-        const cube = new THREE.Mesh(cubeGeo, cubeMat);
-        cube.position.x = -1.4;
-        const cubeEdges = new THREE.EdgesGeometry(cubeGeo);
-        cube.add(new THREE.LineSegments(cubeEdges, new THREE.LineBasicMaterial({ color: 0xffffff })));
-        group.add(cube);
+        const rimLight = new THREE.DirectionalLight(0x6366f1, 0.9);
+        rimLight.position.set(-5, -3, 2);
+        scene.add(rimLight);
 
-        // Sphere
-        const sphereGeo = new THREE.SphereGeometry(0.75, 32, 16);
-        const sphereMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3 });
-        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-        sphere.position.x = 1.4;
-        group.add(sphere);
+        const fillLight = new THREE.PointLight(0x38bdf8, 0.7, 10);
+        fillLight.position.set(0, 3, 3);
+        scene.add(fillLight);
 
-        // Cone
-        const coneGeo = new THREE.ConeGeometry(0.7, 1.4, 32);
-        const coneMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
-        const cone = new THREE.Mesh(coneGeo, coneMat);
-        cone.position.y = 1.1;
-        group.add(cone);
+        // Create current canvas snapshot texture & depth map
+        // Combine canvas and any active SVG overlays for full 3D rendering
+        const fullRenderCanvas = document.createElement('canvas');
+        fullRenderCanvas.width = canvas.width;
+        fullRenderCanvas.height = canvas.height;
+        const frCtx = fullRenderCanvas.getContext('2d');
+        if (frCtx) {
+          frCtx.drawImage(canvas, 0, 0);
+          document.querySelectorAll('.ai-diagram-overlay').forEach((w) => {
+            const svgEl = w.querySelector('svg');
+            if (svgEl) {
+              const wr = (w as HTMLElement).getBoundingClientRect();
+              const cr = canvas.getBoundingClientRect();
+              const sx = (wr.left - cr.left) / currentScale;
+              const sy = (wr.top - cr.top) / currentScale;
+              const dw = (svgEl.clientWidth || svgEl.getBoundingClientRect().width) / currentScale;
+              const dh = (svgEl.clientHeight || svgEl.getBoundingClientRect().height) / currentScale;
+              const ser = new XMLSerializer().serializeToString(svgEl);
+              const blob = new Blob([ser], { type: 'image/svg+xml;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const tempImg = new Image();
+              tempImg.src = url;
+              frCtx.drawImage(tempImg, sx, sy, dw, dh);
+            }
+          });
+        }
 
-        scene.add(group);
+        // Texture loader
+        const texture = new THREE.CanvasTexture(fullRenderCanvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
 
+        // Generate height/displacement canvas
+        const dispCanvas = document.createElement('canvas');
+        dispCanvas.width = 256;
+        dispCanvas.height = Math.round(256 * (canvas.height / canvas.width));
+        const dCtx = dispCanvas.getContext('2d');
+        if (dCtx && frCtx) {
+          dCtx.drawImage(fullRenderCanvas, 0, 0, dispCanvas.width, dispCanvas.height);
+          const imgData = dCtx.getImageData(0, 0, dispCanvas.width, dispCanvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            // Invert lightness so darker lines/diagram pop out in 3D relief
+            const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+            const bump = 255 - brightness;
+            data[i] = bump;
+            data[i + 1] = bump;
+            data[i + 2] = bump;
+          }
+          dCtx.putImageData(imgData, 0, 0);
+        }
+        const displacementTexture = new THREE.CanvasTexture(dispCanvas);
+
+        const aspect = canvas.width / canvas.height;
+        const planeW = 3.2;
+        const planeH = planeW / aspect;
+
+        // 3D Realistic Relief Model (Plane with high segments for displacement)
+        const geometry = new THREE.PlaneGeometry(planeW, planeH, 128, 128);
+        const material = new THREE.MeshStandardMaterial({
+          map: texture,
+          displacementMap: displacementTexture,
+          displacementScale: 0.18,
+          roughness: 0.35,
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
+
+        const boardMesh = new THREE.Mesh(geometry, material);
+
+        // Add 3D frame border around the board
+        const frameGeo = new THREE.BoxGeometry(planeW + 0.12, planeH + 0.12, 0.08);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.8 });
+        const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+        frameMesh.position.z = -0.045;
+
+        const main3DGroup = new THREE.Group();
+        main3DGroup.add(boardMesh);
+        main3DGroup.add(frameMesh);
+        scene.add(main3DGroup);
+
+        // Interactive mouse & touch orbit rotation
         let isDragging3D = false;
         let prevMouseX = 0;
         let prevMouseY = 0;
@@ -1701,17 +1768,22 @@ export default function WhiteboardPage() {
           if (!isDragging3D) return;
           const deltaX = e.clientX - prevMouseX;
           const deltaY = e.clientY - prevMouseY;
-          group.rotation.y += deltaX * 0.01;
-          group.rotation.x += deltaY * 0.01;
+          main3DGroup.rotation.y += deltaX * 0.008;
+          main3DGroup.rotation.x += deltaY * 0.008;
           prevMouseX = e.clientX;
           prevMouseY = e.clientY;
+        };
+
+        // Scroll zoom
+        container3d.onwheel = (e: WheelEvent) => {
+          e.preventDefault();
+          camera.position.z = Math.max(1.8, Math.min(8.0, camera.position.z + e.deltaY * 0.003));
         };
 
         const animate = () => {
           threeAnimationId = requestAnimationFrame(animate);
           if (!isDragging3D) {
-            group.rotation.y += 0.008;
-            group.rotation.x += 0.004;
+            main3DGroup.rotation.y += 0.003;
           }
           threeRenderer.render(scene, camera);
         };
@@ -1997,13 +2069,14 @@ export default function WhiteboardPage() {
           title: b.title,
           image: b.image,
           thumb: b.thumb,
+          overlays: b.overlays || [],
           date: b.createdAt?.toDate ? b.createdAt.toDate().toISOString() : b.createdAt || new Date().toISOString(),
           isCloud: true,
         }));
       }
       // Firestore empty or offline — fall back to local
       const localBoards = await loadFromIDB();
-      return localBoards.map((b: any) => ({ ...b, isCloud: false }));
+      return localBoards.map((b: any) => ({ ...b, overlays: b.overlays || [], isCloud: false }));
     };
 
     // ---- Render the saved boards list ----
@@ -2329,7 +2402,7 @@ export default function WhiteboardPage() {
       <div id="modal-3d" className="hidden">
         <div className="modal-content">
           <span id="close-3d" title="বন্ধ করুন">&times;</span>
-          <h4 style={{ color: 'white', fontWeight: 'bold', marginBottom: '10px' }}>🧊 ৩ডি জ্যামিতিক মডেল ভিউয়ার (মাউস দিয়ে ঘোরান)</h4>
+          <h4 style={{ color: 'white', fontWeight: 'bold', marginBottom: '10px' }}>🧊 বর্তমান বোর্ডের বাস্তব ৩ডি মডেল ভিউয়ার (মাউস দিয়ে ঘোরান ও জুম করুন)</h4>
           <div id="container-3d"></div>
         </div>
       </div>
