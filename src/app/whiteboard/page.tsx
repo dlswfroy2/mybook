@@ -960,9 +960,9 @@ export default function WhiteboardPage() {
           const parser = new DOMParser();
           const svgDoc = parser.parseFromString(safeSvg, 'image/svg+xml');
           const svgRoot = svgDoc.documentElement;
-          svgRoot.setAttribute('width', '1200');
-          svgRoot.setAttribute('height', '720');
-          if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1200 720');
+          svgRoot.setAttribute('width', '1300');
+          svgRoot.setAttribute('height', '760');
+          if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1300 760');
           safeSvg = new XMLSerializer().serializeToString(svgRoot);
         } catch (e) {
           console.warn('SVG parse error:', e);
@@ -1003,9 +1003,9 @@ export default function WhiteboardPage() {
         svgDiv.innerHTML = safeSvg;
         const svgEl = svgDiv.querySelector('svg');
         if (svgEl) {
-          const maxW = Math.min(canvas.width * 0.85, 960);
+          const maxW = Math.min(canvas.width * 0.85, 1000);
           svgEl.setAttribute('width', String(maxW));
-          svgEl.setAttribute('height', String(Math.round(maxW * 720 / 1200)));
+          svgEl.setAttribute('height', String(Math.round(maxW * 760 / 1300)));
           svgEl.style.display = 'block';
         }
         svgDiv.style.pointerEvents = 'none';
