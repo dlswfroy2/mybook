@@ -183,17 +183,22 @@ MANDATORY RULES:
      Line 1: Bengali name (bold, font-size 13px)
      Line 2: English/Scientific name (regular, font-size 11px, dy="18")
    - For LEFT margin (text-anchor="end"):
-     <text x="265" y="140" text-anchor="end" font-family="sans-serif">
+     <text x="265" y="140" text-anchor="end" font-family="sans-serif" data-name="অমসৃণ এন্ডোপ্লাজমিক জালিকা" data-desc="রাইবোজোম যুক্ত নালিকা যা প্রোটিন সংশ্লেষণ ও পরিবহনে সরাসরি অংশ নেয়।">
        <tspan x="265" font-size="13" font-weight="bold" fill="#0f172a">অমসৃণ এন্ডোপ্লাজমিক জালিকা</tspan>
        <tspan x="265" dy="18" font-size="11" fill="#475569">(Rough Endoplasmic Reticulum)</tspan>
      </text>
    - For RIGHT margin (text-anchor="start"):
-     <text x="1035" y="140" text-anchor="start" font-family="sans-serif">
+     <text x="1035" y="140" text-anchor="start" font-family="sans-serif" data-name="মসৃণ এন্ডোপ্লাজমিক জালিকা" data-desc="রাইবোজোমবিহীন জালিকা যা মূলত লিপিড ও হরমোন সংশ্লেষণ এবং কোষের বিষাক্ত পদার্থ দূরীকরণে কাজ করে।">
        <tspan x="1035" font-size="13" font-weight="bold" fill="#0f172a">মসৃণ এন্ডোপ্লাজমিক জালিকা</tspan>
        <tspan x="1035" dy="18" font-size="11" fill="#475569">(Smooth Endoplasmic Reticulum)</tspan>
      </text>
-   - If a single Bengali name itself is too long (more than 18 characters), break the Bengali name into 2 lines using <tspan>.
-6. ARROW & POINTER RULES:
+6. INTERACTIVE DATA ATTRIBUTES (MANDATORY FOR EVERY PART & LABEL):
+   - EVERY organelle, part, shape, path, circle or label group MUST have these two data attributes in Bengali:
+     data-name="অংশের বাংলা নাম"
+     data-desc="এই অংশের কাজ, বৈশিষ্ট্য ও বিস্তারিত বৈজ্ঞানিক বিবরণ (২-৩ বাক্য বাংলায়)"
+   - Example on shape/path:
+     <circle cx="450" cy="220" r="45" fill="#f59e0b" data-name="নিউক্লিয়াস" data-desc="কোষের প্রাণকেন্দ্র। এটি বংশগতির উপাদান DNA ধারণ করে এবং কোষের সব জৈবনিক কার্যাবলী নিয়ন্ত্রণ করে।"/>
+7. ARROW & POINTER RULES:
    - For left labels: line starts at x1=268, y1=labelY and points directly to the part at x2=targetX, y2=targetY (where targetX >= 295).
    - For right labels: line starts at x1=1032, y1=labelY and points directly to the part at x2=targetX, y2=targetY (where targetX <= 1005).
    - In <defs> include:
@@ -201,12 +206,12 @@ MANDATORY RULES:
        <path d="M0,0 L6,3 L0,6 z" fill="#334155"/>
      </marker>
    - Pointer line style: stroke="#334155" stroke-width="1.3" fill="none" marker-end="url(#arr)"
-7. NON-CROSSING TOPOLOGICAL ORDER (NEVER CROSS ARROWS):
+8. NON-CROSSING TOPOLOGICAL ORDER (NEVER CROSS ARROWS):
    - Parts on left: sort by vertical position (Y) top to bottom. Assign left labels vertically (y=110, 175, 240, 305, 370, 435, 500, 565, 630).
    - Parts on right: sort by vertical position (Y) top to bottom. Assign right labels vertically (y=110, 175, 240, 305, 370, 435, 500, 565, 630).
    - Leader lines must NEVER cross or intersect each other.
-8. Shapes must be detailed, vivid, educational and scientifically accurate.
-9. All labels and elements must stay strictly within the 1300x760 canvas bounds.`;
+9. Shapes must be detailed, vivid, educational and scientifically accurate.
+10. All labels and elements must stay strictly within the 1300x760 canvas bounds.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;

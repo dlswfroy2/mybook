@@ -1007,12 +1007,200 @@ export default function WhiteboardPage() {
           svgEl.setAttribute('width', String(maxW));
           svgEl.setAttribute('height', String(Math.round(maxW * 760 / 1300)));
           svgEl.style.display = 'block';
+          svgEl.style.cursor = 'pointer';
         }
-        svgDiv.style.pointerEvents = 'none';
+        svgDiv.style.pointerEvents = 'auto';
 
         wrapper.appendChild(toolbar);
         wrapper.appendChild(svgDiv);
         overlayContainer.appendChild(wrapper);
+
+        // Helper: Create draggable & stampable detail popup
+        const showPartDetailPopup = (partName: string, partDesc: string, clientX: number, clientY: number) => {
+          const popup = document.createElement('div');
+          popup.className = 'ai-part-detail-popup';
+          const canvasRect = canvas.getBoundingClientRect();
+          const popX = Math.max(20, Math.min(canvasRect.width - 340, (clientX - canvasRect.left) / currentScale + 15));
+          const popY = Math.max(20, Math.min(canvasRect.height - 240, (clientY - canvasRect.top) / currentScale + 15));
+
+          popup.style.cssText = `position:absolute;left:${popX}px;top:${popY}px;width:300px;background:#ffffff;border:2px solid #6366f1;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,0.25);z-index:10000;user-select:none;font-family:'Kalpurush',sans-serif;overflow:hidden;animation:fadeInWidget 0.2s ease-out;`;
+
+          const popHeader = document.createElement('div');
+          popHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #4f46e5, #7c3aed);padding:8px 12px;cursor:grab;color:#ffffff;';
+
+          const popTitle = document.createElement('span');
+          popTitle.style.cssText = 'font-weight:bold;font-size:13px;display:flex;align-items:center;gap:6px;';
+          popTitle.innerHTML = `🔍 <span>${partName}</span>`;
+
+          const popBtns = document.createElement('div');
+          popBtns.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+          const popStampBtn = document.createElement('button');
+          popStampBtn.type = 'button';
+          popStampBtn.title = 'ক্যানভাসে স্থায়ীভাবে যুক্ত করুন';
+          popStampBtn.textContent = '📌 স্থায়ী';
+          popStampBtn.style.cssText = 'padding:2px 8px;background:#16a34a;color:#ffffff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;';
+
+          const popCloseBtn = document.createElement('button');
+          popCloseBtn.type = 'button';
+          popCloseBtn.title = 'বন্ধ করুন';
+          popCloseBtn.textContent = '✕';
+          popCloseBtn.style.cssText = 'padding:2px 6px;background:#dc2626;color:#ffffff;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;';
+
+          popBtns.appendChild(popStampBtn);
+          popBtns.appendChild(popCloseBtn);
+          popHeader.appendChild(popTitle);
+          popHeader.appendChild(popBtns);
+
+          const popBody = document.createElement('div');
+          popBody.style.cssText = 'padding:12px 14px;background:#f8fafc;color:#0f172a;font-size:12px;line-height:1.6;font-weight:500;';
+          popBody.innerHTML = `
+            <div style="font-weight:bold;color:#312e81;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
+              ${partName}
+            </div>
+            <div style="color:#334155;text-align:justify;">
+              ${partDesc}
+            </div>
+          `;
+
+          popup.appendChild(popHeader);
+          popup.appendChild(popBody);
+          overlayContainer.appendChild(popup);
+
+          // Drag logic for the detail popup
+          let popDragging = false;
+          let pStartX = 0, pStartY = 0;
+          let pStartLeft = 0, pStartTop = 0;
+
+          const onPopPointerDown = (e: PointerEvent) => {
+            if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+            popDragging = true;
+            pStartX = e.clientX;
+            pStartY = e.clientY;
+            pStartLeft = popup.offsetLeft;
+            pStartTop = popup.offsetTop;
+            popHeader.style.cursor = 'grabbing';
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            e.stopPropagation();
+          };
+
+          const onPopPointerMove = (e: PointerEvent) => {
+            if (!popDragging) return;
+            const dx = (e.clientX - pStartX) / currentScale;
+            const dy = (e.clientY - pStartY) / currentScale;
+            popup.style.left = (pStartLeft + dx) + 'px';
+            popup.style.top = (pStartTop + dy) + 'px';
+          };
+
+          const onPopPointerUp = (e: PointerEvent) => {
+            if (popDragging) {
+              popDragging = false;
+              popHeader.style.cursor = 'grab';
+              try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+            }
+          };
+
+          popHeader.addEventListener('pointerdown', onPopPointerDown);
+          popHeader.addEventListener('pointermove', onPopPointerMove);
+          popHeader.addEventListener('pointerup', onPopPointerUp);
+          popHeader.addEventListener('pointercancel', onPopPointerUp);
+
+          // Close popup
+          popCloseBtn.onclick = (e) => {
+            e.stopPropagation();
+            popup.remove();
+          };
+
+          // Stamp popup text as a clean card onto whiteboard canvas
+          popStampBtn.onclick = (e) => {
+            e.stopPropagation();
+            saveState();
+            const pRect = popup.getBoundingClientRect();
+            const cRect = canvas.getBoundingClientRect();
+            const sx = (pRect.left - cRect.left) / currentScale;
+            const sy = (pRect.top - cRect.top) / currentScale;
+            const cardW = 280;
+            const cardH = 140;
+
+            // Draw card background
+            ctx.save();
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#4f46e5';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(sx, sy, cardW, cardH, 8) : ctx.rect(sx, sy, cardW, cardH);
+            ctx.fill();
+            ctx.stroke();
+
+            // Card Header
+            ctx.fillStyle = '#4f46e5';
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(sx, sy, cardW, 28, [8, 8, 0, 0]) : ctx.rect(sx, sy, cardW, 28);
+            ctx.fill();
+
+            // Header Title
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 13px Kalpurush, sans-serif';
+            ctx.fillText(partName, sx + 10, sy + 18);
+
+            // Body text
+            ctx.fillStyle = '#1e293b';
+            ctx.font = '11px Kalpurush, sans-serif';
+            const words = partDesc.split(' ');
+            let line = '';
+            let lineY = sy + 46;
+            for (let n = 0; n < words.length; n++) {
+              const testLine = line + words[n] + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > cardW - 20 && n > 0) {
+                ctx.fillText(line, sx + 10, lineY);
+                line = words[n] + ' ';
+                lineY += 18;
+                if (lineY > sy + cardH - 10) break;
+              } else {
+                line = testLine;
+              }
+            }
+            if (line && lineY <= sy + cardH - 10) {
+              ctx.fillText(line, sx + 10, lineY);
+            }
+            ctx.restore();
+            saveState();
+            popup.remove();
+          };
+        };
+
+        // Click detection on interactive SVG elements or labels
+        svgDiv.addEventListener('click', (e: MouseEvent) => {
+          const target = e.target as SVGElement;
+          if (!target) return;
+
+          // Check if clicked element or its closest parent has data-name or data-desc
+          const interactiveEl = target.closest('[data-name], [data-desc]') as SVGElement | null;
+          let name = interactiveEl?.getAttribute('data-name');
+          let desc = interactiveEl?.getAttribute('data-desc');
+
+          // Fallback: If clicked a <text> element, extract text content
+          if (!name) {
+            const textEl = target.closest('text') as SVGTextElement | null;
+            if (textEl) {
+              name = textEl.textContent?.trim() || '';
+              // Remove english part from name if present
+              if (name.includes('(')) {
+                name = name.split('(')[0].trim();
+              }
+              desc = textEl.getAttribute('data-desc') || `${name} হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ কার্যকরী অংশ।`;
+            }
+          }
+
+          if (name) {
+            e.stopPropagation();
+            if (!desc) {
+              desc = `${name} হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ কার্যকরী অংশ।`;
+            }
+            showPartDetailPopup(name, desc, e.clientX, e.clientY);
+          }
+        });
 
         // Drag logic attached ONLY to toolbar header
         let isDragging = false;
