@@ -972,27 +972,27 @@ export default function WhiteboardPage() {
         const overlayContainer = document.getElementById('svg-overlays')!;
         const wrapper = document.createElement('div');
         wrapper.className = 'ai-diagram-overlay';
-        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;z-index:60;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 8px 30px rgba(124,58,237,0.22);user-select:none;';
+        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;z-index:9999;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 8px 30px rgba(124,58,237,0.22);user-select:none;pointer-events:auto;';
 
         const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #7c3aed, #4f46e5);padding:6px 12px;border-radius:8px 8px 0 0;cursor:grab;';
+        toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #7c3aed, #4f46e5);padding:6px 12px;border-radius:8px 8px 0 0;cursor:grab;pointer-events:auto;user-select:none;';
 
         const moveLabel = document.createElement('span');
-        moveLabel.textContent = '✥ টেনে সরান (Drag Here)';
-        moveLabel.style.cssText = 'color:#ffffff;font-size:12px;font-weight:bold;cursor:grab;display:flex;align-items:center;gap:4px;';
+        moveLabel.textContent = '✥ টেনে সরান';
+        moveLabel.style.cssText = 'color:#ffffff;font-size:13px;font-weight:bold;cursor:grab;display:flex;align-items:center;gap:4px;';
 
         const btnGroup = document.createElement('div');
-        btnGroup.style.cssText = 'display:flex;align-items:center;gap:6px;';
+        btnGroup.style.cssText = 'display:flex;align-items:center;gap:8px;pointer-events:auto;';
 
         const stampBtn = document.createElement('button');
         stampBtn.type = 'button';
         stampBtn.textContent = '📌 বোর্ডে স্থায়ী করুন';
-        stampBtn.style.cssText = 'padding:4px 12px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);';
+        stampBtn.style.cssText = 'padding:6px 14px;background:#16a34a;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.25);pointer-events:auto;';
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.textContent = '🗑️ মুছুন';
-        delBtn.style.cssText = 'padding:4px 10px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);';
+        delBtn.style.cssText = 'padding:6px 12px;background:#dc2626;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.25);pointer-events:auto;';
 
         btnGroup.appendChild(stampBtn);
         btnGroup.appendChild(delBtn);
@@ -1014,52 +1014,62 @@ export default function WhiteboardPage() {
         wrapper.appendChild(svgDiv);
         overlayContainer.appendChild(wrapper);
 
-        // Drag logic attached cleanly to the entire toolbar header
+        // Drag logic attached ONLY to toolbar header
         let isDragging = false;
         let startClientX = 0, startClientY = 0;
         let startLeft = 0, startTop = 0;
 
-        const onMouseDown = (e: MouseEvent) => {
-          if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+        const onPointerDown = (e: PointerEvent) => {
+          // If clicked a button, ignore drag
+          if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
+            return;
+          }
           isDragging = true;
           startClientX = e.clientX;
           startClientY = e.clientY;
           startLeft = wrapper.offsetLeft;
           startTop = wrapper.offsetTop;
           toolbar.style.cursor = 'grabbing';
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
           e.preventDefault();
           e.stopPropagation();
         };
 
-        const onMouseMove = (e: MouseEvent) => {
+        const onPointerMove = (e: PointerEvent) => {
           if (!isDragging) return;
-          const deltaX = e.clientX - startClientX;
-          const deltaY = e.clientY - startClientY;
+          const deltaX = (e.clientX - startClientX) / currentScale;
+          const deltaY = (e.clientY - startClientY) / currentScale;
           wrapper.style.left = (startLeft + deltaX) + 'px';
           wrapper.style.top = (startTop + deltaY) + 'px';
         };
 
-        const onMouseUp = () => {
+        const onPointerUp = (e: PointerEvent) => {
           if (isDragging) {
             isDragging = false;
             toolbar.style.cursor = 'grab';
+            try {
+              (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+            } catch {}
           }
         };
 
-        toolbar.addEventListener('mousedown', onMouseDown);
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
+        toolbar.addEventListener('pointerdown', onPointerDown);
+        toolbar.addEventListener('pointermove', onPointerMove);
+        toolbar.addEventListener('pointerup', onPointerUp);
+        toolbar.addEventListener('pointercancel', onPointerUp);
 
         // Delete button
-        delBtn.onclick = (e) => {
+        const handleDelete = (e: Event) => {
+          e.preventDefault();
           e.stopPropagation();
-          window.removeEventListener('mousemove', onMouseMove);
-          window.removeEventListener('mouseup', onMouseUp);
           wrapper.remove();
         };
+        delBtn.onclick = handleDelete;
+        delBtn.onpointerdown = (e) => e.stopPropagation();
 
         // Stamp to canvas permanently
-        stampBtn.onclick = (e) => {
+        const handleStamp = (e: Event) => {
+          e.preventDefault();
           e.stopPropagation();
           const el = wrapper.querySelector('svg');
           if (!el) { wrapper.remove(); return; }
@@ -1071,7 +1081,6 @@ export default function WhiteboardPage() {
             saveState();
             const canvasRect = canvas.getBoundingClientRect();
             const wrapRect = wrapper.getBoundingClientRect();
-            // Account for toolbar height offset so SVG lands exactly where seen
             const sx = (wrapRect.left - canvasRect.left) / currentScale;
             const sy = (wrapRect.top + toolbar.offsetHeight - canvasRect.top) / currentScale;
             const dw = (el.clientWidth || el.getBoundingClientRect().width) / currentScale;
@@ -1079,12 +1088,12 @@ export default function WhiteboardPage() {
             ctx.drawImage(stamp, sx, sy, dw, dh);
             saveState();
             URL.revokeObjectURL(url2);
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
             wrapper.remove();
           };
           stamp.src = url2;
         };
+        stampBtn.onclick = handleStamp;
+        stampBtn.onpointerdown = (e) => e.stopPropagation();
         aiDrawStatus.textContent = '✅ চিত্র তৈরি হয়েছে! টেনে সরান বা বোর্ডে স্থায়ী করুন।';
         setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 2200);
       } catch (err: any) {
