@@ -942,6 +942,14 @@ export default function WhiteboardPage() {
     const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
     const aiDrawStatus = document.getElementById('ai-draw-status')!;
 
+    // Allow Enter key to trigger AI diagram generation
+    aiDrawInput.onkeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        aiDrawDoBtn.click();
+      }
+    };
+
     aiDrawDoBtn.onclick = async () => {
       const desc = aiDrawInput.value.trim();
       if (!desc) { aiDrawStatus.textContent = '⚠️ চিত্রের নাম বা বর্ণনা লিখুন।'; return; }
@@ -1106,13 +1114,17 @@ export default function WhiteboardPage() {
           popHeader.addEventListener('pointercancel', onPopPointerUp);
 
           // Close popup
-          popCloseBtn.onclick = (e) => {
+          const handlePopClose = (e: Event) => {
+            e.preventDefault();
             e.stopPropagation();
             popup.remove();
           };
+          popCloseBtn.onclick = handlePopClose;
+          popCloseBtn.onpointerdown = (e) => e.stopPropagation();
 
           // Stamp popup text as a clean card onto whiteboard canvas
-          popStampBtn.onclick = (e) => {
+          const handlePopStamp = (e: Event) => {
+            e.preventDefault();
             e.stopPropagation();
             saveState();
             const pRect = popup.getBoundingClientRect();
@@ -1168,6 +1180,8 @@ export default function WhiteboardPage() {
             saveState();
             popup.remove();
           };
+          popStampBtn.onclick = handlePopStamp;
+          popStampBtn.onpointerdown = (e) => e.stopPropagation();
         };
 
         // Click detection on interactive SVG elements or labels
@@ -1255,30 +1269,18 @@ export default function WhiteboardPage() {
         delBtn.onclick = handleDelete;
         delBtn.onpointerdown = (e) => e.stopPropagation();
 
-        // Stamp to canvas permanently
+        // Stamp to canvas permanently (Lock image and hide toolbar, but keep interactive click events)
         const handleStamp = (e: Event) => {
           e.preventDefault();
           e.stopPropagation();
-          const el = wrapper.querySelector('svg');
-          if (!el) { wrapper.remove(); return; }
-          const serialized = new XMLSerializer().serializeToString(el);
-          const blob2 = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
-          const url2 = URL.createObjectURL(blob2);
-          const stamp = new Image();
-          stamp.onload = () => {
-            saveState();
-            const canvasRect = canvas.getBoundingClientRect();
-            const wrapRect = wrapper.getBoundingClientRect();
-            const sx = (wrapRect.left - canvasRect.left) / currentScale;
-            const sy = (wrapRect.top + toolbar.offsetHeight - canvasRect.top) / currentScale;
-            const dw = (el.clientWidth || el.getBoundingClientRect().width) / currentScale;
-            const dh = (el.clientHeight || el.getBoundingClientRect().height) / currentScale;
-            ctx.drawImage(stamp, sx, sy, dw, dh);
-            saveState();
-            URL.revokeObjectURL(url2);
-            wrapper.remove();
-          };
-          stamp.src = url2;
+          // Hide toolbar and dashed border to lock visually on canvas
+          toolbar.style.display = 'none';
+          wrapper.style.border = 'none';
+          wrapper.style.boxShadow = 'none';
+          wrapper.style.background = 'transparent';
+          wrapper.style.cursor = 'default';
+          // Save state to canvas history
+          saveState();
         };
         stampBtn.onclick = handleStamp;
         stampBtn.onpointerdown = (e) => e.stopPropagation();
