@@ -5,6 +5,7 @@ import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, XCircle, BrainCircuit, Sparkles, Copy, Check, CheckCircle2 } from 'lucide-react';
 import { performWhiteboardVisionOcr, solveWhiteboardProblem, generateWhiteboardDiagram } from '@/ai/flows/whiteboard-solver-flow';
+import { saveWhiteboardToServer, getSavedWhiteboardsFromServer, deleteWhiteboardFromServer } from './whiteboard-storage-actions';
 import './whiteboard.css';
 
 export default function WhiteboardPage() {
@@ -1710,7 +1711,7 @@ export default function WhiteboardPage() {
       drawBackground();
     }
 
-    // Saved Boards Library Logic (IndexedDB for quota-free storage)
+    // Saved Boards Library Logic (Dual Sync: Server + IndexedDB for offline)
     const savedBoardsBtn = document.getElementById('saved-boards-btn');
     const savedBoardsModal = document.getElementById('saved-boards-modal');
     const closeSavedBoardsBtn = document.getElementById('close-saved-boards-modal');
@@ -1726,7 +1727,7 @@ export default function WhiteboardPage() {
         req.onupgradeneeded = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -1734,7 +1735,25 @@ export default function WhiteboardPage() {
       });
     };
 
-    const getSavedBoardsFromDB = async (): Promise<any[]> => {
+    const getSavedBoards = async (): Promise<any[]> => {
+      // 1. Try server first
+      try {
+        const serverBoards = await getSavedWhiteboardsFromServer();
+        if (serverBoards && serverBoards.length > 0) {
+          return serverBoards.map((b: any) => ({
+            id: b.id,
+            title: b.title,
+            image: b.imageUrl,
+            thumb: b.thumbUrl,
+            date: b.createdAt,
+            isServer: true
+          }));
+        }
+      } catch (e) {
+        console.warn('Server boards fetch failed, falling back to local DB', e);
+      }
+
+      // 2. Fallback to IndexedDB
       try {
         const db = await openDB();
         return new Promise((resolve) => {
@@ -1749,45 +1768,28 @@ export default function WhiteboardPage() {
       }
     };
 
-    const saveBoardToDB = async (item: { title: string; image: string; thumb: string; date: string }): Promise<void> => {
-      const db = await openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.add(item);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    };
-
-    const deleteBoardFromDB = async (id: number): Promise<void> => {
-      const db = await openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    };
-
     const renderSavedBoardsList = async () => {
       if (!savedBoardsList) return;
       savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">লোড হচ্ছে...</p>';
-      const list = await getSavedBoardsFromDB();
+      const list = await getSavedBoards();
       if (list.length === 0) {
         savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি। উপরের বাটন দিয়ে সংরক্ষণ করুন।</p>';
         return;
       }
       savedBoardsList.innerHTML = '';
-      list.forEach((item, idx) => {
+      list.forEach((item: any, idx: number) => {
         const itemCard = document.createElement('div');
         itemCard.className = 'flex items-center justify-between p-3 border rounded-xl hover:border-amber-400 bg-slate-50/70 transition-all';
         itemCard.innerHTML = `
           <div class="flex items-center gap-3">
             <img src="${item.thumb}" class="w-16 h-12 object-cover rounded-md border border-slate-300 shadow-sm" alt="Preview" />
             <div>
-              <p class="font-bold text-xs text-slate-900">${item.title || 'হোয়াইটবোর্ড পেজ ' + (idx + 1)}</p>
+              <div class="flex items-center gap-1.5">
+                <p class="font-bold text-xs text-slate-900">${item.title || 'হোয়াইটবোর্ড পেজ ' + (idx + 1)}</p>
+                <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.isServer ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-blue-100 text-blue-700'}">
+                  ${item.isServer ? '☁️ সার্ভার' : '💾 লোকাল'}
+                </span>
+              </div>
               <p class="text-[10px] text-slate-500">${new Date(item.date).toLocaleString('bn-BD')}</p>
             </div>
           </div>
@@ -1805,9 +1807,9 @@ export default function WhiteboardPage() {
 
       savedBoardsList.querySelectorAll('.load-board-btn').forEach(btn => {
         (btn as HTMLElement).onclick = async (e) => {
-          const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
-          const currentList = await getSavedBoardsFromDB();
-          const item = currentList.find(b => b.id === id);
+          const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
+          const currentList = await getSavedBoards();
+          const item = currentList.find(b => String(b.id) === String(id));
           if (item && item.image) {
             const img = new Image();
             img.onload = () => {
@@ -1825,8 +1827,18 @@ export default function WhiteboardPage() {
 
       savedBoardsList.querySelectorAll('.del-board-btn').forEach(btn => {
         (btn as HTMLElement).onclick = async (e) => {
-          const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
-          await deleteBoardFromDB(id);
+          const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
+          if (!id) return;
+          try {
+            await deleteWhiteboardFromServer(id);
+          } catch (e) {
+            console.warn(e);
+          }
+          try {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).delete(isNaN(Number(id)) ? id : Number(id));
+          } catch (e) {}
           renderSavedBoardsList();
         };
       });
@@ -1863,14 +1875,39 @@ export default function WhiteboardPage() {
           }
           const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
 
-          await saveBoardToDB({
-            title: titlePrompt.trim(),
-            image: dataUrl,
-            thumb: thumbUrl,
-            date: new Date().toISOString()
-          });
+          // 1. Save to server
+          let serverSuccess = false;
+          try {
+            const res = await saveWhiteboardToServer({
+              title: titlePrompt.trim(),
+              image: dataUrl,
+              thumb: thumbUrl
+            });
+            if (res && res.success) {
+              serverSuccess = true;
+            }
+          } catch (e) {
+            console.warn('Server save error:', e);
+          }
+
+          // 2. Also save to IndexedDB as offline backup
+          try {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            store.put({
+              id: 'local_' + Date.now(),
+              title: titlePrompt.trim(),
+              image: dataUrl,
+              thumb: thumbUrl,
+              date: new Date().toISOString()
+            });
+          } catch (e) {
+            console.warn('Local DB save error:', e);
+          }
+
           renderSavedBoardsList();
-          alert('✓ পেজটি সফলভাবে সংরক্ষণ করা হয়েছে!');
+          alert(serverSuccess ? '✓ পেজটি সফলভাবে সার্ভারে সংরক্ষণ করা হয়েছে!' : '✓ পেজটি সংরক্ষিত হয়েছে!');
         } catch (err: any) {
           alert('সংরক্ষণ ব্যর্থ হয়েছে: ' + (err?.message || err));
         }
