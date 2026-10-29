@@ -942,13 +942,16 @@ export default function WhiteboardPage() {
     const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
     const aiDrawStatus = document.getElementById('ai-draw-status')!;
 
-    // Allow Enter key to trigger AI diagram generation
-    aiDrawInput.onkeydown = (e: KeyboardEvent) => {
+    // Allow Enter key to trigger AI diagram generation (works on both keydown and keypress)
+    const triggerAiDraw = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        e.stopPropagation();
         aiDrawDoBtn.click();
       }
     };
+    aiDrawInput.addEventListener('keydown', triggerAiDraw);
+    aiDrawInput.addEventListener('keypress', triggerAiDraw);
 
     aiDrawDoBtn.onclick = async () => {
       const desc = aiDrawInput.value.trim();
@@ -1185,7 +1188,7 @@ export default function WhiteboardPage() {
         };
 
         // Click detection on interactive SVG elements or labels
-        svgDiv.addEventListener('click', (e: MouseEvent) => {
+        const handleDiagramClick = (e: MouseEvent) => {
           const target = e.target as SVGElement;
           if (!target) return;
 
@@ -1208,13 +1211,21 @@ export default function WhiteboardPage() {
           }
 
           if (name) {
+            e.preventDefault();
             e.stopPropagation();
             if (!desc) {
               desc = `${name} হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ কার্যকরী অংশ।`;
             }
             showPartDetailPopup(name, desc, e.clientX, e.clientY);
           }
-        });
+        };
+
+        svgDiv.addEventListener('click', handleDiagramClick, true);
+        svgDiv.addEventListener('pointerup', (e: PointerEvent) => {
+          if (!isDragging) {
+            handleDiagramClick(e as unknown as MouseEvent);
+          }
+        }, true);
 
         // Drag logic attached ONLY to toolbar header
         let isDragging = false;
