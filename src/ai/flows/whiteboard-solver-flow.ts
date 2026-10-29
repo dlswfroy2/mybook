@@ -167,38 +167,36 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
 
 
 const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator for Bangladeshi students.
-Draw a detailed, accurate, beautifully labeled educational SVG diagram based on the user's description.
+Draw a detailed, scientifically accurate, beautifully labeled educational SVG diagram based on the user's description.
 
 MANDATORY RULES:
-1. Output ONLY raw SVG code. No backticks, no explanations, no text before <svg or after </svg>.
-2. Use: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
-3. First child: <rect width="1200" height="720" fill="#ffffff"/>
-4. ZONE MAP:
-   LEFT LABELS  : x=5 to x=245, text-anchor="end" at x=243
-   DIAGRAM AREA : x=260 to x=940 shapes only! Absolutely NO label text inside diagram area.
-   RIGHT LABELS : x=955 to x=1195, text-anchor="start" at x=957
-   TITLE ROW    : y=5 to y=60
-5. LABEL-ARROW NON-CROSSING RULE (STRICT):
-   - Sort parts that belong on the LEFT by their Y position from TOP to BOTTOM.
-   - Corresponding left labels MUST be ordered from top to bottom (y=110, y=170, y=230, etc.) matching their target parts' top-to-bottom order.
-   - Sort parts that belong on the RIGHT by their Y position from TOP to BOTTOM.
-   - Corresponding right labels MUST be ordered from top to bottom (y=110, y=170, y=230, etc.) matching their target parts' top-to-bottom order.
-   - ZERO INTERSECTING ARROWS: Never cross leader lines/arrows! An upper label must always point to a higher or equal part; a lower label must point to a lower part. Lines must never overlap, cross, or cut across each other.
-   - Parts located on the left half of the diagram (x < 600) MUST be labeled from the LEFT margin.
-   - Parts located on the right half of the diagram (x >= 600) MUST be labeled from the RIGHT margin.
-6. Long labels: use two <tspan> lines (dy="18") or font-size="12". Max label width 230px. Ensure labels never get clipped.
-7. ARROWS: one <line> per label from label edge to EXACT part location inside diagram.
-   - Left label: x1=244 y1=labelY x2=partX y2=partY
-   - Right label: x1=956 y1=labelY x2=partX y2=partY
-   - Arrow style: stroke="#475569" stroke-width="1.3" fill="none" marker-end="url(#arr)"
-8. In <defs> include:
-   <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-     <path d="M0,0 L7,3.5 L0,7 z" fill="#475569"/>
-   </marker>
-9. Label text: font-family="sans-serif" font-size="13" fill="#0f172a" font-weight="600"
-10. Title: <text x="600" y="48" text-anchor="middle" font-size="22" font-weight="bold" fill="#0f172a">BENGALI TITLE</text>
-11. Use clear, vibrant colors for shapes. Make diagram scientifically authentic, neat and highly legible.
-12. NEVER place any element outside the 0-1200 width and 0-720 height bounds.`;
+1. Output ONLY raw SVG code. No markdown fences, no conversational text, no comments before <svg or after </svg>.
+2. Dimensions: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
+3. Background: The very first element MUST be <rect width="1200" height="720" fill="#ffffff"/>
+4. STRICT ZONE ALLOCATION (ZERO TEXT IN DIAGRAM):
+   - LEFT MARGIN  : x = 10 to x = 230 → For left-side Bengali labels only! (text-anchor="end" at x=225)
+   - DIAGRAM BODY : x = 250 to x = 950 → ONLY graphical shapes, paths, organelles, structures! Absolutely NO <text> element is permitted in this entire zone under any circumstance!
+   - RIGHT MARGIN : x = 970 to x = 1190 → For right-side Bengali labels only! (text-anchor="start" at x=975)
+   - TITLE        : Top center at x=600, y=45.
+5. ARROW & POINTER RULES:
+   - Every single part of the diagram is identified by a thin pointer line with an arrow.
+   - For left labels: line starts at x1=225, y1=labelY and points directly to the part at x2=targetX, y2=targetY (where targetX >= 260).
+   - For right labels: line starts at x1=975, y1=labelY and points directly to the part at x2=targetX, y2=targetY (where targetX <= 940).
+   - In <defs> include:
+     <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+       <path d="M0,0 L6,3 L0,6 z" fill="#334155"/>
+     </marker>
+   - Pointer line style: stroke="#334155" stroke-width="1.3" fill="none" marker-end="url(#arr)"
+6. NON-CROSSING TOPOLOGICAL ORDER (NEVER CROSS ARROWS):
+   - Sort parts labeled from the left by their vertical position (Y) from top to bottom.
+   - Place their corresponding labels on the left margin in that exact same top-to-bottom order (e.g. y=120, 180, 240, 300, 360, 420, 480, 540, 600).
+   - Sort parts labeled from the right by their vertical position (Y) from top to bottom.
+   - Place their corresponding labels on the right margin in that exact same top-to-bottom order.
+   - Lines must NEVER cross, intersect, or tangle with one another!
+7. LABEL TEXT FORMAT:
+   - Bengali name with English scientific name below or beside it, e.g. <text x="225" y="140" text-anchor="end" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0f172a">মাইটোকন্ড্রিয়া <tspan font-size="11" fill="#475569" font-weight="normal">(Mitochondria)</tspan></text>
+8. Diagram shapes must be visually appealing, modern, vibrant and scientifically authentic.
+9. All labels and arrows must stay strictly within the 1200x720 canvas bounds.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;

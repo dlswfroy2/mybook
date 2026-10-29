@@ -954,130 +954,133 @@ export default function WhiteboardPage() {
           aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
           return;
         }
-        // Force white background
-        let safeSvg = result.svg.replace(/(<svg[^>]*>)/i, '$1<rect width="100%" height="100%" fill="#ffffff"/>');
-
-        // POST-PROCESSING: Force all label <text> elements inside diagram zone (x=260..940) out to margins
+        // Ensure SVG dimensions and viewbox
+        let safeSvg = result.svg;
         try {
           const parser = new DOMParser();
           const svgDoc = parser.parseFromString(safeSvg, 'image/svg+xml');
           const svgRoot = svgDoc.documentElement;
-          // Ensure SVG dimensions are set correctly
           svgRoot.setAttribute('width', '1200');
           svgRoot.setAttribute('height', '720');
           if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1200 720');
-
-          const DIAG_LEFT = 260, DIAG_RIGHT = 940, SVG_W = 1200;
-          let leftY = 110, rightY = 110;
-          const leftStep = 58, rightStep = 58;
-
-          // Collect all text/tspan not inside defs
-          const allTexts = Array.from(svgRoot.querySelectorAll('text'));
-          allTexts.forEach(t => {
-            // Skip title (y < 65)
-            const ty = parseFloat(t.getAttribute('y') || '0');
-            if (ty < 65) return; // keep title in place
-
-            const tx = parseFloat(t.getAttribute('x') || '0');
-            // If x is inside diagram zone → move to margin
-            if (tx >= DIAG_LEFT && tx <= DIAG_RIGHT) {
-              const isLeftSide = tx < (DIAG_LEFT + DIAG_RIGHT) / 2;
-              if (isLeftSide) {
-                t.setAttribute('x', '243');
-                t.setAttribute('text-anchor', 'end');
-                t.setAttribute('y', String(leftY));
-                // Fix all tspan x too
-                t.querySelectorAll('tspan').forEach(ts => { ts.setAttribute('x', '243'); });
-                leftY += leftStep;
-              } else {
-                t.setAttribute('x', '957');
-                t.setAttribute('text-anchor', 'start');
-                t.setAttribute('y', String(rightY));
-                t.querySelectorAll('tspan').forEach(ts => { ts.setAttribute('x', '957'); });
-                rightY += rightStep;
-              }
-            }
-          });
-
-          // Also fix any lines/arrows whose x1 or x2 lands outside SVG bounds
-          svgRoot.querySelectorAll('line').forEach(ln => {
-            const x1 = parseFloat(ln.getAttribute('x1') || '0');
-            const x2 = parseFloat(ln.getAttribute('x2') || '0');
-            if (x1 < 0) ln.setAttribute('x1', '1');
-            if (x2 > SVG_W) ln.setAttribute('x2', String(SVG_W - 1));
-            if (x1 > SVG_W) ln.setAttribute('x1', String(SVG_W - 1));
-            if (x2 < 0) ln.setAttribute('x2', '1');
-          });
-
           safeSvg = new XMLSerializer().serializeToString(svgRoot);
-        } catch (parseErr) {
-          console.warn('SVG post-processing failed, using raw SVG:', parseErr);
+        } catch (e) {
+          console.warn('SVG parse error:', e);
         }
 
         // Show as draggable overlay instead of burning to canvas
         const overlayContainer = document.getElementById('svg-overlays')!;
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;cursor:move;z-index:55;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 4px 24px rgba(124,58,237,0.18);';
+        wrapper.className = 'ai-diagram-overlay';
+        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;z-index:60;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 8px 30px rgba(124,58,237,0.22);user-select:none;';
+
         const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'position:absolute;top:-34px;left:0;display:flex;gap:5px;background:#7c3aed;padding:4px 8px;border-radius:6px 6px 0 0;z-index:56;';
-        const stampBtn = document.createElement('button');
-        stampBtn.textContent = '📌 বোর্ডে স্থায়ী করুন';
-        stampBtn.style.cssText = 'padding:2px 10px;background:#22c55e;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;';
+        toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #7c3aed, #4f46e5);padding:6px 12px;border-radius:8px 8px 0 0;cursor:grab;';
+
         const moveLabel = document.createElement('span');
-        moveLabel.textContent = '✥ টেনে সরান';
-        moveLabel.style.cssText = 'color:#fff;font-size:11px;font-weight:bold;padding:2px 6px;line-height:1.8;';
+        moveLabel.textContent = '✥ টেনে সরান (Drag Here)';
+        moveLabel.style.cssText = 'color:#ffffff;font-size:12px;font-weight:bold;cursor:grab;display:flex;align-items:center;gap:4px;';
+
+        const btnGroup = document.createElement('div');
+        btnGroup.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+        const stampBtn = document.createElement('button');
+        stampBtn.type = 'button';
+        stampBtn.textContent = '📌 বোর্ডে স্থায়ী করুন';
+        stampBtn.style.cssText = 'padding:4px 12px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);';
+
         const delBtn = document.createElement('button');
+        delBtn.type = 'button';
         delBtn.textContent = '🗑️ মুছুন';
-        delBtn.style.cssText = 'padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;';
+        delBtn.style.cssText = 'padding:4px 10px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.15);';
+
+        btnGroup.appendChild(stampBtn);
+        btnGroup.appendChild(delBtn);
         toolbar.appendChild(moveLabel);
-        toolbar.appendChild(stampBtn);
-        toolbar.appendChild(delBtn);
+        toolbar.appendChild(btnGroup);
+
         const svgDiv = document.createElement('div');
         svgDiv.innerHTML = safeSvg;
         const svgEl = svgDiv.querySelector('svg');
         if (svgEl) {
-          // Scale SVG to fit nicely on board
-          const maxW = Math.min(canvas.width * 0.80, 900);
+          const maxW = Math.min(canvas.width * 0.85, 960);
           svgEl.setAttribute('width', String(maxW));
           svgEl.setAttribute('height', String(Math.round(maxW * 720 / 1200)));
+          svgEl.style.display = 'block';
         }
         svgDiv.style.pointerEvents = 'none';
+
         wrapper.appendChild(toolbar);
         wrapper.appendChild(svgDiv);
         overlayContainer.appendChild(wrapper);
-        // Drag logic
-        let dragging = false, dsx = 0, dsy = 0, dex = 0, dey = 0;
-        wrapper.addEventListener('mousedown', (e: MouseEvent) => {
+
+        // Drag logic attached cleanly to the entire toolbar header
+        let isDragging = false;
+        let startClientX = 0, startClientY = 0;
+        let startLeft = 0, startTop = 0;
+
+        const onMouseDown = (e: MouseEvent) => {
           if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-          dragging = true; dsx = e.clientX; dsy = e.clientY;
-          dex = wrapper.offsetLeft; dey = wrapper.offsetTop;
+          isDragging = true;
+          startClientX = e.clientX;
+          startClientY = e.clientY;
+          startLeft = wrapper.offsetLeft;
+          startTop = wrapper.offsetTop;
+          toolbar.style.cursor = 'grabbing';
           e.preventDefault();
-        });
-        document.addEventListener('mousemove', (e: MouseEvent) => {
-          if (!dragging) return;
-          wrapper.style.left = (dex + e.clientX - dsx) + 'px';
-          wrapper.style.top = (dey + e.clientY - dsy) + 'px';
-        });
-        document.addEventListener('mouseup', () => { dragging = false; });
-        // Delete
-        delBtn.onclick = () => wrapper.remove();
+          e.stopPropagation();
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+          if (!isDragging) return;
+          const deltaX = e.clientX - startClientX;
+          const deltaY = e.clientY - startClientY;
+          wrapper.style.left = (startLeft + deltaX) + 'px';
+          wrapper.style.top = (startTop + deltaY) + 'px';
+        };
+
+        const onMouseUp = () => {
+          if (isDragging) {
+            isDragging = false;
+            toolbar.style.cursor = 'grab';
+          }
+        };
+
+        toolbar.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
+        // Delete button
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          wrapper.remove();
+        };
+
         // Stamp to canvas permanently
-        stampBtn.onclick = () => {
-          const stamp = new Image();
+        stampBtn.onclick = (e) => {
+          e.stopPropagation();
           const el = wrapper.querySelector('svg');
           if (!el) { wrapper.remove(); return; }
           const serialized = new XMLSerializer().serializeToString(el);
           const blob2 = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
           const url2 = URL.createObjectURL(blob2);
+          const stamp = new Image();
           stamp.onload = () => {
             saveState();
             const canvasRect = canvas.getBoundingClientRect();
             const wrapRect = wrapper.getBoundingClientRect();
+            // Account for toolbar height offset so SVG lands exactly where seen
             const sx = (wrapRect.left - canvasRect.left) / currentScale;
-            const sy = (wrapRect.top - canvasRect.top) / currentScale;
-            ctx.drawImage(stamp, sx, sy, stamp.naturalWidth, stamp.naturalHeight);
+            const sy = (wrapRect.top + toolbar.offsetHeight - canvasRect.top) / currentScale;
+            const dw = (el.clientWidth || el.getBoundingClientRect().width) / currentScale;
+            const dh = (el.clientHeight || el.getBoundingClientRect().height) / currentScale;
+            ctx.drawImage(stamp, sx, sy, dw, dh);
             saveState();
             URL.revokeObjectURL(url2);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
             wrapper.remove();
           };
           stamp.src = url2;
@@ -1612,7 +1615,7 @@ export default function WhiteboardPage() {
             <div id="curtain-handle">🚪 পর্দা</div>
           </div>
           <div id="spotlight-overlay" className="hidden"></div>
-          <div id="svg-overlays" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 50 }}></div>
+          <div id="svg-overlays" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'auto', zIndex: 50 }}></div>
         </div>
       </div>
 
