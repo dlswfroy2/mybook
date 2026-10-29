@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
@@ -1294,8 +1294,29 @@ export default function WhiteboardPage() {
           wrapper.style.boxShadow = 'none';
           wrapper.style.background = 'transparent';
           wrapper.style.cursor = 'default';
-          // Save state to canvas history
-          saveState();
+
+          // Burn SVG graphics onto HTML5 canvas so image is saved in canvas state & autosave
+          const el = wrapper.querySelector('svg');
+          if (el) {
+            const serialized = new XMLSerializer().serializeToString(el);
+            const blob2 = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+            const url2 = URL.createObjectURL(blob2);
+            const stamp = new Image();
+            stamp.onload = () => {
+              const canvasRect = canvas.getBoundingClientRect();
+              const wrapRect = wrapper.getBoundingClientRect();
+              const sx = (wrapRect.left - canvasRect.left) / currentScale;
+              const sy = (wrapRect.top - canvasRect.top) / currentScale;
+              const dw = (el.clientWidth || el.getBoundingClientRect().width) / currentScale;
+              const dh = (el.clientHeight || el.getBoundingClientRect().height) / currentScale;
+              ctx.drawImage(stamp, sx, sy, dw, dh);
+              saveState();
+              URL.revokeObjectURL(url2);
+            };
+            stamp.src = url2;
+          } else {
+            saveState();
+          }
         };
         stampBtn.onclick = handleStamp;
         stampBtn.onpointerdown = (e) => e.stopPropagation();
