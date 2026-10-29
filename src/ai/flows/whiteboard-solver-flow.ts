@@ -171,17 +171,22 @@ The user will provide a name or description of a diagram. Create a detailed, acc
 STRICT RULES:
 1. Return ONLY valid SVG code - starting with <svg ...> and ending with </svg>.
 2. No markdown backticks, no explanation, no introduction - ONLY SVG code.
-3. SVG must have viewBox="0 0 900 650" and width="900" height="650".
-4. CRITICAL: Background must be WHITE (#ffffff). Always start with <rect width="900" height="650" fill="#ffffff"/>.
-5. LAYOUT: Draw the main diagram in the CENTER of the SVG (roughly 250,80 to 650,520). Leave margins of at least 200px on left and right, and 80px on top and bottom for labels.
-6. ALL labels MUST be placed OUTSIDE the diagram drawing — in the left margin, right margin, top margin, or bottom margin. NO label text should overlap or appear on top of the diagram itself.
-7. Use leader lines (thin lines or polylines) with arrowheads to connect each label text (in the margin) to the corresponding part inside the diagram. Use <line> or <polyline> with marker-end="url(#arrow)" for arrows.
-8. ALL label text must be in Bengali (Bangla script). Each part of the diagram must have a Bengali label.
-9. Make the diagram as detailed, accurate and professional as possible.
-10. Use bright, vibrant colors for diagram parts so they are visible on white background.
-11. Add a Bengali title at the very top center using a large <text> element.
-12. Define an arrowhead marker in <defs>: <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/></marker>
-13. Label placement strategy: place labels alternately on LEFT side and RIGHT side of the diagram, evenly spaced vertically. Draw a leader line from label to the part.`;
+3. SVG must have viewBox="0 0 1100 700" width="1100" height="700". This is MANDATORY.
+4. CRITICAL: Background must be WHITE. Always put this as the FIRST child: <rect width="1100" height="700" fill="#ffffff"/>
+5. LAYOUT - strictly follow these zones:
+   - LEFT LABEL ZONE: x = 0 to 220 (labels and text only, no diagram shapes here)
+   - CENTER DIAGRAM ZONE: x = 230 to 870 (draw the actual diagram here only)
+   - RIGHT LABEL ZONE: x = 880 to 1100 (labels and text only, no diagram shapes here)
+   - TOP ZONE: y = 0 to 60 (title only)
+   - BOTTOM ZONE: y = 620 to 700 (optional extra labels)
+6. NO text or label may appear inside the CENTER DIAGRAM ZONE (x=230 to x=870). All Bengali label text must be in the LEFT or RIGHT label zones only.
+7. Use <line> elements with marker-end="url(#arr)" to draw leader lines from label text to the diagram part. Leader lines cross from label zone into diagram zone.
+8. ALL labels MUST be in Bengali (Bangla script). Left-side labels use text-anchor="end". Right-side labels use text-anchor="start".
+9. In <defs>, define: <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#333"/></marker>
+10. Add Bengali title at top center: <text x="550" y="45" text-anchor="middle" font-size="22" font-weight="bold" fill="#1a1a2e">...</text>
+11. Use bright colors for diagram parts. Make diagram detailed and accurate.
+12. Ensure ALL text stays within x=0 to x=1100 and y=0 to y=700. Never let text overflow.
+13. Left labels: right-align at x=215. Right labels: left-align at x=885.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;
