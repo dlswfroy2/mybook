@@ -496,7 +496,13 @@ export default function WhiteboardPage() {
       }
     }, { passive: false });
 
-    clearBtn.onclick = () => { saveState(); drawBackground(); };
+    clearBtn.onclick = () => {
+      saveState();
+      drawBackground();
+      const oc = document.getElementById('svg-overlays');
+      if (oc) oc.innerHTML = '';
+      if (pagesData[currentBoardPage]) pagesData[currentBoardPage].overlays = [];
+    };
     undoBtn.onclick = () => {
       if (undoStack.length > 0) {
         redoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
@@ -514,6 +520,35 @@ export default function WhiteboardPage() {
     resetViewBtn.onclick = () => { currentScale = 1; panOffsetX = 0; panOffsetY = 0; updateCanvasTransform(); };
     toggleDarkBtn.onclick = () => { document.body.classList.toggle('dark-mode'); drawBackground(); };
 
+        const saveCurrentPageOverlays = () => {
+      const overlays: any[] = [];
+      document.querySelectorAll('.ai-diagram-overlay').forEach((w) => {
+        const svgEl = w.querySelector('svg');
+        if (svgEl) {
+          const rect = (w as HTMLElement).style;
+          const tb = w.querySelector('.ai-diagram-toolbar') as HTMLElement | null;
+          overlays.push({
+            svg: new XMLSerializer().serializeToString(svgEl),
+            left: rect.left || '40px',
+            top: rect.top || '60px',
+            stamped: tb ? tb.style.display === 'none' : false,
+          });
+        }
+      });
+      if (pagesData[currentBoardPage]) {
+        pagesData[currentBoardPage].overlays = overlays;
+      }
+    };
+
+    const restorePageOverlays = (pageIdx: number) => {
+      const oc = document.getElementById('svg-overlays');
+      if (oc) oc.innerHTML = '';
+      const pOverlays = pagesData[pageIdx]?.overlays || [];
+      pOverlays.forEach((ov: any) => {
+        createInteractiveDiagramOverlay(ov.svg, { left: ov.left, top: ov.top, stamped: ov.stamped });
+      });
+    };
+
     function renderTabs() {
       tabsWrapper.innerHTML = '';
       pagesData.forEach((_, idx) => {
@@ -521,6 +556,7 @@ export default function WhiteboardPage() {
         tab.className = `board-tab ${idx === currentBoardPage ? 'active' : ''}`;
         tab.textContent = `পেজ ${idx + 1}`;
         tab.onclick = () => {
+            saveCurrentPageOverlays();
             pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             currentBoardPage = idx;
             updateUIForPage();
@@ -531,8 +567,13 @@ export default function WhiteboardPage() {
 
     function updateUIForPage() {
         boardPageNumSpan.textContent = `পেজ: ${currentBoardPage + 1}/${pagesData.length}`;
-        if (pagesData[currentBoardPage].imageData) ctx.putImageData(pagesData[currentBoardPage].imageData, 0, 0);
-        else drawBackground();
+        if (pagesData[currentBoardPage].imageData) {
+          ctx.putImageData(pagesData[currentBoardPage].imageData, 0, 0);
+        } else {
+          drawBackground();
+        }
+
+        restorePageOverlays(currentBoardPage);
 
         if (pagesData[currentBoardPage].pdfDoc) {
             pdfControls.style.display = 'grid';
@@ -544,8 +585,9 @@ export default function WhiteboardPage() {
     }
 
     addBoardPageBtn.onclick = () => {
+        saveCurrentPageOverlays();
         pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        pagesData.push({ imageData: null, pdfDoc: null, pageNum: 1, numPages: 0 });
+        pagesData.push({ imageData: null, pdfDoc: null, pageNum: 1, numPages: 0, overlays: [] });
         currentBoardPage = pagesData.length - 1;
         updateUIForPage();
     };
@@ -1623,7 +1665,7 @@ export default function WhiteboardPage() {
     document.getElementById('stop-timer')!.onclick = () => clearInterval(timerInt);
     document.getElementById('reset-timer')!.onclick = () => { clearInterval(timerInt); document.getElementById('timer-display')!.textContent = '00:00'; };
 
-    // Realistic 3D Board Viewer (Generates 3D Relief / Realistic Depth Model of Current Board)
+    // Realistic 3D Board Viewer (Generates 3D Textured Model of Current Board)
     const view3dBtn = document.getElementById('view-3d-btn');
     const modal3d = document.getElementById('modal-3d');
     const close3d = document.getElementById('close-3d');
@@ -1632,11 +1674,53 @@ export default function WhiteboardPage() {
     let threeRenderer: any = null;
 
     if (view3dBtn && modal3d && close3d && container3d) {
-      view3dBtn.onclick = () => {
+      view3dBtn.onclick = async () => {
         modal3d.classList.remove('hidden');
         if (!(window as any).THREE) {
           container3d.innerHTML = '<div style="color:white;display:flex;align-items:center;justify-content:center;height:100%;font-weight:bold;">৩ডি লাইব্রেরি (Three.js) লোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</div>';
           return;
+        }
+
+        container3d.innerHTML = '<div style="color:#38bdf8;display:flex;align-items:center;justify-content:center;height:100%;font-weight:bold;gap:8px;"><span>🌀 ৩ডি মডেল প্রস্তুত হচ্ছে...</span></div>';
+
+        // 1. Snapshot board canvas
+        const fullRenderCanvas = document.createElement('canvas');
+        fullRenderCanvas.width = canvas.width;
+        fullRenderCanvas.height = canvas.height;
+        const frCtx = fullRenderCanvas.getContext('2d');
+        if (!frCtx) return;
+
+        // Draw whiteboard canvas
+        frCtx.drawImage(canvas, 0, 0);
+
+        // Draw any active SVG overlays asynchronously
+        const overlayWrappers = Array.from(document.querySelectorAll('.ai-diagram-overlay'));
+        for (const w of overlayWrappers) {
+          const svgEl = w.querySelector('svg');
+          if (svgEl) {
+            const wr = (w as HTMLElement).getBoundingClientRect();
+            const cr = canvas.getBoundingClientRect();
+            const sx = (wr.left - cr.left) / currentScale;
+            const sy = (wr.top - cr.top) / currentScale;
+            const dw = (svgEl.clientWidth || svgEl.getBoundingClientRect().width) / currentScale;
+            const dh = (svgEl.clientHeight || svgEl.getBoundingClientRect().height) / currentScale;
+            const ser = new XMLSerializer().serializeToString(svgEl);
+            const blob = new Blob([ser], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            await new Promise<void>((resolve) => {
+              const tempImg = new Image();
+              tempImg.onload = () => {
+                frCtx.drawImage(tempImg, sx, sy, dw, dh);
+                URL.revokeObjectURL(url);
+                resolve();
+              };
+              tempImg.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve();
+              };
+              tempImg.src = url;
+            });
+          }
         }
 
         container3d.innerHTML = '';
@@ -1645,115 +1729,74 @@ export default function WhiteboardPage() {
         const height = container3d.clientHeight || 440;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0b0f19);
+        scene.background = new THREE.Color(0x0f172a);
 
         const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        camera.position.set(0, 0, 4.2);
+        camera.position.set(0, 0, 4.4);
 
         threeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
         threeRenderer.setSize(width, height);
         threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        threeRenderer.shadowMap.enabled = true;
         container3d.appendChild(threeRenderer.domElement);
 
-        // Lighting for realistic 3D depth and shadows
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        // Studio lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
         scene.add(ambientLight);
 
-        const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
-        keyLight.position.set(4, 5, 6);
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        keyLight.position.set(3, 4, 5);
         scene.add(keyLight);
 
-        const rimLight = new THREE.DirectionalLight(0x6366f1, 0.9);
-        rimLight.position.set(-5, -3, 2);
-        scene.add(rimLight);
-
-        const fillLight = new THREE.PointLight(0x38bdf8, 0.7, 10);
-        fillLight.position.set(0, 3, 3);
+        const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.6);
+        fillLight.position.set(-4, -2, 3);
         scene.add(fillLight);
 
-        // Create current canvas snapshot texture & depth map
-        // Combine canvas and any active SVG overlays for full 3D rendering
-        const fullRenderCanvas = document.createElement('canvas');
-        fullRenderCanvas.width = canvas.width;
-        fullRenderCanvas.height = canvas.height;
-        const frCtx = fullRenderCanvas.getContext('2d');
-        if (frCtx) {
-          frCtx.drawImage(canvas, 0, 0);
-          document.querySelectorAll('.ai-diagram-overlay').forEach((w) => {
-            const svgEl = w.querySelector('svg');
-            if (svgEl) {
-              const wr = (w as HTMLElement).getBoundingClientRect();
-              const cr = canvas.getBoundingClientRect();
-              const sx = (wr.left - cr.left) / currentScale;
-              const sy = (wr.top - cr.top) / currentScale;
-              const dw = (svgEl.clientWidth || svgEl.getBoundingClientRect().width) / currentScale;
-              const dh = (svgEl.clientHeight || svgEl.getBoundingClientRect().height) / currentScale;
-              const ser = new XMLSerializer().serializeToString(svgEl);
-              const blob = new Blob([ser], { type: 'image/svg+xml;charset=utf-8' });
-              const url = URL.createObjectURL(blob);
-              const tempImg = new Image();
-              tempImg.src = url;
-              frCtx.drawImage(tempImg, sx, sy, dw, dh);
-            }
-          });
-        }
-
-        // Texture loader
+        // Texture
         const texture = new THREE.CanvasTexture(fullRenderCanvas);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
-
-        // Generate height/displacement canvas
-        const dispCanvas = document.createElement('canvas');
-        dispCanvas.width = 256;
-        dispCanvas.height = Math.round(256 * (canvas.height / canvas.width));
-        const dCtx = dispCanvas.getContext('2d');
-        if (dCtx && frCtx) {
-          dCtx.drawImage(fullRenderCanvas, 0, 0, dispCanvas.width, dispCanvas.height);
-          const imgData = dCtx.getImageData(0, 0, dispCanvas.width, dispCanvas.height);
-          const data = imgData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            // Invert lightness so darker lines/diagram pop out in 3D relief
-            const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-            const bump = 255 - brightness;
-            data[i] = bump;
-            data[i + 1] = bump;
-            data[i + 2] = bump;
-          }
-          dCtx.putImageData(imgData, 0, 0);
-        }
-        const displacementTexture = new THREE.CanvasTexture(dispCanvas);
+        texture.generateMipmaps = false;
 
         const aspect = canvas.width / canvas.height;
-        const planeW = 3.2;
-        const planeH = planeW / aspect;
+        const boardW = 3.3;
+        const boardH = boardW / aspect;
+        const depth = 0.14;
 
-        // 3D Realistic Relief Model (Plane with high segments for displacement)
-        const geometry = new THREE.PlaneGeometry(planeW, planeH, 128, 128);
-        const material = new THREE.MeshStandardMaterial({
-          map: texture,
-          displacementMap: displacementTexture,
-          displacementScale: 0.18,
+        // Front Face (Whiteboard drawing)
+        const frontGeo = new THREE.PlaneGeometry(boardW, boardH);
+        const frontMat = new THREE.MeshBasicMaterial({ map: texture });
+        const frontMesh = new THREE.Mesh(frontGeo, frontMat);
+        frontMesh.position.z = depth / 2 + 0.002;
+
+        // Realistic Whiteboard Body / Stand
+        const bodyGeo = new THREE.BoxGeometry(boardW + 0.08, boardH + 0.08, depth);
+        const bodyMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
           roughness: 0.35,
-          metalness: 0.1,
-          side: THREE.DoubleSide
+          metalness: 0.7
         });
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
 
-        const boardMesh = new THREE.Mesh(geometry, material);
-
-        // Add 3D frame border around the board
-        const frameGeo = new THREE.BoxGeometry(planeW + 0.12, planeH + 0.12, 0.08);
-        const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.8 });
+        // Shiny Bezel Trim around board
+        const frameGeo = new THREE.BoxGeometry(boardW + 0.14, boardH + 0.14, depth * 0.9);
+        const frameMat = new THREE.MeshStandardMaterial({
+          color: 0x4f46e5,
+          roughness: 0.25,
+          metalness: 0.85
+        });
         const frameMesh = new THREE.Mesh(frameGeo, frameMat);
-        frameMesh.position.z = -0.045;
 
         const main3DGroup = new THREE.Group();
-        main3DGroup.add(boardMesh);
+        main3DGroup.add(bodyMesh);
         main3DGroup.add(frameMesh);
+        main3DGroup.add(frontMesh);
+
+        // Tilt slightly towards camera for instant 3D look
+        main3DGroup.rotation.x = 0.12;
+        main3DGroup.rotation.y = -0.22;
         scene.add(main3DGroup);
 
-        // Interactive mouse & touch orbit rotation
+        // Mouse Drag to Rotate 360
         let isDragging3D = false;
         let prevMouseX = 0;
         let prevMouseY = 0;
@@ -1768,13 +1811,32 @@ export default function WhiteboardPage() {
           if (!isDragging3D) return;
           const deltaX = e.clientX - prevMouseX;
           const deltaY = e.clientY - prevMouseY;
-          main3DGroup.rotation.y += deltaX * 0.008;
-          main3DGroup.rotation.x += deltaY * 0.008;
+          main3DGroup.rotation.y += deltaX * 0.009;
+          main3DGroup.rotation.x += deltaY * 0.009;
           prevMouseX = e.clientX;
           prevMouseY = e.clientY;
         };
 
-        // Scroll zoom
+        // Touch drag
+        let prevTouchX = 0, prevTouchY = 0;
+        container3d.ontouchstart = (e: TouchEvent) => {
+          if (e.touches.length === 1) {
+            prevTouchX = e.touches[0].clientX;
+            prevTouchY = e.touches[0].clientY;
+          }
+        };
+        container3d.ontouchmove = (e: TouchEvent) => {
+          if (e.touches.length === 1) {
+            const dx = e.touches[0].clientX - prevTouchX;
+            const dy = e.touches[0].clientY - prevTouchY;
+            main3DGroup.rotation.y += dx * 0.009;
+            main3DGroup.rotation.x += dy * 0.009;
+            prevTouchX = e.touches[0].clientX;
+            prevTouchY = e.touches[0].clientY;
+          }
+        };
+
+        // Scroll wheel to Zoom
         container3d.onwheel = (e: WheelEvent) => {
           e.preventDefault();
           camera.position.z = Math.max(1.8, Math.min(8.0, camera.position.z + e.deltaY * 0.003));
@@ -2130,10 +2192,13 @@ export default function WhiteboardPage() {
               drawBackground();
               ctx.drawImage(img, 0, 0);
               saveState();
-              // Restore interactive SVG overlays
+              // Restore interactive SVG overlays to current page
+              if (pagesData[currentBoardPage]) {
+                pagesData[currentBoardPage].overlays = item.overlays || [];
+              }
+              const oc = document.getElementById('svg-overlays');
+              if (oc) oc.innerHTML = '';
               if (item.overlays && Array.isArray(item.overlays)) {
-                const oc = document.getElementById('svg-overlays');
-                if (oc) oc.innerHTML = '';
                 item.overlays.forEach((ov: any) => {
                   createInteractiveDiagramOverlay(ov.svg, { left: ov.left, top: ov.top, stamped: ov.stamped });
                 });
