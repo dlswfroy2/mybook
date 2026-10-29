@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 /**
  * @fileOverview High-power AI OCR and Academic Problem Solver for the Whiteboard module.
@@ -165,28 +165,32 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
   };
 }
 
-const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator for Bangladeshi students.
-The user will provide a name or description of a diagram. Create a detailed, accurate, and educational SVG diagram for it.
 
-STRICT RULES:
-1. Return ONLY valid SVG code - starting with <svg ...> and ending with </svg>.
-2. No markdown backticks, no explanation, no introduction - ONLY SVG code.
-3. SVG must have viewBox="0 0 1100 700" width="1100" height="700". This is MANDATORY.
-4. CRITICAL: Background must be WHITE. Always put this as the FIRST child: <rect width="1100" height="700" fill="#ffffff"/>
-5. LAYOUT - strictly follow these zones:
-   - LEFT LABEL ZONE: x = 0 to 220 (labels and text only, no diagram shapes here)
-   - CENTER DIAGRAM ZONE: x = 230 to 870 (draw the actual diagram here only)
-   - RIGHT LABEL ZONE: x = 880 to 1100 (labels and text only, no diagram shapes here)
-   - TOP ZONE: y = 0 to 60 (title only)
-   - BOTTOM ZONE: y = 620 to 700 (optional extra labels)
-6. NO text or label may appear inside the CENTER DIAGRAM ZONE (x=230 to x=870). All Bengali label text must be in the LEFT or RIGHT label zones only.
-7. Use <line> elements with marker-end="url(#arr)" to draw leader lines from label text to the diagram part. Leader lines cross from label zone into diagram zone.
-8. ALL labels MUST be in Bengali (Bangla script). Left-side labels use text-anchor="end". Right-side labels use text-anchor="start".
-9. In <defs>, define: <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#333"/></marker>
-10. Add Bengali title at top center: <text x="550" y="45" text-anchor="middle" font-size="22" font-weight="bold" fill="#1a1a2e">...</text>
-11. Use bright colors for diagram parts. Make diagram detailed and accurate.
-12. Ensure ALL text stays within x=0 to x=1100 and y=0 to y=700. Never let text overflow.
-13. Left labels: right-align at x=215. Right labels: left-align at x=885.`;
+const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator for Bangladeshi students.
+Draw a detailed, accurate, labeled educational SVG diagram based on the user's description.
+
+MANDATORY RULES:
+1. Output ONLY raw SVG code. No backticks, no explanations, no text before <svg or after </svg>.
+2. Use: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
+3. First child: <rect width="1200" height="720" fill="#ffffff"/>
+4. ZONE MAP:
+   LEFT LABELS  x=5 to x=245, text-anchor=end at x=243
+   DIAGRAM AREA x=260 to x=940 shapes only NO label text here
+   RIGHT LABELS x=955 to x=1195 text-anchor=start at x=957
+   TITLE ROW    y=5 to y=60
+5. Every label text is fully inside LEFT or RIGHT zone. No label crosses into diagram area.
+6. Long labels: use two tspan dy=18 lines or font-size=12. Max label width 230px.
+7. ARROWS: one line per label from label edge to EXACT part location inside diagram.
+   Left label: x1=244 y1=labelY x2=partX y2=partY
+   Right label: x1=956 y1=labelY x2=partX y2=partY
+   Each arrow points to its OWN specific part not all to center.
+8. In defs include marker id=arr markerWidth=7 markerHeight=7 refX=6 refY=3.5 orient=auto path d=M0,0 L7,3.5 L0,7 z fill=#444
+9. Arrow style: stroke=#444 stroke-width=1.3 fill=none marker-end=url(#arr)
+10. Label text: font-family=sans-serif font-size=13 fill=#1a1a2e font-weight=600
+11. Title: text x=600 y=48 text-anchor=middle font-size=22 font-weight=bold fill=#1a1a2e
+12. Use vivid colors for shapes. Make diagram scientifically accurate and detailed.
+13. Spread left labels evenly y from 100 to 650 and right labels evenly y from 100 to 650.
+14. NEVER place any element outside 0-1200 wide 0-720 tall boundary.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;

@@ -961,32 +961,76 @@ export default function WhiteboardPage() {
         );
         // Remove any dark fill on the root svg element
         safeSvg = safeSvg.replace(/style="[^"]*background\s*:\s*(#[01][0-9a-fA-F]{5}|black|#000000|rgb\(0,0,0\))[^"]*"/gi, 'style="background:#ffffff"');
-        // Render SVG onto canvas
-        const svgBlob = new Blob([safeSvg], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(svgBlob);
-        const img = new Image();
-        img.onload = () => {
-          saveState();
-          const maxW = canvas.width * 0.85;
-          const maxH = canvas.height * 0.85;
-          const naturalW = img.naturalWidth || 800;
-          const naturalH = img.naturalHeight || 600;
-          const scale = Math.min(maxW / naturalW, maxH / naturalH, 1);
-          const drawW = naturalW * scale;
-          const drawH = naturalH * scale;
-          const drawX = (canvas.width - drawW) / 2;
-          const drawY = (canvas.height - drawH) / 2;
-          ctx.drawImage(img, drawX, drawY, drawW, drawH);
-          saveState();
-          URL.revokeObjectURL(url);
-          aiDrawStatus.textContent = '✅ চিত্র বোর্ডে যোগ হয়েছে!';
-          setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 1800);
+        // Show as draggable overlay instead of burning to canvas
+        const overlayContainer = document.getElementById('svg-overlays')!;
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;cursor:move;z-index:55;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 4px 24px rgba(124,58,237,0.18);';
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = 'position:absolute;top:-34px;left:0;display:flex;gap:5px;background:#7c3aed;padding:4px 8px;border-radius:6px 6px 0 0;z-index:56;';
+        const stampBtn = document.createElement('button');
+        stampBtn.textContent = '📌 বোর্ডে স্থায়ী করুন';
+        stampBtn.style.cssText = 'padding:2px 10px;background:#22c55e;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap;';
+        const moveLabel = document.createElement('span');
+        moveLabel.textContent = '✥ টেনে সরান';
+        moveLabel.style.cssText = 'color:#fff;font-size:11px;font-weight:bold;padding:2px 6px;line-height:1.8;';
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️ মুছুন';
+        delBtn.style.cssText = 'padding:2px 8px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;';
+        toolbar.appendChild(moveLabel);
+        toolbar.appendChild(stampBtn);
+        toolbar.appendChild(delBtn);
+        const svgDiv = document.createElement('div');
+        svgDiv.innerHTML = safeSvg;
+        const svgEl = svgDiv.querySelector('svg');
+        if (svgEl) {
+          // Scale SVG to fit nicely on board
+          const maxW = Math.min(canvas.width * 0.80, 900);
+          svgEl.setAttribute('width', String(maxW));
+          svgEl.setAttribute('height', String(Math.round(maxW * 720 / 1200)));
+        }
+        svgDiv.style.pointerEvents = 'none';
+        wrapper.appendChild(toolbar);
+        wrapper.appendChild(svgDiv);
+        overlayContainer.appendChild(wrapper);
+        // Drag logic
+        let dragging = false, dsx = 0, dsy = 0, dex = 0, dey = 0;
+        wrapper.addEventListener('mousedown', (e: MouseEvent) => {
+          if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+          dragging = true; dsx = e.clientX; dsy = e.clientY;
+          dex = wrapper.offsetLeft; dey = wrapper.offsetTop;
+          e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e: MouseEvent) => {
+          if (!dragging) return;
+          wrapper.style.left = (dex + e.clientX - dsx) + 'px';
+          wrapper.style.top = (dey + e.clientY - dsy) + 'px';
+        });
+        document.addEventListener('mouseup', () => { dragging = false; });
+        // Delete
+        delBtn.onclick = () => wrapper.remove();
+        // Stamp to canvas permanently
+        stampBtn.onclick = () => {
+          const stamp = new Image();
+          const el = wrapper.querySelector('svg');
+          if (!el) { wrapper.remove(); return; }
+          const serialized = new XMLSerializer().serializeToString(el);
+          const blob2 = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+          const url2 = URL.createObjectURL(blob2);
+          stamp.onload = () => {
+            saveState();
+            const canvasRect = canvas.getBoundingClientRect();
+            const wrapRect = wrapper.getBoundingClientRect();
+            const sx = (wrapRect.left - canvasRect.left) / currentScale;
+            const sy = (wrapRect.top - canvasRect.top) / currentScale;
+            ctx.drawImage(stamp, sx, sy, stamp.naturalWidth, stamp.naturalHeight);
+            saveState();
+            URL.revokeObjectURL(url2);
+            wrapper.remove();
+          };
+          stamp.src = url2;
         };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          aiDrawStatus.textContent = '⚠️ SVG রেন্ডার করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।';
-        };
-        img.src = url;
+        aiDrawStatus.textContent = '✅ চিত্র তৈরি হয়েছে! টেনে সরান বা বোর্ডে স্থায়ী করুন।';
+        setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 2200);
       } catch (err: any) {
         aiDrawStatus.textContent = `⚠️ ${err?.message || 'অজানা সমস্যা হয়েছে।'}`;
       } finally {
@@ -1515,6 +1559,7 @@ export default function WhiteboardPage() {
             <div id="curtain-handle">🚪 পর্দা</div>
           </div>
           <div id="spotlight-overlay" className="hidden"></div>
+          <div id="svg-overlays" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 50 }}></div>
         </div>
       </div>
 
