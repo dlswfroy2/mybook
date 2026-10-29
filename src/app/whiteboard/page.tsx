@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
@@ -1710,6 +1710,114 @@ export default function WhiteboardPage() {
       drawBackground();
     }
 
+    // Saved Boards Library Logic
+    const savedBoardsBtn = document.getElementById('saved-boards-btn');
+    const savedBoardsModal = document.getElementById('saved-boards-modal');
+    const closeSavedBoardsBtn = document.getElementById('close-saved-boards-modal');
+    const saveCurrentToLibBtn = document.getElementById('save-current-to-library-btn');
+    const savedBoardsList = document.getElementById('saved-boards-list');
+
+    const STORAGE_KEY = 'mybook_saved_whiteboards_v1';
+
+    const getSavedBoards = (): any[] => {
+      try {
+        const d = localStorage.getItem(STORAGE_KEY);
+        return d ? JSON.parse(d) : [];
+      } catch { return []; }
+    };
+
+    const renderSavedBoardsList = () => {
+      if (!savedBoardsList) return;
+      const list = getSavedBoards();
+      if (list.length === 0) {
+        savedBoardsList.innerHTML = '<p class="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি। উপরের বাটন দিয়ে সংরক্ষণ করুন।</p>';
+        return;
+      }
+      savedBoardsList.innerHTML = '';
+      list.forEach((item, idx) => {
+        const itemCard = document.createElement('div');
+        itemCard.className = 'flex items-center justify-between p-3 border rounded-xl hover:border-amber-400 bg-slate-50/70 transition-all';
+        itemCard.innerHTML = `
+          <div class="flex items-center gap-3">
+            <img src="${item.thumb}" class="w-16 h-12 object-cover rounded-md border border-slate-300 shadow-sm" alt="Preview" />
+            <div>
+              <p class="font-bold text-xs text-slate-900">${item.title || 'হোয়াইটবোর্ড পেজ ' + (idx + 1)}</p>
+              <p class="text-[10px] text-slate-500">${new Date(item.date).toLocaleString('bn-BD')}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="load-board-btn px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition-colors" data-idx="${idx}">
+              📂 খুলুন
+            </button>
+            <button class="del-board-btn px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-md text-xs font-bold transition-colors" data-idx="${idx}">
+              🗑️
+            </button>
+          </div>
+        `;
+        savedBoardsList.appendChild(itemCard);
+      });
+
+      savedBoardsList.querySelectorAll('.load-board-btn').forEach(btn => {
+        (btn as HTMLElement).onclick = (e) => {
+          const idx = Number((e.currentTarget as HTMLElement).getAttribute('data-idx'));
+          const currentList = getSavedBoards();
+          const item = currentList[idx];
+          if (item && item.image) {
+            const img = new Image();
+            img.onload = () => {
+              saveState();
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              drawBackground();
+              ctx.drawImage(img, 0, 0);
+              saveState();
+              savedBoardsModal?.classList.add('hidden');
+            };
+            img.src = item.image;
+          }
+        };
+      });
+
+      savedBoardsList.querySelectorAll('.del-board-btn').forEach(btn => {
+        (btn as HTMLElement).onclick = (e) => {
+          const idx = Number((e.currentTarget as HTMLElement).getAttribute('data-idx'));
+          const currentList = getSavedBoards();
+          currentList.splice(idx, 1);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentList));
+          renderSavedBoardsList();
+        };
+      });
+    };
+
+    if (savedBoardsBtn && savedBoardsModal) {
+      savedBoardsBtn.onclick = () => {
+        savedBoardsModal.classList.toggle('hidden');
+        if (!savedBoardsModal.classList.contains('hidden')) {
+          renderSavedBoardsList();
+        }
+      };
+    }
+
+    if (closeSavedBoardsBtn && savedBoardsModal) {
+      closeSavedBoardsBtn.onclick = () => savedBoardsModal.classList.add('hidden');
+    }
+
+    if (saveCurrentToLibBtn) {
+      saveCurrentToLibBtn.onclick = () => {
+        const titlePrompt = prompt('পেজের একটি নাম দিন:', 'লেকচার ' + new Date().toLocaleDateString('bn-BD'));
+        if (!titlePrompt) return;
+        const currentList = getSavedBoards();
+        const dataUrl = canvas.toDataURL('image/png');
+        currentList.unshift({
+          title: titlePrompt.trim(),
+          image: dataUrl,
+          thumb: dataUrl,
+          date: new Date().toISOString()
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentList));
+        renderSavedBoardsList();
+        alert('✓ পেজটি সফলভাবে সংরক্ষণ করা হয়েছে!');
+      };
+    }
     renderTabs();
     isInitialized.current = true;
 
@@ -1743,10 +1851,24 @@ export default function WhiteboardPage() {
       <Script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" strategy="afterInteractive" onReady={handleScriptLoad} />
 
       <div id="browser-tabs-container" className="no-print">
+        <button
+          onClick={() => router.push('/')}
+          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1.5 shadow-md mr-1 border border-indigo-400"
+          title="হোম পোর্টালে ফিরে যান"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> পোর্টালে ফিরুন
+        </button>
         <div id="tabs-wrapper"></div>
         <button id="add-board-page" className="browser-plus-btn top-plus-btn" title="নতুন পেজ">➕</button>
         <button id="delete-board-page" className="browser-delete-btn" title="ডিলিট">🗑️</button>
         <button id="clear">🗑️ মুছুন</button>
+        <button
+          id="saved-boards-btn"
+          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black transition-colors flex items-center gap-1 shadow-md border border-amber-400 ml-1"
+          title="সংরক্ষিত হোয়াইটবোর্ড পেজগুলো দেখুন ও লোড করুন"
+        >
+          📁 সংরক্ষিত পেজ
+        </button>
         <div id="cloud-sync-status" className="sync-indicator">
           <span id="sync-icon">☁️</span> <span id="sync-text">অটো-সেভ সক্রিয়...</span>
         </div>
@@ -1929,9 +2051,27 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      <button className="back-home-btn no-print" onClick={() => router.push('/')}>
-        <ArrowLeft className="w-4 h-4" /> পোর্টালে ফিরুন
-      </button>
+
+      {/* Saved Boards Library Modal */}
+      <div id="saved-boards-modal" className="widget hidden flex flex-col p-0" style={{ width: '640px', maxWidth: '94vw', height: '520px', zIndex: 10025 }}>
+        <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 p-3.5 text-white flex justify-between items-center shadow-md">
+          <h4 className="font-black text-sm md:text-base flex items-center gap-2">
+            📁 সংরক্ষিত হোয়াইটবোর্ড পেজ লাইব্রেরি
+          </h4>
+          <button id="close-saved-boards-modal" className="text-white hover:text-amber-200 transition-colors p-1 rounded-lg text-lg font-bold">
+            ✕
+          </button>
+        </div>
+        <div className="p-3 bg-amber-50/50 border-b flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-700">বর্তমান পেজটি তালিকায় সেভ করে রাখতে ডানপাশের বাটন চাপুন:</span>
+          <button id="save-current-to-library-btn" className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold shadow-sm flex items-center gap-1">
+            💾 বর্তমান পেজ সেভ করুন
+          </button>
+        </div>
+        <div id="saved-boards-list" className="p-4 overflow-y-auto flex-1 bg-white text-slate-900 space-y-3">
+          <p className="text-center text-xs text-slate-500 py-8">কোনো সংরক্ষিত পেজ পাওয়া যায়নি।</p>
+        </div>
+      </div>
     </div>
   );
 }
