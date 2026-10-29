@@ -1331,7 +1331,181 @@ export default function WhiteboardPage() {
       }
     };
 
-    speechBtn.onclick = () => {
+    // ---- Reusable: create interactive diagram overlay (used on load too) ----
+    const createInteractiveDiagramOverlay = (svgString: string, opts?: { left?: string; top?: string; stamped?: boolean }) => {
+      const overlayContainer = document.getElementById('svg-overlays');
+      if (!overlayContainer) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ai-diagram-overlay';
+      wrapper.style.cssText = 'position:absolute;top:' + (opts?.top || '60px') + ';left:' + (opts?.left || '40px') + ';z-index:9999;border:2.5px dashed #7c3aed;border-radius:10px;background:rgba(255,255,255,0.95);overflow:visible;box-shadow:0 8px 32px rgba(124,58,237,0.18);';
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'ai-diagram-toolbar';
+      toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#4f46e5,#7c3aed);padding:6px 10px;cursor:grab;border-radius:8px 8px 0 0;gap:8px;';
+      const moveLabel = document.createElement('span');
+      moveLabel.style.cssText = 'color:#fff;font-size:11px;font-weight:bold;pointer-events:none;';
+      moveLabel.textContent = '☁️ AI চিত্র — টেনে সরান';
+      const btnGroup = document.createElement('div');
+      btnGroup.style.cssText = 'display:flex;gap:6px;';
+      const stampBtn = document.createElement('button');
+      stampBtn.innerHTML = '📌 স্থায়ী';
+      stampBtn.style.cssText = 'background:#22c55e;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:bold;cursor:pointer;';
+      const delBtn = document.createElement('button');
+      delBtn.innerHTML = '✕';
+      delBtn.style.cssText = 'background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:bold;cursor:pointer;';
+      btnGroup.appendChild(stampBtn);
+      btnGroup.appendChild(delBtn);
+      toolbar.appendChild(moveLabel);
+      toolbar.appendChild(btnGroup);
+
+      const svgDiv = document.createElement('div');
+      svgDiv.innerHTML = svgString;
+      const svgEl = svgDiv.querySelector('svg');
+      if (svgEl) {
+        const maxW = Math.min(canvas.width * 0.85, 1000);
+        svgEl.setAttribute('width', String(maxW));
+        svgEl.setAttribute('height', String(Math.round(maxW * 760 / 1300)));
+        svgEl.style.display = 'block';
+        svgEl.style.cursor = 'pointer';
+      }
+      svgDiv.style.pointerEvents = 'auto';
+
+      wrapper.appendChild(toolbar);
+      wrapper.appendChild(svgDiv);
+      overlayContainer.appendChild(wrapper);
+
+      // ---- Popup helper ----
+      const showPartDetailPopup2 = (partName: string, partDesc: string, clientX: number, clientY: number) => {
+        const popup = document.createElement('div');
+        popup.className = 'ai-part-detail-popup';
+        const canvasRect = canvas.getBoundingClientRect();
+        const popX = Math.max(20, Math.min(canvasRect.width - 340, (clientX - canvasRect.left) / currentScale + 15));
+        const popY = Math.max(20, Math.min(canvasRect.height - 240, (clientY - canvasRect.top) / currentScale + 15));
+        popup.style.cssText = `position:absolute;left:${popX}px;top:${popY}px;width:300px;background:#ffffff;border:2px solid #6366f1;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,0.25);z-index:10000;user-select:none;font-family:'Kalpurush',sans-serif;overflow:hidden;animation:fadeInWidget 0.2s ease-out;pointer-events:auto;`;
+        const popHeader = document.createElement('div');
+        popHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:8px 12px;cursor:grab;color:#fff;';
+        const popTitle = document.createElement('span');
+        popTitle.style.cssText = 'font-weight:bold;font-size:13px;';
+        popTitle.textContent = '🔍 ' + partName;
+        const popClose = document.createElement('button');
+        popClose.textContent = '✕';
+        popClose.style.cssText = 'background:rgba(255,255,255,0.2);border:none;color:#fff;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer;font-weight:bold;display:flex;align-items:center;justify-content:center;pointer-events:auto;';
+        popHeader.appendChild(popTitle);
+        popHeader.appendChild(popClose);
+        const popBody = document.createElement('div');
+        popBody.style.cssText = 'padding:12px;font-size:12px;line-height:1.7;color:#334155;max-height:160px;overflow-y:auto;';
+        popBody.textContent = partDesc;
+        const popFooter = document.createElement('div');
+        popFooter.style.cssText = 'display:flex;gap:8px;padding:8px 12px;border-top:1px solid #e2e8f0;background:#f8fafc;';
+        const popStampBtn = document.createElement('button');
+        popStampBtn.innerHTML = '📌 স্থায়ী করুন';
+        popStampBtn.style.cssText = 'flex:1;background:#4f46e5;color:#fff;border:none;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:bold;cursor:pointer;pointer-events:auto;';
+        const popCloseBtn = document.createElement('button');
+        popCloseBtn.textContent = '✕ বন্ধ';
+        popCloseBtn.style.cssText = 'flex:1;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;pointer-events:auto;';
+        popFooter.appendChild(popStampBtn);
+        popFooter.appendChild(popCloseBtn);
+        popup.appendChild(popHeader);
+        popup.appendChild(popBody);
+        popup.appendChild(popFooter);
+        const canvasContEl = document.getElementById('canvas-container');
+        if (canvasContEl) canvasContEl.appendChild(popup);
+        const closePopup = () => popup.remove();
+        popClose.onclick = closePopup;
+        popCloseBtn.onclick = closePopup;
+        popClose.onpointerdown = (e) => e.stopPropagation();
+        popCloseBtn.onpointerdown = (e) => e.stopPropagation();
+        const handlePopStamp = () => {
+          const popupImg = new Image();
+          popupImg.onload = () => {
+            const pr = popup.getBoundingClientRect();
+            const cr = canvas.getBoundingClientRect();
+            const px = (pr.left - cr.left) / currentScale;
+            const py = (pr.top - cr.top) / currentScale;
+            ctx.drawImage(popupImg, px, py, pr.width / currentScale, pr.height / currentScale);
+            saveState();
+          };
+          const html = popup.outerHTML;
+          const svg2 = '<svg xmlns="http://www.w3.org/2000/svg" width="' + popup.offsetWidth + '" height="' + popup.offsetHeight + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">' + html + '</div></foreignObject></svg>';
+          const blob3 = new Blob([svg2], { type: 'image/svg+xml;charset=utf-8' });
+          const url3 = URL.createObjectURL(blob3);
+          popupImg.src = url3;
+          closePopup();
+        };
+        popStampBtn.onclick = handlePopStamp;
+        popStampBtn.onpointerdown = (e) => e.stopPropagation();
+        // Drag popup
+        let popDragging = false, popSX = 0, poSY = 0, popLX = 0, popLY = 0;
+        popHeader.onpointerdown = (e) => { if ((e.target as HTMLElement).tagName === 'BUTTON') return; popDragging = true; popSX = e.clientX; poSY = e.clientY; popLX = popup.offsetLeft; popLY = popup.offsetTop; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); e.preventDefault(); };
+        popHeader.onpointermove = (e) => { if (!popDragging) return; popup.style.left = (popLX + (e.clientX - popSX) / currentScale) + 'px'; popup.style.top = (popLY + (e.clientY - poSY) / currentScale) + 'px'; };
+        popHeader.onpointerup = (e) => { popDragging = false; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {} };
+      };
+
+      // ---- Click detection ----
+      let isDragging2 = false;
+      const handleDiagramClick2 = (e: MouseEvent) => {
+        if (isDragging2) return;
+        const target = e.target as SVGElement;
+        if (!target) return;
+        const interactiveEl = target.closest('[data-name],[data-desc]') as SVGElement | null;
+        let name = interactiveEl?.getAttribute('data-name');
+        let desc = interactiveEl?.getAttribute('data-desc');
+        if (!name) {
+          const textEl = target.closest('text') as SVGTextElement | null;
+          if (textEl) {
+            name = textEl.textContent?.trim() || '';
+            if (name.includes('(')) name = name.split('(')[0].trim();
+            desc = textEl.getAttribute('data-desc') || (name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ অংশ।');
+          }
+        }
+        if (!name) {
+          const gEl = target.closest('g') as SVGGElement | null;
+          if (gEl) { name = gEl.getAttribute('data-name') || ''; desc = gEl.getAttribute('data-desc') || ''; }
+        }
+        if (name) { e.preventDefault(); e.stopPropagation(); if (!desc) desc = name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ অংশ।'; showPartDetailPopup2(name, desc, e.clientX, e.clientY); }
+      };
+      svgDiv.addEventListener('click', handleDiagramClick2, true);
+      svgDiv.addEventListener('pointerup', (e: PointerEvent) => { if (!isDragging2) handleDiagramClick2(e as unknown as MouseEvent); }, true);
+
+      // ---- Drag (toolbar only) ----
+      let startCX = 0, startCY = 0, startL = 0, startT = 0;
+      const onPD = (e: PointerEvent) => { if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) return; isDragging2 = true; startCX = e.clientX; startCY = e.clientY; startL = wrapper.offsetLeft; startT = wrapper.offsetTop; toolbar.style.cursor = 'grabbing'; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation(); };
+      const onPM = (e: PointerEvent) => { if (!isDragging2) return; wrapper.style.left = (startL + (e.clientX - startCX) / currentScale) + 'px'; wrapper.style.top = (startT + (e.clientY - startCY) / currentScale) + 'px'; };
+      const onPU = (e: PointerEvent) => { if (isDragging2) { isDragging2 = false; toolbar.style.cursor = 'grab'; try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {} } };
+      toolbar.addEventListener('pointerdown', onPD);
+      toolbar.addEventListener('pointermove', onPM);
+      toolbar.addEventListener('pointerup', onPU);
+
+      // ---- Delete ----
+      delBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); wrapper.remove(); };
+      delBtn.onpointerdown = (e) => e.stopPropagation();
+
+      // ---- Stamp to canvas ----
+      const handleStamp2 = (e: Event) => {
+        e.preventDefault(); e.stopPropagation();
+        toolbar.style.display = 'none';
+        wrapper.style.border = 'none'; wrapper.style.boxShadow = 'none'; wrapper.style.background = 'transparent'; wrapper.style.cursor = 'default';
+        const el2 = wrapper.querySelector('svg');
+        if (el2) {
+          const ser = new XMLSerializer().serializeToString(el2);
+          const blob2 = new Blob([ser], { type: 'image/svg+xml;charset=utf-8' });
+          const url2 = URL.createObjectURL(blob2);
+          const stamp2 = new Image();
+          stamp2.onload = () => { const cr = canvas.getBoundingClientRect(); const wr = wrapper.getBoundingClientRect(); ctx.drawImage(stamp2, (wr.left - cr.left) / currentScale, (wr.top - cr.top) / currentScale, (el2.clientWidth || el2.getBoundingClientRect().width) / currentScale, (el2.clientHeight || el2.getBoundingClientRect().height) / currentScale); saveState(); URL.revokeObjectURL(url2); };
+          stamp2.src = url2;
+        } else saveState();
+      };
+      stampBtn.onclick = handleStamp2;
+      stampBtn.onpointerdown = (e) => e.stopPropagation();
+
+      // If restored in stamped state, immediately hide toolbar
+      if (opts?.stamped) {
+        toolbar.style.display = 'none';
+        wrapper.style.border = 'none'; wrapper.style.boxShadow = 'none'; wrapper.style.background = 'transparent'; wrapper.style.cursor = 'default';
+      }
+    };
+
+        speechBtn.onclick = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) return alert('আপনার ব্রাউজার ভয়েস টাইপিং সাপোর্ট করে না। ক্রোম ব্রাউজার ব্যবহার করুন।');
         const rec = new SpeechRecognition();
@@ -1740,7 +1914,7 @@ export default function WhiteboardPage() {
       }
     };
 
-    const saveBoardToFirestore = async (item: { title: string; image: string; thumb: string }): Promise<string | null> => {
+    const saveBoardToFirestore = async (item: { title: string; image: string; thumb: string; overlays?: any[] }): Promise<string | null> => {
       try {
         const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
         const db = await getFirestoreDB();
@@ -1748,6 +1922,7 @@ export default function WhiteboardPage() {
           title: item.title,
           image: item.image,
           thumb: item.thumb,
+          overlays: item.overlays || [],
           createdAt: serverTimestamp(),
         });
         return ref.id;
@@ -1882,6 +2057,14 @@ export default function WhiteboardPage() {
               drawBackground();
               ctx.drawImage(img, 0, 0);
               saveState();
+              // Restore interactive SVG overlays
+              if (item.overlays && Array.isArray(item.overlays)) {
+                const oc = document.getElementById('svg-overlays');
+                if (oc) oc.innerHTML = '';
+                item.overlays.forEach((ov: any) => {
+                  createInteractiveDiagramOverlay(ov.svg, { left: ov.left, top: ov.top, stamped: ov.stamped });
+                });
+              }
               savedBoardsModal?.classList.add('hidden');
             };
             img.src = item.image;
@@ -1924,6 +2107,22 @@ export default function WhiteboardPage() {
         if (!titlePrompt) return;
 
         try {
+          // Collect active SVG overlays (for restoring click logic after load)
+          const overlays: any[] = [];
+          document.querySelectorAll('.ai-diagram-overlay').forEach((wrapper) => {
+            const svgEl = wrapper.querySelector('svg');
+            if (svgEl) {
+              const rect = (wrapper as HTMLElement).style;
+              const toolbar = wrapper.querySelector('.ai-diagram-toolbar') as HTMLElement | null;
+              overlays.push({
+                svg: new XMLSerializer().serializeToString(svgEl),
+                left: rect.left || '40px',
+                top: rect.top || '60px',
+                stamped: toolbar ? toolbar.style.display === 'none' : false,
+              });
+            }
+          });
+
           // Compress image to JPEG for Firestore (keep under 900KB)
           const compCanvas = document.createElement('canvas');
           compCanvas.width = canvas.width;
@@ -1947,6 +2146,7 @@ export default function WhiteboardPage() {
             title: titlePrompt.trim(),
             image: imageData,
             thumb: thumbData,
+            overlays,
           });
 
           // 2. Also save to IndexedDB (offline fallback)
@@ -1956,6 +2156,7 @@ export default function WhiteboardPage() {
             image: imageData,
             thumb: thumbData,
             date: new Date().toISOString(),
+            overlays,
           });
 
           renderSavedBoardsList();
