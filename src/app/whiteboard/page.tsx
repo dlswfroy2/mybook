@@ -1812,7 +1812,7 @@ export default function WhiteboardPage() {
             <div id="curtain-handle">🚪 পর্দা</div>
           </div>
           <div id="spotlight-overlay" className="hidden"></div>
-          <div id="svg-overlays" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'auto', zIndex: 50 }}></div>
+          <div id="svg-overlays" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 50 }}></div>
         </div>
       </div>
 
