@@ -167,30 +167,38 @@ export async function solveWhiteboardProblem(imageDataUri: string, userInstructi
 
 
 const DIAGRAM_PROMPT = `You are a world-class SVG diagram expert and educational illustrator for Bangladeshi students.
-Draw a detailed, accurate, labeled educational SVG diagram based on the user's description.
+Draw a detailed, accurate, beautifully labeled educational SVG diagram based on the user's description.
 
 MANDATORY RULES:
 1. Output ONLY raw SVG code. No backticks, no explanations, no text before <svg or after </svg>.
 2. Use: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
 3. First child: <rect width="1200" height="720" fill="#ffffff"/>
 4. ZONE MAP:
-   LEFT LABELS  x=5 to x=245, text-anchor=end at x=243
-   DIAGRAM AREA x=260 to x=940 shapes only NO label text here
-   RIGHT LABELS x=955 to x=1195 text-anchor=start at x=957
-   TITLE ROW    y=5 to y=60
-5. Every label text is fully inside LEFT or RIGHT zone. No label crosses into diagram area.
-6. Long labels: use two tspan dy=18 lines or font-size=12. Max label width 230px.
-7. ARROWS: one line per label from label edge to EXACT part location inside diagram.
-   Left label: x1=244 y1=labelY x2=partX y2=partY
-   Right label: x1=956 y1=labelY x2=partX y2=partY
-   Each arrow points to its OWN specific part not all to center.
-8. In defs include marker id=arr markerWidth=7 markerHeight=7 refX=6 refY=3.5 orient=auto path d=M0,0 L7,3.5 L0,7 z fill=#444
-9. Arrow style: stroke=#444 stroke-width=1.3 fill=none marker-end=url(#arr)
-10. Label text: font-family=sans-serif font-size=13 fill=#1a1a2e font-weight=600
-11. Title: text x=600 y=48 text-anchor=middle font-size=22 font-weight=bold fill=#1a1a2e
-12. Use vivid colors for shapes. Make diagram scientifically accurate and detailed.
-13. Spread left labels evenly y from 100 to 650 and right labels evenly y from 100 to 650.
-14. NEVER place any element outside 0-1200 wide 0-720 tall boundary.`;
+   LEFT LABELS  : x=5 to x=245, text-anchor="end" at x=243
+   DIAGRAM AREA : x=260 to x=940 shapes only! Absolutely NO label text inside diagram area.
+   RIGHT LABELS : x=955 to x=1195, text-anchor="start" at x=957
+   TITLE ROW    : y=5 to y=60
+5. LABEL-ARROW NON-CROSSING RULE (STRICT):
+   - Sort parts that belong on the LEFT by their Y position from TOP to BOTTOM.
+   - Corresponding left labels MUST be ordered from top to bottom (y=110, y=170, y=230, etc.) matching their target parts' top-to-bottom order.
+   - Sort parts that belong on the RIGHT by their Y position from TOP to BOTTOM.
+   - Corresponding right labels MUST be ordered from top to bottom (y=110, y=170, y=230, etc.) matching their target parts' top-to-bottom order.
+   - ZERO INTERSECTING ARROWS: Never cross leader lines/arrows! An upper label must always point to a higher or equal part; a lower label must point to a lower part. Lines must never overlap, cross, or cut across each other.
+   - Parts located on the left half of the diagram (x < 600) MUST be labeled from the LEFT margin.
+   - Parts located on the right half of the diagram (x >= 600) MUST be labeled from the RIGHT margin.
+6. Long labels: use two <tspan> lines (dy="18") or font-size="12". Max label width 230px. Ensure labels never get clipped.
+7. ARROWS: one <line> per label from label edge to EXACT part location inside diagram.
+   - Left label: x1=244 y1=labelY x2=partX y2=partY
+   - Right label: x1=956 y1=labelY x2=partX y2=partY
+   - Arrow style: stroke="#475569" stroke-width="1.3" fill="none" marker-end="url(#arr)"
+8. In <defs> include:
+   <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+     <path d="M0,0 L7,3.5 L0,7 z" fill="#475569"/>
+   </marker>
+9. Label text: font-family="sans-serif" font-size="13" fill="#0f172a" font-weight="600"
+10. Title: <text x="600" y="48" text-anchor="middle" font-size="22" font-weight="bold" fill="#0f172a">BENGALI TITLE</text>
+11. Use clear, vibrant colors for shapes. Make diagram scientifically authentic, neat and highly legible.
+12. NEVER place any element outside the 0-1200 width and 0-720 height bounds.`;
 
 export interface WhiteboardDiagramResult {
   success: boolean;

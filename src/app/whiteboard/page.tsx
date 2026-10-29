@@ -954,13 +954,66 @@ export default function WhiteboardPage() {
           aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
           return;
         }
-        // Force white background: inject a white rect at the start of SVG body
-        let safeSvg = result.svg.replace(
-          /(<svg[^>]*>)/i,
-          '$1<rect width="100%" height="100%" fill="#ffffff"/>'
-        );
-        // Remove any dark fill on the root svg element
-        safeSvg = safeSvg.replace(/style="[^"]*background\s*:\s*(#[01][0-9a-fA-F]{5}|black|#000000|rgb\(0,0,0\))[^"]*"/gi, 'style="background:#ffffff"');
+        // Force white background
+        let safeSvg = result.svg.replace(/(<svg[^>]*>)/i, '$1<rect width="100%" height="100%" fill="#ffffff"/>');
+
+        // POST-PROCESSING: Force all label <text> elements inside diagram zone (x=260..940) out to margins
+        try {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(safeSvg, 'image/svg+xml');
+          const svgRoot = svgDoc.documentElement;
+          // Ensure SVG dimensions are set correctly
+          svgRoot.setAttribute('width', '1200');
+          svgRoot.setAttribute('height', '720');
+          if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1200 720');
+
+          const DIAG_LEFT = 260, DIAG_RIGHT = 940, SVG_W = 1200;
+          let leftY = 110, rightY = 110;
+          const leftStep = 58, rightStep = 58;
+
+          // Collect all text/tspan not inside defs
+          const allTexts = Array.from(svgRoot.querySelectorAll('text'));
+          allTexts.forEach(t => {
+            // Skip title (y < 65)
+            const ty = parseFloat(t.getAttribute('y') || '0');
+            if (ty < 65) return; // keep title in place
+
+            const tx = parseFloat(t.getAttribute('x') || '0');
+            // If x is inside diagram zone → move to margin
+            if (tx >= DIAG_LEFT && tx <= DIAG_RIGHT) {
+              const isLeftSide = tx < (DIAG_LEFT + DIAG_RIGHT) / 2;
+              if (isLeftSide) {
+                t.setAttribute('x', '243');
+                t.setAttribute('text-anchor', 'end');
+                t.setAttribute('y', String(leftY));
+                // Fix all tspan x too
+                t.querySelectorAll('tspan').forEach(ts => { ts.setAttribute('x', '243'); });
+                leftY += leftStep;
+              } else {
+                t.setAttribute('x', '957');
+                t.setAttribute('text-anchor', 'start');
+                t.setAttribute('y', String(rightY));
+                t.querySelectorAll('tspan').forEach(ts => { ts.setAttribute('x', '957'); });
+                rightY += rightStep;
+              }
+            }
+          });
+
+          // Also fix any lines/arrows whose x1 or x2 lands outside SVG bounds
+          svgRoot.querySelectorAll('line').forEach(ln => {
+            const x1 = parseFloat(ln.getAttribute('x1') || '0');
+            const x2 = parseFloat(ln.getAttribute('x2') || '0');
+            if (x1 < 0) ln.setAttribute('x1', '1');
+            if (x2 > SVG_W) ln.setAttribute('x2', String(SVG_W - 1));
+            if (x1 > SVG_W) ln.setAttribute('x1', String(SVG_W - 1));
+            if (x2 < 0) ln.setAttribute('x2', '1');
+          });
+
+          safeSvg = new XMLSerializer().serializeToString(svgRoot);
+        } catch (parseErr) {
+          console.warn('SVG post-processing failed, using raw SVG:', parseErr);
+        }
+
         // Show as draggable overlay instead of burning to canvas
         const overlayContainer = document.getElementById('svg-overlays')!;
         const wrapper = document.createElement('div');
