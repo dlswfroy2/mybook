@@ -1050,7 +1050,21 @@ export default function WhiteboardPage() {
         const popCloseBtn = document.createElement('button');
         popCloseBtn.textContent = '✕ বন্ধ';
         popCloseBtn.style.cssText = 'flex:1;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;pointer-events:auto;';
+        const popVoiceBtn = document.createElement('button');
+        popVoiceBtn.innerHTML = '🔊 শুনুন';
+        popVoiceBtn.style.cssText = 'flex:1;background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:bold;cursor:pointer;pointer-events:auto;';
+        popVoiceBtn.onclick = () => {
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(partName + '। ' + partDesc);
+            utt.lang = 'bn-BD';
+            utt.rate = 0.9;
+            window.speechSynthesis.speak(utt);
+          }
+        };
+        popVoiceBtn.onpointerdown = (e) => e.stopPropagation();
         popFooter.appendChild(popStampBtn);
+        popFooter.appendChild(popVoiceBtn);
         popFooter.appendChild(popCloseBtn);
         popup.appendChild(popHeader);
         popup.appendChild(popBody);
@@ -1294,10 +1308,17 @@ export default function WhiteboardPage() {
               } else {
                 stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
               }
-              mediaRecorder = new MediaRecorder(stream);
+              let combinedStream = stream;
+              try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const tracks = [...stream.getVideoTracks(), ...audioStream.getAudioTracks()];
+                combinedStream = new MediaStream(tracks);
+              } catch { /* মাইক্রোফোন না থাকলে শুধু ভিডিও */ }
+              mediaRecorder = new MediaRecorder(combinedStream);
               chunks = [];
               mediaRecorder.ondataavailable = (e: any) => chunks.push(e.data);
               mediaRecorder.onstop = () => {
+                  combinedStream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
                   const blob = new Blob(chunks, { type: 'video/webm' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url; a.download = 'whiteboard_recording.webm'; a.click();
@@ -1342,6 +1363,51 @@ export default function WhiteboardPage() {
         }
         mathWidget.classList.add('hidden');
     };
+
+    const graphPlotBtn = document.getElementById('graph-plot-btn');
+    if (graphPlotBtn) {
+      graphPlotBtn.onclick = () => {
+        const rawExpr = mathLatexInput.value.trim();
+        const expr = rawExpr.replace(/^(y|f\(x\))\s*=\s*/i, '');
+        if (!expr) { alert('একটি সমীকরণ লিখুন (যেমন: y = x^2 বা y = sin(x))'); return; }
+        const W = canvas.width, H = canvas.height;
+        const cx = W / 2, cy = H / 2, scale = 40;
+        ctx.save();
+        ctx.strokeStyle = '#334155'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 0.5;
+        for (let gx = cx % scale; gx < W; gx += scale) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+        for (let gy = cy % scale; gy < H; gy += scale) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+        ctx.fillStyle = '#475569'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        for (let i = -Math.floor(cx/scale); i <= Math.floor((W-cx)/scale); i++) {
+          if (i !== 0) ctx.fillText(String(i), cx + i*scale, cy + 12);
+        }
+        ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2; ctx.beginPath();
+        let first = true;
+        const evalFn = (xVal: number): number => {
+          try {
+            const clean = expr
+              .replace(/sin/g, 'Math.sin').replace(/cos/g, 'Math.cos')
+              .replace(/tan/g, 'Math.tan').replace(/sqrt/g, 'Math.sqrt')
+              .replace(/abs/g, 'Math.abs').replace(/log/g, 'Math.log')
+              .replace(/pi/gi, 'Math.PI').replace(/\\^/g, '**')
+              .replace(/x/g, String(xVal));
+            return Function('"use strict"; return (' + clean + ')')() as number;
+          } catch { return NaN; }
+        };
+        for (let px = 0; px < W; px++) {
+          const xVal = (px - cx) / scale;
+          const yVal = evalFn(xVal);
+          if (isNaN(yVal) || !isFinite(yVal)) { first = true; continue; }
+          const pyCoord = cy - yVal * scale;
+          if (first) { ctx.moveTo(px, pyCoord); first = false; } else ctx.lineTo(px, pyCoord);
+        }
+        ctx.stroke(); ctx.restore();
+        saveState();
+        mathWidget.classList.add('hidden');
+      };
+    }
 
     calcBtn.onclick = () => calcWidget.classList.toggle('hidden');
     const calcScreen = document.getElementById('calc-screen') as HTMLInputElement;
@@ -1600,14 +1666,29 @@ export default function WhiteboardPage() {
     fullscreenBtn.onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
 
     saveImgBtn.onclick = () => { const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'whiteboard.png'; a.click(); };
-    savePdfBtn.onclick = () => {
+    savePdfBtn.onclick = async () => {
         if (!(window as any).jspdf) {
           alert('PDF জেনারেটর প্রস্তুত হচ্ছে...');
           return;
         }
+        pagesData[currentBoardPage].imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pdf = new (window as any).jspdf.jsPDF('l', 'px', [canvas.width, canvas.height]);
-        pdf.addImage(canvas.toDataURL(), 'PNG', 0, 0, canvas.width, canvas.height);
-        pdf.save('whiteboard.pdf');
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = canvas.width; tmpCanvas.height = canvas.height;
+        const tmpCtx = tmpCanvas.getContext('2d')!;
+        for (let pi = 0; pi < pagesData.length; pi++) {
+          if (pi > 0) pdf.addPage([canvas.width, canvas.height], 'l');
+          tmpCtx.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+          tmpCtx.fillStyle = '#ffffff'; tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+          if (pagesData[pi].imageData) tmpCtx.putImageData(pagesData[pi].imageData, 0, 0);
+          tmpCtx.fillStyle = 'rgba(79,70,229,0.08)';
+          tmpCtx.fillRect(0, 0, tmpCanvas.width, 28);
+          tmpCtx.fillStyle = '#4f46e5';
+          tmpCtx.font = 'bold 13px Kalpurush, sans-serif';
+          tmpCtx.fillText('\ud83d\udcd2 স্মার্ট হোয়ার্টবোর্ড  |  পেজ ' + (pi + 1) + ' / ' + pagesData.length, 10, 18);
+          pdf.addImage(tmpCanvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+        }
+        pdf.save('whiteboard_all_pages.pdf');
     };
     
     // PDF Upload
@@ -2221,6 +2302,7 @@ export default function WhiteboardPage() {
         <input type="text" id="math-latex-input" placeholder="LaTeX লিখুন (যেমন: x^2 + y^2 = r^2)..." style={{ width: '100%', padding:'5px', color:'black' }} />
         <div id="math-preview" style={{ background: '#fff', color: '#000', padding: '10px', minHeight: '40px', marginTop: '5px', borderRadius:'4px' }}></div>
         <button id="insert-math-btn" style={{ width: '100%', marginTop: '5px', background:'#27ae60', color:'white', padding:'8px', borderRadius:'6px' }}>বোর্ডে যোগ করুন</button>
+        <button id="graph-plot-btn" style={{ width: '100%', marginTop: '5px', background:'#2563eb', color:'white', padding:'8px', borderRadius:'6px' }}>📈 গ্রাফ আঁকুন</button>
       </div>
 
       <div id="timer-widget" className="widget hidden">
@@ -2243,6 +2325,14 @@ export default function WhiteboardPage() {
           <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', fontWeight: 600 }}>
             যেকোনো চিত্রের নাম বা বর্ণনা লিখুন (বাংলা বা ইংরেজিতে)
           </p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'5px', marginBottom:'8px' }}>
+            {['উদ্ভিদ কোষ','প্রাণী কোষ','মানব হৃদপিণ্ড','পরমাণুর গঠন','DNA গঠন','পানি চক্র'].map((preset) => (
+              <button key={preset} onClick={() => {
+                const inp = document.getElementById('ai-draw-input') as HTMLTextAreaElement;
+                if (inp) { inp.value = preset; inp.dispatchEvent(new Event('input')); }
+              }} style={{ padding:'3px 8px', background:'#ede9fe', color:'#5b21b6', border:'1px solid #c4b5fd', borderRadius:'12px', fontSize:'10px', fontWeight:'bold', cursor:'pointer' }}>{preset}</button>
+            ))}
+          </div>
           <textarea
             id="ai-draw-input"
             placeholder="উদাহরণ: মানব হৃদয়ের চিত্র, বৈদ্যুতিক বর্তনী, পানি চক্র, সমকোণী ত্রিভুজ, DNA গঠন..."
