@@ -270,7 +270,7 @@ export default function WhiteboardPage() {
         const clickY = coords.y;
 
         const existingInput = document.querySelector('.canvas-text-input');
-        if (existingInput) existingInput.remove();
+        if (existingInput && existingInput.parentNode) existingInput.parentNode.removeChild(existingInput);
 
         const input = document.createElement('input');
         input.type = 'text';
@@ -300,11 +300,13 @@ export default function WhiteboardPage() {
                 ctx.textBaseline = 'middle';
                 ctx.fillText(text, clickX, clickY);
             }
-            input.remove();
+            if (input.parentNode) input.parentNode.removeChild(input);
         };
 
-        input.addEventListener('keydown', (evt) => { if (evt.key === 'Enter') finalize(); });
-        input.addEventListener('blur', finalize);
+        let _finalized = false;
+        const safeFinalize = () => { if (_finalized) return; _finalized = true; finalize(); };
+        input.addEventListener('keydown', (evt) => { if (evt.key === 'Enter') { evt.preventDefault(); safeFinalize(); } });
+        input.addEventListener('blur', safeFinalize);
     }
 
     const toolBtnHandler = (e: Event) => {
