@@ -978,401 +978,6 @@ export default function WhiteboardPage() {
 
     closeAiBtn.onclick = () => aiModal.classList.add('hidden');
 
-    // AI Diagram Draw: Generate SVG from text description and render on canvas
-    aiDrawBtn.onclick = () => aiDrawWidget.classList.toggle('hidden');
-
-    const aiDrawDoBtn = document.getElementById('ai-draw-do-btn')!;
-    const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
-    const aiDrawStatus = document.getElementById('ai-draw-status')!;
-
-    // Allow Enter key to trigger AI diagram generation (works on both keydown and keypress)
-    const triggerAiDraw = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        aiDrawDoBtn.click();
-      }
-    };
-    aiDrawInput.addEventListener('keydown', triggerAiDraw);
-    aiDrawInput.addEventListener('keypress', triggerAiDraw);
-
-    aiDrawDoBtn.onclick = async () => {
-      const desc = aiDrawInput.value.trim();
-      if (!desc) { aiDrawStatus.textContent = '⚠️ চিত্রের নাম বা বর্ণনা লিখুন।'; return; }
-      aiDrawDoBtn.textContent = '⏳ তৈরি হচ্ছে...';
-      aiDrawDoBtn.setAttribute('disabled', 'true');
-      aiDrawStatus.textContent = '🤖 AI চিত্র তৈরি করছে, অনুগ্রহ করে অপেক্ষা করুন...';
-      try {
-        const result = await generateWhiteboardDiagram(desc);
-        if (!result.success || !result.svg) {
-          aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
-          return;
-        }
-        // Ensure SVG dimensions and viewbox
-        let safeSvg = result.svg;
-        try {
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(safeSvg, 'image/svg+xml');
-          const svgRoot = svgDoc.documentElement;
-          svgRoot.setAttribute('width', '1300');
-          svgRoot.setAttribute('height', '760');
-          if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1300 760');
-          safeSvg = new XMLSerializer().serializeToString(svgRoot);
-        } catch (e) {
-          console.warn('SVG parse error:', e);
-        }
-
-        // Show as draggable overlay instead of burning to canvas
-        const overlayContainer = document.getElementById('svg-overlays')!;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'ai-diagram-overlay';
-        wrapper.style.cssText = 'position:absolute;top:60px;left:40px;z-index:9999;border:2.5px dashed #7c3aed;border-radius:10px;background:#fff;box-shadow:0 8px 30px rgba(124,58,237,0.22);user-select:none;pointer-events:auto;';
-
-        const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #7c3aed, #4f46e5);padding:6px 12px;border-radius:8px 8px 0 0;cursor:grab;pointer-events:auto;user-select:none;';
-
-        const moveLabel = document.createElement('span');
-        moveLabel.textContent = '✥ টেনে সরান';
-        moveLabel.style.cssText = 'color:#ffffff;font-size:13px;font-weight:bold;cursor:grab;display:flex;align-items:center;gap:4px;';
-
-        const btnGroup = document.createElement('div');
-        btnGroup.style.cssText = 'display:flex;align-items:center;gap:8px;pointer-events:auto;';
-
-        const stampBtn = document.createElement('button');
-        stampBtn.type = 'button';
-        stampBtn.textContent = '📌 বোর্ডে স্থায়ী করুন';
-        stampBtn.style.cssText = 'padding:6px 14px;background:#16a34a;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.25);pointer-events:auto;';
-
-        const delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.textContent = '🗑️ মুছুন';
-        delBtn.style.cssText = 'padding:6px 12px;background:#dc2626;color:#ffffff;border:none;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.25);pointer-events:auto;';
-
-        btnGroup.appendChild(stampBtn);
-        btnGroup.appendChild(delBtn);
-        toolbar.appendChild(moveLabel);
-        toolbar.appendChild(btnGroup);
-
-        const svgDiv = document.createElement('div');
-        svgDiv.innerHTML = safeSvg;
-        const svgEl = svgDiv.querySelector('svg');
-        if (svgEl) {
-          const maxW = Math.min(canvas.width * 0.85, 1000);
-          svgEl.setAttribute('width', String(maxW));
-          svgEl.setAttribute('height', String(Math.round(maxW * 760 / 1300)));
-          svgEl.style.display = 'block';
-          svgEl.style.cursor = 'pointer';
-        }
-        svgDiv.style.pointerEvents = 'auto';
-
-        wrapper.appendChild(toolbar);
-        wrapper.appendChild(svgDiv);
-        overlayContainer.appendChild(wrapper);
-
-        // Helper: Create draggable & stampable detail popup
-        const showPartDetailPopup = (partName: string, partDesc: string, clientX: number, clientY: number) => {
-          const popup = document.createElement('div');
-          popup.className = 'ai-part-detail-popup';
-          const canvasRect = canvas.getBoundingClientRect();
-          const popX = Math.max(20, Math.min(canvasRect.width - 340, (clientX - canvasRect.left) / currentScale + 15));
-          const popY = Math.max(20, Math.min(canvasRect.height - 240, (clientY - canvasRect.top) / currentScale + 15));
-
-          popup.style.cssText = `position:absolute;left:${popX}px;top:${popY}px;width:300px;background:#ffffff;border:2px solid #6366f1;border-radius:12px;box-shadow:0 12px 35px rgba(0,0,0,0.25);z-index:10000;user-select:none;font-family:'Kalpurush',sans-serif;overflow:hidden;animation:fadeInWidget 0.2s ease-out;pointer-events:auto;`;
-
-          const popHeader = document.createElement('div');
-          popHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg, #4f46e5, #7c3aed);padding:8px 12px;cursor:grab;color:#ffffff;';
-
-          const popTitle = document.createElement('span');
-          popTitle.style.cssText = 'font-weight:bold;font-size:13px;display:flex;align-items:center;gap:6px;';
-          popTitle.innerHTML = `🔍 <span>${partName}</span>`;
-
-          const popBtns = document.createElement('div');
-          popBtns.style.cssText = 'display:flex;align-items:center;gap:6px;';
-
-          const popStampBtn = document.createElement('button');
-          popStampBtn.type = 'button';
-          popStampBtn.title = 'ক্যানভাসে স্থায়ীভাবে যুক্ত করুন';
-          popStampBtn.textContent = '📌 স্থায়ী';
-          popStampBtn.style.cssText = 'padding:2px 8px;background:#16a34a;color:#ffffff;border:none;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;';
-
-          const popCloseBtn = document.createElement('button');
-          popCloseBtn.type = 'button';
-          popCloseBtn.title = 'বন্ধ করুন';
-          popCloseBtn.textContent = '✕';
-          popCloseBtn.style.cssText = 'padding:2px 6px;background:#dc2626;color:#ffffff;border:none;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;line-height:1;';
-
-          popBtns.appendChild(popStampBtn);
-          popBtns.appendChild(popCloseBtn);
-          popHeader.appendChild(popTitle);
-          popHeader.appendChild(popBtns);
-
-          const popBody = document.createElement('div');
-          popBody.style.cssText = 'padding:12px 14px;background:#f8fafc;color:#0f172a;font-size:12px;line-height:1.6;font-weight:500;';
-          popBody.innerHTML = `
-            <div style="font-weight:bold;color:#312e81;font-size:13px;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
-              ${partName}
-            </div>
-            <div style="color:#334155;text-align:justify;">
-              ${partDesc}
-            </div>
-          `;
-
-          popup.appendChild(popHeader);
-          popup.appendChild(popBody);
-          overlayContainer.appendChild(popup);
-
-          // Drag logic for the detail popup
-          let popDragging = false;
-          let pStartX = 0, pStartY = 0;
-          let pStartLeft = 0, pStartTop = 0;
-
-          const onPopPointerDown = (e: PointerEvent) => {
-            if ((e.target as HTMLElement).tagName === 'BUTTON') return;
-            popDragging = true;
-            pStartX = e.clientX;
-            pStartY = e.clientY;
-            pStartLeft = popup.offsetLeft;
-            pStartTop = popup.offsetTop;
-            popHeader.style.cursor = 'grabbing';
-            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            e.stopPropagation();
-          };
-
-          const onPopPointerMove = (e: PointerEvent) => {
-            if (!popDragging) return;
-            const dx = (e.clientX - pStartX) / currentScale;
-            const dy = (e.clientY - pStartY) / currentScale;
-            popup.style.left = (pStartLeft + dx) + 'px';
-            popup.style.top = (pStartTop + dy) + 'px';
-          };
-
-          const onPopPointerUp = (e: PointerEvent) => {
-            if (popDragging) {
-              popDragging = false;
-              popHeader.style.cursor = 'grab';
-              try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
-            }
-          };
-
-          popHeader.addEventListener('pointerdown', onPopPointerDown);
-          popHeader.addEventListener('pointermove', onPopPointerMove);
-          popHeader.addEventListener('pointerup', onPopPointerUp);
-          popHeader.addEventListener('pointercancel', onPopPointerUp);
-
-          // Close popup
-          const handlePopClose = (e: Event) => {
-            e.preventDefault();
-            e.stopPropagation();
-            popup.remove();
-          };
-          popCloseBtn.addEventListener('click', handlePopClose);
-          popCloseBtn.addEventListener('pointerup', handlePopClose);
-          popCloseBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-          popCloseBtn.addEventListener('mousedown', (e) => e.stopPropagation());
-
-          // Stamp popup text as a clean card onto whiteboard canvas
-          const handlePopStamp = (e: Event) => {
-            e.preventDefault();
-            e.stopPropagation();
-            saveState();
-            const pRect = popup.getBoundingClientRect();
-            const cRect = canvas.getBoundingClientRect();
-            const sx = (pRect.left - cRect.left) / currentScale;
-            const sy = (pRect.top - cRect.top) / currentScale;
-            const cardW = 280;
-            const cardH = 140;
-
-            // Draw card background
-            ctx.save();
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#4f46e5';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect ? ctx.roundRect(sx, sy, cardW, cardH, 8) : ctx.rect(sx, sy, cardW, cardH);
-            ctx.fill();
-            ctx.stroke();
-
-            // Card Header
-            ctx.fillStyle = '#4f46e5';
-            ctx.beginPath();
-            ctx.roundRect ? ctx.roundRect(sx, sy, cardW, 28, [8, 8, 0, 0]) : ctx.rect(sx, sy, cardW, 28);
-            ctx.fill();
-
-            // Header Title
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 13px Kalpurush, sans-serif';
-            ctx.fillText(partName, sx + 10, sy + 18);
-
-            // Body text
-            ctx.fillStyle = '#1e293b';
-            ctx.font = '11px Kalpurush, sans-serif';
-            const words = partDesc.split(' ');
-            let line = '';
-            let lineY = sy + 46;
-            for (let n = 0; n < words.length; n++) {
-              const testLine = line + words[n] + ' ';
-              const metrics = ctx.measureText(testLine);
-              if (metrics.width > cardW - 20 && n > 0) {
-                ctx.fillText(line, sx + 10, lineY);
-                line = words[n] + ' ';
-                lineY += 18;
-                if (lineY > sy + cardH - 10) break;
-              } else {
-                line = testLine;
-              }
-            }
-            if (line && lineY <= sy + cardH - 10) {
-              ctx.fillText(line, sx + 10, lineY);
-            }
-            ctx.restore();
-            saveState();
-            popup.remove();
-          };
-          popStampBtn.addEventListener('click', handlePopStamp);
-          popStampBtn.addEventListener('pointerup', handlePopStamp);
-          popStampBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-          popStampBtn.addEventListener('mousedown', (e) => e.stopPropagation());
-        };
-
-        // Click detection on interactive SVG elements or labels
-        const handleDiagramClick = (e: MouseEvent) => {
-          const target = e.target as SVGElement;
-          if (!target) return;
-
-          // Check if clicked element or its closest parent has data-name or data-desc
-          const interactiveEl = target.closest('[data-name], [data-desc]') as SVGElement | null;
-          let name = interactiveEl?.getAttribute('data-name');
-          let desc = interactiveEl?.getAttribute('data-desc');
-
-          // Fallback: If clicked a <text> element, extract text content
-          if (!name) {
-            const textEl = target.closest('text') as SVGTextElement | null;
-            if (textEl) {
-              name = textEl.textContent?.trim() || '';
-              // Remove english part from name if present
-              if (name.includes('(')) {
-                name = name.split('(')[0].trim();
-              }
-              desc = textEl.getAttribute('data-desc') || `${name} হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ কার্যকরী অংশ।`;
-            }
-          }
-
-          if (name) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!desc) {
-              desc = `${name} হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ কার্যকরী অংশ।`;
-            }
-            showPartDetailPopup(name, desc, e.clientX, e.clientY);
-          }
-        };
-
-        svgDiv.addEventListener('click', handleDiagramClick, true);
-        svgDiv.addEventListener('pointerup', (e: PointerEvent) => {
-          if (!isDragging) {
-            handleDiagramClick(e as unknown as MouseEvent);
-          }
-        }, true);
-
-        // Drag logic attached ONLY to toolbar header
-        let isDragging = false;
-        let startClientX = 0, startClientY = 0;
-        let startLeft = 0, startTop = 0;
-
-        const onPointerDown = (e: PointerEvent) => {
-          // If clicked a button, ignore drag
-          if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) {
-            return;
-          }
-          isDragging = true;
-          startClientX = e.clientX;
-          startClientY = e.clientY;
-          startLeft = wrapper.offsetLeft;
-          startTop = wrapper.offsetTop;
-          toolbar.style.cursor = 'grabbing';
-          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-          e.preventDefault();
-          e.stopPropagation();
-        };
-
-        const onPointerMove = (e: PointerEvent) => {
-          if (!isDragging) return;
-          const deltaX = (e.clientX - startClientX) / currentScale;
-          const deltaY = (e.clientY - startClientY) / currentScale;
-          wrapper.style.left = (startLeft + deltaX) + 'px';
-          wrapper.style.top = (startTop + deltaY) + 'px';
-        };
-
-        const onPointerUp = (e: PointerEvent) => {
-          if (isDragging) {
-            isDragging = false;
-            toolbar.style.cursor = 'grab';
-            try {
-              (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-            } catch {}
-          }
-        };
-
-        toolbar.addEventListener('pointerdown', onPointerDown);
-        toolbar.addEventListener('pointermove', onPointerMove);
-        toolbar.addEventListener('pointerup', onPointerUp);
-        toolbar.addEventListener('pointercancel', onPointerUp);
-
-        // Delete button
-        const handleDelete = (e: Event) => {
-          e.preventDefault();
-          e.stopPropagation();
-          wrapper.remove();
-        };
-        delBtn.onclick = handleDelete;
-        delBtn.onpointerdown = (e) => e.stopPropagation();
-
-        // Stamp to canvas permanently (Lock image and hide toolbar, but keep interactive click events)
-        const handleStamp = (e: Event) => {
-          e.preventDefault();
-          e.stopPropagation();
-          // Hide toolbar and dashed border to lock visually on canvas
-          toolbar.style.display = 'none';
-          wrapper.style.border = 'none';
-          wrapper.style.boxShadow = 'none';
-          wrapper.style.background = 'transparent';
-          wrapper.style.cursor = 'default';
-
-          // Burn SVG graphics onto HTML5 canvas so image is saved in canvas state & autosave
-          const el = wrapper.querySelector('svg');
-          if (el) {
-            const serialized = new XMLSerializer().serializeToString(el);
-            const blob2 = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
-            const url2 = URL.createObjectURL(blob2);
-            const stamp = new Image();
-            stamp.onload = () => {
-              const canvasRect = canvas.getBoundingClientRect();
-              const wrapRect = wrapper.getBoundingClientRect();
-              const sx = (wrapRect.left - canvasRect.left) / currentScale;
-              const sy = (wrapRect.top - canvasRect.top) / currentScale;
-              const dw = (el.clientWidth || el.getBoundingClientRect().width) / currentScale;
-              const dh = (el.clientHeight || el.getBoundingClientRect().height) / currentScale;
-              ctx.drawImage(stamp, sx, sy, dw, dh);
-              saveState();
-              URL.revokeObjectURL(url2);
-            };
-            stamp.src = url2;
-          } else {
-            saveState();
-          }
-        };
-        stampBtn.onclick = handleStamp;
-        stampBtn.onpointerdown = (e) => e.stopPropagation();
-        aiDrawStatus.textContent = '✅ চিত্র তৈরি হয়েছে! টেনে সরান বা বোর্ডে স্থায়ী করুন।';
-        setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 2200);
-      } catch (err: any) {
-        aiDrawStatus.textContent = `⚠️ ${err?.message || 'অজানা সমস্যা হয়েছে।'}`;
-      } finally {
-        aiDrawDoBtn.textContent = '🎨 আঁকুন';
-        aiDrawDoBtn.removeAttribute('disabled');
-      }
-    };
-
     // ---- Reusable: create interactive diagram overlay (used on load too) ----
     const createInteractiveDiagramOverlay = (svgString: string, opts?: { left?: string; top?: string; stamped?: boolean }) => {
       const overlayContainer = document.getElementById('svg-overlays');
@@ -1489,22 +1094,53 @@ export default function WhiteboardPage() {
         if (isDragging2) return;
         const target = e.target as SVGElement;
         if (!target) return;
-        const interactiveEl = target.closest('[data-name],[data-desc]') as SVGElement | null;
+        
+        // 1. Element with data attributes
+        const interactiveEl = target.closest('[data-name], [data-desc]') as SVGElement | null;
         let name = interactiveEl?.getAttribute('data-name');
         let desc = interactiveEl?.getAttribute('data-desc');
+
+        // 2. Closest text element
         if (!name) {
           const textEl = target.closest('text') as SVGTextElement | null;
           if (textEl) {
             name = textEl.textContent?.trim() || '';
             if (name.includes('(')) name = name.split('(')[0].trim();
-            desc = textEl.getAttribute('data-desc') || (name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ অংশ।');
+            desc = textEl.getAttribute('data-desc') || (name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ কার্যকরী অংশ।');
           }
         }
+
+        // 3. Closest group element or sibling label
         if (!name) {
           const gEl = target.closest('g') as SVGGElement | null;
-          if (gEl) { name = gEl.getAttribute('data-name') || ''; desc = gEl.getAttribute('data-desc') || ''; }
+          if (gEl) {
+            name = gEl.getAttribute('data-name') || gEl.querySelector('text')?.textContent?.trim() || '';
+            if (name.includes('(')) name = name.split('(')[0].trim();
+            desc = gEl.getAttribute('data-desc') || (name ? name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ অংশ।' : '');
+          }
         }
-        if (name) { e.preventDefault(); e.stopPropagation(); if (!desc) desc = name + ' হলো এই চিত্রের একটি গুরুত্বপূর্ণ অংশ।'; showPartDetailPopup2(name, desc, e.clientX, e.clientY); }
+
+        // 4. Fallback: inspect any text inside the SVG
+        if (!name) {
+          const svgParent = target.closest('svg');
+          if (svgParent) {
+            const allTexts = Array.from(svgParent.querySelectorAll('text'));
+            if (allTexts.length > 0) {
+              const firstTxt = allTexts[0].textContent?.trim() || '';
+              if (firstTxt) {
+                name = firstTxt.includes('(') ? firstTxt.split('(')[0].trim() : firstTxt;
+                desc = name + ' হলো এই চিত্রের একটি অংশ।';
+              }
+            }
+          }
+        }
+
+        if (name && name.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!desc) desc = name + ' হলো এই চিত্রের একটি অত্যন্ত গুরুত্বপূর্ণ ও কার্যকরী অংশ।';
+          showPartDetailPopup2(name, desc, e.clientX, e.clientY);
+        }
       };
       svgDiv.addEventListener('click', handleDiagramClick2, true);
       svgDiv.addEventListener('pointerup', (e: PointerEvent) => { if (!isDragging2) handleDiagramClick2(e as unknown as MouseEvent); }, true);
@@ -1547,7 +1183,65 @@ export default function WhiteboardPage() {
       }
     };
 
-        speechBtn.onclick = () => {
+    
+    // AI Diagram Draw: Generate SVG from text description and render on canvas
+    aiDrawBtn.onclick = () => aiDrawWidget.classList.toggle('hidden');
+
+    const aiDrawDoBtn = document.getElementById('ai-draw-do-btn')!;
+    const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
+    const aiDrawStatus = document.getElementById('ai-draw-status')!;
+
+    // Allow Enter key to trigger AI diagram generation (works on both keydown and keypress)
+    const triggerAiDraw = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        aiDrawDoBtn.click();
+      }
+    };
+    aiDrawInput.addEventListener('keydown', triggerAiDraw);
+    aiDrawInput.addEventListener('keypress', triggerAiDraw);
+
+    aiDrawDoBtn.onclick = async () => {
+      const desc = aiDrawInput.value.trim();
+      if (!desc) { aiDrawStatus.textContent = '⚠️ চিত্রের নাম বা বর্ণনা লিখুন।'; return; }
+      aiDrawDoBtn.textContent = '⏳ তৈরি হচ্ছে...';
+      aiDrawDoBtn.setAttribute('disabled', 'true');
+      aiDrawStatus.textContent = '🤖 AI চিত্র তৈরি করছে, অনুগ্রহ করে অপেক্ষা করুন...';
+      try {
+        const result = await generateWhiteboardDiagram(desc);
+        if (!result.success || !result.svg) {
+          aiDrawStatus.textContent = `⚠️ ${result.error || 'চিত্র তৈরি হয়নি, পুনরায় চেষ্টা করুন।'}`;
+          return;
+        }
+        // Ensure SVG dimensions and viewbox
+        let safeSvg = result.svg;
+        try {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(safeSvg, 'image/svg+xml');
+          const svgRoot = svgDoc.documentElement;
+          svgRoot.setAttribute('width', '1300');
+          svgRoot.setAttribute('height', '760');
+          if (!svgRoot.getAttribute('viewBox')) svgRoot.setAttribute('viewBox', '0 0 1300 760');
+          safeSvg = new XMLSerializer().serializeToString(svgRoot);
+        } catch (e) {
+          console.warn('SVG parse error:', e);
+        }
+
+        // Create interactive diagram overlay using the unified function
+        createInteractiveDiagramOverlay(safeSvg);
+
+        aiDrawStatus.textContent = '✅ চিত্র তৈরি হয়েছে! টেনে সরান বা বোর্ডে স্থায়ী করুন।';
+        setTimeout(() => { aiDrawWidget.classList.add('hidden'); aiDrawStatus.textContent = ''; aiDrawInput.value = ''; }, 2200);
+      } catch (err: any) {
+        aiDrawStatus.textContent = `⚠️ ${err?.message || 'অজানা সমস্যা হয়েছে।'}`;
+      } finally {
+        aiDrawDoBtn.textContent = '🎨 আঁকুন';
+        aiDrawDoBtn.removeAttribute('disabled');
+      }
+    };
+
+    speechBtn.onclick = () => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) return alert('আপনার ব্রাউজার ভয়েস টাইপিং সাপোর্ট করে না। ক্রোম ব্রাউজার ব্যবহার করুন।');
         const rec = new SpeechRecognition();
@@ -2306,6 +2000,7 @@ export default function WhiteboardPage() {
         }
       };
     }
+    adjustScrollWrapperLayout();
     renderTabs();
     isInitialized.current = true;
 
