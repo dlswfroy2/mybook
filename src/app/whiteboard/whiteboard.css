@@ -575,3 +575,12 @@
   overflow: hidden;
   background: white;
 }
+
+/* AI Draw Widget dropdown under top header */
+.whiteboard-body #ai-draw-widget {
+  position: fixed;
+  top: 55px;
+  left: 320px;
+  right: auto;
+  z-index: 10025;
+}

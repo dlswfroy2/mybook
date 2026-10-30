@@ -1185,7 +1185,24 @@ export default function WhiteboardPage() {
 
     
     // AI Diagram Draw: Generate SVG from text description and render on canvas
-    aiDrawBtn.onclick = () => aiDrawWidget.classList.toggle('hidden');
+    const handleToggleAiDraw = (e?: Event) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      const widget = document.getElementById('ai-draw-widget');
+      if (widget) {
+        widget.classList.toggle('hidden');
+        if (!widget.classList.contains('hidden')) {
+          const input = document.getElementById('ai-draw-input') as HTMLInputElement | null;
+          if (input) input.focus();
+        }
+      }
+    };
+    if (aiDrawBtn) {
+      aiDrawBtn.onclick = handleToggleAiDraw;
+    }
+    const btnFromDOM = document.getElementById('ai-draw-btn');
+    if (btnFromDOM && btnFromDOM !== aiDrawBtn) {
+      btnFromDOM.onclick = handleToggleAiDraw;
+    }
 
     const aiDrawDoBtn = document.getElementById('ai-draw-do-btn')!;
     const aiDrawInput = document.getElementById('ai-draw-input') as HTMLInputElement;
