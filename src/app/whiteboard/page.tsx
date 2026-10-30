@@ -982,8 +982,7 @@ export default function WhiteboardPage() {
 
         // Render math expressions with MathJax
         if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
-          const solutionContainer = aiBody.querySelector('.p-5.bg-slate-50\/70');
-          (window as any).MathJax.typesetPromise(solutionContainer ? [solutionContainer] : [aiBody]).catch(() => {});
+          (window as any).MathJax.typesetPromise([aiBody]).catch(() => {});
         }
 
         const copySolBtn = document.getElementById('copy-ai-solution-btn');
