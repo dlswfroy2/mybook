@@ -665,27 +665,67 @@ export default function WhiteboardPage() {
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    /**
+     * Converts inline math notation to MathJax-renderable \(...\) format.
+     */
+    function prepareMathForMathJax(text: string): string {
+      if (!text) return '';
+      let result = text.replace(/\r\n/g, '\n');
+      // Display math $$...$$ -> \[...\]
+      result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_: string, m: string) => '\\[' + m.trim() + '\\]');
+      // Inline math $...$ -> \(...\)
+      result = result.replace(/\$([^\$\n]+?)\$/g, (_: string, m: string) => '\\(' + m.trim() + '\\)');
+      // Strip markdown bold ** ** but keep content
+      result = result.replace(/\*\*([^*]+)\*\*/g, '$1');
+      result = result.replace(/\*([^*]+)\*/g, '$1');
+      // Strip heading markers
+      result = result.replace(/^#{1,6}\s*/gm, '');
+      return result;
+    }
+
     function renderAcademicSolutionHtml(markdown: string): string {
-      const cleaned = cleanMathText(markdown);
-      const lines = cleaned.split('\n');
+      const prepared = prepareMathForMathJax(markdown);
+      const lines = prepared.split('\n');
       const htmlParts: string[] = [];
+
+      // Helper: escape HTML but preserve \(...\) and \[...\] for MathJax
+      const safeHtml = (str: string): string => {
+        const mathStore: string[] = [];
+        let mi = 0;
+        let s = str
+          .replace(/\\\[([\s\S]*?)\\\]/g, (_: string, inner: string) => {
+            const tok = '__MD' + (mi++) + '__';
+            mathStore.push('\\[' + inner + '\\]');
+            return tok;
+          })
+          .replace(/\\\(([\s\S]*?)\\\)/g, (_: string, inner: string) => {
+            const tok = '__MI' + (mi++) + '__';
+            mathStore.push('\\(' + inner + '\\)');
+            return tok;
+          });
+        s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        mathStore.forEach((mp, i) => {
+          s = s.replace('__MD' + i + '__', mp).replace('__MI' + i + '__', mp);
+        });
+        return s;
+      };
 
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        const isHeading = trimmed.startsWith('১.') || trimmed.startsWith('২.') || trimmed.startsWith('৩.') || trimmed.startsWith('৪.') || trimmed.startsWith('৫.') || trimmed.includes('চিহ্নিত প্রশ্ন') || trimmed.includes('সূত্র ও তত্ত্ব') || trimmed.includes('ধারাবাহিক') || trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('টিপস');
-        const isAnswer = trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('উত্তর:');
+        const isHeading = trimmed.startsWith('১.') || trimmed.startsWith('২.') || trimmed.startsWith('৩.') || trimmed.startsWith('৪.') || trimmed.startsWith('৫.') || trimmed.includes('চিহ্নিত প্রশ্ন') || trimmed.includes('সূত্র ও তত্ত্ব') || trimmed.includes('ধারাবাহিক') || trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('টিপস');
+        const isAnswer = trimmed.includes('চূড়ান্ত ফলাফল') || trimmed.includes('উত্তর:');
+        const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ');
 
         if (isHeading) {
-          htmlParts.push(`<h4 class="text-sm md:text-base font-black text-indigo-900 border-b pb-1.5 mt-3.5 flex items-center gap-1.5">${escapeHtml(trimmed)}</h4>`);
-        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          const item = trimmed.substring(2);
-          htmlParts.push(`<li class="text-xs font-bold text-slate-800 ml-4 list-disc">${escapeHtml(item)}</li>`);
+          htmlParts.push('<h4 class="text-sm md:text-base font-black text-indigo-900 border-b pb-1.5 mt-3.5 flex items-center gap-1.5">' + safeHtml(trimmed) + '</h4>');
+        } else if (isBullet) {
+          htmlParts.push('<li class="text-xs font-bold text-slate-800 ml-4 list-disc leading-relaxed">' + safeHtml(trimmed.substring(2)) + '</li>');
         } else if (isAnswer) {
-          htmlParts.push(`<div class="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl my-2.5 text-emerald-950 font-black text-xs md:text-sm shadow-sm">${escapeHtml(trimmed)}</div>`);
+          htmlParts.push('<div class="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl my-2.5 text-emerald-950 font-black text-xs md:text-sm shadow-sm">' + safeHtml(trimmed) + '</div>');
         } else {
-          htmlParts.push(`<p class="text-xs font-bold text-slate-800 leading-relaxed">${escapeHtml(trimmed)}</p>`);
+          htmlParts.push('<p class="text-xs font-bold text-slate-800 leading-relaxed">' + safeHtml(trimmed) + '</p>');
         }
       }
 
@@ -913,7 +953,7 @@ export default function WhiteboardPage() {
         }
 
         const solutionText = cleanMathText(res.solution);
-        const renderedHtml = renderAcademicSolutionHtml(solutionText);
+        const renderedHtml = renderAcademicSolutionHtml(res.solution);
 
         aiBody.innerHTML = `
           <div class="space-y-4 font-kalpurush">
@@ -939,6 +979,12 @@ export default function WhiteboardPage() {
             </div>
           </div>
         `;
+
+        // Render math expressions with MathJax
+        if ((window as any).MathJax && (window as any).MathJax.typesetPromise) {
+          const solutionContainer = aiBody.querySelector('.p-5.bg-slate-50\/70');
+          (window as any).MathJax.typesetPromise(solutionContainer ? [solutionContainer] : [aiBody]).catch(() => {});
+        }
 
         const copySolBtn = document.getElementById('copy-ai-solution-btn');
         if (copySolBtn) {
