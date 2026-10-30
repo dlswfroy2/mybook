@@ -2044,6 +2044,13 @@ export default function WhiteboardPage() {
         <div id="tabs-wrapper"></div>
         <button id="add-board-page" className="browser-plus-btn top-plus-btn" title="নতুন পেজ">➕</button>
         <button id="delete-board-page" className="browser-delete-btn" title="ডিলিট">🗑️</button>
+        <button
+          id="ai-draw-btn"
+          className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-xs font-black transition-all flex items-center gap-1 shadow-md border border-purple-400 ml-1"
+          title="AI দিয়ে চিত্র আঁকুন"
+        >
+          🎨 AI চিত্র
+        </button>
         <button id="clear">🗑️ মুছুন</button>
         <button
           id="saved-boards-btn"
@@ -2118,7 +2125,7 @@ export default function WhiteboardPage() {
         <button id="add-sticky">📌 স্টিকি</button>
         <button id="ocr-btn">📝 OCR</button>
         <button id="ai-solve-btn">🤖 এআই সলভ</button>
-        <button id="ai-draw-btn" style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)', color: 'white', fontWeight: 'bold' }}>🎨 AI চিত্র</button>
+        
         <button id="math-tool-btn">{"∑math LaTeX"}</button>
         <button id="view-3d-btn">🧊 ৩ডি ভিউয়ার</button>
         <button id="calc-btn">🧮 ক্যালকুলেটর</button>
