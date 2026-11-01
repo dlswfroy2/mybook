@@ -9,7 +9,7 @@ import { deleteStudent, Student, studentFromDoc, isMale, isFemale, getStudentPla
 import { 
     Eye, FilePen, Trash2, LayoutGrid, List, UserRound, Search, 
     GraduationCap, MapPin, Users, Phone, Info, ChevronRight, 
-    Printer, FileText, Loader2, Plus, AlertCircle, BookOpen, Briefcase, FileUp, Download, RefreshCw, XCircle
+    Printer, FileText, Loader2, Plus, AlertCircle, BookOpen, Briefcase, FileUp, Download, RefreshCw, XCircle, Save, Calendar, Upload
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,6 +50,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
     if (!str && str !== 0) return '';
@@ -57,7 +59,7 @@ const toBengaliNumber = (str: string | number | undefined | null) => {
     return String(str).replace(/[0-9]/g, (w) => bengaliDigits[parseInt(w, 10)]);
 };
 
-const classNamesMap: { [key: string]: string } = {
+const classNamesMap: Record<string, string> = {
     '6': '৬ষ্ঠ', '7': '৭ম', '8': '৮ম', '9': '৯ম', '10': '১০ম',
 };
 
@@ -173,6 +175,10 @@ function StudentListContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
+  // Bulk Edit States
+  const [isBulkEdit, setIsBulkEdit] = useState(false);
+  const [editedData, setEditedData] = useState<Record<string, Partial<Student>>>({});
+
   // Upload States
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -269,6 +275,8 @@ function StudentListContent() {
     setFilterReligion('all');
     setFilterGroup('all');
     setSearchQuery('');
+    setIsBulkEdit(false);
+    setEditedData({});
   }, [activeTab, selectedYear]);
 
   useEffect(() => {
@@ -377,11 +385,11 @@ function StudentListContent() {
       s.optionalSubject || '',
       s.presentVillage || '',
       s.presentUnion || '',
-      s.presentPostOffice || ''
+      s.presentPostOffice || 'বীরগঞ্জ'
     ]);
 
     if (data.length === 0) {
-        data.push(['', '1', 'আব্দুর রহিম', 'Abdur Rahim', 'করিম মিয়া', 'Karim Mia', 'রহিমা বেগম', 'Rahima Begum', '', '', '', '01700000000', '01-01-2010', 'male', 'islam', 'general', '', '', '', '']);
+        data.push(['', '1', 'আব্দুর রহিম', 'Abdur Rahim', 'করিম মিয়া', 'Karim Mia', 'রহিমা বেগম', 'Rahima Begum', '', '', '', '01700000000', '01-01-2010', 'male', 'islam', 'general', '', 'চরপাড়া', 'বীরগঞ্জ', 'বীরগঞ্জ']);
     }
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -435,7 +443,7 @@ function StudentListContent() {
                 optionalSubject: String(row['Optional Subject'] || row['ঐচ্ছিক বিষয়'] || '').trim(),
                 presentVillage: String(row['Village'] || row['গ্রাম'] || '').trim(),
                 presentUnion: String(row['Union'] || row['ইউনিয়ন'] || '').trim(),
-                presentPostOffice: String(row['Post Office'] || row['ডাকঘর'] || '').trim(),
+                presentPostOffice: String(row['Post Office'] || row['ডাকঘর'] || 'বীরগঞ্জ').trim(),
             };
 
             const dobVal = row['Date of Birth (DD-MM-YYYY)'] || row['Date of Birth (YYYY-MM-DD)'] || row['জন্ম তারিখ'];
@@ -508,15 +516,74 @@ function StudentListContent() {
     reader.readAsBinaryString(file);
   };
 
+  // Bulk Edit Functions
+  const handleBulkInputChange = (id: string, field: keyof Student, value: any) => {
+    setEditedData(prev => ({
+        ...prev,
+        [id]: { ...prev[id], [field]: value }
+    }));
+  };
+
+  const handleBulkPhotoChange = (id: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        handleBulkInputChange(id, 'photoUrl', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleIndividualSave = async (id: string) => {
+    if (!db || !editedData[id]) return;
+    const data = editedData[id];
+    try {
+        await updateStudent(db, id, data);
+        toast({ title: 'তথ্য আপডেট হয়েছে' });
+        const nextEditedData = { ...editedData };
+        delete nextEditedData[id];
+        setEditedData(nextEditedData);
+    } catch (e) {}
+  };
+
+  const handleSaveAll = async () => {
+    if (!db || Object.keys(editedData).length === 0) return;
+    setIsUploading(true);
+    const batch = writeBatch(db);
+    
+    Object.entries(editedData).forEach(([id, data]) => {
+        const ref = doc(db, 'students', id);
+        const dataToSave = { ...data };
+        if (dataToSave.dob) {
+            dataToSave.dob = Timestamp.fromDate(new Date(dataToSave.dob));
+        }
+        batch.update(ref, { ...dataToSave, updatedAt: serverTimestamp() });
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: 'সকল তথ্য সফলভাবে আপডেট হয়েছে।' });
+        setEditedData({});
+        setIsBulkEdit(false);
+    } catch (e: any) {
+        console.error("Bulk Save Error:", e);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'students', operation: 'write' }));
+    } finally {
+        setIsUploading(false);
+    }
+  };
+
   if (!isMounted) return null;
 
   return (
-    <div className="flex min-h-screen w-full flex-col font-kalpurush">
-      <main className="flex-1 p-4 md:p-6 pb-[250px]">
+    <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
+      <main className="flex-1 p-4 md:p-10 pb-40">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
             <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
                 <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">শিক্ষার্থী মডিউল</h2>
-                <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">
+                <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
                     {sidebarItems.map(item => (
                         <button
                             key={item.id}
@@ -563,19 +630,25 @@ function StudentListContent() {
                                         />
                                     </div>
                                     <div className="flex bg-muted p-1 rounded-xl">
-                                        <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => setViewMode('table')}><List className="h-4 w-4" /></Button>
-                                        <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => setViewMode('grid')}><LayoutGrid className="h-4 w-4" /></Button>
+                                        <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('table'); setIsBulkEdit(false); }}><List className="h-4 w-4" /></Button>
+                                        <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('grid'); setIsBulkEdit(false); }}><LayoutGrid className="h-4 w-4" /></Button>
                                     </div>
+                                    {viewMode === 'table' && canEditStudent && (
+                                        <Button 
+                                            variant={isBulkEdit ? "default" : "outline"} 
+                                            size="sm" 
+                                            className={cn("h-10 px-4 font-black border-2", isBulkEdit ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-200 text-amber-700")}
+                                            onClick={() => { setIsBulkEdit(!isBulkEdit); if(isBulkEdit) setEditedData({}); }}
+                                        >
+                                            {isBulkEdit ? <XCircle className="mr-1.5 h-4 w-4" /> : <FilePen className="mr-1.5 h-4 w-4" />}
+                                            {isBulkEdit ? 'এডিট বন্ধ করুন' : 'একসাথে এডিট'}
+                                        </Button>
+                                    )}
                                     {hasPermission('upload:students') && (
                                         <Button variant="outline" className="font-black border-2 border-primary text-primary" onClick={() => setIsUploadOpen(true)}>
                                             <FileUp className="mr-2 h-4 w-4" /> Excel আপলোড
                                         </Button>
                                     )}
-                                    <Link href="/student-promotion">
-                                        <Button variant="outline" className="font-black border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50">
-                                            <GraduationCap className="mr-2 h-4 w-4 text-emerald-600" /> বার্ষিক প্রমোশন
-                                        </Button>
-                                    </Link>
                                 </>
                             )}
                             {activeSection === 'print' && (
@@ -662,7 +735,7 @@ function StudentListContent() {
                     ) : (
                         <>
                             {activeSection === 'list' && (
-                                <div className="animate-in fade-in duration-500">
+                                <div className="animate-in fade-in duration-500 relative">
                                     {getStudentsByClass(activeTab).length === 0 ? (
                                         <div className="py-20 text-center text-muted-foreground border-4 border-dashed rounded-3xl opacity-40 flex flex-col items-center">
                                             <XCircle className="h-16 w-16 mx-auto mb-3 text-rose-300" />
@@ -706,51 +779,245 @@ function StudentListContent() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="table-container shadow-xl border-2">
-                                            <Table>
-                                                <TableHeader className="bg-muted/50 sticky top-0 z-20">
+                                        <div className="table-container shadow-xl border-2 border-black">
+                                            <Table className="min-w-max border-separate border-spacing-0 border-t-2 border-black">
+                                                <TableHeader className="sticky top-0 z-40 bg-muted/95 backdrop-blur-sm shadow-sm border-b-2 border-black">
                                                     <TableRow className="h-14">
-                                                        <TableHead className="font-black text-center w-16">রোল</TableHead>
-                                                        <TableHead className="font-black text-center w-16">ছবি</TableHead>
-                                                        <TableHead className="font-black">নাম ও আইডি</TableHead>
-                                                        <TableHead className="font-black">পিতা-মাতার নাম</TableHead>
-                                                        <TableHead className="font-black">মোবাইল নম্বর</TableHead>
-                                                        <TableHead className="text-right pr-8 font-black">কার্যক্রম</TableHead>
+                                                        <TableHead className="font-black text-center w-16 sticky left-0 z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black">রোল</TableHead>
+                                                        <TableHead className="font-black text-center w-20 border-r-2 border-b-2 border-black text-black">ছবি</TableHead>
+                                                        <TableHead className="font-black min-w-[220px] sticky left-[64px] z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black">শিক্ষার্থীর নাম (বাংলা ও ইংরেজি)</TableHead>
+                                                        <TableHead className="font-black min-w-[200px] border-r-2 border-b-2 border-black text-black">পিতা ও মাতার নাম</TableHead>
+                                                        <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">মোবাইল</TableHead>
+                                                        {isBulkEdit && (
+                                                            <>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">জন্ম তারিখ</TableHead>
+                                                                <TableHead className="font-black w-24 border-r-2 border-b-2 border-black text-black">লিঙ্গ</TableHead>
+                                                                <TableHead className="font-black w-24 border-r-2 border-b-2 border-black text-black">ধর্ম</TableHead>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">শাখা/বিভাগ</TableHead>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">ঐচ্ছিক বিষয়</TableHead>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">পিতার NID</TableHead>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">মাতার NID</TableHead>
+                                                                <TableHead className="font-black w-40 border-r-2 border-b-2 border-black text-black">বর্তমান গ্রাম</TableHead>
+                                                                <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">ইউনিয়ন</TableHead>
+                                                            </>
+                                                        )}
+                                                        <TableHead className="text-center w-16 sticky right-0 z-50 bg-muted border-l-2 border-b-2 border-black">
+                                                            <Link href="/add-student">
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary text-white hover:bg-primary/90" title="নতুন শিক্ষার্থী যোগ করুন">
+                                                                    <Plus className="h-5 w-5" />
+                                                                </Button>
+                                                            </Link>
+                                                        </TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {getStudentsByClass(activeTab).map((student) => (
-                                                        <TableRow key={student.id} id={`student-row-${student.id}`} className={cn("transition-colors h-16 hover:bg-primary/5", student.id === targetStudentId && "bg-yellow-50")}>
-                                                            <TableCell className="font-black text-center text-lg">{toBengaliNumber(student.roll)}</TableCell>
-                                                            <TableCell className="text-center">
-                                                                <Avatar className="h-10 w-10 border shadow-sm mx-auto">
-                                                                    <AvatarImage src={sanitizePhotoUrl(student.photoUrl, student.gender) || getStudentPlaceholderImage(student.gender)} className="object-cover" />
-                                                                    <AvatarFallback className="font-black text-xs">S</AvatarFallback>
-                                                                </Avatar>
+                                                        <TableRow key={student.id} id={`student-row-${student.id}`} className={cn("transition-colors h-16 group", student.id === targetStudentId && "bg-yellow-50", editedData[student.id] && "bg-amber-50")}>
+                                                            <TableCell className="font-black text-center text-lg border-r-2 border-b-2 border-black sticky left-0 z-30 bg-white group-hover:bg-slate-50">
+                                                                {isBulkEdit ? (
+                                                                    <Input 
+                                                                        type="number"
+                                                                        value={editedData[student.id]?.roll ?? student.roll} 
+                                                                        onChange={e => handleBulkInputChange(student.id, 'roll', parseInt(e.target.value) || 0)}
+                                                                        className="h-8 w-16 font-black text-center border-2 border-primary/20"
+                                                                    />
+                                                                ) : toBengaliNumber(student.roll)}
                                                             </TableCell>
-                                                            <TableCell>
-                                                                <p className="font-black text-slate-800">{student.studentNameBn}</p>
-                                                                <p className="text-[10px] font-bold text-primary italic uppercase tracking-tighter">ID: {toBengaliNumber(student.generatedId || '-')}</p>
+                                                            <TableCell className="text-center border-r-2 border-b-2 border-black p-1">
+                                                                <div className="relative h-11 w-11 mx-auto rounded-lg overflow-hidden border-2 border-slate-100 group/img">
+                                                                    <Avatar className="h-full w-full rounded-none">
+                                                                        <AvatarImage src={sanitizePhotoUrl(editedData[student.id]?.photoUrl || student.photoUrl, student.gender) || getStudentPlaceholderImage(student.gender)} className="object-cover" />
+                                                                        <AvatarFallback className="font-black text-xs">S</AvatarFallback>
+                                                                    </Avatar>
+                                                                    {isBulkEdit && (
+                                                                        <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 cursor-pointer transition-opacity">
+                                                                            <Upload className="h-4 w-4 text-white" />
+                                                                            <input 
+                                                                                type="file" 
+                                                                                className="hidden" 
+                                                                                accept="image/*" 
+                                                                                onChange={(e) => handleBulkPhotoChange(student.id, e)}
+                                                                            />
+                                                                        </label>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
-                                                            <TableCell>
-                                                                <p className="text-xs font-bold text-slate-600">পিতা: {student.fatherNameBn}</p>
-                                                                <p className="text-xs font-bold text-slate-500">মাতা: {student.motherNameBn}</p>
+                                                            <TableCell className="border-r-2 border-b-2 border-black sticky left-[64px] z-30 bg-white group-hover:bg-slate-50 px-3">
+                                                                {isBulkEdit ? (
+                                                                    <div className="space-y-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.studentNameBn ?? student.studentNameBn} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'studentNameBn', e.target.value)}
+                                                                            className="h-8 font-black text-sm border-2 border-primary/20"
+                                                                            placeholder="নাম (বাংলা)"
+                                                                        />
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.studentNameEn ?? (student.studentNameEn || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'studentNameEn', e.target.value)}
+                                                                            className="h-7 text-[11px] font-bold uppercase border-slate-200"
+                                                                            placeholder="Name (English)"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="overflow-hidden">
+                                                                        <p className="font-black text-slate-800 truncate">{student.studentNameBn}</p>
+                                                                        <p className="text-[10px] font-black text-primary italic uppercase tracking-tighter truncate">ID: {toBengaliNumber(student.generatedId || '-')}</p>
+                                                                    </div>
+                                                                )}
                                                             </TableCell>
-                                                            <TableCell className="text-xs font-black text-slate-700">{toBengaliNumber(student.guardianMobile || student.studentMobile || '-')}</TableCell>
-                                                            <TableCell className="text-right pr-6">
+                                                            <TableCell className="border-r-2 border-b-2 border-black px-3">
+                                                                {isBulkEdit ? (
+                                                                    <div className="space-y-1">
+                                                                        <Input 
+                                                                            placeholder="পিতার নাম"
+                                                                            value={editedData[student.id]?.fatherNameBn ?? student.fatherNameBn} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'fatherNameBn', e.target.value)}
+                                                                            className="h-7 text-[10px] border-slate-200"
+                                                                        />
+                                                                        <Input 
+                                                                            placeholder="মাতার নাম"
+                                                                            value={editedData[student.id]?.motherNameBn ?? student.motherNameBn} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'motherNameBn', e.target.value)}
+                                                                            className="h-7 text-[10px] border-slate-200"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="overflow-hidden">
+                                                                        <p className="text-xs font-bold text-slate-600 truncate">পিতা: {student.fatherNameBn}</p>
+                                                                        <p className="text-xs font-bold text-slate-500 truncate">মাতা: {student.motherNameBn}</p>
+                                                                    </div>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="border-r-2 border-b-2 border-black px-3">
+                                                                {isBulkEdit ? (
+                                                                    <Input 
+                                                                        value={editedData[student.id]?.guardianMobile ?? (student.guardianMobile || '')} 
+                                                                        onChange={e => handleBulkInputChange(student.id, 'guardianMobile', e.target.value)}
+                                                                        className="h-8 font-black text-xs border-2 border-primary/20"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-xs font-black text-slate-700">{toBengaliNumber(student.guardianMobile || student.studentMobile || '-') || '-'}</span>
+                                                                )}
+                                                            </TableCell>
+
+                                                            {isBulkEdit && (
+                                                                <>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <DatePicker 
+                                                                            value={editedData[student.id]?.dob ? new Date(editedData[student.id]!.dob!) : (student.dob ? new Date(student.dob) : undefined)} 
+                                                                            onChange={d => handleBulkInputChange(student.id, 'dob', d)}
+                                                                            triggerClassName="h-8 text-[10px] border-slate-200"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Select 
+                                                                            value={editedData[student.id]?.gender ?? (student.gender || 'male')} 
+                                                                            onValueChange={v => handleBulkInputChange(student.id, 'gender', v)}
+                                                                        >
+                                                                            <SelectTrigger className="h-8 text-[10px] border-slate-200"><SelectValue /></SelectTrigger>
+                                                                            <SelectContent className="font-kalpurush">
+                                                                                <SelectItem value="male">পুরুষ</SelectItem>
+                                                                                <SelectItem value="female">মহিলা</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Select 
+                                                                            value={editedData[student.id]?.religion ?? (student.religion || 'islam')} 
+                                                                            onValueChange={v => handleBulkInputChange(student.id, 'religion', v)}
+                                                                        >
+                                                                            <SelectTrigger className="h-8 text-[10px] border-slate-200"><SelectValue /></SelectTrigger>
+                                                                            <SelectContent className="font-kalpurush">
+                                                                                <SelectItem value="islam">ইসলাম</SelectItem>
+                                                                                <SelectItem value="hinduism">হিন্দু</SelectItem>
+                                                                                <SelectItem value="buddhism">বৌদ্ধ</SelectItem>
+                                                                                <SelectItem value="christianity">খ্রিস্টান</SelectItem>
+                                                                                <SelectItem value="other">অন্যান্য</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Select 
+                                                                            value={editedData[student.id]?.group ?? (student.group || 'general')} 
+                                                                            onValueChange={v => handleBulkInputChange(student.id, 'group', v)}
+                                                                        >
+                                                                            <SelectTrigger className="h-8 text-[10px] border-slate-200"><SelectValue /></SelectTrigger>
+                                                                            <SelectContent className="font-kalpurush">
+                                                                                <SelectItem value="general">সাধারণ (General)</SelectItem>
+                                                                                <SelectItem value="science">বিজ্ঞান (Science)</SelectItem>
+                                                                                <SelectItem value="arts">মানবিক (Arts)</SelectItem>
+                                                                                <SelectItem value="commerce">ব্যবসায় শিক্ষা (Commerce)</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.optionalSubject ?? (student.optionalSubject || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'optionalSubject', e.target.value)}
+                                                                            className="h-8 text-[10px] font-bold border-2 border-primary/20"
+                                                                            placeholder="ঐচ্ছিক বিষয়"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.fatherNid ?? (student.fatherNid || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'fatherNid', e.target.value)}
+                                                                            className="h-8 text-[10px] font-bold border-slate-200"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.motherNid ?? (student.motherNid || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'motherNid', e.target.value)}
+                                                                            className="h-8 text-[10px] font-bold border-slate-200"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.presentVillage ?? (student.presentVillage || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'presentVillage', e.target.value)}
+                                                                            className="h-8 text-[10px] font-bold border-slate-200"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="border-r-2 border-b-2 border-black px-1">
+                                                                        <Input 
+                                                                            value={editedData[student.id]?.presentUnion ?? (student.presentUnion || '')} 
+                                                                            onChange={e => handleBulkInputChange(student.id, 'presentUnion', e.target.value)}
+                                                                            className="h-8 text-[10px] font-bold border-slate-200"
+                                                                        />
+                                                                    </TableCell>
+                                                                </>
+                                                            )}
+
+                                                            <TableCell className="text-right pr-6 sticky right-0 z-30 bg-white/95 border-l-2 border-b-2 border-black group-hover:bg-slate-50">
                                                                 <div className="flex justify-end gap-1.5">
-                                                                    <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-2 hover:bg-slate-50" onClick={() => setStudentToView(student)} title="দেখুন"><Eye className="h-4 w-4" /></Button>
-                                                                    {canEditStudent && <Link href={`/edit-student/${student.id}`}><Button variant="outline" size="icon" className="h-8 w-8 text-blue-600 bg-white border-2 hover:bg-blue-50" title="এডিট"><FilePen className="h-4 w-4" /></Button></Link>}
-                                                                    {canDeleteStudent && (
-                                                                        <AlertDialog>
-                                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                                                            <AlertDialogContent className="font-kalpurush">
-                                                                                <AlertDialogHeader><AlertDialogTitle className="text-rose-700 font-black">নিশ্চিত তো?</AlertDialogTitle><AlertDialogDescription className="font-bold">এই শিক্ষার্থীকে স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription></AlertDialogHeader>
-                                                                                <AlertDialogFooter>
-                                                                                    <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(student.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-black">ডিলিট করুন</AlertDialogAction>
-                                                                                </AlertDialogFooter>
-                                                                            </AlertDialogContent>
-                                                                        </AlertDialog>
+                                                                    {isBulkEdit ? (
+                                                                        <Button 
+                                                                            variant="outline" 
+                                                                            size="icon" 
+                                                                            className="h-8 w-8 text-emerald-600 border-2 border-emerald-100 bg-white shadow-sm"
+                                                                            disabled={!editedData[student.id]}
+                                                                            onClick={() => handleIndividualSave(student.id)}
+                                                                            title="এই শিক্ষার্থীর তথ্য সেভ করুন"
+                                                                        >
+                                                                            <Save className="h-4 w-4" />
+                                                                        </Button>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-2 hover:bg-slate-50" onClick={() => setStudentToView(student)} title="দেখুন"><Eye className="h-4 w-4" /></Button>
+                                                                            {canEditStudent && <Link href={`/edit-student/${student.id}`}><Button variant="outline" size="icon" className="h-8 w-8 text-blue-600 bg-white border-2 hover:bg-blue-50" title="এডিট"><FilePen className="h-4 w-4" /></Button></Link>}
+                                                                            {canDeleteStudent && (
+                                                                                <AlertDialog>
+                                                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                                                    <AlertDialogContent className="font-kalpurush">
+                                                                                        <AlertDialogHeader><AlertDialogTitle className="text-rose-700 font-black">নিশ্চিত তো?</AlertDialogTitle><AlertDialogDescription className="font-bold">এই শিক্ষার্থীকে স্থায়ীভাবে মুছে ফেলা হবে।</AlertDialogDescription></AlertDialogHeader>
+                                                                                        <AlertDialogFooter>
+                                                                                            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(student.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-black">ডিলিট করুন</AlertDialogAction>
+                                                                                        </AlertDialogFooter>
+                                                                                    </AlertDialogContent>
+                                                                                </AlertDialog>
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </TableCell>
@@ -758,6 +1025,20 @@ function StudentListContent() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                        </div>
+                                    )}
+
+                                    {/* Floating Bulk Save Action */}
+                                    {isBulkEdit && Object.keys(editedData).length > 0 && (
+                                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-10">
+                                            <Button 
+                                                onClick={handleSaveAll} 
+                                                disabled={isUploading}
+                                                className="h-16 px-12 text-xl font-black shadow-2xl rounded-full gap-3 ring-8 ring-white"
+                                            >
+                                                {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+                                                সকল তথ্য সেভ করুন ({toBengaliNumber(Object.keys(editedData).length)})
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -791,48 +1072,48 @@ function StudentListContent() {
                                     <div className="w-full">
                                         <table className="w-full border-collapse border-[1.5px] border-black text-[9px]">
                                             <thead>
-                                                <tr className="bg-slate-100">
-                                                    <th className="border border-black p-0.5 w-[5%] text-center">ছবি</th>
-                                                    <th className="border border-black p-0.5 w-[10%] text-center">আইডি নং</th>
-                                                    <th className="border border-black p-0.5 w-[4%] text-center">রোল</th>
-                                                    <th className="border border-black p-0.5 w-[18%] text-left pl-1">শিক্ষার্থীর নাম</th>
-                                                    <th className="border border-black p-0.5 w-[15%] text-left pl-1">পিতার নাম</th>
-                                                    <th className="border border-black p-0.5 w-[15%] text-left pl-1">মাতার নাম</th>
-                                                    <th className="border border-black p-0.5 w-[9%] text-center">জন্ম তারিখ</th>
-                                                    <th className="border border-black p-0.5 w-[7%] text-center">লিঙ্গ/ধর্ম</th>
-                                                    <th className="border border-black p-0.5 w-[10%] text-center">মোবাইল নং</th>
-                                                    <th className="border border-black p-0.5 w-[7%] text-left pl-1">ঠিকানা</th>
+                                                <tr className="bg-slate-100 h-10 border-b-2 border-black">
+                                                    <th className="border-r border-black p-0.5 w-[5%] text-center">ছবি</th>
+                                                    <th className="border-r border-black p-0.5 w-[10%] text-center">আইডি নং</th>
+                                                    <th className="border-r border-black p-0.5 w-[4%] text-center">রোল</th>
+                                                    <th className="border-r border-black p-0.5 w-[18%] text-left pl-1">শিক্ষার্থীর নাম</th>
+                                                    <th className="border-r border-black p-0.5 w-[15%] text-left pl-1">পিতার নাম</th>
+                                                    <th className="border-r border-black p-0.5 w-[15%] text-left pl-1">মাতার নাম</th>
+                                                    <th className="border-r border-black p-0.5 w-[9%] text-center">জন্ম তারিখ</th>
+                                                    <th className="border-r border-black p-0.5 w-[7%] text-center">লিঙ্গ/ধর্ম</th>
+                                                    <th className="border-r border-black p-0.5 w-[10%] text-center">মোবাইল নং</th>
+                                                    <th className="p-0.5 w-[7%] text-left pl-1">ঠিকানা</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {getStudentsByClass(activeTab).map(s => (
-                                                    <tr key={s.id} className="h-10 border border-black" style={{ breakInside: 'avoid' }}>
-                                                        <td className="border border-black text-center p-0.5">
+                                                    <tr key={s.id} className="h-10 border-b border-black" style={{ breakInside: 'avoid' }}>
+                                                        <td className="border-r border-black text-center p-0.5">
                                                             <div className="h-8 w-8 mx-auto relative overflow-hidden">
                                                                 <img src={sanitizePhotoUrl(s.photoUrl, s.gender) || getStudentPlaceholderImage(s.gender)} alt="Photo" className="object-cover h-full w-full" />
                                                             </div>
                                                         </td>
-                                                        <td className="border border-black text-center font-bold text-[10px] break-words">{toBengaliNumber(s.generatedId || '-')}</td>
-                                                        <td className="border border-black text-center font-black text-[10px]">{toBengaliNumber(s.roll)}</td>
-                                                        <td className="border border-black font-bold text-[10px] leading-tight px-1 break-words">
+                                                        <td className="border-r border-black text-center font-bold text-[10px] break-words">{toBengaliNumber(s.generatedId || '-')}</td>
+                                                        <td className="border-r border-black text-center font-black text-[10px]">{toBengaliNumber(s.roll)}</td>
+                                                        <td className="border-r border-black font-bold text-[10px] leading-tight px-1 break-words">
                                                             <p>{s.studentNameBn}</p>
                                                             <p className="text-[8px] uppercase text-slate-600">{s.studentNameEn || '-'}</p>
                                                         </td>
-                                                        <td className="border border-black font-bold text-[10px] leading-tight px-1 break-words">
+                                                        <td className="border-r border-black font-bold text-[10px] leading-tight px-1 break-words">
                                                             <p>{s.fatherNameBn}</p>
                                                             <p className="text-[8px] uppercase text-slate-600">{s.fatherNameEn || '-'}</p>
                                                         </td>
-                                                        <td className="border border-black font-bold text-[10px] leading-tight px-1 break-words">
+                                                        <td className="border-r border-black font-bold text-[10px] leading-tight px-1 break-words">
                                                             <p>{s.motherNameBn}</p>
                                                             <p className="text-[8px] uppercase text-slate-600">{s.motherNameEn || '-'}</p>
                                                         </td>
-                                                        <td className="border border-black text-center text-[10px]">{s.dob ? toBengaliNumber(format(new Date(s.dob), 'dd-MM-yyyy')) : '-'}</td>
-                                                        <td className="border border-black text-center text-[9px] leading-tight break-words">
+                                                        <td className="border-r border-black text-center text-[10px]">{s.dob ? toBengaliNumber(format(new Date(s.dob), 'dd-MM-yyyy')) : '-'}</td>
+                                                        <td className="border-r border-black text-center text-[9px] leading-tight break-words">
                                                             <p>{s.gender === 'male' || s.gender === 'পুরুষ' ? 'পুরুষ' : 'মহিলা'}</p>
                                                             <p>{religionMapBn[s.religion?.toLowerCase() || ''] || s.religion}</p>
                                                         </td>
-                                                        <td className="border border-black text-center font-black text-[10px]">{toBengaliNumber(s.guardianMobile || '-')}</td>
-                                                        <td className="border border-black text-[8px] leading-tight px-1 break-words">
+                                                        <td className="border-r border-black text-center font-black text-[10px]">{toBengaliNumber(s.guardianMobile || '-')}</td>
+                                                        <td className="text-[8px] leading-tight px-1 break-words">
                                                             গ্রাম: {s.presentVillage || '-'}<br/>ডাকঘর: {s.presentPostOffice || '-'}
                                                         </td>
                                                     </tr>
@@ -855,47 +1136,19 @@ function StudentListContent() {
                                                 size: A4 landscape;
                                                 margin: 0.5in !important;
                                             }
-                                            body * {
-                                                visibility: hidden;
-                                            }
-                                            .esif-container, .esif-container * {
-                                                visibility: visible;
-                                            }
-                                            .esif-container {
-                                                position: absolute !important;
-                                                left: 0 !important;
-                                                top: 0 !important;
-                                                width: 100% !important;
-                                                margin: 0 !important;
-                                                padding: 0 !important;
-                                                display: block !important;
-                                                border: none !important;
-                                                box-shadow: none !important;
-                                            }
-                                            .esif-container > div {
-                                                width: 100% !important;
-                                                max-width: none !important;
-                                                padding: 0 !important;
-                                                margin: 0 !important;
-                                            }
-                                            table {
-                                                width: 100% !important;
-                                                min-width: 100% !important;
-                                                border-collapse: collapse !important;
-                                            }
                                         }
                                     `}</style>
                                     {['6', '8', '9'].includes(activeTab) ? (
-                                        <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full print:w-full">
-                                            <div className="w-full mx-auto bg-white p-4 print:p-0 print:m-0">
+                                        <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full">
+                                            <div className="w-full mx-auto bg-white p-4">
                                                 <header className="text-center mb-6">
-                                                    <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || schoolInfo.name || ""}</h1>
+                                                    <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || "BIRGANJ POURO HIGH SCHOOL"}</h1>
                                                     <p className="text-sm font-bold border-b-2 border-black inline-block px-4 pb-0.5 uppercase tracking-widest">ESIF STUDENT REGISTRATION FORM</p>
                                                     <h2 className="text-xl font-black mt-2">Class {classRomanMap[activeTab]} Registration - {selectedYear}</h2>
                                                 </header>
                                                 <Table className="border-collapse border-2 border-black w-full min-w-[800px] print:min-w-full print:w-full">
                                                     <TableHeader>
-                                                        <TableRow className="bg-slate-50 border-b-2 border-black">
+                                                        <TableRow className="bg-slate-50 border-b-2 border-black h-12">
                                                             <TableHead className="border-r-2 border-black text-center font-black p-1 w-12 text-black text-[12px]">SL NO</TableHead>
                                                             <TableHead className="border-r-2 border-black font-black p-1 w-72 text-black text-[11px] text-center">Candidate Name, Father And Mother Name</TableHead>
                                                             <TableHead className="border-r-2 border-black text-center font-black p-1 w-32 text-black text-[11px]">Date of Birth And Sex</TableHead>
@@ -1049,18 +1302,18 @@ function StudentListContent() {
                                 <div className="space-y-4">
                                     <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
                                         <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">বর্তমান ঠিকানা</p>
-                                        <p className="text-xs font-bold leading-relaxed">
+                                        <p className="text-sm font-bold leading-relaxed">
                                             গ্রাম: {studentToView.presentVillage || '-'}, ইউ: {studentToView.presentUnion || '-'}<br/>
-                                            ডাকঘর: {studentToView.presentPostOffice || '-'}, উপজেলা: {studentToView.presentUpazila || '-'}<br/>
-                                            জেলা: {studentToView.presentDistrict || '-'}
+                                            ডাকঘর: {studentToView.presentPostOffice || '-'}, উপজেলা: {studentToView.presentUpazila || 'বীরগঞ্জ'}<br/>
+                                            জেলা: {studentToView.presentDistrict || 'দিনাজপুর'}
                                         </p>
                                     </div>
                                     <div className="p-3 bg-slate-50 rounded-lg border-2 border-dashed">
                                         <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">স্থায়ী ঠিকানা</p>
-                                        <p className="text-xs font-bold leading-relaxed">
+                                        <p className="text-sm font-bold leading-relaxed">
                                             গ্রাম: {studentToView.permanentVillage || '-'}, ইউ: {studentToView.permanentUnion || '-'}<br/>
-                                            ডাকঘর: {studentToView.permanentPostOffice || '-'}, উপজেলা: {studentToView.permanentUpazila || '-'}<br/>
-                                            জেলা: {studentToView.permanentDistrict || '-'}
+                                            ডাকঘর: {studentToView.permanentPostOffice || '-'}, উপজেলা: {studentToView.permanentUpazila || 'বীরগঞ্জ'}<br/>
+                                            জেলা: {studentToView.permanentDistrict || 'দিনাজপুর'}
                                         </p>
                                     </div>
                                 </div>
@@ -1073,7 +1326,7 @@ function StudentListContent() {
                 </>
              )}
         </DialogContent>
-    </Dialog>
+      </Dialog>
     </div>
   );
 }
@@ -1085,4 +1338,3 @@ export default function StudentListPage() {
     </Suspense>
   );
 }
-
