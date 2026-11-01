@@ -30,24 +30,48 @@ export function SchoolInfoProvider({ children }: { children: ReactNode }) {
         return;
     };
 
+    // 1. Initial load from localStorage cache if available
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_school_info');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.name || parsed.logoUrl)) {
+            setSchoolInfo(prev => ({ ...prev, ...parsed }));
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {}
+    }
+
     const docRef = doc(db, 'school', 'info');
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
-            setSchoolInfo({ ...defaultSchoolInfo, ...docSnap.data() } as SchoolInfo);
-        } else {
-            if (user?.role === 'admin') {
-                saveSchoolInfo(db, defaultSchoolInfo).catch(console.error);
+            const data = docSnap.data();
+            // Only update if there is actual meaningful data so we never overwrite with blanks
+            if (data && (data.name || data.logoUrl || data.address || data.eiin)) {
+              const fullInfo = { ...defaultSchoolInfo, ...data } as SchoolInfo;
+              setSchoolInfo(fullInfo);
+              if (typeof window !== 'undefined') {
+                try { localStorage.setItem('cached_school_info', JSON.stringify(fullInfo)); } catch (e) {}
+              }
             }
-            setSchoolInfo(defaultSchoolInfo);
         }
         setIsLoading(false);
     }, async (error: FirestoreError) => {
-        if (error.code === 'permission-denied') return;
-        const permissionError = new FirestorePermissionError({
-          path: 'school/info',
-          operation: 'get',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        // Fallback to cache on quota/network error, never clear out logo or name!
+        console.warn("School info snapshot warning:", error.message || error.code);
+        if (typeof window !== 'undefined') {
+          try {
+            const cached = localStorage.getItem('cached_school_info');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed && (parsed.name || parsed.logoUrl)) {
+                setSchoolInfo(prev => ({ ...prev, ...parsed }));
+              }
+            }
+          } catch (e) {}
+        }
         setIsLoading(false);
     });
 
@@ -55,8 +79,12 @@ export function SchoolInfoProvider({ children }: { children: ReactNode }) {
   }, [db, user]);
 
   const updateSchoolInfo = useCallback(async (newInfo: Partial<SchoolInfo>) => {
-    if (!db) return Promise.reject("Firestore not initialized");
     const updatedInfo = { ...schoolInfo, ...newInfo };
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('cached_school_info', JSON.stringify(updatedInfo)); } catch (e) {}
+    }
+    setSchoolInfo(updatedInfo);
+    if (!db) return Promise.reject("Firestore not initialized");
     return saveSchoolInfo(db, updatedInfo);
   }, [db, schoolInfo]);
 

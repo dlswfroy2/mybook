@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastLoginAt: serverTimestamp()
         }, { merge: true }).catch(() => {});
 
-        // Keep presence alive with a 45s heartbeat
+        // Keep presence alive with a 5-minute heartbeat to drastically conserve Firestore write quota
         const heartbeatInterval = setInterval(() => {
           if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
             setDoc(userDocRef, {
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               lastActiveAt: serverTimestamp()
             }, { merge: true }).catch(() => {});
           }
-        }, 45000);
+        }, 300000);
 
         const handleVisibility = () => {
           if (document.visibilityState === 'visible') {
@@ -119,9 +119,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             setLoading(false);
           } else {
-            // Document missing fallback: Mandatory signup enforcement
-            await signOut(auth);
-            setUser(null);
+            // Do NOT force sign out on missing document (avoids kicking user out on quota exceed or transient network issues)
+            console.warn("User document not found in Firestore for UID:", fbUser.uid);
+            setUser(prev => prev || {
+              uid: fbUser.uid,
+              email: fbUser.email || '',
+              displayName: fbUser.displayName || 'ব্যবহারকারী',
+              role: fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com' ? 'admin' : 'viewer',
+              permissions: fbUser.email?.toLowerCase() === 'dlswf.roy@gmail.com' ? availablePermissions.map(p => p.id) : defaultPermissions,
+              marksPermissions: {},
+              isOnline: true
+            } as any);
             setLoading(false);
           }
         }, async (error) => {
