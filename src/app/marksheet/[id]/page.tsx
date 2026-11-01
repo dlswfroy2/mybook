@@ -123,32 +123,32 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                 </div>
 
                 <div className="text-center mb-4">
-                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest">
+                    <h2 className="text-lg font-black underline underline-offset-8 uppercase tracking-widest text-black">
                         {displayExamName.toUpperCase()} - PROGRESS REPORT
                     </h2>
                 </div>
 
                 <section className="mb-4 text-[11px] leading-relaxed bg-slate-50/50 p-2 border border-dashed border-gray-300 rounded">
-                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 border-b pb-1">
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 border-b border-black/10 pb-1">
                         <div className="font-bold text-gray-600 uppercase">Student's Name</div><div className="font-bold uppercase text-blue-900">: {student.studentNameEn || student.studentNameBn}</div>
                         <div className="font-bold text-gray-600 text-right uppercase">Class</div><div className="font-bold">: {classMap[student.className] || student.className}</div>
                     </div>
-                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b pb-1">
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b border-black/10 pb-1">
                         <div className="font-bold text-gray-600 uppercase">Father's Name</div><div>: {student.fatherNameEn || student.fatherNameBn}</div>
                         <div className="font-bold text-gray-600 text-right uppercase">Roll No.</div><div className="font-bold">: {student.roll}</div>
                     </div>
-                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b pb-1">
+                    <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1 border-b border-black/10 pb-1">
                         <div className="font-bold text-gray-600 uppercase">Mother's Name</div><div>: {student.motherNameEn || student.motherNameBn}</div>
                         <div className="font-bold text-gray-600 text-right uppercase">Group</div><div>: {student.group ? groupMap[student.group.toLowerCase()] || student.group : 'General'}</div>
                     </div>
                     <div className="grid grid-cols-[1.5fr_4fr_1fr_2fr] gap-x-4 mt-1">
                         <div className="font-bold text-gray-600 uppercase">Student ID</div><div className="font-black">: {student.generatedId || '-'}</div>
-                        <div className="font-bold text-gray-600 text-right uppercase">Exam</div><div className="font-bold">: {displayExamName}</div>
+                        <div></div><div></div>
                     </div>
                 </section>
 
                 <div className="grid grid-cols-4 border-2 border-black divide-x-2 divide-black text-center text-[11px] bg-blue-900 text-white mb-4 rounded-sm">
-                    <div className="py-1.5 font-bold">Status: <span className={result.isPass ? "text-green-400" : "text-red-400"}>{result.isPass ? 'PASSED' : 'FAILED'}</span></div>
+                    <div className="py-1.5 font-bold">Status: <span className={cn("font-black", result.isPass ? "text-green-400" : "text-red-400")}>{result.isPass ? 'PASSED' : 'FAILED'}</span></div>
                     <div className="py-1.5 font-bold">GPA: <span className="text-amber-300 font-black">{result.gpa.toFixed(2)}</span></div>
                     <div className="py-1.5 font-bold">Final Grade: <span className="text-amber-300 font-black">{result.isPass ? result.finalGrade : 'F'}</span></div>
                     <div className="py-1.5 font-bold">Merit Rank: <span>{result.isPass ? renderMeritPosition(result.meritPosition) : 'N/A'}</span></div>
@@ -160,13 +160,13 @@ const MarksheetTemplate = ({ result, schoolInfo, examName, academicYear, waterma
                             <tr className="border-b-[1.5px] border-black">
                                 <th className="border-r border-black p-1 w-8 text-center">SL</th>
                                 <th className="border-r border-black p-1 text-left pl-4">Subject Name</th>
-                                <th className="border-r border-black p-1 w-12">Full Marks</th>
-                                <th className="border-r border-black p-1 w-14">Written</th>
-                                <th className="border-r border-black p-1 w-14">MCQ</th>
-                                {hasPractical && <th className="border-r border-black p-1 w-14">Practical</th>}
-                                <th className="border-r border-black p-1 w-16">Obtained</th>
-                                <th className="border-r border-black p-1 w-12">Grade</th>
-                                <th className="p-1 w-12">Point</th>
+                                <th className="border-r border-black p-1 w-12 text-center">Full Marks</th>
+                                <th className="border-r border-black p-1 w-14 text-center">Written</th>
+                                <th className="border-r border-black p-1 w-14 text-center">MCQ</th>
+                                {hasPractical && <th className="border-r border-black p-1 w-14 text-center">Practical</th>}
+                                <th className="border-r border-black p-1 w-16 text-center">Obtained</th>
+                                <th className="border-r border-black p-1 w-12 text-center">Grade</th>
+                                <th className="p-1 w-12 text-center">Point</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -233,7 +233,7 @@ function MarksheetContent() {
     const [watermarkOpacity, setWatermarkOpacity] = useState(0.15);
 
     const academicYear = searchParams.get('academicYear') || new Date().getFullYear().toString();
-    const initialExam = searchParams.get('examName') || 'Annual Examination';
+    const initialExam = searchParams.get('examName') || 'বার্ষিক পরীক্ষা';
     const [currentExamName, setCurrentExamName] = useState<string>(initialExam);
 
     useEffect(() => {
@@ -246,14 +246,22 @@ function MarksheetContent() {
                 if (!studentDoc.exists()) { setIsLoading(false); return; }
                 const studentData = studentFromDoc(studentDoc);
                 setStudent(studentData);
-                const classQuery = query(collection(db, 'students'), where('academicYear', '==', academicYear), where('className', '==', studentData.className));
+
+                const classQuery = query(
+                    collection(db, 'students'), 
+                    where('academicYear', '==', academicYear), 
+                    where('className', '==', studentData.className)
+                );
                 const classSnap = await getDocs(classQuery);
                 const studentsList = classSnap.docs.map(studentFromDoc);
+
                 const allResults = await getAllResults(db, academicYear, currentExamName);
                 const fetchedResultsBySubject = allResults.filter(r => r.className === studentData.className);
                 const allSubjectsForGroup = getSubjects(studentData.className, studentData.group || undefined).filter(s => s.isExamSubject !== false);
+                
                 const allFinalResults = processStudentResults(studentsList, fetchedResultsBySubject, allSubjectsForGroup);
                 const finalResultForThisStudent = allFinalResults.find(res => res.student.id === studentId);
+                
                 if (finalResultForThisStudent) setProcessedResult(finalResultForThisStudent);
             } catch (e) { console.error(e); }
             finally { setIsLoading(false); }
@@ -261,12 +269,12 @@ function MarksheetContent() {
         fetchAllData();
     }, [db, studentId, academicYear, currentExamName]);
 
-    if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><Loader2 className="animate-spin" /></div>;
+    if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><Loader2 className="animate-spin text-primary" /></div>;
 
     if (!student || !processedResult) return <div className="flex items-center justify-center min-h-screen">Marksheet data not found.</div>;
 
     return (
-        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center">
+        <div className="bg-slate-100 min-h-screen p-4 sm:p-8 font-sans print:p-0 print:bg-white flex flex-col items-center overflow-x-hidden">
             <style jsx global>{`
                 @media print {
                     @page {

@@ -1,4 +1,3 @@
-
 'use client';
 import type { Student } from './student-data';
 import { getSubjects, subjectNameNormalization } from './subjects';
@@ -65,7 +64,7 @@ const normalize = (name: string) => {
 const groupMap: Record<string, string> = { 
     'science': 'science', 'বিজ্ঞান': 'science',
     'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts',
-    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
+    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
 };
 
 export function processStudentResults(
@@ -75,33 +74,49 @@ export function processStudentResults(
 ): StudentProcessedResult[] {
 
     return students.map(student => {
-        // Step 1: Identify student's group and optional subject
         const rawGroup = (student.group || '').toLowerCase().trim();
-        const studentGroupNormalized = groupMap[rawGroup] || 'science'; 
-        const optionalSubjectNameNormalized = normalize(student.optionalSubject || '');
+        const studentGroupNormalized = groupMap[rawGroup] || rawGroup;
+        
+        let optionalSubjectNameNormalized = normalize(student.optionalSubject || '');
         const studentClassNum = parseInt(student.className);
 
-        // Step 2: Get the list of subjects THIS student is supposed to study
         const groupAllowedSubjects = getSubjects(student.className, studentGroupNormalized);
         
-        // Filter for valid exam subjects
-        const studiedSubjects = groupAllowedSubjects.filter(subInfo => {
-            if (subInfo.isExamSubject === false || subInfo.fullMarks === 0) {
-                return false;
-            }
-
+        // Final subject list for this student
+        const subjectsForStudent = groupAllowedSubjects.filter(subInfo => {
+            if (subInfo.isExamSubject === false) return false;
+            
             const currentSubNameNormalized = normalize(subInfo.name);
             
-            // Special handling for Science electives (Higher Math vs Agriculture)
-            if (studentClassNum >= 9 && studentGroupNormalized === 'science') {
+            // For 9-10: Handle mutually exclusive electives (like HM and Agri)
+            if (studentClassNum >= 9) {
                 const hmNormalized = normalize('উচ্চতর গণিত');
                 const agriNormalized = normalize('কৃষি শিক্ষা');
                 
                 if (currentSubNameNormalized === hmNormalized || currentSubNameNormalized === agriNormalized) {
+                    // If student has specified an optional in profile, strictly show only that one
                     if (optionalSubjectNameNormalized) {
                         return currentSubNameNormalized === optionalSubjectNameNormalized;
                     }
-                    return currentSubNameNormalized === hmNormalized;
+                    
+                    // If no optional specified in profile, check if marks exist in the database for this subject
+                    const classResult = resultsBySubject.find(r => {
+                        const nameMatch = normalize(r.subject) === currentSubNameNormalized;
+                        if (!nameMatch) return false;
+                        
+                        if (studentClassNum >= 9) {
+                            const rGroupRaw = (r.group || 'none').toLowerCase().trim();
+                            const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
+                            return rGroupNorm === 'none' || rGroupNorm === studentGroupNormalized;
+                        }
+                        return true;
+                    });
+                    
+                    const studentResult = classResult?.results.find(r => r.studentId === student.id);
+                    const hasMarks = studentResult && (studentResult.written !== undefined || studentResult.mcq !== undefined || studentResult.practical !== undefined);
+                    
+                    // If student didn't pick an optional and hasn't sat for the exam, hide both
+                    return hasMarks;
                 }
             }
             return true;
@@ -109,14 +124,11 @@ export function processStudentResults(
 
         let totalMarks = 0;
         let totalPossibleMarks = 0;
-        let failedCompulsoryCount = 0;
         const subjectResultsMap = new Map<string, StudentSubjectResult>();
 
-        // Step 3: Iterate through studied subjects and check for marks
-        studiedSubjects.forEach(subjectInfo => {
+        subjectsForStudent.forEach(subjectInfo => {
             const normalizedSubjectName = normalize(subjectInfo.name);
             
-            // Find the marks record for this subject
             const classResult = resultsBySubject.find(r => {
                 const nameMatch = normalize(r.subject) === normalizedSubjectName;
                 if (!nameMatch) return false;
@@ -124,7 +136,6 @@ export function processStudentResults(
                 const classMatch = String(r.className) === String(student.className);
                 if (!classMatch) return false;
 
-                // Check group match for 9-10
                 if (studentClassNum >= 9) {
                     const rGroupRaw = (r.group || 'none').toLowerCase().trim();
                     const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
@@ -136,24 +147,9 @@ export function processStudentResults(
             const studentResult = classResult?.results.find(r => r.studentId === student.id);
             const fullMarks = classResult?.fullMarks || subjectInfo.fullMarks;
 
-            if (!classResult || !studentResult) {
-                subjectResultsMap.set(subjectInfo.name, {
-                    marks: 0,
-                    fullMarks: fullMarks,
-                    grade: 'F',
-                    point: 0,
-                    isPass: false
-                });
-                if (normalize(subjectInfo.name) !== optionalSubjectNameNormalized) {
-                    failedCompulsoryCount++;
-                }
-                totalPossibleMarks += fullMarks;
-                return;
-            }
-
-            const written = studentResult.written;
-            const mcq = studentResult.mcq;
-            const practical = studentResult.practical;
+            const written = studentResult?.written;
+            const mcq = studentResult?.mcq;
+            const practical = studentResult?.practical;
             const obtainedMarks = (written || 0) + (mcq || 0) + (practical || 0);
             
             let isPassSubject = true;
@@ -179,8 +175,8 @@ export function processStudentResults(
                         }
                     } 
                     else if (fullMarks === 50) {
-                        if (written !== undefined && written < 13) isPassSubject = false;
-                        if (mcq !== undefined && mcq < 3) isPassSubject = false;
+                        if (written !== undefined && written < 12) isPassSubject = false;
+                        if (mcq !== undefined && mcq < 5) isPassSubject = false;
                     }
                 }
             }
@@ -191,11 +187,6 @@ export function processStudentResults(
             totalMarks += obtainedMarks;
             totalPossibleMarks += fullMarks;
             
-            const isOptional = normalizedSubjectName === optionalSubjectNameNormalized;
-            if (!isPassSubject && !isOptional) {
-                failedCompulsoryCount++;
-            }
-
             subjectResultsMap.set(subjectInfo.name, {
                 written,
                 mcq,
@@ -208,32 +199,40 @@ export function processStudentResults(
             });
         });
         
-        // Step 4: Calculate GPA
         let totalCompulsoryPoints = 0;
         let compulsorySubjectsCount = 0;
+        let failedInCompulsoryCount = 0;
         let bonusPoints = 0;
 
-        studiedSubjects.forEach(subjectInfo => {
+        subjectsForStudent.forEach(subjectInfo => {
             const result = subjectResultsMap.get(subjectInfo.name);
-            if (!result) return;
-
             const isOptional = normalize(subjectInfo.name) === optionalSubjectNameNormalized;
 
             if (isOptional) {
-                if (result.isPass && result.point > 2.0) {
+                if (result && result.isPass && result.point > 2.0) {
                     bonusPoints = result.point - 2.0;
                 }
-            } else {
+            } else if (subjectInfo.fullMarks > 0) {
                 compulsorySubjectsCount++;
-                totalCompulsoryPoints += result.point;
+                if (!result || !result.isPass) {
+                    failedInCompulsoryCount++;
+                } else {
+                    totalCompulsoryPoints += result.point;
+                }
             }
         });
 
-        const isPass = failedCompulsoryCount === 0;
+        // Forced normalization for 9-10 if calculated count is close
+        let effectiveCompulsoryCount = compulsorySubjectsCount;
+        if (studentClassNum >= 9 && effectiveCompulsoryCount > 11) {
+            effectiveCompulsoryCount = 11;
+        }
+
+        const isPass = failedInCompulsoryCount === 0;
         let gpa = 0;
 
-        if (isPass && compulsorySubjectsCount > 0) {
-            gpa = (totalCompulsoryPoints + bonusPoints) / compulsorySubjectsCount;
+        if (isPass && effectiveCompulsoryCount > 0) {
+            gpa = (totalCompulsoryPoints + bonusPoints) / effectiveCompulsoryCount;
             if (gpa > 5.0) gpa = 5.0;
         }
         
@@ -246,7 +245,7 @@ export function processStudentResults(
             gpa: isPass ? parseFloat(gpa.toFixed(2)) : 0.0,
             finalGrade,
             isPass,
-            failedSubjectsCount: failedCompulsoryCount,
+            failedSubjectsCount: failedInCompulsoryCount,
             subjectResults: subjectResultsMap,
         };
     }).sort((a, b) => {
@@ -262,9 +261,9 @@ export function processStudentResults(
         if (!res.isPass) return res;
         let meritPosition = idx + 1;
         if (idx > 0) {
-            const prev = self[idx - 1] as any;
+            const prev = self[idx - 1];
             if (prev.isPass && prev.gpa === res.gpa && prev.totalMarks === res.totalMarks) {
-                meritPosition = prev.meritPosition;
+                meritPosition = (prev as StudentProcessedResult).meritPosition!;
             }
         }
         return { ...res, meritPosition };
