@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
     Trash2, FileUp, Download, FilePen, BookOpen, AlertCircle, Trophy, Printer, Loader2, 
-    FileSpreadsheet, CheckCircle2, Save, Star, ChevronRight, LayoutGrid, FileText, 
+    FileSpreadsheet, CheckCircle2, Save, Star, ChevronRight, ChevronLeft, LayoutGrid, FileText, 
     Search, Sparkles, Settings, ListTodo, List, XCircle, UserCheck, RefreshCcw, Plus, AlertTriangle, Info, History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -1036,19 +1036,49 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                             <Badge variant="secondary" className="font-black px-3 text-xs">মোট: {toBengaliNumber(results.length)} জন</Badge>
                         </div>
                         
-                        <div 
-                            ref={el => { topScrollRefs.current[gk] = el; }}
-                            onScroll={() => handleScrollSync(gk, 'top')}
-                            className="overflow-x-auto no-print mb-1 h-3 scrollbar-thin scrollbar-thumb-primary/20"
-                            style={{ width: '100%' }}
-                        >
-                            <div style={{ width: `${totalTableWidth}px`, height: '1px' }} />
+                        {/* Top Table Scrollbar Controller with Left/Right Buttons */}
+                        <div className="bg-slate-100/90 border-x-2 border-t-2 border-black p-2 no-print shadow-sm flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    tableContainerRefs.current[gk]?.scrollBy({ left: -350, behavior: 'smooth' });
+                                }}
+                                className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
+                                title="টেবিল বামে সরান"
+                            >
+                                <ChevronLeft className="w-4 h-4 text-blue-600" /> বামে
+                            </Button>
+
+                            <div 
+                                ref={el => { topScrollRefs.current[gk] = el; }}
+                                onScroll={() => handleScrollSync(gk, 'top')}
+                                className="flex-1 overflow-x-scroll permanent-scroll top-scrollbar-track rounded-lg border border-slate-300 bg-white cursor-pointer"
+                                style={{ height: '24px' }}
+                                title="স্ক্রোলবারটি ডানে-বামে টেনে পুরো টেবিল সরান"
+                            >
+                                <div style={{ width: `${Math.max(totalTableWidth, 1400)}px`, height: '2px' }} />
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    tableContainerRefs.current[gk]?.scrollBy({ left: 350, behavior: 'smooth' });
+                                }}
+                                className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
+                                title="টেবিল ডানে সরান"
+                            >
+                                ডানে <ChevronRight className="w-4 h-4 text-blue-600" />
+                            </Button>
                         </div>
 
                         <div 
                             ref={el => { tableContainerRefs.current[gk] = el; }}
                             onScroll={() => handleScrollSync(gk, 'table')}
-                            className="table-container !border-2 !border-black relative rounded-b-lg !overflow-auto"
+                            className="table-container !border-2 !border-black relative rounded-b-lg !overflow-auto permanent-scroll"
                         >
                             <table className="min-w-max border-separate border-spacing-0 w-full">
                                 <thead className="z-30">
@@ -1228,7 +1258,7 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print sticky top-0 z-[60] backdrop-blur-md">
+            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print relative z-10 backdrop-blur-md">
                 <div className="w-full md:w-64 space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">১. পরীক্ষা নির্বাচন</Label>
                     <Select value={examName} onValueChange={setExamName}>
