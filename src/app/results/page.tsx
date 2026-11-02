@@ -556,7 +556,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                     <Label className="font-bold text-xs">শ্রেণি</Label>
                     <Select value={className} onValueChange={setClassName}>
                         <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
-                        <SelectContent>{Object.entries(classNamesMap).map(([v, l]) => <SelectItem key={v} value={v}>{l} শ্রেণি</SelectItem>)}</SelectContent>
+                        <SelectContent>{Object.entries(classNamesMap).map(([id, label]) => <SelectItem key={id} value={id}>{l} শ্রেণি</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 {parseInt(className) >= 9 && (
@@ -1416,6 +1416,97 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
     );
 };
 
+const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
+    const db = useFirestore();
+    const { selectedYear } = useAcademicYear();
+    const { toast } = useToast();
+    const [searchRoll, setSearchRoll] = useState('');
+    const [searchClass, setSearchClass] = useState('6');
+    const [searchExam, setSearchExam] = useState('');
+    const [exams, setExams] = useState<Exam[]>([]);
+    const [searchResult, setSearchResult] = useState<StudentProcessedResult | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    useEffect(() => {
+        if (db) getExams(db, selectedYear).then(setExams);
+    }, [db, selectedYear]);
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchRoll || !searchClass || !searchExam) return;
+        setIsSearching(true);
+        try {
+            const bnToEn = (str: string) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
+            const rollNum = parseInt(bnToEn(searchRoll), 10);
+            const student = allStudents.find(s => s.roll === rollNum && s.className === searchClass && s.academicYear === selectedYear);
+            if (!student) { toast({ variant: 'destructive', title: 'শিক্ষার্থী পাওয়া যায়নি' }); setIsSearching(false); return; }
+            const allRes = await getAllResults(db!, selectedYear, searchExam).catch(() => []);
+            const classRes = allRes.filter(r => r.className === searchClass);
+            const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === searchClass);
+            const subs = getSubjects(searchClass, student.group).filter(s => s.isExamSubject !== false);
+            const results = processStudentResults(classStudents, classRes, subs);
+            const res = results.find(r => r.student.id === student.id);
+            if (res) setSearchResult(res); else toast({ variant: 'destructive', title: 'ফলাফল পাওয়া যায়নি' });
+        } catch (e) { console.error(e); }
+        setIsSearching(false);
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <Card className="max-w-lg mx-auto border-2 shadow-xl rounded-3xl overflow-hidden">
+                <CardHeader className="bg-primary text-white p-6"><CardTitle className="text-xl flex items-center gap-2"><Search className="h-6 w-6" /> ফলাফল অনুসন্ধান</CardTitle></CardHeader>
+                <CardContent className="p-6">
+                    <form onSubmit={handleSearch} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2"><Label className="font-bold">রোল</Label><Input value={searchRoll} onChange={e => setSearchRoll(e.target.value)} placeholder="উদা: ১" required className="h-11 font-black text-lg" /></div>
+                            <div className="space-y-2">
+                                <Label className="font-bold">শ্রেণি</Label>
+                                <Select value={searchClass} onValueChange={(v) => setSearchClass(v)}>
+                                    <SelectTrigger className="h-11 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent>{Object.entries(classNamesMap).map(([v, l]) => <SelectItem key={v} value={v}>{l} শ্রেণি</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="font-bold">পরীক্ষা</Label>
+                            <Select value={searchExam} onValueChange={setSearchExam}>
+                                <SelectTrigger className="h-11 border-2 font-black text-lg"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
+                                <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        <Button type="submit" disabled={isSearching} className="w-full h-12 text-lg font-black">{isSearching ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : 'খুঁজুন'}</Button>
+                    </form>
+                </CardContent>
+            </Card>
+            {searchResult && (
+                <Card className="max-w-2xl mx-auto border-2 shadow-xl animate-in zoom-in-95 duration-300">
+                    <CardHeader className="bg-muted/30 border-b flex flex-row items-center gap-4 p-6">
+                        <Avatar className="h-16 w-16 border-2 border-white shadow-md">
+                            <AvatarImage src={sanitizePhotoUrl(searchResult.student.photoUrl, searchResult.student.gender) || getStudentPlaceholderImage(searchResult.student.gender)} className="object-cover" />
+                            <AvatarFallback className="bg-primary/20 font-black">S</AvatarFallback>
+                        </Avatar>
+                        <div><CardTitle className="text-2xl font-black">{searchResult.student.studentNameBn}</CardTitle><CardDescription className="font-bold text-primary">রোল: {toBengaliNumber(searchResult.student.roll)} | {classNamesMap[searchResult.student.className]} শ্রেণি</CardDescription></div>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মোট নম্বর</p><p className="text-xl font-black text-primary">{toBengaliNumber(searchResult.totalMarks)}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">GPA</p><p className="text-xl font-black text-primary">{toBengaliNumber(searchResult.gpa.toFixed(2))}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">গ্রেড</p><p className={cn("text-xl font-black", searchResult.isPass ? "text-emerald-600" : "text-rose-600")}>{searchResult.isPass ? searchResult.finalGrade : 'F'}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মেধাক্রম</p><p className="text-xl font-black text-amber-600">{searchResult.isPass ? toBengaliNumber(searchResult.meritPosition || '-') : '-'}</p></div>
+                        </div>
+                        <div className="table-container max-h-[300px] border-2"><Table><TableHeader className="bg-muted/50 sticky top-0 z-10"><TableRow><TableHead className="font-black">বিষয়</TableHead><TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead><TableHead className="text-center font-black">গ্রেড</TableHead><TableHead className="text-right font-black">পয়েন্ট</TableHead></TableRow></TableHeader><TableBody>{Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (<TableRow key={name} className="h-10"><TableCell className="font-bold text-xs">{name}</TableCell><TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell><TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell><TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell></TableRow>))}</TableBody></Table></div></CardContent>
+                    <CardFooter className="bg-slate-50 p-4 border-t flex justify-end gap-3">
+                        <Button variant="outline" className="font-black" onClick={() => setSearchResult(null)}>অন্য ফলাফল খুঁজুন</Button>
+                        <Link href={`/marksheet/${searchResult.student.id}?academicYear=${selectedYear}&examName=${encodeURIComponent(searchExam)}`} target="_blank">
+                            <Button className="font-black shadow-lg"><Printer className="mr-2 h-4 w-4" /> মার্কশিট প্রিন্ট করুন</Button>
+                        </Link>
+                    </CardFooter>
+                </Card>
+            )}
+        </div>
+    );
+}
+
 const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Student[], onPrintRequested: (data: any) => void }) => {
     const { toast } = useToast();
     const { selectedYear } = useAcademicYear();
@@ -1550,7 +1641,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">পরীক্ষা</Label><Select value={selectedExam} onValueChange={setSelectedExam}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="পরীক্ষা" /></SelectTrigger><SelectContent>{specialExams.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">শ্রেণি</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-2"><Label className="font-bold text-xs text-primary">বিষয়</Label><Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="বিষয়" /></SelectTrigger><SelectContent>{getSubjects(selectedClass).filter(s => s.isExamSubject !== false).map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent></Select></div>
-                        <Button onClick={handleLoadForInput} disabled={isLoading || !selectedMonth || !selectedExam || !selectedSubject} className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 border-b-4 border-black/20 shadow-lg active:translate-y-0.5 font-black text-xs">লোড করুন</Button>
+                        <Button onClick={handleLoadForInput} disabled={isLoading || !selectedMonth || !selectedExam || !selectedSubject} className="font-black h-11 shadow-md">লোড করুন</Button>
                     </div>
 
                     {filteredStudents.length > 0 && selectedSubject && (
@@ -1576,7 +1667,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                                         </TableBody>
                                     </Table>
                                 </div>
-                                <div className="p-6 bg-slate-50 border-t-2 border-black flex justify-end"><Button onClick={handleSaveSpecialMarks} disabled={isLoading} size="lg" className="px-16 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border-b-4 border-emerald-800 text-white shadow-xl active:translate-y-0.5 font-black text-xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
+                                <div className="p-6 bg-slate-50 border-t-2 border-black flex justify-end"><Button onClick={handleSaveSpecialMarks} disabled={isLoading} size="lg" className="px-16 h-14 text-xl font-black shadow-2xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
                             </CardContent>
                         </Card>
                     )}
@@ -1630,7 +1721,7 @@ const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Studen
                                                                 const match = allSpecialResults.find(r => {
                                                                     const normalizedSearch = normalize(sub.name);
                                                                     const normalizedRecord = normalize(r.subject);
-                                                                    if (sub.isCombined) return sub.subList.some((innerSub: string) => normalizedRecord === normalizedRecord) && r.examType === type;
+                                                                    if (sub.isCombined) return sub.subList.some((innerSub: string) => normalize(innerSub) === normalizedRecord) && r.examType === type;
                                                                     return normalizedRecord === normalizedSearch && r.examType === type;
                                                                 });
                                                                 const marks = match?.results.find(res => res.studentId === student.id)?.marks;
@@ -1742,12 +1833,11 @@ export default function ResultsPage() {
     }, [canViewRes, canManageFullMarks, hasPermission, user]);
 
     if (isClient && !canViewRes && !hasPermission('view:merit-list') && !hasPermission('promote:students') && !hasPermission('manage:special-results') && user?.role !== 'admin' && !canManageFullMarks) return (
-        <div className="flex min-h-screen w-full flex-col bg-violet-50"><Header /><main className="flex flex-1 items-center justify-center p-4"><Card className="p-8 text-center border-2 border-primary/20"><AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" /><h2 className="text-xl font-bold">প্রবেশাধিকার সংরক্ষিত</h2></Card></main></div>
+        <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush"><main className="flex flex-1 items-center justify-center p-4"><Card className="p-8 text-center border-2 border-primary/20"><AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" /><h2 className="text-xl font-bold">প্রবেশাধিকার সংরক্ষিত</h2></Card></main></div>
     );
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
-            <Header />
             <main className="flex-1 p-4 md:p-8 no-print pb-40">
                 <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
                     <aside className="w-full md:w-64 shrink-0 space-y-1 bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
