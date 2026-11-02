@@ -1521,11 +1521,21 @@ export default function Home() {
         subLabel: ((q.classId ? 'শ্রেণি ' + q.classId : '') + ' ' + (q.subject || '')).trim(),
         href: '/my-questions', time: q.createdAt || q.updatedAt, icon: 'question', color: 'red' });
     });
-    items.sort((a, b) => {
-      const ta = a.time?.toDate ? a.time.toDate().getTime() : (a.time ? new Date(a.time).getTime() : 0);
-      const tb = b.time?.toDate ? b.time.toDate().getTime() : (b.time ? new Date(b.time).getTime() : 0);
-      return tb - ta;
-    });
+    const getTimeMs = (t: any): number => {
+      if (!t) return 0;
+      try {
+        if (typeof t.toDate === 'function') {
+          const d = t.toDate();
+          return !isNaN(d.getTime()) ? d.getTime() : 0;
+        }
+        if (t.seconds) return t.seconds * 1000;
+        const d = new Date(t);
+        return !isNaN(d.getTime()) ? d.getTime() : 0;
+      } catch {
+        return 0;
+      }
+    };
+    items.sort((a, b) => getTimeMs(b.time) - getTimeMs(a.time));
     return items.slice(0, 6);
   }, [allLectureSheets, allPdfSheets, allQuestions]);
 
@@ -2191,9 +2201,24 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {recentActivity.map((item, i) => {
-              const timeStr = item.time?.toDate
-                ? format(item.time.toDate(), 'dd MMM, HH:mm', { locale: bn })
-                : (item.time ? format(new Date(item.time), 'dd MMM, HH:mm', { locale: bn }) : '');
+              let timeStr = '';
+              try {
+                if (item.time) {
+                  let d: Date | null = null;
+                  if (typeof item.time?.toDate === 'function') {
+                    d = item.time.toDate();
+                  } else if (item.time?.seconds) {
+                    d = new Date(item.time.seconds * 1000);
+                  } else {
+                    d = new Date(item.time);
+                  }
+                  if (d && !isNaN(d.getTime())) {
+                    timeStr = format(d, 'dd MMM, HH:mm', { locale: bn });
+                  }
+                }
+              } catch (e) {
+                timeStr = '';
+              }
               const colorMap: Record<string, { bg: string; border: string; badge: string; text: string }> = {
                 emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-600', text: 'text-emerald-800' },
                 blue:    { bg: 'bg-blue-50',    border: 'border-blue-200',    badge: 'bg-blue-600',    text: 'text-blue-800'    },
