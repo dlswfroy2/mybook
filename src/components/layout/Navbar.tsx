@@ -112,28 +112,28 @@ function NavbarContent() {
   }
 
   const navItems = [
-    { label: 'হোম', icon: LayoutDashboard, href: '/', bg: 'bg-[#0284c7] hover:bg-[#0369a1] border-b-[4px] border-[#075985]', shadow: 'shadow-sky-900/40' },
-    { label: 'বার্ষিক ক্যালেন্ডার', icon: Calendar, href: '/calendar', bg: 'bg-[#d97706] hover:bg-[#b45309] border-b-[4px] border-[#92400e]', shadow: 'shadow-amber-900/40' },
-    { label: 'হোয়াইটবোর্ড', icon: Edit3, href: '/whiteboard', bg: 'bg-[#ea580c] hover:bg-[#c2410c] border-b-[4px] border-[#9a3412]', shadow: 'shadow-orange-900/40' },
-    { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books', bg: 'bg-[#2563eb] hover:bg-[#1d4ed8] border-b-[4px] border-[#1e40af]', shadow: 'shadow-blue-900/40' },
-    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', bg: 'bg-[#65a30d] hover:bg-[#4d7c0f] border-b-[4px] border-[#3f6212]', shadow: 'shadow-lime-900/40' },
-    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', bg: 'bg-[#f59e0b] hover:bg-[#d97706] border-b-[4px] border-[#b45309]', shadow: 'shadow-yellow-900/40' },
-    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', bg: 'bg-[#9333ea] hover:bg-[#7e22ce] border-b-[4px] border-[#6b21a8]', shadow: 'shadow-purple-900/40' },
-    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', bg: 'bg-[#db2777] hover:bg-[#be185d] border-b-[4px] border-[#9d174d]', shadow: 'shadow-pink-900/40' },
-    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', bg: 'bg-[#0d9488] hover:bg-[#0f766e] border-b-[4px] border-[#115e59]', shadow: 'shadow-teal-900/40' },
-    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', bg: 'bg-[#4f46e5] hover:bg-[#4338ca] border-b-[4px] border-[#3730a3]', shadow: 'shadow-indigo-900/40' },
-    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', bg: 'bg-[#059669] hover:bg-[#047857] border-b-[4px] border-[#065f46]', shadow: 'shadow-emerald-900/40' },
-    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', bg: 'bg-[#3b82f6] hover:bg-[#2563eb] border-b-[4px] border-[#1d4ed8]', shadow: 'shadow-blue-900/40' },
-    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', bg: 'bg-[#b45309] hover:bg-[#92400e] border-b-[4px] border-[#78350f]', shadow: 'shadow-amber-900/40' },
-    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', bg: 'bg-[#c026d3] hover:bg-[#a21caf] border-b-[4px] border-[#86198f]', shadow: 'shadow-fuchsia-900/40' },
-    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', bg: 'bg-[#e11d48] hover:bg-[#be123c] border-b-[4px] border-[#9f1239]', shadow: 'shadow-rose-900/40' },
-    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', bg: 'bg-[#7c3aed] hover:bg-[#6d28d9] border-b-[4px] border-[#5b21b6]', shadow: 'shadow-violet-900/40' },
-    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', bg: 'bg-[#0891b2] hover:bg-[#0e7490] border-b-[4px] border-[#155e75]', shadow: 'shadow-cyan-900/40' },
-    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', bg: 'bg-[#4338ca] hover:bg-[#3730a3] border-b-[4px] border-[#312e81]', shadow: 'shadow-indigo-900/40' },
-    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', bg: 'bg-[#f97316] hover:bg-[#ea580c] border-b-[4px] border-[#c2410c]', shadow: 'shadow-orange-900/40' },
-    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', bg: 'bg-[#10b981] hover:bg-[#059669] border-b-[4px] border-[#047857]', shadow: 'shadow-emerald-900/40' },
-    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', bg: 'bg-[#be123c] hover:bg-[#9f1239] border-b-[4px] border-[#881337]', shadow: 'shadow-rose-900/40' },
-    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', bg: 'bg-[#475569] hover:bg-[#334155] border-b-[4px] border-[#1e293b]', shadow: 'shadow-slate-900/40' },
+    { label: 'হোম', icon: LayoutDashboard, href: '/', bg: 'bg-[#0284c7] hover:bg-[#0369a1] border-b-[2.5px] border-[#075985]', shadow: 'shadow-sky-900/40' },
+    { label: 'বার্ষিক ক্যালেন্ডার', icon: Calendar, href: '/calendar', bg: 'bg-[#d97706] hover:bg-[#b45309] border-b-[2.5px] border-[#92400e]', shadow: 'shadow-amber-900/40' },
+    { label: 'হোয়াইটবোর্ড', icon: Edit3, href: '/whiteboard', bg: 'bg-[#ea580c] hover:bg-[#c2410c] border-b-[2.5px] border-[#9a3412]', shadow: 'shadow-orange-900/40' },
+    { label: 'বোর্ড বই', icon: BookOpenText, href: '/board-books', bg: 'bg-[#2563eb] hover:bg-[#1d4ed8] border-b-[2.5px] border-[#1e40af]', shadow: 'shadow-blue-900/40' },
+    { label: 'নোটিশ বোর্ড', icon: Bell, href: '/notices-management', bg: 'bg-[#65a30d] hover:bg-[#4d7c0f] border-b-[2.5px] border-[#3f6212]', shadow: 'shadow-lime-900/40' },
+    { label: 'শিক্ষার্থী প্রোফাইল', icon: Search, href: '/student-profile', bg: 'bg-[#f59e0b] hover:bg-[#d97706] border-b-[2.5px] border-[#b45309]', shadow: 'shadow-yellow-900/40' },
+    { label: 'নতুন শিক্ষার্থী ভর্তি', icon: UserPlus, href: '/add-student', bg: 'bg-[#9333ea] hover:bg-[#7e22ce] border-b-[2.5px] border-[#6b21a8]', shadow: 'shadow-purple-900/40' },
+    { label: 'শিক্ষার্থী তালিকা', icon: Users, href: '/student-list', bg: 'bg-[#db2777] hover:bg-[#be185d] border-b-[2.5px] border-[#9d174d]', shadow: 'shadow-pink-900/40' },
+    { label: 'দৈনিক হাজিরা', icon: CalendarCheck, href: '/attendance', bg: 'bg-[#0d9488] hover:bg-[#0f766e] border-b-[2.5px] border-[#115e59]', shadow: 'shadow-teal-900/40' },
+    { label: 'ফলাফল ব্যবস্থাপনা', icon: Award, href: '/results', bg: 'bg-[#4f46e5] hover:bg-[#4338ca] border-b-[2.5px] border-[#3730a3]', shadow: 'shadow-indigo-900/40' },
+    { label: 'হিসাব শাখা', icon: Banknote, href: '/accounts', bg: 'bg-[#059669] hover:bg-[#047857] border-b-[2.5px] border-[#065f46]', shadow: 'shadow-emerald-900/40' },
+    { label: 'মেসেজ শাখা', icon: MessageSquare, href: '/messaging', bg: 'bg-[#3b82f6] hover:bg-[#2563eb] border-b-[2.5px] border-[#1d4ed8]', shadow: 'shadow-blue-900/40' },
+    { label: 'স্টাফ পোর্টাল', icon: UserCog, href: '/staff', bg: 'bg-[#b45309] hover:bg-[#92400e] border-b-[2.5px] border-[#78350f]', shadow: 'shadow-amber-900/40' },
+    { label: 'ডকুমেন্ট পোর্টাল', icon: FolderOpen, href: '/documents', bg: 'bg-[#c026d3] hover:bg-[#a21caf] border-b-[2.5px] border-[#86198f]', shadow: 'shadow-fuchsia-900/40' },
+    { label: 'নথিপত্র (আর্কাইভ)', icon: FileArchive, href: '/documents/archive', bg: 'bg-[#e11d48] hover:bg-[#be123c] border-b-[2.5px] border-[#9f1239]', shadow: 'shadow-rose-900/40' },
+    { label: 'রুটিন শাখা', icon: Clock, href: '/routines', bg: 'bg-[#7c3aed] hover:bg-[#6d28d9] border-b-[2.5px] border-[#5b21b6]', shadow: 'shadow-violet-900/40' },
+    { label: 'রেকর্ড শাখা', icon: Award, href: '/public-exam-records', bg: 'bg-[#0891b2] hover:bg-[#0e7490] border-b-[2.5px] border-[#155e75]', shadow: 'shadow-cyan-900/40' },
+    { label: 'টিচার্স ডায়েরি', icon: NotebookPen, href: '/diary', bg: 'bg-[#4338ca] hover:bg-[#3730a3] border-b-[2.5px] border-[#312e81]', shadow: 'shadow-indigo-900/40' },
+    { label: 'প্রশ্ন তৈরি', icon: PlusCircle, href: '/create-question', bg: 'bg-[#f97316] hover:bg-[#ea580c] border-b-[2.5px] border-[#c2410c]', shadow: 'shadow-orange-900/40' },
+    { label: 'শিট তৈরি', icon: BookOpen, href: '/create-lecture-sheet', bg: 'bg-[#10b981] hover:bg-[#059669] border-b-[2.5px] border-[#047857]', shadow: 'shadow-emerald-900/40' },
+    { label: 'আমার লাইব্রেরি', icon: Library, href: '/my-questions', bg: 'bg-[#be123c] hover:bg-[#9f1239] border-b-[2.5px] border-[#881337]', shadow: 'shadow-rose-900/40' },
+    { label: 'সেটিংস', icon: SettingsIcon, href: '/settings', bg: 'bg-[#475569] hover:bg-[#334155] border-b-[2.5px] border-[#1e293b]', shadow: 'shadow-slate-900/40' },
   ];
 
   return (
@@ -145,24 +145,24 @@ function NavbarContent() {
             <Menu className="w-6 h-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-[300px] p-0 border-r-white/20 font-kalpurush flex flex-col h-full max-h-screen bg-[#0f172a] overflow-hidden">
-          <SheetHeader className="p-6 bg-gradient-to-b from-primary to-primary/80 text-white border-b border-white/10 shrink-0 relative overflow-hidden">
+        <SheetContent side="left" className="w-[235px] sm:w-[240px] p-0 border-r-white/20 font-kalpurush flex flex-col h-full max-h-screen bg-[#0f172a] overflow-hidden">
+          <SheetHeader className="p-3.5 bg-gradient-to-b from-primary to-primary/80 text-white border-b border-white/10 shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] pointer-events-none" />
             <div className="flex items-center gap-3 relative z-10">
               <div className="bg-white p-2 rounded-2xl text-primary shadow-[0_4px_15px_rgba(255,255,255,0.3)] shrink-0 border-2 border-white/50">
                 {appLogoUrl ? (
-                  <img src={appLogoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+                  <img src={appLogoUrl} alt="Logo" className="w-6 h-6 object-contain" />
                 ) : (
-                  <BookOpenText className="w-8 h-8" />
+                  <BookOpenText className="w-6 h-6" />
                 )}
               </div>
-              <SheetTitle className="text-white text-[14px] font-black leading-tight text-left drop-shadow-md">
+              <SheetTitle className="text-white text-[12px] font-black leading-tight text-left drop-shadow-md">
                 {appName}
               </SheetTitle>
             </div>
           </SheetHeader>
           
-          <div className="flex-1 overflow-y-auto py-3 px-3 space-y-2 bg-[#0f172a] scrollbar-thin scrollbar-thumb-white/20">
+          <div className="flex-1 overflow-y-auto py-2 px-2.5 space-y-1.5 bg-[#0f172a] scrollbar-thin scrollbar-thumb-white/20">
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               return (
@@ -170,25 +170,25 @@ function NavbarContent() {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all duration-200 group text-white",
+                      "flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all duration-200 group text-white min-h-[34px]",
                       item.bg,
                       item.shadow,
-                      "shadow-md active:translate-y-1 active:border-b-0",
-                      isActive ? "ring-2 ring-white ring-offset-2 ring-offset-[#0f172a] scale-[1.02] shadow-xl" : "hover:brightness-110 hover:scale-[1.01]"
+                      "shadow-sm active:translate-y-0.5 active:border-b-0",
+                      isActive ? "ring-1.5 ring-white scale-[1.01] shadow-md" : "hover:brightness-110"
                     )}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
                       {/* Crisp White Glass Badge with Icon */}
-                      <div className="p-2 rounded-lg bg-black/20 text-white shrink-0 border border-white/30 shadow-inner group-hover:scale-110 transition-transform">
-                        <item.icon className="w-4 h-4 drop-shadow-sm" />
+                      <div className="p-1 rounded-md bg-black/20 text-white shrink-0 border border-white/30 shadow-inner group-hover:scale-105 transition-transform">
+                        <item.icon className="w-3 h-3 drop-shadow-sm" />
                       </div>
-                      <span className="font-black text-xs md:text-[13px] tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="font-black text-[11px] md:text-xs tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
                         {item.label}
                       </span>
                     </div>
                     <ChevronRight className={cn(
-                      "w-4 h-4 text-white/90 shrink-0 transition-transform",
-                      isActive ? "scale-110 opacity-100 translate-x-0.5" : "opacity-70 group-hover:opacity-100 group-hover:translate-x-1"
+                      "w-3 h-3 text-white/80 shrink-0 transition-transform",
+                      isActive ? "scale-105 opacity-100 translate-x-0.5" : "opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5"
                     )} />
                   </Link>
                 </SheetClose>
@@ -196,7 +196,7 @@ function NavbarContent() {
             })}
           </div>
           
-          <div className="shrink-0 p-4 border-t border-white/10 bg-black/40 backdrop-blur-md">
+          <div className="shrink-0 p-2.5 border-t border-white/10 bg-black/40 backdrop-blur-md">
              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest text-center">© ২০২৪-২৬ {appName}</p>
           </div>
         </SheetContent>
