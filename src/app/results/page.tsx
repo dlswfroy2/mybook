@@ -53,9 +53,8 @@ const classNamesMap: { [key: string]: string } = { '6': 'ষষ্ঠ', '7': '�
 const groupNamesMap: { [key: string]: string } = { 'science': 'বিজ্ঞান', 'arts': 'মানবিক', 'commerce': 'ব্যবসায় শিক্ষা', 'all': 'সকল শাখা' };
 const groupMap: Record<string, string> = { 
     'science': 'science', 'বিজ্ঞান': 'science', 'Science': 'science',
-    'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts', 'humanity': 'arts', 'Arts': 'arts',
-    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce', 'Commerce': 'commerce',
-    'none': 'none', 'all': 'none', 'general': 'none'
+    'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts', 'Arts': 'arts',
+    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce', 'Commerce': 'commerce'
 };
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
@@ -135,63 +134,49 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     const handleLoadStudents = async () => {
         if (!examName || !className || !subject || !db || !user) {
-            toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ' });
+            toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'অনুগ্রহ করে পরীক্ষা, শ্রেণি ও বিষয় নির্বাচন করুন।' });
             return;
         }
         setIsLoadingStudents(true);
 
-        try {
-            const normSub = subjectNameNormalization[subject] || subject;
-            const q = query(
-                collection(db, 'results'),
-                where('academicYear', '==', selectedYear),
-                where('examName', '==', examName),
-                where('className', '==', className),
-                where('subject', '==', normSub)
-            );
-            const snap = await getDocs(q);
-            const matchingResults = snap.docs.map(d => d.data() as ClassResult);
-            
-            if (matchingResults.length === 0) {
-                toast({ variant: 'destructive', title: 'পূর্ণমান সেট করা নেই' });
-                setIsLoadingStudents(false);
-                setStudentsForClass([]);
-                return;
-            }
-
-            const filteredStudents = allStudents.filter(s => {
-                if (s.academicYear !== selectedYear || s.className !== className) return false;
-                if (!showGroupSelector || group === 'all') return true;
-                const sGrp = groupMap[(s.group || '').toLowerCase().trim()] || (s.group || '').toLowerCase().trim();
-                const fGrp = groupMap[group.toLowerCase().trim()] || group.toLowerCase().trim();
-                return sGrp === fGrp;
-            }).sort((a,b) => a.roll - b.roll);
-
-            setStudentsForClass(filteredStudents);
-            
-            const initialMarks = new Map<string, Marks>();
-            const firstRes = matchingResults[0];
-            setFullMarks(firstRes.fullMarks);
-            setStoredLimits({
-                written: firstRes.writtenLimit ?? 0,
-                mcq: firstRes.mcqLimit ?? 0,
-                practical: firstRes.practicalLimit ?? 0
+        const effectiveGroup = (parseInt(className) < 9 || group === 'all') ? undefined : group;
+        const existingResults = await getResultsForClass(db, selectedYear, examName, className, subject, effectiveGroup).catch(() => undefined);
+        
+        if (!existingResults) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'পূর্ণমান সেট করা নেই', 
+                description: 'নম্বর এন্ট্রি করার আগে "বিষয় ও পূর্ণমান" ট্যাব থেকে এই বিষয়ের পূর্ণমান সেট করুন।' 
             });
-
-            matchingResults.forEach(resRecord => {
-                resRecord.results.forEach(res => {
-                    const existing = initialMarks.get(res.studentId) || {};
-                    initialMarks.set(res.studentId, { ...existing, written: res.written, mcq: res.mcq, practical: res.practical });
-                });
-            });
-            
-            filteredStudents.forEach(student => {
-                if (!initialMarks.has(student.id)) initialMarks.set(student.id, {});
-            });
-            setMarks(initialMarks);
-        } catch (e) {
-            console.error(e);
+            setIsLoadingStudents(false);
+            setStudentsForClass([]);
+            return;
         }
+
+        const filteredStudents = allStudents.filter(s => {
+            const yearMatch = s.academicYear === selectedYear;
+            const classMatch = s.className === className;
+            if (!yearMatch || !classMatch) return false;
+            if (!showGroupSelector || !group || group === 'all') return true;
+            
+            const sGroupNorm = groupMap[(s.group || '').toLowerCase().trim()] || (s.group || '').toLowerCase().trim();
+            const filterGroupNorm = groupMap[group.toLowerCase().trim()] || group.toLowerCase().trim();
+            return sGroupNorm === filterGroupNorm;
+        }).sort((a,b) => (Number(a.roll) || 0) - (Number(b.roll) || 0));
+
+        setStudentsForClass(filteredStudents);
+        
+        const initialMarks = new Map<string, Marks>();
+        setFullMarks(existingResults.fullMarks);
+        setStoredLimits({
+            written: existingResults.writtenLimit ?? 0,
+            mcq: existingResults.mcqLimit ?? 0,
+            practical: existingResults.practicalLimit ?? 0
+        });
+        existingResults.results.forEach(res => initialMarks.set(res.studentId, { written: res.written, mcq: res.mcq, practical: res.practical }));
+        
+        filteredStudents.forEach(student => { if (!initialMarks.has(student.id)) initialMarks.set(student.id, { written: undefined, mcq: undefined, practical: undefined }); });
+        setMarks(initialMarks);
         setIsLoadingStudents(false);
     };
 
@@ -363,6 +348,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                                         
                                         const isAnyMarkEntered = sMarks?.written !== undefined || sMarks?.mcq !== undefined || sMarks?.practical !== undefined;
 
+                                        // Precise fail logic synchronization with results-calculation lib
                                         const normalizedSubjectName = normalize(subject);
                                         const isEnglish = normalizedSubjectName === normalize('ইংরেজি প্রথম') || normalizedSubjectName === normalize('ইংরেজি দ্বিতীয়');
                                         const isIct25 = (normalizedSubjectName.includes('তথ্য ও যোগাযোগ') || normalizedSubjectName.includes('আইসিটি')) && fullMarks === 25;
@@ -469,7 +455,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
     const [exams, setExams] = useState<Exam[]>([]);
     const [examName, setExamName] = useState('');
     const [className, setClassName] = useState('');
-    const [group, setGroup] = useState('all');
+    const [group, setGroup] = useState('');
     const [subject, setSubject] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [availableSubjects, setAvailableSubjects] = useState<SubjectType[]>([]);
@@ -487,7 +473,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
     }, [db, selectedYear, user]);
 
     useEffect(() => {
-        let newSubjects = getSubjects(className, group === 'all' ? undefined : group).filter(s => s.isExamSubject !== false);
+        let newSubjects = getSubjects(className, group).filter(s => s.isExamSubject !== false);
         if (user?.role !== 'admin' && !hasPermission('manage:results') && className) {
             newSubjects = newSubjects.filter(s => isSubjectPermitted(className, s.name));
         }
@@ -501,31 +487,13 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
         }
         setIsLoading(true);
         try {
-            const normSub = subjectNameNormalization[subject] || subject;
-            const q = query(
-                collection(db, 'results'),
-                where('academicYear', '==', selectedYear),
-                where('examName', '==', examName),
-                where('className', '==', className),
-                where('subject', '==', normSub)
-            );
-            const snap = await getDocs(q);
-            const matchingResults = snap.docs.map(d => d.data() as ClassResult);
-            
-            if (matchingResults.length === 0) {
+            const effectiveGroup = parseInt(className) < 9 ? undefined : group;
+            const data = await getResultsForClass(db, selectedYear, examName, className, subject, effectiveGroup).catch(() => undefined);
+            if (!data) {
                 toast({ title: 'কোনো ফলাফল পাওয়া যায়নি' });
                 setResults(null);
             } else {
-                const mergedResults: ClassResult = {
-                    ...matchingResults[0],
-                    results: []
-                };
-                const studentResultsMap = new Map<string, StudentResult>();
-                matchingResults.forEach(r => {
-                    r.results.forEach(sr => studentResultsMap.set(sr.studentId, sr));
-                });
-                mergedResults.results = Array.from(studentResultsMap.values());
-                setResults(mergedResults);
+                setResults(data);
             }
         } catch (e) {
             console.error(e);
@@ -583,34 +551,8 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                 const marks = results.results.find(r => r.studentId === student.id);
                 const obtainedMarks = (marks?.written || 0) + (marks?.mcq || 0) + (marks?.practical || 0);
                 const percentage = results.fullMarks > 0 ? (obtainedMarks / results.fullMarks) * 100 : 0;
-                
-                const normalizedSubjectName = normalize(subject);
-                const isEnglish = normalizedSubjectName === normalize('ইংরেজি প্রথম') || normalizedSubjectName === normalize('ইংরেজি দ্বিতীয়');
-                const isIct25 = (normalizedSubjectName.includes('তথ্য ও যোগাযোগ') || normalizedSubjectName.includes('আইসিটি')) && results.fullMarks === 25;
-
-                let isPass = true;
-                const overallPassMark = Math.ceil(results.fullMarks * 0.33);
-
-                if (obtainedMarks < overallPassMark) {
-                    isPass = false;
-                } else if (!isEnglish) {
-                    if (isIct25) {
-                        if (marks?.mcq !== undefined && (marks.mcq < 8)) isPass = false;
-                    } else if (results.fullMarks === 100) {
-                        if (results.practicalLimit && results.practicalLimit > 0) {
-                            if (marks?.written !== undefined && marks.written < 17) isPass = false;
-                            if (marks?.mcq !== undefined && marks.mcq < 8) isPass = false;
-                            if (marks?.practical !== undefined && marks.practical < 8) isPass = false;
-                        } else {
-                            if (marks?.written !== undefined && marks.written < 23) isPass = false;
-                            if (marks?.mcq !== undefined && marks.mcq < 10) isPass = false;
-                        }
-                    } else if (results.fullMarks === 50) {
-                        if (marks?.written !== undefined && marks.written < 12) isPass = false;
-                        if (marks?.mcq !== undefined && marks.mcq < 5) isPass = false;
-                    }
-                }
-
+                const passMark = Math.ceil(results.fullMarks * 0.33);
+                const isPass = obtainedMarks >= passMark;
                 const { grade, point } = getGradePoint(percentage);
 
                 return {
@@ -622,7 +564,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                     isPass
                 };
             });
-    }, [results, allStudents, selectedYear, className, group, subject]);
+    }, [results, allStudents, selectedYear, className, group]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -646,7 +588,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                         <Label className="text-xs font-bold">শাখা</Label>
                         <Select value={group} onValueChange={setGroup}>
                             <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সকল" /></SelectTrigger>
-                            <SelectContent><SelectItem value="all">সকল শাখা</SelectItem><SelectItem value="science">বিজ্ঞান</SelectItem><SelectItem value="arts">মানবিক</SelectItem><SelectItem value="commerce">ব্যবসায় শিক্ষা</SelectItem></SelectContent>
+                            <SelectContent><SelectItem value="science">বিজ্ঞান</SelectItem><SelectItem value="arts">মানবিক</SelectItem><SelectItem value="commerce">ব্যবসায় শিক্ষা</SelectItem></SelectContent>
                         </Select>
                     </div>
                 )}
@@ -670,7 +612,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
                     <CardHeader className="bg-primary/5 p-4 border-b flex flex-row justify-between items-center space-y-0">
                         <div>
                             <CardTitle className="text-base font-black text-primary">{subject} - নম্বর ফর্দ ({examName})</CardTitle>
-                            <CardDescription className="font-bold text-[10px]">শ্রেণি: {classNamesMap[className]} | শাখা: {groupNamesMap[group || 'all']}</CardDescription>
+                            <CardDescription className="text-[10px] font-bold">শ্রেণি: {classNamesMap[className]} | শাখা: {groupNamesMap[group || 'all']}</CardDescription>
                         </div>
                         <Button variant="outline" className="font-black h-9 border-primary text-primary" onClick={() => onPrintRequested({ studentData: reportStudents, info: { examName, className, subject, group, fullMarks: results.fullMarks }, isBlank: false })}>
                             <Printer className="mr-2 h-4 w-4" /> প্রিন্ট (PDF)
@@ -1201,13 +1143,13 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                 <Button onClick={handleViewResults} disabled={isLoading || !examName || !className} className="lg:col-span-1 shadow-md h-9 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'ফলাফল দেখুন'}</Button>
                 <div className="flex flex-col gap-1.5 lg:col-span-2">
                     <div className="flex gap-2">
-                        <Button onClick={handleDownloadExcel} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-emerald-600 text-emerald-700 hover:bg-emerald-50 h-9 font-black text-xs"><FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel</Button>
-                        <Button onClick={() => onPrint({ results: groupedData, classResults, className, groupFilter, examName })} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-primary text-primary hover:bg-primary/5 h-9 font-black text-xs"><Printer className="h-3.5 w-3.5 mr-1" /> প্রিন্ট</Button>
+                        <Button onClick={handleDownloadExcel} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-emerald-600 text-emerald-700 hover:bg-emerald-50 h-9 font-black text-xs"><FileSpreadsheet className="h-3 w-3 mr-1" /> Excel</Button>
+                        <Button onClick={() => onPrint({ results: groupedData, classResults, className, groupFilter, examName })} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-primary text-primary hover:bg-primary/5 h-9 font-black text-xs"><Printer className="h-3 w-3 mr-1" /> প্রিন্ট</Button>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleDownloadBulkSample} disabled={!className || !examName} variant="outline" className="flex-1 text-[9px] h-7 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50"><Download className="h-3.5 w-3.5 mr-1" /> নমুনা ডাউনলোড</Button>
+                        <Button onClick={handleDownloadBulkSample} disabled={!className || !examName} variant="outline" className="flex-1 text-[9px] h-7 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50"><Download className="h-3 w-3 mr-1" /> নমুনা ডাউনলোড</Button>
                         <Button onClick={() => bulkUploadRef.current?.click()} disabled={isBulkUploading || !className || !examName} className="flex-1 text-[9px] h-7 font-black bg-indigo-600 hover:bg-indigo-700 shadow-md">
-                            {isBulkUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <FileUp className="h-3.5 w-3.5 mr-1" />}
+                            {isBulkUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <FileUp className="h-3 w-3 mr-1" />}
                             Excel আপলোড (সব বিষয়)
                         </Button>
                         <input type="file" ref={bulkUploadRef} className="hidden" accept=".xlsx, .xls" onChange={handleBulkUpload} />
@@ -1273,7 +1215,6 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
     const [practicalLimits, setPracticalLimits] = useState<Record<string, string>>({});
     
     const [isSaving, setIsSaving] = useState<string | null>(null);
-    const [isSavingAll, setIsSavingAll] = useState(false);
 
     useEffect(() => {
         if (!db || !user) return;
@@ -1295,13 +1236,6 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
         if (hasPermission('manage:results') || hasPermission('manage:full-marks')) return true;
         return (user as any)?.marksPermissions?.[cls]?.includes(sub) ?? false;
     }, [user, hasPermission]);
-
-    const classes = ['6', '7', '8', '9', '10'];
-    const currentSubjects = useMemo(() => {
-        const subjects = getSubjects(selectedClass, selectedGroup === 'all' ? undefined : selectedGroup).filter(s => s.isExamSubject !== false);
-        return Array.from(new Set(subjects.map(s => s.name)))
-            .map(name => subjects.find(s => s.name === name)!);
-    }, [selectedClass, selectedGroup]);
 
     const handleUpdateFullMarks = (cls: string, sub: string, exam: string, currentRecord: ClassResult | null, defaultW: string, defaultM: string, defaultP: string) => {
         if (!db || !user) return;
@@ -1337,58 +1271,6 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
         toast({ title: 'পূর্ণমান সংরক্ষিত হয়েছে' });
     };
 
-    const handleSaveAllFullMarks = async () => {
-        if (!db || !user || !examName) return;
-        setIsSavingAll(true);
-        
-        let updateCount = 0;
-        const promises = [];
-
-        for (const subInfo of currentSubjects) {
-            if (!isSubjectPermitted(selectedClass, subInfo.name)) continue;
-
-            const inputKey = `${selectedClass}-${subInfo.name}-${examName}`;
-            
-            const matchingRecords = savedResults.filter(r => 
-                r.className === selectedClass && 
-                normalize(r.subject) === normalize(subInfo.name) && 
-                r.examName === examName &&
-                (parseInt(selectedClass) < 9 || (selectedGroup === 'all' ? (!r.group || r.group === 'none') : r.group === selectedGroup))
-            );
-            
-            const existingRecord = matchingRecords.length > 0 ? matchingRecords[0] : null;
-            const isEnglish = normalize(subInfo.name).includes('ইংরেজি') || normalize(subInfo.name).includes('english');
-            const hasPractical = subInfo.practical;
-
-            const defaultW = existingRecord?.writtenLimit?.toString() || (existingRecord ? '0' : (subInfo.fullMarks === 100 ? (hasPractical ? '50' : '70') : (subInfo.fullMarks === 0 ? '0' : '35')));
-            const defaultM = existingRecord?.mcqLimit?.toString() || (existingRecord ? '0' : (isEnglish ? '0' : (subInfo.fullMarks === 100 ? (hasPractical ? '25' : '30') : (subInfo.fullMarks === 0 ? '0' : '15'))));
-            const defaultP = existingRecord?.practicalLimit?.toString() || (existingRecord ? '0' : (hasPractical ? '25' : '0'));
-
-            const wLimit = parseInt(writtenLimits[inputKey] ?? defaultW, 10) || 0;
-            const mLimit = parseInt(mcqLimits[inputKey] ?? defaultM, 10) || 0;
-            const pLimit = parseInt(practicalLimits[inputKey] ?? defaultP, 10) || 0;
-            const totalFm = wLimit + mLimit + pLimit;
-
-            if (totalFm <= 0) continue;
-
-            const effectiveGroup = (parseInt(selectedClass) < 9 || selectedGroup === 'all') ? undefined : selectedGroup;
-
-            const dataToSave: ClassResult = existingRecord 
-                ? { ...existingRecord, fullMarks: totalFm, writtenLimit: wLimit, mcqLimit: mLimit, practicalLimit: pLimit }
-                : { academicYear: selectedYear, examName: examName, className: selectedClass, subject: subInfo.name, fullMarks: totalFm, writtenLimit: wLimit, mcqLimit: mLimit, practicalLimit: pLimit, results: [], group: effectiveGroup };
-
-            promises.push(saveClassResults(db, dataToSave));
-            updateCount++;
-        }
-
-        if (updateCount > 0) {
-            await Promise.all(promises);
-            toast({ title: 'সকল পূর্ণমান সংরক্ষিত হয়েছে', description: `${toBengaliNumber(updateCount)} টি বিষয়ের তথ্য আপডেট হয়েছে।` });
-            updateSavedResults();
-        }
-        setIsSavingAll(false);
-    };
-
     const handleDeleteResult = (id: string) => {
         if (!db || !id || !user) return;
         deleteClassResult(db, id);
@@ -1396,9 +1278,16 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
         setTimeout(updateSavedResults, 500);
     }
 
+    const classes = ['6', '7', '8', '9', '10'];
+    const currentSubjects = useMemo(() => {
+        const subjects = getSubjects(selectedClass, selectedGroup === 'all' ? undefined : selectedGroup).filter(s => s.isExamSubject !== false);
+        return Array.from(new Set(subjects.map(s => s.name)))
+            .map(name => subjects.find(s => s.name === name)!);
+    }, [selectedClass, selectedGroup]);
+
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print">
+            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print sticky top-0 z-[60] backdrop-blur-md">
                 <div className="w-full md:w-64 space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">১. পরীক্ষা নির্বাচন</Label>
                     <Select value={examName} onValueChange={setExamName}>
@@ -1408,22 +1297,29 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1 w-full md:w-48 space-y-2">
+                <div className="flex-1 w-full space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">২. শ্রেণি নির্বাচন করুন</Label>
-                    <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedGroup('all'); }}>
-                        <SelectTrigger className="h-11 border-2 font-black"><SelectValue placeholder="শ্রেণি নির্বাচন" /></SelectTrigger>
-                        <SelectContent>
-                            {classes.map(cls => (
-                                <SelectItem key={cls} value={cls} className="font-bold">{classNamesMap[cls]} শ্রেণি</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-2">
+                        {classes.map(cls => (
+                            <Button 
+                                key={cls}
+                                onClick={() => { setSelectedClass(cls); setSelectedGroup('all'); }}
+                                variant={selectedClass === cls ? "default" : "outline"}
+                                className={cn(
+                                    "font-black h-11 px-6 rounded-xl transition-all shadow-sm",
+                                    selectedClass === cls ? "bg-primary text-white scale-105" : "bg-white text-slate-600 border-2"
+                                )}
+                            >
+                                {classNamesMap[cls]} শ্রেণি
+                            </Button>
+                        ))}
+                    </div>
                 </div>
                 {parseInt(selectedClass) >= 9 && (
                     <div className="w-full md:w-48 space-y-2">
                         <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">৩. শাখা নির্বাচন</Label>
                         <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                            <SelectTrigger className="h-11 border-2 font-black"><SelectValue placeholder="সকল শাখা" /></SelectTrigger>
+                            <SelectTrigger className="h-11 border-2 font-black"><SelectValue placeholder="শাখা" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">সকল শাখা</SelectItem>
                                 <SelectItem value="science">বিজ্ঞান</SelectItem>
@@ -1571,21 +1467,741 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
                             </Table>
                         </div>
                     </CardContent>
-                    <CardFooter className="bg-slate-50 p-6 border-t-2 border-black flex justify-between items-center no-print">
-                        <p className="text-xs font-bold text-muted-foreground flex items-center gap-2">
-                            <Info className="h-4 w-4 text-primary" /> সব বিষয়ের তথ্য ইনপুট দেওয়ার পর এক ক্লিকে সেভ করুন।
-                        </p>
-                        <Button 
-                            onClick={handleSaveAllFullMarks} 
-                            disabled={isSavingAll || !examName || currentSubjects.length === 0}
-                            className="h-14 px-12 text-lg font-black shadow-2xl transition-all"
-                        >
-                            {isSavingAll ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Save className="h-5 w-5 mr-2" />}
-                            সকল বিষয়ের পূর্ণমান সেভ করুন
-                        </Button>
-                    </CardFooter>
                 </Card>
             </div>
+        </div>
+    );
+};
+
+const MeritListTab = ({ allStudents }: { allStudents: Student[] }) => {
+    const { selectedYear } = useAcademicYear();
+    const db = useFirestore();
+    const { user, hasPermission } = useAuth();
+    const [exams, setExams] = useState<Exam[]>([]);
+    const [examName, setExamName] = useState('');
+    const [className, setClassName] = useState('');
+    const [groupFilter, setGroupFilter] = useState('all');
+    const [processedResults, setProcessedResults] = useState<StudentProcessedResult[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => { 
+        if (db && user) getExams(db, selectedYear).then(setExams); 
+    }, [db, selectedYear, user]);
+
+    const handleViewMerit = async () => {
+        if (!examName || !className || !db || !user) return;
+        setIsLoading(true);
+        try {
+            const students = allStudents.filter(s => {
+                const yearMatch = s.academicYear === selectedYear;
+                const classMatch = s.className === className;
+                if (!yearMatch || !classMatch) return false;
+                if (parseInt(className) < 9 || groupFilter === 'all') return true;
+                const sGroupNorm = groupMap[(s.group || '').toLowerCase().trim()] || (s.group || '').toLowerCase().trim();
+                const filterGroupNorm = groupMap[groupFilter.toLowerCase().trim()] || groupFilter.toLowerCase().trim();
+                return sGroupNorm === filterGroupNorm;
+            });
+            const allRes = await getAllResults(db, selectedYear, examName).catch(() => []);
+            const classRes = allRes.filter(r => r.className === className);
+            const subs = getSubjects(className, groupFilter === 'all' ? undefined : groupFilter).filter(s => s.isExamSubject !== false);
+            const results = processStudentResults(students, classRes, subs);
+            setProcessedResults(results.sort((a,b) => {
+                if (a.isPass !== b.isPass) return a.isPass ? -1 : 1;
+                if (!a.isPass && !b.isPass) {
+                    if (a.failedSubjectsCount !== b.failedSubjectsCount) return a.failedSubjectsCount - b.failedSubjectsCount;
+                }
+                if (b.totalMarks !== a.totalMarks) return b.totalMarks - a.totalMarks;
+                return a.student.roll - b.student.roll;
+            }));
+        } catch (e) {
+            console.error(e);
+        }
+        setIsLoading(false);
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
+                <div className="space-y-2"><Label className="font-bold text-xs">পরীক্ষা</Label><Select value={examName} onValueChange={setExamName}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label className="font-bold text-xs">শ্রেণি</Label><Select value={className} onValueChange={c => { setClassName(c); setGroupFilter('all'); }}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent><SelectItem value="6">৬ষ্ঠ</SelectItem><SelectItem value="7">৭ম</SelectItem><SelectItem value="8">৮ম</SelectItem><SelectItem value="9">৯ম</SelectItem><SelectItem value="10">১০ম</SelectItem></SelectContent></Select></div>
+                {parseInt(className) >= 9 && (<div className="space-y-2"><Label className="font-bold text-xs">শাখা</Label><Select value={groupFilter} onValueChange={setGroupFilter}><SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সকল" /></SelectTrigger><SelectContent><SelectItem value="all">সকল শাখা</SelectItem><SelectItem value="science">বিজ্ঞান</SelectItem><SelectItem value="arts">মানবিক</SelectItem><SelectItem value="commerce">ব্যবসায় শিক্ষা</SelectItem></SelectContent></Select></div>)}
+                <Button onClick={handleViewMerit} disabled={isLoading || !examName || !className} className="lg:col-span-1 shadow-md h-9 font-black text-xs">{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'মেধা তালিকা দেখুন'}</Button>
+                <Link href={`/results/merit-list?academicYear=${selectedYear}&examName=${encodeURIComponent(examName)}&className=${className}&group=${groupFilter}`} target="_blank" className="lg:col-span-1">
+                    <Button disabled={processedResults.length === 0} variant="outline" className="w-full border-primary text-primary hover:bg-primary/5 h-9 font-black text-xs"><Printer className="h-3 w-3 mr-1" /> প্রিন্ট তালিকা</Button>
+                </Link>
+            </div>
+            {processedResults.length > 0 && (
+                <div className="table-container shadow-xl border-2">
+                    <Table>
+                        <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                            <TableRow>
+                                <TableHead className="w-16 text-center font-black">স্থান</TableHead>
+                                <TableHead className="w-16 text-center font-black">রোল</TableHead>
+                                <TableHead className="font-black">নাম</TableHead>
+                                <TableHead className="text-center font-black">মোট নম্বর</TableHead>
+                                <TableHead className="text-center font-black">GPA</TableHead>
+                                <TableHead className="text-center font-black">গ্রেড</TableHead>
+                                <TableHead className="text-right pr-8 font-black">ফলাফল</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {processedResults.map((res, i) => (
+                                <TableRow key={res.student.id} className={cn("h-12 hover:bg-slate-50", !res.isPass && "bg-rose-50/50")}>
+                                    <TableCell className="text-center font-black">{res.isPass ? toBengaliNumber(i + 1) : '-'}</TableCell>
+                                    <TableCell className="text-center font-bold">{toBengaliNumber(res.student.roll)}</TableCell>
+                                    <TableCell className="font-bold">{res.student.studentNameBn}</TableCell>
+                                    <TableCell className="text-center font-black text-primary">{toBengaliNumber(res.totalMarks)}</TableCell>
+                                    <TableCell className="text-center font-black">{toBengaliNumber(res.gpa.toFixed(2))}</TableCell>
+                                    <TableCell className={cn("text-center font-black", !res.isPass && "text-rose-600")}>{res.isPass ? res.finalGrade : `F${toBengaliNumber(res.failedSubjectsCount)}`}</TableCell>
+                                    <TableCell className="text-right pr-8">
+                                        <Badge className={res.isPass ? "bg-emerald-600" : "bg-rose-600"}>{res.isPass ? 'কৃতকার্য' : 'অকৃতকার্য'}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const PromotionTab = ({ allStudents }: { allStudents: Student[] }) => {
+    const db = useFirestore();
+    const { selectedYear } = useAcademicYear();
+    const { toast } = useToast();
+    
+    const [sourceClass, setSourceClass] = useState('6');
+    const [targetYear, setTargetYear] = useState<string>((parseInt(selectedYear) + 1).toString());
+    const [targetClass, setTargetClass] = useState<string>('7');
+    const [passedStudents, setPassedStudents] = useState<StudentProcessedResult[]>([]);
+    const [failedStudents, setFailedStudents] = useState<StudentProcessedResult[]>([]);
+    const [selectedIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+    const [isLoading, setIsLoading] = useState(false);
+    const [isPromoting, setIsPromoting] = useState(false);
+    
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [promotionMode, setPromotionType] = useState<'pass' | 'special'>('pass');
+    const [projectedPromotions, setProjectedPromotions] = useState<any[]>([]);
+
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [historyLoading, setHistoryHistoryLoading] = useState(false);
+    const [promotedHistory, setPromotedHistory] = useState<any[]>([]);
+    const [unpromotedHistory, setUnpromotedHistory] = useState<any[]>([]);
+
+    const handleLoadSource = async () => {
+        if (!sourceClass || !db) return;
+        setIsLoading(true);
+        try {
+            const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === sourceClass);
+            const allRes = await getAllResults(db, selectedYear, 'বার্ষিক পরীক্ষা').catch(() => []);
+            const classRes = allRes.filter(r => r.className === sourceClass);
+            const subs = getSubjects(sourceClass).filter(s => s.isExamSubject !== false);
+            const processed = processStudentResults(classStudents, classRes, subs);
+            
+            setPassedStudents(processed.filter(r => r.isPass).sort((a,b) => (a.meritPosition || 0) - (b.meritPosition || 0)));
+            setFailedStudents(processed.filter(r => !r.isPass).sort((a,b) => {
+                if (a.failedSubjectsCount !== b.failedSubjectsCount) return a.failedSubjectsCount - b.failedSubjectsCount;
+                return b.totalMarks - a.totalMarks;
+            }));
+            setSelectedStudentIds(new Set());
+        } catch (e) { console.error(e); }
+        setIsLoading(false);
+    };
+
+    const handleShowPreview = async (mode: 'pass' | 'special') => {
+        if (isPromoting) return;
+        setPromotionType(mode);
+        const studentsToPromote = mode === 'pass' ? passedStudents : failedStudents.filter(f => selectedIds.has(f.student.id));
+        if (studentsToPromote.length === 0) {
+            toast({ variant: 'destructive', title: 'কোনো শিক্ষার্থী নির্বাচিত করা হয়নি' });
+            return;
+        }
+
+        setIsPromoting(true);
+        try {
+            const startRoll = mode === 'pass' ? 1 : passedStudents.length + 1;
+            
+            const projected = studentsToPromote.map((res, index) => {
+                const s = res.student;
+                return {
+                    name: s.studentNameBn,
+                    id: s.id,
+                    generatedId: s.generatedId,
+                    currentRoll: s.roll,
+                    projectedRoll: startRoll + index,
+                    resData: res
+                };
+            });
+
+            setProjectedPromotions(projected);
+            setIsPreviewOpen(true);
+        } catch (e) { console.error(e); }
+        setIsPromoting(false);
+    };
+
+    const updateProjectedRoll = (studentId: string, newRoll: string) => {
+        const bnToEn = (str: string) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
+        const rollNum = parseInt(bnToEn(newRoll).trim(), 10);
+        setProjectedPromotions(prev => prev.map(p => 
+            p.id === studentId ? { ...p, projectedRoll: isNaN(rollNum) ? 0 : rollNum } : p
+        ));
+    };
+
+    const handleConfirmPromotion = async () => {
+        if (!db || isPromoting) return;
+        setIsPromoting(true);
+        try {
+            const batch = writeBatch(db);
+            const targetSnap = await getDocs(query(collection(db, 'students'), where('academicYear', '==', String(targetYear)), where('className', '==', String(targetClass))));
+            const existingTargetStudents = targetSnap.docs.map(studentFromDoc);
+            const newAdmissions = existingTargetStudents.filter(s => !s._promoStatus);
+            const alreadyPromoted = existingTargetStudents.filter(s => !!s._promoStatus);
+            const studentsToPromote = projectedPromotions;
+            const normalizeStr = (s: any) => String(s || '').trim().toLowerCase();
+
+            for (let i = 0; i < studentsToPromote.length; i++) {
+                const item = studentsToPromote[i];
+                const res = item.resData;
+                const s = res.student;
+                const yearSuffix = String(targetYear).slice(-2);
+                const classCode = String(targetClass).padStart(2, '0');
+                const rollSerial = String(item.projectedRoll).padStart(4, '0');
+                const newGeneratedId = `${yearSuffix}${classCode}${rollSerial}`;
+                const studentData = { ...s, roll: item.projectedRoll, generatedId: newGeneratedId, academicYear: String(targetYear), className: String(targetClass), updatedAt: serverTimestamp(), _promoStatus: res.isPass ? 'pass' : 'fail', _promoRank: res.meritPosition || 999, _promoFailCount: res.failedSubjectsCount, _promoTotalMarks: res.totalMarks };
+                delete (studentData as any).id;
+                delete (studentData as any).createdAt;
+                Object.keys(studentData).forEach(key => { if ((studentData as any)[key] === undefined) delete (studentData as any)[key]; });
+                const existingRec = existingTargetStudents.find(ts => normalizeStr(ts.studentNameBn) === normalizeStr(s.studentNameBn) && normalizeStr(ts.fatherNameBn) === normalizeStr(s.fatherNameBn) && normalizeStr(ts.motherNameBn) === normalizeStr(s.motherNameBn));
+                if (existingRec) batch.update(doc(db, 'students', existingRec.id), studentData);
+                else batch.set(doc(collection(db, 'students')), studentData);
+            }
+
+            const newlyPromotedSourceIds = new Set(studentsToPromote.map(p => p.id));
+            const distinctPromotedCount = alreadyPromoted.filter(ap => !newlyPromotedSourceIds.has(ap.id)).length + studentsToPromote.length;
+            const totalPromotedNowCount = distinctPromotedCount;
+
+            newAdmissions.sort((a,b) => a.roll - b.roll).forEach((nas, idx) => {
+                const newRoll = totalPromotedNowCount + idx + 1;
+                const yearSuffix = String(targetYear).slice(-2);
+                const classCode = String(targetClass).padStart(2, '0');
+                const rollSerial = String(newRoll).padStart(4, '0');
+                const newId = `${yearSuffix}${classCode}${rollSerial}`;
+                batch.update(doc(db, 'students', nas.id), { roll: newRoll, generatedId: newId, updatedAt: serverTimestamp() });
+            });
+
+            await batch.commit();
+            toast({ title: 'প্রমোশন সফল', description: `${studentsToPromote.length} জন শিক্ষার্থীকে উন্নীত করা হয়েছে।` });
+            setIsPreviewOpen(false);
+            handleLoadSource();
+        } catch (e) { 
+            console.error(e);
+            toast({ variant: 'destructive', title: 'প্রমোশন করা যায়নি' });
+        }
+        setIsPromoting(false);
+    };
+
+    const handleLoadHistory = async () => {
+        if (!db || !sourceClass) return;
+        setHistoryHistoryLoading(true);
+        setIsHistoryOpen(true);
+        try {
+            const tYear = (parseInt(selectedYear) + 1).toString();
+            const tClass = (parseInt(sourceClass) + 1).toString();
+
+            const [sourceSnap, targetSnap] = await Promise.all([
+                getDocs(query(collection(db, 'students'), where('academicYear', '==', selectedYear), where('className', '==', sourceClass))),
+                getDocs(query(collection(db, 'students'), where('academicYear', '==', tYear), where('className', '==', tClass)))
+            ]);
+
+            const sourceList = sourceSnap.docs.map(studentFromDoc);
+            const targetList = targetSnap.docs.map(studentFromDoc);
+
+            const promoted: any[] = [];
+            const unpromoted: any[] = [];
+            const normalizeStr = (s: any) => String(s || '').trim().toLowerCase();
+
+            sourceList.forEach(s => {
+                const match = targetList.find(t => 
+                    normalizeStr(t.studentNameBn) === normalizeStr(s.studentNameBn) && 
+                    normalizeStr(t.fatherNameBn) === normalizeStr(s.fatherNameBn) && 
+                    normalizeStr(t.motherNameBn) === normalizeStr(s.motherNameBn)
+                );
+                if (match) promoted.push({ ...s, targetRoll: match.roll, targetId: match.generatedId });
+                else unpromoted.push(s);
+            });
+
+            setPromotedHistory(promoted.sort((a,b) => a.targetRoll - b.targetRoll));
+            setUnpromotedHistory(unpromoted.sort((a,b) => a.roll - b.roll));
+        } catch (e) { console.error(e); }
+        setHistoryHistoryLoading(false);
+    };
+
+    const toggleSelection = (id: string) => {
+        const n = new Set(selectedIds);
+        if (n.has(id)) n.delete(id); else n.add(id);
+        setSelectedStudentIds(n);
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end p-6 border-2 border-primary/10 rounded-2xl bg-white shadow-sm">
+                <div className="space-y-2">
+                    <Label className="font-bold text-xs">সোর্স শ্রেণি (বর্তমান)</Label>
+                    <Select value={sourceClass} onValueChange={v => { setSourceClass(v); const next = (parseInt(v)+1); setTargetClass(String(next)); setTargetYear((parseInt(selectedYear) + 1).toString()); }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{['6', '7', '8', '9'].map(v => <SelectItem key={v} value={v}>{classNamesMap[v]} শ্রেণি</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2"><Label className="font-bold text-xs">টার্গেট বছর</Label><Input value={toBengaliNumber(targetYear)} disabled className="bg-slate-50 font-black" /></div>
+                <div className="space-y-2"><Label className="font-bold text-xs">টার্গেট শ্রেণি</Label><Input value={classNamesMap[targetClass] + ' শ্রেণি'} disabled className="bg-slate-50 font-black" /></div>
+                <Button onClick={handleLoadSource} disabled={isLoading} className="h-10 font-black"><Search className="h-4 w-4 mr-2" /> তালিকা লোড</Button>
+                <Button onClick={handleLoadHistory} variant="outline" className="h-10 font-black border-primary text-primary"><History className="h-4 w-4 mr-2" /> হিস্টোরি ও সংশোধন</Button>
+            </div>
+
+            {passedStudents.length > 0 && (
+                <Card className="border-2 shadow-xl rounded-3xl overflow-hidden">
+                    <CardHeader className="bg-emerald-50 border-b-2 border-emerald-100 flex flex-row justify-between items-center p-6">
+                        <div><CardTitle className="text-xl font-black text-emerald-800">পাস করা শিক্ষার্থীদের তালিকা</CardTitle><CardDescription className="font-bold">মেধাক্রম অনুযায়ী অটোমেটিক রোল ১ থেকে এসাইন হবে</CardDescription></div>
+                        <Button onClick={() => handleShowPreview('pass')} className="bg-emerald-600 hover:bg-emerald-700 font-black h-12 px-10 shadow-xl"><CheckCircle2 className="mr-2 h-5 v-5" /> সকল পাসকৃতদের প্রমোশন দিন</Button>
+                    </CardHeader>
+                    <CardContent className="p-0 max-h-[400px] overflow-auto">
+                        <Table>
+                            <TableHeader className="bg-muted/30 sticky top-0 z-10"><TableRow><TableHead className="text-center font-black">মেধাস্থান</TableHead><TableHead className="text-center font-black">বর্তমান রোল</TableHead><TableHead className="font-black">নাম</TableHead><TableHead className="text-center font-black">মোট নম্বর</TableHead><TableHead className="text-right pr-10 font-black">GPA</TableHead></TableRow></TableHeader>
+                            <TableBody>{passedStudents.map(res => (<TableRow key={res.student.id} className="h-12 hover:bg-emerald-50/30 transition-colors"><TableCell className="text-center font-black text-emerald-700">{toBengaliNumber(res.meritPosition || '-')}</TableCell><TableCell className="text-center font-bold">{toBengaliNumber(res.student.roll)}</TableCell><TableCell className="font-bold">{res.student.studentNameBn}</TableCell><TableCell className="text-center font-black text-primary">{toBengaliNumber(res.totalMarks)}</TableCell><TableCell className="text-right pr-10 font-black">{toBengaliNumber(res.gpa.toFixed(2))}</TableCell></TableRow>))}</TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
+            {failedStudents.length > 0 && (
+                <Card className="border-2 shadow-xl rounded-3xl overflow-hidden">
+                    <CardHeader className="bg-rose-50 border-b-2 border-rose-100 flex flex-row justify-between items-center p-6">
+                        <div><CardTitle className="text-xl font-black text-rose-800">অকৃতকার্য শিক্ষার্থীদের তালিকা (বিশেষ পাশ)</CardTitle><CardDescription className="font-bold text-rose-600">কম ফেল এবং বেশি নম্বর অনুযায়ী এরা পাস করাদের পরে সিরিয়াল পাবে</CardDescription></div>
+                        <Button onClick={() => handleShowPreview('special')} disabled={selectedIds.size === 0} className="bg-rose-600 hover:bg-rose-700 font-black h-12 px-8 shadow-xl"><Plus className="mr-2 h-5 v-5" /> নির্বাচিতদের প্রমোশন দিন</Button>
+                    </CardHeader>
+                    <CardContent className="p-0 max-h-[400px] overflow-auto">
+                        <Table>
+                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                                <TableRow>
+                                    <TableHead className="w-12 text-center"><Checkbox onCheckedChange={c => setSelectedStudentIds(c ? new Set(failedStudents.map(f => f.student.id)) : new Set())} /></TableHead>
+                                    <TableHead className="w-20 text-center font-black">বর্তমান রোল</TableHead>
+                                    <TableHead className="font-black">নাম</TableHead>
+                                    <TableHead className="text-center font-black">ফেল করা বিষয়</TableHead>
+                                    <TableHead className="text-right pr-10 font-black">মোট নম্বর</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {failedStudents.map(res => (
+                                    <TableRow key={res.student.id} className="h-14 hover:bg-rose-50/50 cursor-pointer" onClick={() => toggleSelection(res.student.id)}>
+                                        <TableCell className="text-center" onClick={e => e.stopPropagation()}><Checkbox checked={selectedIds.has(res.student.id)} onCheckedChange={() => toggleSelection(res.student.id)} /></TableCell>
+                                        <TableCell className="text-center font-black">{toBengaliNumber(res.student.roll)}</TableCell>
+                                        <TableCell className="font-bold text-slate-800">{res.student.studentNameBn}</TableCell>
+                                        <TableCell className="text-center"><Badge variant="outline" className="text-rose-600 border-rose-200">{toBengaliNumber(res.failedSubjectsCount)} টি বিষয়</Badge></TableCell>
+                                        <TableCell className="text-right pr-10 font-black">{toBengaliNumber(res.totalMarks)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col font-kalpurush p-0 border-none shadow-2xl rounded-2xl overflow-hidden">
+                    <DialogHeader className="p-6 bg-primary text-white shrink-0">
+                        <DialogTitle className="text-2xl font-black flex items-center gap-2"><Sparkles className="h-6 w-6" /> প্রমোশন কনফার্মেশন ও প্রিভিউ</DialogTitle>
+                        <DialogDescription className="text-white/80 font-bold">{classNamesMap[sourceClass]} থেকে {classNamesMap[targetClass]} শ্রেণিতে উন্নীতকরণের তালিকা</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto p-6 bg-slate-50"><Card className="border-2 border-black/5 bg-white shadow-inner rounded-xl"><div className="grid grid-cols-4 p-3 text-[10px] font-black uppercase text-muted-foreground tracking-widest text-center"><span>শিক্ষার্থীর নাম (আইডি)</span><span>বর্তমান রোল</span><span>স্ট্যাটাস</span><span className="text-primary">নতুন রোল</span></div><div className="divide-y-2 divide-slate-50">{projectedPromotions.map((item) => (<div key={item.id} className="grid grid-cols-4 p-4 items-center text-center hover:bg-primary/5 transition-colors"><div className="flex flex-col items-center"><span className="font-black text-slate-800 text-sm truncate px-1">{item.name}</span><span className="text-[10px] font-bold text-muted-foreground">ID: {toBengaliNumber(item.generatedId || '')}</span></div><span className="font-bold text-slate-500">{toBengaliNumber(item.currentRoll)}</span><span><Badge className={item.isPass ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}>{item.isPass ? 'কৃতকার্য' : 'বিশেষ পাশ'}</Badge></span><div className="flex justify-center"><Input type="number" value={item.projectedRoll} onChange={(e) => updateProjectedRoll(item.id, e.target.value)} className="w-20 h-9 text-center font-black border-2 border-primary/20 bg-white" /></div></div>))}</div></Card></div>
+                    <DialogFooter className="p-6 bg-white border-t flex gap-3"><Button variant="outline" onClick={() => setIsPreviewOpen(false)} className="flex-1 font-bold h-12">বাতিল</Button><Button onClick={handleConfirmPromotion} disabled={isPromoting} className="flex-1 min-w-[200px] h-12 text-lg font-black bg-emerald-600 hover:bg-emerald-700 shadow-xl">{isPromoting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}প্রমোশন নিশ্চিত করুন</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col font-kalpurush p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+                    <DialogHeader className="p-6 bg-slate-800 text-white shrink-0">
+                        <DialogTitle className="text-2xl font-black flex items-center gap-2"><History className="h-7 w-7" /> প্রমোশন হিস্টোরি ও তালিকা</DialogTitle>
+                        <DialogDescription className="text-slate-300 font-bold">{classNamesMap[sourceClass]} শ্রেণি থেকে পরবর্তী শ্রেণিতে প্রমোশন স্ট্যাটাস</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-hidden bg-slate-100 p-0 flex flex-col">
+                        <Tabs defaultValue="promoted" className="w-full h-full flex flex-col">
+                            <TabsList className="grid w-full grid-cols-2 h-14 bg-white/50 p-1 border-b rounded-none">
+                                <TabsTrigger value="promoted" className="font-black text-base data-[state=active]:bg-white data-[state=active]:text-emerald-700">প্রমোশনপ্রাপ্ত ({toBengaliNumber(promotedHistory.length)})</TabsTrigger>
+                                <TabsTrigger value="unpromoted" className="font-black text-base data-[state=active]:bg-white data-[state=active]:text-rose-700">প্রমোশনহীন ({toBengaliNumber(unpromotedHistory.length)})</TabsTrigger>
+                            </TabsList>
+                            <div className="flex-1 overflow-hidden">
+                                <TabsContent value="promoted" className="h-full m-0 outline-none">
+                                    <ScrollArea className="h-full p-4">
+                                        {historyLoading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div> : promotedHistory.length === 0 ? <p className="text-center py-20 italic">কেউ প্রমোশন পায়নি</p> : (
+                                            <Card className="border-none shadow-sm"><Table><TableHeader className="bg-muted/50">
+                                                <TableRow><TableHead className="font-black">আইডি</TableHead><TableHead className="font-black">নাম</TableHead><TableHead className="text-center font-black">বর্তমান রোল</TableHead><TableHead className="text-right pr-6 font-black">টার্গেট আইডি</TableHead></TableRow>
+                                            </TableHeader><TableBody>{promotedHistory.map(s => (
+                                                <TableRow key={s.id} className="h-14"><TableCell className="font-black text-xs">{toBengaliNumber(s.generatedId)}</TableCell><TableCell className="font-bold text-slate-800">{s.studentNameBn}</TableCell><TableCell className="text-center font-black text-emerald-700 text-lg">{toBengaliNumber(s.targetRoll)}</TableCell><TableCell className="text-right pr-6 font-bold text-xs text-primary">{toBengaliNumber(s.targetId)}</TableCell></TableRow>
+                                            ))}</TableBody></Table></Card>
+                                        )}
+                                    </ScrollArea>
+                                </TabsContent>
+                                <TabsContent value="unpromoted" className="h-full m-0 outline-none">
+                                    <ScrollArea className="h-full p-4">
+                                        {historyLoading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div> : unpromotedHistory.length === 0 ? <p className="text-center py-20 text-emerald-600 font-black">সবাই প্রমোশন পেয়েছে!</p> : (
+                                            <Card className="border-none shadow-sm"><Table><TableHeader className="bg-muted/50">
+                                                <TableRow><TableHead className="font-black">আইডি</TableHead><TableHead className="font-black">নাম</TableHead><TableHead className="text-center font-black">রোল</TableHead><TableHead className="text-right pr-6 font-black">অবস্থা</TableHead></TableRow>
+                                            </TableHeader><TableBody>{unpromotedHistory.map(s => (
+                                                <TableRow key={s.id} className="h-14"><TableCell className="font-black text-xs">{toBengaliNumber(s.generatedId)}</TableCell><TableCell className="font-bold text-slate-800">{s.studentNameBn}</TableCell><TableCell className="text-center font-bold">{toBengaliNumber(s.roll)}</TableCell><TableCell className="text-right pr-6"><Badge variant="destructive" className="bg-rose-100 text-rose-700 border-rose-200">বকেয়া</Badge></TableCell></TableRow>
+                                            ))}</TableBody></Table></Card>
+                                        )}
+                                    </ScrollArea>
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+                    </div>
+                    <DialogFooter className="p-4 bg-white border-t shrink-0"><Button variant="outline" className="font-black w-full" onClick={() => setIsHistoryOpen(false)}>বন্ধ করুন</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+};
+
+const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
+    const db = useFirestore();
+    const { selectedYear } = useAcademicYear();
+    const { toast } = useToast();
+    const [searchRoll, setSearchRoll] = useState('');
+    const [searchClass, setSearchClass] = useState('6');
+    const [searchExam, setSearchExam] = useState('');
+    const [exams, setExams] = useState<Exam[]>([]);
+    const [searchResult, setSearchResult] = useState<StudentProcessedResult | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    useEffect(() => {
+        if (db) getExams(db, selectedYear).then(setExams);
+    }, [db, selectedYear]);
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchRoll || !searchClass || !searchExam) return;
+        setIsSearching(true);
+        try {
+            const bnToEn = (str: string) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
+            const rollNum = parseInt(bnToEn(searchRoll), 10);
+            const student = allStudents.find(s => s.roll === rollNum && s.className === searchClass && s.academicYear === selectedYear);
+            if (!student) { toast({ variant: 'destructive', title: 'শিক্ষার্থী পাওয়া যায়নি' }); setIsSearching(false); return; }
+            const allRes = await getAllResults(db!, selectedYear, searchExam).catch(() => []);
+            const classRes = allRes.filter(r => r.className === searchClass);
+            const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === searchClass);
+            const subs = getSubjects(searchClass, student.group).filter(s => s.isExamSubject !== false);
+            const results = processStudentResults(classStudents, classRes, subs);
+            const res = results.find(r => r.student.id === student.id);
+            if (res) setSearchResult(res); else toast({ variant: 'destructive', title: 'ফলাফল পাওয়া যায়নি' });
+        } catch (e) { console.error(e); }
+        setIsSearching(false);
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <Card className="max-w-lg mx-auto border-2 shadow-xl rounded-3xl overflow-hidden">
+                <CardHeader className="bg-primary text-white p-6"><CardTitle className="text-xl flex items-center gap-2"><Search className="h-6 w-6" /> ফলাফল অনুসন্ধান</CardTitle></CardHeader>
+                <CardContent className="p-6">
+                    <form onSubmit={handleSearch} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2"><Label className="font-bold">রোল</Label><Input value={searchRoll} onChange={e => setSearchRoll(e.target.value)} placeholder="উদা: ১" required className="h-11 font-black text-lg" /></div>
+                            <div className="space-y-2">
+                                <Label className="font-bold">শ্রেণি</Label>
+                                <Select value={searchClass} onValueChange={(v) => setSearchClass(v)}>
+                                    <SelectTrigger className="h-11 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent>{Object.entries(classNamesMap).map(([v, l]) => <SelectItem key={v} value={v}>{l} শ্রেণি</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="font-bold">পরীক্ষা</Label>
+                            <Select value={searchExam} onValueChange={setSearchExam}>
+                                <SelectTrigger className="h-11 border-2 font-black text-lg"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
+                                <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        <Button type="submit" disabled={isSearching} className="w-full h-12 text-lg font-black">{isSearching ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : 'খুঁজুন'}</Button>
+                    </form>
+                </CardContent>
+            </Card>
+            {searchResult && (
+                <Card className="max-w-2xl mx-auto border-2 shadow-xl animate-in zoom-in-95 duration-300">
+                    <CardHeader className="bg-muted/30 border-b flex flex-row items-center gap-4 p-6">
+                        <Avatar className="h-16 w-16 border-2 border-white shadow-md">
+                            <AvatarImage src={sanitizePhotoUrl(searchResult.student.photoUrl, searchResult.student.gender) || getStudentPlaceholderImage(searchResult.student.gender)} className="object-cover" />
+                            <AvatarFallback className="bg-primary/20 font-black">S</AvatarFallback>
+                        </Avatar>
+                        <div><CardTitle className="text-2xl font-black">{searchResult.student.studentNameBn}</CardTitle><CardDescription className="font-bold text-primary">রোল: {toBengaliNumber(searchResult.student.roll)} | {classNamesMap[searchResult.student.className]} শ্রেণি</CardDescription></div>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মোট নম্বর</p><p className="text-xl font-black text-primary">{toBengaliNumber(searchResult.totalMarks)}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">GPA</p><p className="text-xl font-black text-primary">{toBengaliNumber(searchResult.gpa.toFixed(2))}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">গ্রেড</p><p className={cn("text-xl font-black", searchResult.isPass ? "text-emerald-600" : "text-rose-600")}>{searchResult.isPass ? searchResult.finalGrade : 'F'}</p></div>
+                            <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মেধাক্রম</p><p className="text-xl font-black text-amber-600">{searchResult.isPass ? toBengaliNumber(searchResult.meritPosition || '-') : '-'}</p></div>
+                        </div>
+                        <div className="table-container max-h-[300px] border-2"><Table><TableHeader className="bg-muted/50 sticky top-0 z-10"><TableRow><TableHead className="font-black">বিষয়</TableHead><TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead><TableHead className="text-center font-black">গ্রেড</TableHead><TableHead className="text-right font-black">পয়েন্ট</TableHead></TableRow></TableHeader><TableBody>{Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (<TableRow key={name} className="h-10"><TableCell className="font-bold text-xs">{name}</TableCell><TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell><TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell><TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell></TableRow>))}</TableBody></Table></div></CardContent>
+                    <CardFooter className="bg-slate-50 p-4 border-t flex justify-end gap-3">
+                        <Button variant="outline" className="font-black" onClick={() => setSearchResult(null)}>অন্য ফলাফল খুঁজুন</Button>
+                        <Link href={`/marksheet/${searchResult.student.id}?academicYear=${selectedYear}&examName=${encodeURIComponent(searchExam)}`} target="_blank">
+                            <Button className="font-black shadow-lg"><Printer className="mr-2 h-4 w-4" /> মার্কশিট প্রিন্ট করুন</Button>
+                        </Link>
+                    </CardFooter>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Student[], onPrintRequested: (data: any) => void }) => {
+    const { toast } = useToast();
+    const { selectedYear } = useAcademicYear();
+    const db = useFirestore();
+    
+    const [selectedMonth, setSelectedMonth] = useState<string>(BENGALI_MONTHS[new Date().getMonth()]);
+    const [selectedExam, setSelectedExam] = useState<string>('বিশেষ পরীক্ষা-১');
+    const [selectedClass, setSelectedClass] = useState<string>('6');
+    const [selectedSubject, setSelectedSubject] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(false);
+    
+    const [specialMode, setSpecialMode] = useState<'input' | 'sheet' | 'fullmarks'>('input');
+    const [specialMarks, setSpecialMarks] = useState<Map<string, number>>(new Map());
+    const [specialFullMarks, setSpecialFullMarks] = useState<string>('20');
+    
+    const [allSpecialResults, setAllSpecialResults] = useState<SpecialClassResult[]>([]);
+
+    const classes = ['6', '7', '8', '9', '10'];
+    const specialExams = ['বিশেষ পরীক্ষা-১', 'বিশেষ পরীক্ষা-২', 'বিশেষ পরীক্ষা-৩', 'বিশেষ পরীক্ষা-৪', 'বিশেষ পরীক্ষা-৫'];
+
+    const availableSubjects = useMemo(() => {
+        if (!selectedClass) return [];
+        const baseSubs = getSubjects(selectedClass).filter(s => s.isExamSubject !== false);
+        
+        if (specialMode === 'sheet' && parseInt(selectedClass) >= 9) {
+            const resultList: any[] = [];
+            const seen = new Set<string>();
+            const coreNames = ['বাংলা প্রথম', 'বাংলা দ্বিতীয়', 'ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়', 'গণিত', 'ধর্ম ও নৈতিক শিক্ষা', 'তথ্য ও যোগাযোগ প্রযুক্তি'];
+
+            baseSubs.forEach(s => {
+                if (coreNames.some(cn => normalize(cn) === normalize(s.name))) {
+                    if (!seen.has(normalize(s.name))) { resultList.push(s); seen.add(normalize(s.name)); }
+                }
+            });
+
+            const combinedPairs = [
+                { name: 'পদার্থ / ইতিহাস', isCombined: true, subList: ['পদার্থ', 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা'] },
+                { name: 'রসায়ন / ভূগোল', isCombined: true, subList: ['রসায়ন', 'ভূগোল ও পরিবেশ'] },
+                { name: 'জীব বিজ্ঞান / পৌরনীতি', isCombined: true, subList: ['জীব বিজ্ঞান', 'পৌরনীতি ও নাগরিকতা'] },
+                { name: 'উচ্চতর গণিত / কৃষি / ফিন্যান্স', isCombined: true, subList: ['উচ্চতর গণিত', 'কৃষি শিক্ষা', 'ফিন্যান্স ও ব্যাংকিং', 'হিসাব বিজ্ঞান', 'ব্যবসায় উদ্যোগ'] },
+                { name: 'বিজ্ঞান / বা ও বি', isCombined: true, subList: ['সাধারণ বিজ্ঞান', 'বাংলাদেশ ও বিশ্ব পরিচয়'] }
+            ];
+
+            combinedPairs.forEach(p => resultList.push(p));
+            return resultList;
+        }
+
+        return baseSubs;
+    }, [selectedClass, specialMode]);
+
+    const handleLoadForInput = async () => {
+        if (!db || !selectedMonth || !selectedClass || !selectedSubject || !selectedExam) return;
+        setIsLoading(true);
+        try {
+            const results = await getSpecialResultsForClass(db, selectedYear, selectedClass, selectedMonth).catch(() => []);
+            const matching = results.find(r => normalize(r.subject) === normalize(selectedSubject) && r.examType === selectedExam);
+            
+            const initialMap = new Map();
+            if (matching) {
+                setSpecialFullMarks(matching.fullMarks.toString());
+                matching.results.forEach(r => initialMap.set(r.studentId, r.marks));
+            } else setSpecialFullMarks('20');
+            setSpecialMarks(initialMap);
+        } catch (e) { console.error(e); }
+        setIsLoading(false);
+    };
+
+    const handleSaveSpecialMarks = async () => {
+        if (!db || !selectedClass || !selectedSubject || !selectedExam || !selectedMonth) return;
+        setIsLoading(true);
+        try {
+            const resultsData = Array.from(specialMarks.entries()).map(([id, m]) => ({ studentId: id, marks: m }));
+            await saveSpecialResults(db, {
+                academicYear: selectedYear,
+                className: selectedClass,
+                subject: selectedSubject,
+                examType: selectedExam,
+                month: selectedMonth,
+                fullMarks: parseInt(specialFullMarks, 10) || 20,
+                results: resultsData
+            });
+            toast({ title: 'বিশেষ পরীক্ষার নম্বর সংরক্ষিত হয়েছে' });
+        } catch (e) {
+            console.error(e);
+        }
+        setIsLoading(false);
+    };
+
+    const handleLoadFullSheet = async () => {
+        if (!db || !selectedMonth || !selectedClass) return;
+        setIsLoading(true);
+        try {
+            const results = await getSpecialResultsForClass(db, selectedYear, selectedClass, selectedMonth).catch(() => []);
+            setAllSpecialResults(results);
+        } catch (e) { console.error(e); }
+        setIsLoading(false);
+    };
+
+    const filteredStudents = useMemo(() => {
+        return allStudents
+            .filter(s => s.academicYear === selectedYear && s.className === selectedClass)
+            .sort((a, b) => (Number(a.roll) || 0) - (Number(b.roll) || 0));
+    }, [allStudents, selectedYear, selectedClass]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const table = e.currentTarget.closest('table');
+            if (!table) return;
+            const inputs = Array.from(table.querySelectorAll('tbody input[type="number"]')) as HTMLInputElement[];
+            const index = inputs.indexOf(e.currentTarget);
+            if (index >= 0 && index < inputs.length - 1) {
+                const nextInput = inputs[index + 1];
+                nextInput.focus();
+                nextInput.select();
+            }
+        }
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+            <div className="flex flex-wrap gap-2 no-print">
+                <Button variant={specialMode === 'input' ? 'default' : 'outline'} onClick={() => setSpecialMode('input')} className="font-black h-10 px-6 rounded-xl shadow-sm"><FilePen className="h-4 w-4 mr-2" /> নম্বর ইনপুট</Button>
+                <Button variant={specialMode === 'sheet' ? 'default' : 'outline'} onClick={() => setSpecialMode('sheet')} className="font-black h-10 px-6 rounded-xl shadow-sm"><LayoutGrid className="h-4 w-4 mr-2" /> ফলাফল শিট</Button>
+                <Button variant={specialMode === 'fullmarks' ? 'default' : 'outline'} onClick={() => setSpecialMode('fullmarks')} className="font-black h-10 px-6 rounded-xl shadow-sm"><Settings className="h-4 w-4 mr-2" /> পূর্ণমান সেটআপ</Button>
+            </div>
+
+            {specialMode === 'input' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-6 border-2 border-black/5 bg-white shadow-sm rounded-2xl">
+                        <div className="space-y-2"><Label className="font-bold text-xs text-primary">মাস</Label><Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="মাস" /></SelectTrigger><SelectContent>{BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-2"><Label className="font-bold text-xs text-primary">পরীক্ষা</Label><Select value={selectedExam} onValueChange={setSelectedExam}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="পরীক্ষা" /></SelectTrigger><SelectContent>{specialExams.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-2"><Label className="font-bold text-xs text-primary">শ্রেণি</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-2"><Label className="font-bold text-xs text-primary">বিষয়</Label><Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="বিষয়" /></SelectTrigger><SelectContent>{getSubjects(selectedClass).filter(s => s.isExamSubject !== false).map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent></Select></div>
+                        <Button onClick={handleLoadForInput} disabled={isLoading || !selectedMonth || !selectedExam || !selectedSubject} className="font-black h-11 shadow-md">লোড করুন</Button>
+                    </div>
+
+                    {filteredStudents.length > 0 && selectedSubject && (
+                        <Card className="border-2 border-black overflow-hidden shadow-xl rounded-2xl">
+                            <CardHeader className="bg-primary/5 p-4 border-b-2 border-black flex flex-row justify-between items-center">
+                                <div><CardTitle className="text-base font-black text-primary">{selectedSubject} - {selectedExam}</CardTitle><CardDescription className="font-bold">পূর্ণমান: {toBengaliNumber(specialFullMarks)} | মাস: {selectedMonth}</CardDescription></div>
+                                <div className="flex items-center gap-3"><Label className="text-xs font-black">পূর্ণমান এডিট:</Label><Input type="number" value={specialFullMarks} onChange={e => setSpecialFullMarks(e.target.value)} className="w-16 h-8 text-center font-black border-2 border-primary/20" /></div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="max-h-[500px] overflow-auto">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-white z-10 border-b-2 border-black">
+                                            <TableRow><TableHead className="w-20 text-center font-black border-r-2 border-black text-black">রোল</TableHead><TableHead className="font-black border-r-2 border-black text-black">শিক্ষার্থীর নাম</TableHead><TableHead className="w-40 text-center font-black text-black">প্রাপ্ত নম্বর</TableHead></TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredStudents.map(s => (
+                                                <TableRow key={s.id} className="h-12 hover:bg-slate-50 transition-colors border-b-2 border-black">
+                                                    <TableCell className="text-center font-black border-r-2 border-black text-lg">{toBengaliNumber(s.roll)}</TableCell>
+                                                    <TableCell className="font-bold border-r-2 border-black text-slate-800">{s.studentNameBn}</TableCell>
+                                                    <TableCell className="p-1 text-center"><Input type="number" value={specialMarks.get(s.id) ?? ''} onChange={e => setSpecialMarks(prev => new Map(prev).set(s.id, parseInt(e.target.value, 10)))} onKeyDown={handleKeyDown} className="w-28 mx-auto h-9 text-center font-black border-2 border-black text-lg focus:bg-amber-50 shadow-sm" /></TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <div className="p-6 bg-slate-50 border-t-2 border-black flex justify-end"><Button onClick={handleSaveSpecialMarks} disabled={isLoading} size="lg" className="px-16 h-14 text-xl font-black shadow-2xl"><Save className="mr-2 h-6 w-6" /> প্রাপ্ত নম্বর সেভ করুন</Button></div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
+
+            {specialMode === 'sheet' && (
+                <div className="space-y-8 animate-in fade-in duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 border rounded-2xl bg-white shadow-sm no-print items-end">
+                        <div className="space-y-2"><Label className="font-bold">মাস নির্বাচন</Label><Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="মাস" /></SelectTrigger><SelectContent>{BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-2"><Label className="font-bold">শ্রেণি</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="bg-slate-50 border-2 font-bold"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{classNamesMap[c]} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
+                        <div className="flex gap-2">
+                            <Button onClick={handleLoadFullSheet} disabled={isLoading || !selectedMonth || !selectedClass} className="flex-1 font-black h-11"><Search className="mr-2 h-4 w-4" /> রিপোর্ট লোড করুন</Button>
+                            <Button onClick={() => onPrintRequested({ allSpecialResults, students: filteredStudents, availableSubjects, month: selectedMonth, year: selectedYear })} variant="outline" disabled={allSpecialResults.length === 0} className="h-11 border-2 border-primary text-primary font-black shadow-sm"><Printer className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+
+                    {allSpecialResults.length > 0 && (
+                        <div className="special-sheet-container w-full bg-white text-black font-kalpurush overflow-hidden border-[4px] border-black rounded-[32px] shadow-2xl">
+                            <div className="table-container !max-h-[550px] !overflow-auto !border-0 !rounded-none">
+                                <table className="w-full border-separate border-spacing-0 border-black text-[11px]">
+                                    <thead>
+                                        <tr className="bg-slate-100 h-[40px]">
+                                            <th rowSpan={2} className="border-r-2 border-b-2 border-black font-black p-1 w-[45px] text-center sticky left-0 top-0 z-[60] bg-slate-100 h-[80px] box-border">রোল</th>
+                                            <th rowSpan={2} className="border-r-2 border-b-2 border-black font-black p-1 text-left min-w-[180px] pl-3 sticky left-[10px] top-0 z-[60] bg-slate-100 h-[80px] box-border">শিক্ষার্থীর নাম</th>
+                                            {availableSubjects.map((sub, i) => (
+                                                <th key={sub.name} colSpan={3} className={cn("border-r-2 border-b-2 border-black font-black p-1 text-center h-[40px] box-border sticky top-0 z-40", i % 2 === 0 ? "bg-blue-100" : "bg-emerald-100")}>{sub.name}</th>
+                                            ))}
+                                            <th rowSpan={2} className="border-b-2 border-black font-black p-1 w-20 text-center bg-yellow-100 text-yellow-950 h-[80px] box-border sticky top-0 right-0 z-50">মোট নম্বর</th>
+                                        </tr>
+                                        <tr className="bg-slate-50 h-[40px]">
+                                            {availableSubjects.map((sub, sIdx) => (
+                                                <React.Fragment key={`${sub.name}-h`}>
+                                                    <th className={cn("border-r-2 border-b-2 border-black font-black p-0.5 w-10 sticky top-[40px] z-40 h-[40px] box-border text-center", sIdx % 2 === 0 ? "bg-blue-50" : "bg-emerald-50")}>প-১</th>
+                                                    <th className={cn("border-r-2 border-b-2 border-black font-black p-0.5 w-10 sticky top-[40px] z-40 h-[40px] box-border text-center", sIdx % 2 === 0 ? "bg-blue-50" : "bg-emerald-50")}>প-২</th>
+                                                    <th className={cn("border-r-2 border-b-2 border-black font-black p-0.5 w-10 sticky top-[40px] z-40 h-[40px] box-border text-center", sIdx % 2 === 0 ? "bg-blue-50" : "bg-emerald-50")}>প-৩</th>
+                                                </React.Fragment>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredStudents.map(student => {
+                                            let studentTotal = 0;
+                                            return (
+                                                <tr key={student.id} className="h-10 hover:bg-slate-50 transition-colors">
+                                                    <td className="border-r-2 border-b-2 border-black text-center font-black sticky left-0 z-30 bg-white w-[45px] h-10 box-border">{toBengaliNumber(student.roll)}</td>
+                                                    <td className="border-r-2 border-b-2 border-black font-bold px-3 whitespace-nowrap sticky left-[10px] z-30 bg-white min-w-[180px] h-10 box-border">{student.studentNameBn}</td>
+                                                    {availableSubjects.map((sub, sIdx) => (
+                                                        <React.Fragment key={`${student.id}-${sub.name}`}>
+                                                            {['বিশেষ পরীক্ষা-১', 'বিশেষ পরীক্ষা-২', 'বিশেষ পরীক্ষা-৩'].map((type) => {
+                                                                const match = allSpecialResults.find(r => {
+                                                                    const normalizedSearch = normalize(sub.name);
+                                                                    const normalizedRecord = normalize(r.subject);
+                                                                    if (sub.isCombined) return sub.subList.some((innerSub: string) => normalize(innerSub) === normalizedRecord) && r.examType === type;
+                                                                    return normalizedRecord === normalizedSearch && r.examType === type;
+                                                                });
+                                                                const marks = match?.results.find(res => res.studentId === student.id)?.marks;
+                                                                if (marks !== undefined) studentTotal += marks;
+                                                                return <td key={type} className={cn("border-r-2 border-b-2 border-black text-center font-black text-blue-900 h-10 w-10 min-w-10", sIdx % 2 === 0 ? "bg-blue-50/20" : "bg-emerald-50/20")}>{marks !== undefined ? toBengaliNumber(marks) : '-'}</td>;
+                                                            })}
+                                                        </React.Fragment>
+                                                    ))}
+                                                    <td className="text-center font-black bg-yellow-50 text-base border-b-2 border-black sticky right-0 z-20 w-20 min-w-20 h-10 box-border">{toBengaliNumber(studentTotal)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {specialMode === 'fullmarks' && (
+                <div className="animate-in fade-in duration-500">
+                    <Card className="max-w-md mx-auto border-2 shadow-lg rounded-3xl overflow-hidden">
+                        <CardHeader className="bg-muted/30 border-b"><CardTitle className="text-lg font-black flex items-center gap-2"><Settings className="h-5 w-5" /> বিশেষ পরীক্ষার পূর্ণমান নির্ধারণ</CardTitle></CardHeader>
+                        <CardContent className="p-8 space-y-6">
+                             <div className="space-y-4">
+                                <p className="text-sm font-bold text-muted-foreground leading-relaxed text-center">বিশেষ পরীক্ষার ফলাফল ইনপুট দেওয়ার সময় সরাসরি ওই সেকশন থেকেই পূর্ণমান এডিট করতে পারবেন। ডিফল্ট পূর্ণমান ২০ হিসেবে সেট করা থাকে।</p>
+                                <div className="p-6 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 text-center"><AlertCircle className="h-10 w-10 text-primary mx-auto mb-3 opacity-30" /><p className="text-xs font-black uppercase tracking-widest text-primary">শীঘ্রই আরও উন্নত সেটিংস যুক্ত হবে</p></div>
+                             </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 };
@@ -1634,17 +2250,17 @@ export default function ResultsPage() {
 
     const handleSubjectPrint = (data: any) => {
         setPrintingReport(data);
-        setTimeout(() => { window.print(); setPrintingReport(null); }, 1500);
+        setTimeout(() => { window.print(); setPrintingReport(null); }, 300);
     };
 
     const handleFullSheetPrint = (data: any) => {
         setFullSheetPrintData(data);
-        setTimeout(() => { window.print(); setFullSheetPrintData(null); }, 1500);
+        setTimeout(() => { window.print(); setFullSheetPrintData(null); }, 800);
     };
 
     const handleSpecialPrint = (data: any) => {
         setSpecialPrintData(data);
-        setTimeout(() => { window.print(); setSpecialPrintData(null); }, 1500);
+        setTimeout(() => { window.print(); setSpecialPrintData(null); }, 800);
     };
 
     const sidebarItems = useMemo(() => {
@@ -1719,22 +2335,31 @@ export default function ResultsPage() {
                             <div className="text-center flex-grow">
                                 <h1 className="text-4xl font-black text-emerald-950 leading-none mb-1">{schoolInfo.name}</h1>
                                 <p className="text-sm font-bold text-slate-700">{schoolInfo.address}</p>
-                                <div className="mt-2 inline-block border-2 border-emerald-800 px-8 py-0.5 rounded-full bg-emerald-50 shadow-sm">
-                                    <h2 className="text-xl font-black uppercase text-emerald-900">
-                                        {printingReport.info.examName} - {toBengaliNumber(selectedYear)}
-                                    </h2>
-                                </div>
+                                {printingReport.isBlank && (
+                                    <div className="mt-2">
+                                        <h2 className="text-2xl font-black">{printingReport.info.examName}- {toBengaliNumber(selectedYear)}</h2>
+                                    </div>
+                                )}
                             </div>
                             <div className="w-20"></div>
                         </div>
                         
-                        <div className="flex flex-col gap-2 mt-4 px-2 font-black text-lg">
-                            <div className="flex justify-between items-center border-b-2 border-slate-300 pb-1">
-                                <span>বিষয়ঃ {printingReport.info.subject}</span>
-                                <span>শ্রেণিঃ {classNamesMap[printingReport.info.className]} শ্রেণি {printingReport.info.group && printingReport.info.group !== 'all' && `(${groupNamesMap[printingReport.info.group]})`}</span>
-                                <span>পূর্ণমান: {toBengaliNumber(printingReport.info.fullMarks)}</span>
+                        {!printingReport.isBlank ? (
+                            <div className="text-center">
+                                <div className="mt-2 inline-block bg-emerald-50 px-6 py-0.5 rounded-full border-2 border-emerald-800">
+                                    <h2 className="text-lg font-black uppercase">নম্বর ফর্দ (Mark Sheet) - {toBengaliNumber(selectedYear)}</h2>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex flex-col gap-2 mt-4 px-2 font-black text-lg">
+                                <div className="text-center text-xl underline underline-offset-8 mb-2">পরীক্ষার নামঃ {printingReport.info.examName}</div>
+                                <div className="flex justify-between items-center border-b-2 border-slate-300 pb-1">
+                                    <span>বিষয়ঃ {printingReport.info.subject}</span>
+                                    <span>শ্রেণিঃ {classNamesMap[printingReport.info.className]}</span>
+                                    <span>পূর্ণমান- {toBengaliNumber(printingReport.info.fullMarks)}</span>
+                                </div>
+                            </div>
+                        )}
                     </header>
                     <Table className="border-2 border-black">
                         <TableHeader className="bg-slate-100"><TableRow className="border-b-2 border-black"><TableHead className="w-16 text-center font-black border-r-2 border-black text-black">রোল</TableHead><TableHead className="font-black border-r-2 border-black text-black">শিক্ষার্থীর নাম</TableHead><TableHead className="w-20 text-center font-black border-r-2 border-black text-black">লিখিত</TableHead><TableHead className="w-20 text-center font-black border-r-2 border-black text-black">নৈবেত্তিক</TableHead><TableHead className="w-20 text-center font-black border-r-2 border-black text-black">ব্যবহারিক</TableHead><TableHead className={cn("w-20 text-center font-black text-black", !printingReport.isBlank && "border-r-2 border-black")}>{printingReport.isBlank ? 'মোট' : 'প্রাপ্ত'}</TableHead>{!printingReport.isBlank && <TableHead className="w-20 text-center font-black border-r-2 border-black text-black">গ্রেড</TableHead>}{!printingReport.isBlank && <TableHead className="w-20 text-center font-black border-r-2 border-black text-black">পয়েন্ট</TableHead>}</TableRow></TableHeader>
@@ -1768,7 +2393,7 @@ export default function ResultsPage() {
                             @page { size: A4 landscape; margin: 5mm !important; }
                             .printable-area { width: 100% !important; padding: 0 !important; }
                             table { border-collapse: collapse !important; border: 1px solid black !important; width: 100% !important; table-layout: auto !important; }
-                            th, td { border: 1px solid black !important; padding: 1px !important; font-size: 8px !important; line-height: 1.1 !important; text-align: center; }
+                            th, td { border: 1px solid black !important; padding: 1px !important; font-size: 8px !important; line-height: 1.1 !important; }
                             .no-print { display: none !important; }
                         }
                     `}</style>
@@ -1776,8 +2401,8 @@ export default function ResultsPage() {
                         {schoolInfo.logoUrl && <img src={schoolInfo.logoUrl} alt="Logo" className="w-12 h-12 object-contain mb-1" />}
                         <h1 className="text-xl font-black">{schoolInfo.name}</h1>
                         <p className="text-[12px] font-bold">{schoolInfo.address}</p>
-                        <div className="mt-1 inline-block border-2 border-black px-8 py-0.5 rounded-full font-black text-xs uppercase bg-slate-50">
-                            {fullSheetPrintData.examName} - ফলাফল বিবরণী শিট ({classNamesMap[fullSheetPrintData.className]} শ্রেণি)
+                        <div className="mt-1 inline-block border border-black px-6 py-1 rounded-full font-black text-xs uppercase">
+                            {fullSheetPrintData.examName} - ফলাফল বিবরণী শিট ({classNamesMap[fullSheetPrintData.className]})
                         </div>
                         <p className="text-[12px] font-bold mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p>
                     </header>
@@ -1791,7 +2416,7 @@ export default function ResultsPage() {
                                 if (parseInt(fullSheetPrintData.className) >= 9) {
                                     const rGroupRaw = (r.group || 'none').toLowerCase().trim();
                                     const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
-                                    const groupKeyNorm = groupMap[gk.toLowerCase().trim()] || groupMap[gk.trim()] || gk.toLowerCase().trim();
+                                    const groupKeyNorm = groupMap[gk.toLowerCase().trim()] || gk.toLowerCase().trim();
                                     return rGroupNorm === 'none' || rGroupNorm === groupKeyNorm || gk === 'all';
                                 }
                                 return true;
@@ -1801,12 +2426,12 @@ export default function ResultsPage() {
 
                         return (
                             <div key={gk} className="mb-8">
-                                <div className="mb-2 font-black text-[10px] uppercase">বিভাগ: {groupNamesMap[gk] || gk}</div>
+                                <div className="mb-2 font-black text-sm uppercase">বিভাগ: {groupNamesMap[gk] || gk}</div>
                                 <table className="w-full">
                                     <thead>
                                         <tr className="bg-slate-100">
-                                            <th rowSpan={2} className="w-8">রোল</th>
-                                            <th rowSpan={2} className="min-w-[120px] text-left pl-1">শিক্ষার্থীর নাম</th>
+                                            <th rowSpan={2}>রোল</th>
+                                            <th rowSpan={2} className="min-w-[120px]">নাম</th>
                                             {subs.map((s, idx) => (
                                                 <th key={s.name} colSpan={s.name.includes('ইংরেজি') ? 3 : (s.practical ? 6 : 5)} className={subBgColors[idx % subBgColors.length]}>{s.name}</th>
                                             ))}
@@ -1832,23 +2457,23 @@ export default function ResultsPage() {
                                         {results.map((res: StudentProcessedResult) => (
                                             <tr key={res.student.id} className={!res.isPass ? "bg-rose-50" : ""}>
                                                 <td className="text-center font-bold">{toBengaliNumber(res.student.roll)}</td>
-                                                <td className="text-left pl-1 font-bold">{res.student.studentNameBn}</td>
+                                                <td className="font-bold pl-1">{res.student.studentNameBn}</td>
                                                 {subs.map((s, idx) => {
                                                     const sr = res.subjectResults.get(s.name);
                                                     const isEng = s.name.includes('ইংরেজি');
                                                     const bg = subBgColors[idx % subBgColors.length];
                                                     return (
                                                         <React.Fragment key={s.name}>
-                                                            {!isEng && <><td className={bg}>{toBengaliNumber(sr?.written ?? '-')}</td><td className={bg}>{toBengaliNumber(sr?.mcq ?? '-')}</td>{s.practical && <td className={bg}>{toBengaliNumber(sr?.practical ?? '-')}</td>}</>}
-                                                            <td className="text-center font-black bg-blue-50">{toBengaliNumber(sr?.marks ?? '-')}</td>
+                                                            {!isEng && <><td className={bg}>{sr?.written ?? '-'}</td><td className={bg}>{sr?.mcq ?? '-'}</td>{s.practical && <td className={bg}>{sr?.practical ?? '-'}</td>}</>}
+                                                            <td className="text-center font-black bg-blue-50">{sr?.marks ?? '-'}</td>
                                                             <td className={cn("text-center", sr && !sr.isPass && "text-rose-700 font-black")}>{sr?.grade ?? '-'}</td>
-                                                            <td className="text-center">{toBengaliNumber(sr?.point?.toFixed(2) ?? '-')}</td>
+                                                            <td className="text-center">{sr?.point?.toFixed(2) ?? '-'}</td>
                                                         </React.Fragment>
                                                     )
                                                 })}
                                                 <td className="text-center font-black">{toBengaliNumber(res.totalMarks)}</td>
                                                 <td className="text-center font-black">{toBengaliNumber(res.gpa.toFixed(2))}</td>
-                                                <td className={cn("text-center font-black", !res.isPass && "text-rose-700")}>{res.isPass ? res.finalGrade : `F${toBengaliNumber(res.failedSubjectsCount)}`}</td>
+                                                <td className={cn("text-center font-black", !res.isPass && "text-rose-700")}>{res.isPass ? res.finalGrade : `F${res.failedSubjectsCount}`}</td>
                                                 <td className="text-center font-bold">{res.isPass ? toBengaliNumber(res.meritPosition || '-') : 'ফেল'}</td>
                                             </tr>
                                         ))}
@@ -1857,10 +2482,6 @@ export default function ResultsPage() {
                             </div>
                         );
                     })}
-                    <div className="mt-10 flex justify-between px-10 pt-4 border-t border-black">
-                        <div className="text-center w-40 border-t border-black pt-1 font-black text-[10px]">অফিস সহকারীর স্বাক্ষর</div>
-                        <div className="text-center w-40 border-t border-black pt-1 font-black text-[10px]">প্রধান শিক্ষকের স্বাক্ষর ও সিল</div>
-                    </div>
                 </div>
             )}
 
@@ -1870,8 +2491,8 @@ export default function ResultsPage() {
                         @media print {
                             @page { size: A4 landscape; margin: 5mm !important; }
                             .printable-area { padding: 0 !important; margin: 0 !important; border: none !important; width: 100% !important; }
-                            table { border-collapse: collapse !important; border: 1px solid black !important; width: 100% !important; }
-                            th, td { border: 1px solid black !important; padding: 2px !important; font-size: 9px !important; text-align: center; }
+                            table { border-collapse: collapse !important; border: 1.5px solid black !important; width: 100% !important; }
+                            th, td { border: 1.5px solid black !important; padding: 2px !important; font-size: 9px !important; text-align: center; }
                             .no-print { display: none !important; }
                         }
                     `}</style>
@@ -1879,14 +2500,14 @@ export default function ResultsPage() {
                         {schoolInfo.logoUrl && <img src={schoolInfo.logoUrl} alt="Logo" className="w-12 h-12 object-contain mb-1" />}
                         <h1 className="text-xl font-black">{schoolInfo.name}</h1>
                         <p className="text-[12px] font-bold">{schoolInfo.address}</p>
-                        <div className="mt-1 inline-block border-2 border-black px-6 py-0.5 rounded-full font-black text-xs uppercase bg-slate-50">বিশেষ পরীক্ষার ফলাফল শিট - {specialPrintData.month} {toBengaliNumber(specialPrintData.year)}</div>
+                        <div className="mt-1 inline-block border border-black px-6 py-0.5 rounded-full font-black text-xs uppercase">বিশেষ পরীক্ষার ফলাফল শিট - {specialPrintData.month} {toBengaliNumber(specialPrintData.year)}</div>
                         <p className="text-[12px] font-bold mt-1">শ্রেণি: {classNamesMap[specialPrintData.className] || specialPrintData.className}</p>
                     </header>
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-100">
                                 <th rowSpan={2} className="w-12">রোল</th>
-                                <th rowSpan={2} className="min-w-[150px] text-left pl-2">শিক্ষার্থীর নাম</th>
+                                <th rowSpan={2} className="min-w-[150px]">নাম</th>
                                 {specialPrintData.availableSubjects.map((sub: any) => (
                                     <th key={sub.name} colSpan={3}>{sub.name}</th>
                                 ))}
@@ -1929,409 +2550,3 @@ export default function ResultsPage() {
         </div>
     );
 }
-
-function MeritListTab({ allStudents }: { allStudents: Student[] }) {
-    const { selectedYear } = useAcademicYear();
-    const db = useFirestore();
-    const { user } = useAuth();
-    const [exams, setExams] = useState<Exam[]>([]);
-    const [examName, setExamName] = useState('');
-    const [className, setClassName] = useState('');
-    const [groupFilter, setGroupFilter] = useState('all');
-    const [isLoading, setIsLoading] = useState(false);
-    const [meritResults, setMeritResults] = useState<StudentProcessedResult[]>([]);
-
-    useEffect(() => { 
-        if (db && user) getExams(db, selectedYear).then(setExams); 
-    }, [db, selectedYear, user]);
-
-    const handleViewMeritList = async () => {
-        if (!examName || !className || !db) return;
-        setIsLoading(true);
-        try {
-            const students = allStudents.filter(s => {
-                const yearMatch = s.academicYear === selectedYear;
-                const classMatch = s.className === className;
-                if (!yearMatch || !classMatch) return false;
-                if (parseInt(className) < 9 || groupFilter === 'all') return true;
-                
-                const sGroupNorm = groupMap[(s.group || '').toLowerCase().trim()] || (s.group || '').toLowerCase().trim();
-                const filterGroupNorm = groupMap[groupFilter.toLowerCase().trim()] || groupFilter.toLowerCase().trim();
-                return sGroupNorm === filterGroupNorm;
-            });
-
-            if (students.length === 0) { setMeritResults([]); setIsLoading(false); return; }
-
-            const allRes = await getAllResults(db, selectedYear, examName);
-            const classRes = allRes.filter(r => r.className === className);
-            const subs = getSubjects(className, groupFilter === 'all' ? undefined : groupFilter).filter(s => s.isExamSubject !== false);
-            setMeritResults(processStudentResults(students, classRes, subs));
-        } catch (e) {
-            console.error(e);
-        }
-        setIsLoading(false);
-    };
-
-    return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
-                <div className="space-y-2">
-                    <Label className="text-xs font-bold">পরীক্ষা</Label>
-                    <Select value={examName} onValueChange={setExamName}>
-                        <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
-                        <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label className="font-bold text-xs">শ্রেণি</Label>
-                    <Select value={className} onValueChange={setClassName}>
-                        <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
-                        <SelectContent>{Object.entries(classNamesMap).map(([v, l]) => <SelectItem key={v} value={v}>{l} শ্রেণি</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                {parseInt(className) >= 9 && (
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold">শাখা</Label>
-                        <Select value={groupFilter} onValueChange={setGroupFilter}>
-                            <SelectTrigger className="bg-white h-9 text-xs font-bold border-2"><SelectValue placeholder="সকল শাখা" /></SelectTrigger>
-                            <SelectContent><SelectItem value="all">সকল শাখা</SelectItem><SelectItem value="science">বিজ্ঞান</SelectItem><SelectItem value="arts">মানবিক</SelectItem><SelectItem value="commerce">ব্যবসায় শিক্ষা</SelectItem></SelectContent>
-                        </Select>
-                    </div>
-                )}
-                <Button onClick={handleViewMeritList} disabled={isLoading || !examName || !className} className="h-9 text-xs font-black">মেধা তালিকা দেখুন</Button>
-                <Link href={`/results/merit-list?academicYear=${selectedYear}&examName=${encodeURIComponent(examName)}&className=${className}&group=${groupFilter}`} target="_blank">
-                    <Button variant="outline" disabled={meritResults.length === 0} className="w-full h-9 text-xs font-black border-primary text-primary"><Printer className="h-3.5 w-3.5 mr-1" /> প্রিন্ট তালিকা</Button>
-                </Link>
-            </div>
-
-            {meritResults.length > 0 && (
-                <Card className="border-2 shadow-lg rounded-2xl overflow-hidden bg-white">
-                    <CardHeader className="bg-primary/5 p-4 border-b flex flex-row justify-between items-center">
-                        <CardTitle className="text-lg font-black text-primary">মেধা তালিকা - {examName}</CardTitle>
-                        <Badge className="bg-primary font-black px-4">{toBengaliNumber(meritResults.length)} জন</Badge>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="w-16 text-center font-black">মেধা</TableHead>
-                                    <TableHead className="w-16 text-center font-black">রোল</TableHead>
-                                    <TableHead className="font-black">নাম</TableHead>
-                                    <TableHead className="text-center font-black">মোট নম্বর</TableHead>
-                                    <TableHead className="text-center font-black">GPA</TableHead>
-                                    <TableHead className="text-center font-black">গ্রেড</TableHead>
-                                    <TableHead className="text-center font-black">অবস্থা</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {meritResults.map((res, idx) => (
-                                    <TableRow key={res.student.id} className={cn("h-11", !res.isPass && "bg-rose-50/50")}>
-                                        <TableCell className="text-center font-black text-lg">{res.isPass ? toBengaliNumber(res.meritPosition || idx + 1) : '-'}</TableCell>
-                                        <TableCell className="text-center font-bold">{toBengaliNumber(res.student.roll)}</TableCell>
-                                        <TableCell className="font-bold text-slate-700">{res.student.studentNameBn}</TableCell>
-                                        <TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.totalMarks)}</TableCell>
-                                        <TableCell className="text-center font-black">{toBengaliNumber(res.gpa.toFixed(2))}</TableCell>
-                                        <TableCell className={cn("text-center font-black", !res.isPass && "text-rose-600")}>{res.isPass ? res.finalGrade : `F${toBengaliNumber(res.failedSubjectsCount)}`}</TableCell>
-                                        <TableCell className="text-center"><Badge className={cn("font-black px-3", res.isPass ? "bg-emerald-600" : "bg-rose-600")}>{res.isPass ? 'কৃতকার্য' : 'অকৃতকার্য'}</Badge></TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
-    );
-}
-
-const PromotionTab = ({ allStudents }: { allStudents: Student[] }) => {
-    return (<Card className="p-20 text-center border-2 border-dashed rounded-3xl opacity-50"><Star className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><CardTitle>Promotion Management</CardTitle><CardDescription>শীঘ্রই মেধাক্রম অনুযায়ী পরবর্তী শ্রেণিতে প্রমোশন দেওয়ার সুবিধা যুক্ত হবে।</CardDescription></Card>);
-}
-
-const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
-    const db = useFirestore();
-    const { selectedYear, availableYears } = useAcademicYear();
-    const { toast } = useToast();
-    const [searchYear, setSearchYear] = useState(selectedYear);
-    const [searchClass, setSearchClass] = useState('');
-    const [searchExam, setSearchExam] = useState('');
-    const [searchRoll, setSearchRoll] = useState('');
-    const [searchStudentId, setSearchStudentId] = useState('');
-    const [exams, setExams] = useState<Exam[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchResult, setSearchResult] = useState<StudentProcessedResult | null>(null);
-
-    useEffect(() => { if (db && searchYear) getExams(db, searchYear).then(setExams); }, [db, searchYear]);
-
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const bnToEn = (str: string) => str.toString().replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
-        if (!db || !searchYear || !searchClass || !searchExam || !searchRoll || !searchStudentId) {
-            toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'সবগুলো ঘর পূরণ করুন।' });
-            return;
-        }
-        setIsSearching(true);
-        try {
-            const cleanRoll = parseInt(bnToEn(searchRoll).trim(), 10);
-            const cleanStudentId = bnToEn(searchStudentId).trim().toUpperCase().replace(/\s/g, '');
-            
-            const studentQuery = query(
-                collection(db, 'students'), 
-                where('academicYear', '==', searchYear), 
-                where('className', '==', searchClass), 
-                where('roll', '==', cleanRoll), 
-                limit(1)
-            );
-            const studentSnap = await getDocs(studentQuery);
-            
-            if (studentSnap.empty) {
-                toast({ variant: 'destructive', title: 'শিক্ষার্থী পাওয়া যায়নি' });
-                setIsSearching(false); return;
-            }
-            
-            const foundStudent = studentFromDoc(studentSnap.docs[0]);
-            const dbStudentId = bnToEn(foundStudent.generatedId || '').trim().toUpperCase().replace(/\s/g, '');
-            
-            if (dbStudentId !== cleanStudentId && foundStudent.generatedId !== cleanStudentId) {
-                 toast({ variant: 'destructive', title: 'আইডি মেলেনি', description: 'অনুগ্রহ করে সঠিক আইডি নম্বরটি পুনরায় লিখুন।' });
-                 setIsSearching(false); return;
-            }
-            
-            const allResults = await getAllResults(db, searchYear, searchExam);
-            const classRes = allResults.filter(r => r.className === searchClass);
-            if (classRes.length === 0) {
-                toast({ variant: 'destructive', title: 'ফলাফল প্রকাশিত হয়নি' });
-                setIsSearching(false); return;
-            }
-            const classStudentsSnap = await getDocs(query(collection(db, 'students'), where('academicYear', '==', searchYear), where('className', '==', searchClass)));
-            const classStudents = classStudentsSnap.docs.map(studentFromDoc);
-            const subs = getSubjects(searchClass, foundStudent.group).filter(s => s.isExamSubject !== false);
-            const processedResultsList = processStudentResults(classStudents, classRes, subs);
-            const studentProcessed = processedResultsList.find(r => r.student.id === foundStudent.id);
-            if (studentProcessed) setSearchResult(studentProcessed);
-            else toast({ variant: 'destructive', title: 'ফলাফল পাওয়া যায়নি' });
-        } catch (error: any) {
-            console.error("Result Search Error:", error);
-            toast({ variant: 'destructive', title: 'সার্ভার ত্রুটি' });
-        } finally { setIsSearching(false); }
-    };
-
-    return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            {!searchResult ? (
-                <Card className="max-w-xl mx-auto border-none shadow-xl rounded-[32px] overflow-hidden">
-                    <CardHeader className="bg-primary text-white p-8">
-                        <CardTitle className="text-2xl font-black flex items-center gap-3"><Search className="h-8 w-8" /> ফলাফল অনুসন্ধান</CardTitle>
-                        <CardDescription className="text-white/80 font-bold">সঠিক তথ্য দিয়ে ড্রাফট রেজাল্ট সামারি দেখুন</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-8 bg-white space-y-6">
-                        <form onSubmit={handleSearch} className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="font-black text-xs uppercase text-muted-foreground">শিক্ষাবর্ষ</Label>
-                                    <Select value={searchYear} onValueChange={setSearchYear}>
-                                        <SelectTrigger className="h-12 bg-slate-50 border-2 font-black text-lg"><SelectValue /></SelectTrigger>
-                                        <SelectContent>{availableYears.map(y => <SelectItem key={y} value={y} className="font-bold">{toBengaliNumber(y)}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="font-black text-xs uppercase text-muted-foreground">শ্রেণি</Label>
-                                    <Select value={searchClass} onValueChange={setSearchClass}>
-                                        <SelectTrigger className="h-12 bg-slate-50 border-2 font-black text-lg"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
-                                        <SelectContent>{Object.entries(classNamesMap).map(([id, label]) => <SelectItem key={id} value={id} className="font-bold">{label} শ্রেণি</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="font-black text-xs uppercase text-muted-foreground">পরীক্ষার নাম</Label>
-                                <Select value={searchExam} onValueChange={setSearchExam}>
-                                    <SelectTrigger className="h-12 bg-slate-50 border-2 font-black text-lg"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
-                                    <SelectContent>
-                                        {exams.map(e => <SelectItem key={e.id} value={e.name} className="font-bold">{e.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="font-black text-xs uppercase text-muted-foreground">রোল নম্বর</Label>
-                                    <Input value={searchRoll} onChange={e => setSearchRoll(e.target.value)} placeholder="উদা: ১" className="font-black text-xl h-12 border-2" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="font-black text-xs uppercase text-muted-foreground">শিক্ষার্থী আইডি (ID)</Label>
-                                    <Input value={searchStudentId} onChange={e => setSearchStudentId(e.target.value)} placeholder="ID লিখুন" className="font-black text-xl h-12 uppercase border-2" required />
-                                </div>
-                            </div>
-                            <Button type="submit" className="w-full h-14 text-xl font-black shadow-xl" disabled={isSearching}>
-                                {isSearching ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : <Search className="mr-2 h-6 w-6" />}
-                                ফলাফল দেখুন
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="max-w-4xl mx-auto space-y-6 animate-in zoom-in-95 duration-500">
-                    <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-2xl bg-white">
-                        <CardHeader className="p-8 bg-primary text-white flex flex-row items-center gap-8 border-b-0">
-                            <Avatar className="h-28 w-28 border-4 border-white shadow-xl">
-                                <AvatarImage src={sanitizePhotoUrl(searchResult.student.photoUrl, searchResult.student.gender) || getStudentPlaceholderImage(searchResult.student.gender)} />
-                                <AvatarFallback className="bg-white/20 text-3xl font-black">S</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                                <CardTitle className="text-3xl font-black mb-1">{searchResult.student.studentNameBn}</CardTitle>
-                                <CardDescription className="text-white/90 text-lg font-bold">
-                                    রোল: {toBengaliNumber(searchResult.student.roll)} | {classNamesMap[searchResult.student.className]} শ্রেণি | {searchExam}
-                                </CardDescription>
-                            </div>
-                            <Button variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 font-black h-12 px-6" onClick={() => setSearchResult(null)}><RotateCcw className="mr-2 h-5 w-5" /> পুনরায় খুঁজুন</Button>
-                        </CardHeader>
-                        <CardContent className="p-8 space-y-8 bg-slate-50/50">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                <Card className="p-6 text-center border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,0.1)] rounded-2xl bg-white group hover:scale-105 transition-all"><p className="text-[10px] font-black text-muted-foreground uppercase mb-2">মোট নম্বর</p><p className="text-4xl font-black text-primary group-hover:scale-110 transition-transform">{toBengaliNumber(searchResult.totalMarks)}</p></Card>
-                                <Card className="p-6 text-center border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,0.1)] rounded-2xl bg-white group hover:scale-105 transition-all"><p className="text-[10px] font-black text-muted-foreground uppercase mb-2">GPA</p><p className="text-4xl font-black text-primary group-hover:scale-110 transition-transform">{toBengaliNumber(searchResult.gpa.toFixed(2))}</p></Card>
-                                <Card className="p-6 text-center border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,0.1)] rounded-2xl bg-white group hover:scale-105 transition-all"><p className="text-[10px] font-black text-muted-foreground uppercase mb-2">গ্রেড</p><p className={cn("text-4xl font-black group-hover:scale-110 transition-transform", searchResult.isPass ? "text-emerald-600" : "text-rose-600")}>{searchResult.isPass ? searchResult.finalGrade : 'F'}</p></Card>
-                                <Card className="p-6 text-center border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,0.1)] rounded-2xl bg-white group hover:scale-105 transition-all"><p className="text-[10px] font-black text-muted-foreground uppercase mb-2">মেধাস্থান</p><p className="text-4xl font-black text-amber-600 group-hover:scale-110 transition-transform">{searchResult.isPass ? toBengaliNumber(searchResult.meritPosition || '-') : '-'}</p></Card>
-                            </div>
-                            <div className="border-[3px] border-black rounded-[32px] overflow-hidden bg-white shadow-xl">
-                                <Table>
-                                    <TableHeader className="bg-primary/5 h-14">
-                                        <TableRow className="border-b-[3px] border-black">
-                                            <TableHead className="font-black text-slate-800 text-sm pl-10">বিষয়ের নাম</TableHead>
-                                            <TableHead className="text-center font-black text-slate-800 text-sm">প্রাপ্ত নম্বর</TableHead>
-                                            <TableHead className="text-center font-black text-slate-800 text-sm">গ্রেড</TableHead>
-                                            <TableHead className="text-right pr-10 font-black text-slate-800 text-sm">পয়েন্ট</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (
-                                            <TableRow key={name} className="h-12 border-b-2 border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                                <TableCell className="font-bold text-slate-700 pl-10">{name}</TableCell>
-                                                <TableCell className="text-center font-black text-blue-900 text-xl">{toBengaliNumber(res.marks)}</TableCell>
-                                                <TableCell className={cn("text-center font-black text-base", res.isPass ? "text-emerald-700" : "text-rose-600")}>{res.grade}</TableCell>
-                                                <TableCell className="text-right pr-10 font-bold text-base">{toBengaliNumber(res.point.toFixed(2))}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <div className="flex justify-center no-print">
-                        <Button className="h-16 px-16 text-2xl font-black shadow-2xl bg-emerald-600 hover:bg-emerald-700 rounded-full" onClick={() => window.print()}><Printer className="mr-3 h-8 w-8" /> মার্কশিট প্রিন্ট করুন</Button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const SpecialExamTab = ({ allStudents, onPrintRequested }: { allStudents: Student[], onPrintRequested: (data: any) => void }) => {
-    const { toast } = useToast();
-    const { selectedYear } = useAcademicYear();
-    const db = useFirestore();
-    const { user } = useAuth();
-    
-    const [selectedMonth, setSelectedMonth] = useState<string>(BENGALI_MONTHS[new Date().getMonth()]);
-    const [className, setClassName] = useState<string>('6');
-    const [examType, setExamType] = useState<string>('বিশেষ পরীক্ষা-১');
-    const [subject, setSubject] = useState<string>('');
-    const [fullMarks, setFullMarks] = useState<number>(20);
-    const [isLoading, setIsLoading] = useState(false);
-    const [marks, setMarks] = useState<Map<string, number>>(new Map());
-    
-    const [allSpecialResults, setAllSpecialResults] = useState<SpecialClassResult[]>([]);
-
-    const students = useMemo(() => allStudents.filter(s => s.academicYear === selectedYear && s.className === className).sort((a,b) => a.roll - b.roll), [allStudents, selectedYear, className]);
-    const availableSubjects = useMemo(() => {
-        const base = getSubjects(className).filter(s => s.isExamSubject !== false);
-        const unique = new Map<string, SubjectType>();
-        base.forEach(s => unique.set(s.name, s));
-        return Array.from(unique.values());
-    }, [className]);
-
-    const fetchData = useCallback(async () => {
-        if (!db || !selectedMonth || !className) return;
-        setIsLoading(true);
-        const data = await getSpecialResultsForClass(db, selectedYear, className, selectedMonth);
-        setAllSpecialResults(data);
-        
-        if (subject && examType) {
-            const match = data.find(r => normalize(r.subject) === normalize(subject) && r.examType === examType);
-            const m = new Map<string, number>();
-            if (match) {
-                match.results.forEach(res => { if (res.marks !== undefined) m.set(res.studentId, res.marks); });
-                setFullMarks(match.fullMarks);
-            } else {
-                setFullMarks(20);
-            }
-            setMarks(m);
-        }
-        setIsLoading(false);
-    }, [db, selectedMonth, className, subject, examType, selectedYear]);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-
-    const handleSave = async () => {
-        if (!db || !user || !subject || !examType) return;
-        setIsLoading(true);
-        const results = students.map(s => ({ studentId: s.id, marks: marks.get(s.id) }));
-        await saveSpecialResults(db, { academicYear: selectedYear, className, subject, examType, month: selectedMonth, fullMarks, results });
-        toast({ title: 'বিশেষ পরীক্ষার নম্বর সংরক্ষিত হয়েছে' });
-        fetchData();
-        setIsLoading(false);
-    };
-
-    const handlePrint = () => {
-        const sortedSubList = [
-            { name: 'বাংলা', isCombined: true, subList: ['বাংলা প্রথম', 'বাংলা দ্বিতীয়'] },
-            { name: 'ইংরেজি', isCombined: true, subList: ['ইংরেজি প্রথম', 'ইংরেজি দ্বিতীয়'] },
-            { name: 'গণিত' }, { name: 'সাধারণ বিজ্ঞান' }, { name: 'বাংলাদেশ ও বিশ্ব পরিচয়' },
-            { name: 'ধর্ম ও নৈতিক শিক্ষা' }, { name: 'তথ্য ও যোগাযোগ প্রযুক্তি' }, { name: 'কৃষি শিক্ষা' },
-            { name: 'পদার্থ' }, { name: 'রসায়ন' }, { name: 'জীব বিজ্ঞান' }, { name: 'উচ্চতর গণিত' },
-            { name: 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা' }, { name: 'ভূগোল ও পরিবেশ' }, { name: 'পৌরনীতি ও নাগরিকতা' }
-        ].filter(s => {
-            if (s.isCombined) return s.subList.some(inner => availableSubjects.some(as => normalize(as.name) === normalize(inner)));
-            return availableSubjects.some(as => normalize(as.name) === normalize(s.name));
-        });
-
-        onPrintRequested({ students, allSpecialResults, availableSubjects: sortedSubList, month: selectedMonth, year: selectedYear, className });
-    };
-
-    return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm no-print">
-                <div className="space-y-2"><Label>মাস</Label><Select value={selectedMonth} onValueChange={setSelectedMonth}><SelectTrigger className="bg-white"><SelectValue /></SelectTrigger><SelectContent>{BENGALI_MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>শ্রেণি</Label><Select value={className} onValueChange={(v) => { setClassName(v); setSubject(''); }}><SelectTrigger className="bg-white"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(classNamesMap).map(([id, label]) => <SelectItem key={id} value={id}>{label} শ্রেণি</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>পরীক্ষার নাম</Label><Select value={examType} onValueChange={setExamType}><SelectTrigger className="bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="বিশেষ পরীক্ষা-১">বিশেষ পরীক্ষা-১</SelectItem><SelectItem value="বিশেষ পরীক্ষা-২">বিশেষ পরীক্ষা-২</SelectItem><SelectItem value="বিশেষ পরীক্ষা-৩">বিশেষ পরীক্ষা-৩</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>বিষয়</Label><Select value={subject} onValueChange={setSubject} disabled={!className}><SelectTrigger className="bg-white"><SelectValue placeholder="বিষয়" /></SelectTrigger><SelectContent>{availableSubjects.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>পূর্ণমান</Label><Input type="number" value={fullMarks} onChange={e => setFullMarks(parseInt(e.target.value) || 0)} className="bg-white font-black" /></div>
-            </div>
-
-            {subject ? (
-                <Card className="border-2 shadow-xl rounded-2xl overflow-hidden animate-in zoom-in-95">
-                    <CardHeader className="bg-primary/5 p-4 border-b flex flex-row justify-between items-center">
-                        <div><CardTitle className="text-base font-black text-primary">{subject} - {examType} ({selectedMonth})</CardTitle><CardDescription className="font-bold text-[10px]">পূর্ণমান: {toBengaliNumber(fullMarks)} | শিক্ষার্থী: {toBengaliNumber(students.length)} জন</CardDescription></div>
-                        <Button variant="outline" className="font-black border-primary text-primary" onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> মাসিক রিপোর্ট প্রিন্ট</Button>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="max-h-[500px] overflow-auto">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-white z-10 border-b-2 border-black"><TableRow><TableHead className="w-20 text-center font-black">রোল</TableHead><TableHead className="font-black">নাম</TableHead><TableHead className="w-40 text-center font-black">প্রাপ্ত নম্বর</TableHead></TableRow></TableHeader>
-                                <TableBody>
-                                    {students.map(s => (
-                                        <TableRow key={s.id} className="hover:bg-slate-50">
-                                            <TableCell className="text-center font-black border-r">{toBengaliNumber(s.roll)}</TableCell>
-                                            <TableCell className="font-bold border-r">{s.studentNameBn}</TableCell>
-                                            <TableCell className="text-center flex justify-center"><Input type="number" value={marks.get(s.id) ?? ''} onChange={e => setMarks(prev => new Map(prev).set(s.id, parseInt(e.target.value) || 0))} className="w-24 text-center font-black text-blue-900 border-2 border-black/20 h-9" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const inputs = Array.from(document.querySelectorAll('input[type="number"]')) as HTMLInputElement[]; const idx = inputs.indexOf(e.currentTarget as HTMLInputElement); if (idx < inputs.length - 1) inputs[idx + 1].focus(); } }} /></TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="bg-slate-50 p-6 border-t flex justify-end"><Button onClick={handleSave} disabled={isLoading} className="px-12 h-12 font-black shadow-lg">{isLoading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} নম্বর সেভ করুন</Button></CardFooter>
-                </Card>
-            ) : <div className="p-20 text-center border-4 border-dashed rounded-3xl opacity-20"><Sparkles className="h-16 w-16 mx-auto mb-4" /><p className="text-xl font-black">একটি বিষয় নির্বাচন করুন</p></div>}
-        </div>
-    );
-};
-
