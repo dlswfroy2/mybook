@@ -700,8 +700,8 @@ function GroupResultTable({
                 <table className="min-w-max border-separate border-spacing-0 w-full">
                     <thead className="z-30">
                         <tr>
-                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-0 top-0 z-50 w-[60px] text-[12px] p-1 h-[64px] box-border">রোল</th>
-                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-[60px] top-0 z-50 min-w-[200px] text-[12px] p-1 h-[64px] box-border">শিক্ষার্থীর নাম</th>
+                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-0 top-0 z-30 w-[60px] text-[12px] p-1 h-[64px] box-border">রোল</th>
+                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-[60px] top-0 z-30 min-w-[200px] text-[12px] p-1 h-[64px] box-border">শিক্ষার্থীর নাম</th>
                             {subs.map((s, idx) => (
                                 <th 
                                     key={s.name} 
@@ -714,11 +714,11 @@ function GroupResultTable({
                                     {s.name}
                                 </th>
                             ))}
-                            <th rowSpan={2} className="text-center font-black border-l-2 border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[280px] z-50 w-[70px] h-[64px] box-border">মোট</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[210px] z-50 w-[70px] h-[64px] box-border">GPA</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[140px] bg-[#fff1f2] z-50 w-[70px] h-[64px] box-border">গ্রেড</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[70px] bg-[#fff1f2] z-50 w-[70px] h-[64px] box-border">মেধা</th>
-                            <th rowSpan={2} className="text-center font-black border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-0 z-50 w-[70px] h-[64px] box-border">প্রিন্ট</th>
+                            <th rowSpan={2} className="text-center font-black border-l-2 border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[280px] z-30 w-[70px] h-[64px] box-border">মোট</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[210px] z-30 w-[70px] h-[64px] box-border">GPA</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[140px] bg-[#fff1f2] z-30 w-[70px] h-[64px] box-border">গ্রেড</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[70px] bg-[#fff1f2] z-30 w-[70px] h-[64px] box-border">মেধা</th>
+                            <th rowSpan={2} className="text-center font-black border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-0 z-30 w-[70px] h-[64px] box-border">প্রিন্ট</th>
                         </tr>
                         <tr className="h-[32px]">
                             {subs.map((s, idx) => {
@@ -1287,7 +1287,7 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print sticky top-0 z-[60] backdrop-blur-md">
+            <div className="flex flex-col md:flex-row gap-6 items-end p-6 bg-white border-2 border-black/5 rounded-3xl shadow-sm no-print">
                 <div className="w-full md:w-64 space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">১. পরীক্ষা নির্বাচন</Label>
                     <Select value={examName} onValueChange={setExamName}>
@@ -1297,23 +1297,16 @@ const FullMarksTab = ({ allStudents }: { allStudents: Student[] }) => {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="flex-1 w-full space-y-2">
+                <div className="w-full md:w-56 space-y-2">
                     <Label className="font-black text-xs text-primary mb-1 block uppercase tracking-wider">২. শ্রেণি নির্বাচন করুন</Label>
-                    <div className="flex flex-wrap gap-2">
-                        {classes.map(cls => (
-                            <Button 
-                                key={cls}
-                                onClick={() => { setSelectedClass(cls); setSelectedGroup('all'); }}
-                                variant={selectedClass === cls ? "default" : "outline"}
-                                className={cn(
-                                    "font-black h-11 px-6 rounded-xl transition-all shadow-sm",
-                                    selectedClass === cls ? "bg-primary text-white scale-105" : "bg-white text-slate-600 border-2"
-                                )}
-                            >
-                                {classNamesMap[cls]} শ্রেণি
-                            </Button>
-                        ))}
-                    </div>
+                    <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedGroup('all'); }}>
+                        <SelectTrigger className="h-11 border-2 font-black"><SelectValue placeholder="শ্রেণি নির্বাচন" /></SelectTrigger>
+                        <SelectContent>
+                            {classes.map(cls => (
+                                <SelectItem key={cls} value={cls} className="font-bold">{classNamesMap[cls]} শ্রেণি</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                 {parseInt(selectedClass) >= 9 && (
                     <div className="w-full md:w-48 space-y-2">
