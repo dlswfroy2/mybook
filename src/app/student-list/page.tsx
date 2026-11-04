@@ -707,7 +707,7 @@ function StudentListContent() {
         const ref = doc(db, 'students', id);
         const dataToSave = { ...data };
         if (dataToSave.dob) {
-            dataToSave.dob = Timestamp.fromDate(new Date(dataToSave.dob));
+            dataToSave.dob = Timestamp.fromDate(new Date(dataToSave.dob)) as any;
         }
         batch.update(ref, { ...dataToSave, updatedAt: serverTimestamp() });
     });

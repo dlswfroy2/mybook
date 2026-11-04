@@ -52,9 +52,6 @@ const getFinalGrade = (gpa: number): string => {
     return 'F';
 }
 
-/**
- * Normalizes a subject name for comparison
- */
 const normalize = (name: string) => {
     if (!name) return "";
     const trimmed = name.trim();
@@ -62,9 +59,10 @@ const normalize = (name: string) => {
 };
 
 const groupMap: Record<string, string> = { 
-    'science': 'science', 'বিজ্ঞান': 'science',
-    'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts',
-    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce'
+    'science': 'science', 'বিজ্ঞান': 'science', 'Science': 'science', 'বিজ্ঞান শাখা': 'science',
+    'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts', 'humanity': 'arts', 'Arts': 'arts', 'মানবিক শাখা': 'arts',
+    'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce', 'Commerce': 'commerce', 'ব্যবসায় শিক্ষা শাখা': 'commerce',
+    'none': 'none', 'all': 'none', 'general': 'none', '': 'none'
 };
 
 export function processStudentResults(
@@ -74,7 +72,7 @@ export function processStudentResults(
 ): StudentProcessedResult[] {
 
     return students.map(student => {
-        const rawGroup = (student.group || '').toLowerCase().trim();
+        const rawGroup = (student.group || 'none').toLowerCase().trim();
         const studentGroupNormalized = groupMap[rawGroup] || rawGroup;
         
         let optionalSubjectNameNormalized = normalize(student.optionalSubject || '');
@@ -82,39 +80,27 @@ export function processStudentResults(
 
         const groupAllowedSubjects = getSubjects(student.className, studentGroupNormalized);
         
-        // Final subject list for this student
         const subjectsForStudent = groupAllowedSubjects.filter(subInfo => {
             const currentSubNameNormalized = normalize(subInfo.name);
             
-            // For 9-10: Handle mutually exclusive electives (like HM and Agri)
             if (studentClassNum >= 9) {
                 const hmNormalized = normalize('উচ্চতর গণিত');
                 const agriNormalized = normalize('কৃষি শিক্ষা');
                 
                 if (currentSubNameNormalized === hmNormalized || currentSubNameNormalized === agriNormalized) {
-                    // If student has specified an optional in profile, strictly show only that one
                     if (optionalSubjectNameNormalized) {
                         return currentSubNameNormalized === optionalSubjectNameNormalized;
                     }
                     
-                    // If no optional specified in profile, check if marks exist in the database for this subject
-                    const classResult = resultsBySubject.find(r => {
+                    // If no optional subject is set, only show if marks exist for this specific student
+                    const studentHasMarks = resultsBySubject.some(r => {
                         const nameMatch = normalize(r.subject) === currentSubNameNormalized;
                         if (!nameMatch) return false;
-                        
-                        if (studentClassNum >= 9) {
-                            const rGroupRaw = (r.group || 'none').toLowerCase().trim();
-                            const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
-                            return rGroupNorm === 'none' || rGroupNorm === studentGroupNormalized;
-                        }
-                        return true;
+                        const studentResult = r.results.find(res => res.studentId === student.id);
+                        return studentResult && (studentResult.written !== undefined || studentResult.mcq !== undefined || studentResult.practical !== undefined);
                     });
                     
-                    const studentResult = classResult?.results.find(r => r.studentId === student.id);
-                    const hasMarks = studentResult && (studentResult.written !== undefined || studentResult.mcq !== undefined || studentResult.practical !== undefined);
-                    
-                    // If student didn't pick an optional and hasn't sat for the exam, hide both
-                    return hasMarks;
+                    return studentHasMarks;
                 }
             }
             return true;
@@ -127,6 +113,7 @@ export function processStudentResults(
         subjectsForStudent.forEach(subjectInfo => {
             const normalizedSubjectName = normalize(subjectInfo.name);
             
+            // CRITICAL FIX: Find the specific record that contains this student's result
             const classResult = resultsBySubject.find(r => {
                 const nameMatch = normalize(r.subject) === normalizedSubjectName;
                 if (!nameMatch) return false;
@@ -134,13 +121,16 @@ export function processStudentResults(
                 const classMatch = String(r.className) === String(student.className);
                 if (!classMatch) return false;
 
-                if (studentClassNum >= 9) {
-                    const rGroupRaw = (r.group || 'none').toLowerCase().trim();
-                    const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
-                    return rGroupNorm === 'none' || rGroupNorm === studentGroupNormalized;
-                }
-                return true;
-            });
+                // Priority: Specific group match or 'none' group match
+                const rGroupRaw = (r.group || 'none').toLowerCase().trim();
+                const rGroupNorm = groupMap[rGroupRaw] || rGroupRaw;
+                
+                const groupMatch = rGroupNorm === 'none' || rGroupNorm === studentGroupNormalized;
+                if (!groupMatch) return false;
+
+                // Final confirmation: This record must contain the student's ID
+                return r.results.some(res => res.studentId === student.id);
+            }) || resultsBySubject.find(r => normalize(r.subject) === normalizedSubjectName && String(r.className) === String(student.className));
 
             const studentResult = classResult?.results.find(r => r.studentId === student.id);
             const fullMarks = classResult?.fullMarks || subjectInfo.fullMarks;
@@ -163,7 +153,11 @@ export function processStudentResults(
                     if (isIct25) {
                         if (mcq !== undefined && mcq < 8) isPassSubject = false;
                     } else if (fullMarks === 100) {
-                        if (subjectInfo.practical) {
+                        const wrLimit = classResult?.writtenLimit ?? (subjectInfo.practical ? 50 : 70);
+                        const mcqLimit = classResult?.mcqLimit ?? (subjectInfo.practical ? 25 : 30);
+                        const prLimit = classResult?.practicalLimit ?? (subjectInfo.practical ? 25 : 0);
+
+                        if (prLimit > 0) {
                             if (written !== undefined && written < 17) isPassSubject = false;
                             if (mcq !== undefined && mcq < 8) isPassSubject = false;
                             if (practical !== undefined && practical < 8) isPassSubject = false;
@@ -220,7 +214,6 @@ export function processStudentResults(
             }
         });
 
-        // Forced normalization for 9-10 if calculated count is close
         let effectiveCompulsoryCount = compulsorySubjectsCount;
         if (studentClassNum >= 9 && effectiveCompulsoryCount > 11) {
             effectiveCompulsoryCount = 11;
