@@ -57,37 +57,37 @@ ${chapterText}
 প্রশ্নের ধরণ: ${typeText}
 মোট প্রশ্নের সংখ্যা: ${input.count} টি
 
-কঠোর নিয়মাবলী:
-১. প্রতিটি সৃজনশীল প্রশ্নের ক্ষেত্রে একটি মানসম্পন্ন উদ্দীপক (stimulus) এবং ৪টি ধারাবাহিক উপ-প্রশ্ন থাকবে:
-   - ক (জ্ঞানমূলক - ১ নম্বর)
-   - খ (অনুধাবনমূলক - ২ নম্বর)
-   - গ (প্রয়োগমূলক - ৩ নম্বর)
-   - ঘ (উচ্চতর দক্ষতামূলক - ৪ নম্বর)
-২. বহুনির্বাচনির ক্ষেত্রে ৪টি স্পষ্ট অপশন (ক, খ, গ, ঘ) এবং সঠিক উত্তর উল্লেখ থাকবে।
-৩. গাণিতিক/বিজ্ঞান বিষয়ের চিহ্নের সঠিক রূপ থাকবে।
-৪. ভাষা হবে শতভাগ নির্ভুল ও প্রমিত বাংলা।
+কঠোর ও অলঙ্ঘনীয় নিয়মাবলী (১০০% মান্য):
+১. শুধুমাত্র প্রশ্নপত্র তৈরি করতে হবে: কোনো অবস্থাতেই প্রশ্নের উত্তর, সমাধান বা সঠিক উত্তরের কোনো প্রকার ক্লু দেওয়া যাবে না! [সঠিক উত্তর: ...] বা "সঠিক উত্তর:" বা "উত্তর:" ইত্যাদি কোনো উত্তরমালা লেখা কঠোরভাবে নিষিদ্ধ।
+২. প্রতিটি সৃজনশীল প্রশ্নের ক্ষেত্রে একটি মানসম্পন্ন উদ্দীপক (stimulus) এবং ৪টি ধারাবাহিক উপ-প্রশ্ন আলাদা আলাদা লাইনে থাকবে এবং ডানপাশে মান বণ্টন থাকবে:
+   - ক. (জ্ঞানমূলক) [১]
+   - খ. (অনুধাবনমূলক) [২]
+   - গ. (প্রয়োগমূলক) [৩]
+   - ঘ. (উচ্চতর দক্ষতামূলক) [৪]
+৩. বহুনির্বাচনির ক্ষেত্রে ৪টি স্পষ্ট অপশন (ক, খ, গ, ঘ) থাকবে, কিন্তু কোনো অবস্থাতেই সঠিক উত্তর উল্লেখ থাকবে না!
+৪. গাণিতিক/বিজ্ঞান বিষয়ের চিহ্নের সঠিক রূপ থাকবে।
+৫. ভাষা হবে শতভাগ নির্ভুল ও প্রমিত বাংলা।
 
 Output strictly in JSON format (no markdown backticks):
 {
   "questions": [
     {
       "type": "creative",
-      "stimulus": "উদ্দীপক...",
-      "qA": "ক. প্রশ্ন...",
-      "qB": "খ. প্রশ্ন...",
-      "qC": "গ. প্রশ্ন...",
-      "qD": "ঘ. প্রশ্ন...",
-      "formattedText": "উদ্দীপক...\\nক. ...\\nখ. ...\\nগ. ...\\nঘ. ..."
+      "stimulus": "উদ্দীপকের দৃশ্যকল্প...",
+      "qA": "জ্ঞানমূলক প্রশ্ন...",
+      "qB": "অনুধাবনমূলক প্রশ্ন...",
+      "qC": "প্রয়োগমূলক প্রশ্ন...",
+      "qD": "উচ্চতর দক্ষতামূলক প্রশ্ন...",
+      "formattedText": "উদ্দীপক...\\nক. জ্ঞানমূলক প্রশ্ন... [১]\\nখ. অনুধাবনমূলক প্রশ্ন... [২]\\nগ. প্রয়োগমূলক প্রশ্ন... [৩]\\nঘ. উচ্চতর দক্ষতামূলক প্রশ্ন... [৪]"
     },
     {
       "type": "mcq",
       "mcqQuestion": "প্রশ্ন...",
-      "optA": "ক) অপশন...",
-      "optB": "খ) অপশন...",
-      "optC": "গ) অপশন...",
-      "optD": "ঘ) অপশন...",
-      "correctOpt": "ক",
-      "formattedText": "প্রশ্ন...\\n(ক) ...  (খ) ...\\n(গ) ...  (ঘ) ...\\n[সঠিক উত্তর: ক]"
+      "optA": "অপশন ১",
+      "optB": "অপশন ২",
+      "optC": "অপশন ৩",
+      "optD": "অপশন ৪",
+      "formattedText": "প্রশ্ন...\\n(ক) অপশন ১  (খ) অপশন ২\\n(গ) অপশন ৩  (ঘ) অপশন ৪"
     }
   ]
 }`;
@@ -124,25 +124,57 @@ Output strictly in JSON format (no markdown backticks):
   try {
     const clean = rawText.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
+
+    const stripAnswers = (txt: string) => {
+      if (!txt) return '';
+      return txt
+        .replace(/\[\s*(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)[^\]]*\]/gi, '')
+        .replace(/\(\s*(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)[^)]*\)/gi, '')
+        .replace(/(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)\s*:\s*[^\n]+/gi, '')
+        .trim();
+    };
+
     return {
-      questions: (parsed.questions || []).map((q: any) => ({
-        ...q,
-        formattedText:
-          q.formattedText ||
-          (q.type === 'creative'
-            ? `${q.stimulus || ''}\nক. ${q.qA || ''}\nখ. ${q.qB || ''}\nগ. ${q.qC || ''}\nঘ. ${q.qD || ''}`.trim()
-            : q.type === 'mcq'
-            ? `${q.mcqQuestion || ''}\n(ক) ${q.optA || ''} (খ) ${q.optB || ''}\n(গ) ${q.optC || ''} (ঘ) ${q.optD || ''}`.trim()
-            : q.shortText || ''),
-      })),
+      questions: (parsed.questions || []).map((q: any) => {
+        let fText = q.formattedText || '';
+        if (!fText) {
+          if (q.type === 'creative') {
+            const qA = q.qA?.includes('[') ? q.qA : `${q.qA || ''} [১]`;
+            const qB = q.qB?.includes('[') ? q.qB : `${q.qB || ''} [২]`;
+            const qC = q.qC?.includes('[') ? q.qC : `${q.qC || ''} [৩]`;
+            const qD = q.qD?.includes('[') ? q.qD : `${q.qD || ''} [৪]`;
+            fText = `${q.stimulus || ''}\nক. ${qA}\nখ. ${qB}\nগ. ${qC}\nঘ. ${qD}`.trim();
+          } else if (q.type === 'mcq') {
+            fText = `${q.mcqQuestion || ''}\n(ক) ${q.optA || ''}  (খ) ${q.optB || ''}\n(গ) ${q.optC || ''}  (ঘ) ${q.optD || ''}`.trim();
+          } else {
+            fText = q.shortText || '';
+          }
+        }
+        return {
+          ...q,
+          correctOpt: undefined,
+          formattedText: stripAnswers(fText),
+          stimulus: stripAnswers(q.stimulus || ''),
+          mcqQuestion: stripAnswers(q.mcqQuestion || ''),
+          shortText: stripAnswers(q.shortText || ''),
+        };
+      }),
     };
   } catch {
+    const stripAnswers = (txt: string) => {
+      if (!txt) return '';
+      return txt
+        .replace(/\[\s*(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)[^\]]*\]/gi, '')
+        .replace(/\(\s*(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)[^)]*\)/gi, '')
+        .replace(/(?:সঠিক উত্তর|উত্তরঃ?|উত্তর)\s*:\s*[^\n]+/gi, '')
+        .trim();
+    };
     return {
       questions: [
         {
           type: 'short',
-          shortText: rawText,
-          formattedText: rawText,
+          shortText: stripAnswers(rawText),
+          formattedText: stripAnswers(rawText),
         },
       ],
     };

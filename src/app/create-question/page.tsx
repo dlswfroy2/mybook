@@ -55,6 +55,7 @@ import { generatePracticeQuestions } from '@/ai/flows/generate-practice-question
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
+import { formatQuestionToBoardStandardHtml, stripAnswers } from '@/lib/question-formatter';
 import { format } from 'date-fns';
 
 type Question = {
@@ -153,6 +154,8 @@ function CreateQuestionContent() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionsB, setQuestionsB] = useState<Question[]>([]);
   const [activeSet, setActiveSet] = useState<'A' | 'B'>('A');
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [aiAssistantChapters, setAiAssistantChapters] = useState<string[]>([]);
 
   // Document Content for Live Visual Editor & Print
   const [documentContent, setDocumentContent] = useState<string>('');

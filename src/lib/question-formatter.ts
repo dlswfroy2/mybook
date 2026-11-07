@@ -1,0 +1,149 @@
+export function toBengaliNumber(n: number | string | undefined | null): string {
+  if (n === undefined || n === null || n === '') return '';
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
+}
+
+export function stripAnswers(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\[\s*(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)[^\]]*\]/gi, '')
+    .replace(/\(\s*(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)[^)]*\)/gi, '')
+    .replace(/(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)\s*:\s*[^\n]+/gi, '')
+    .replace(/(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)\s*[:=]\s*[ক-ঘA-D1-4][^\n]*/gi, '')
+    .trim();
+}
+
+function formatMath(text: string): string {
+  if (!text) return '';
+  let formatted = text.replace(/\$|\\\(|\\\)|\\\[|\\\]|###|\*\*/g, '');
+  formatted = formatted.replace(/\(\((.*?)\)\)/g, '$1').replace(/\[\[(.*?)\]\]/g, '$1').trim();
+  formatted = formatted.replace(/\\text\{([^}]+)\}/g, '<span class="math-text">$1</span>');
+  const fracRegex = /\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g;
+  formatted = formatted.replace(fracRegex, '<span class="math-frac"><span class="math-num">$1</span><span class="math-den">$2</span></span>');
+  formatted = formatted.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, '<span class="math-sqrt"><sup class="math-root">$1</sup>√<span class="math-sqrt-stem">$2</span></span>');
+  formatted = formatted.replace(/\\sqrt\{([^}]+)\}/g, '<span class="math-sqrt">√<span class="math-sqrt-stem">$1</span></span>');
+  formatted = formatted.replace(/\^\{([^}]+)\}/g, '<sup class="math-sup">$1</sup>');
+  formatted = formatted.replace(/\^(\d+|[a-z]|[A-Z])/g, '<sup class="math-sup">$1</sup>');
+  formatted = formatted.replace(/_\{([^}]+)\}/g, '<sub class="math-sub">$1</sub>');
+  formatted = formatted.replace(/_(\d+|[a-z]|[A-Z])/g, '<sub class="math-sub">$1</sub>');
+  const symbolMap: Record<string, string> = {
+    '\\\\log': 'log', '\\\\triangle': '△', '\\\\angle': '∠', '\\\\circ': '°',
+    '\\\\theta': 'θ', '\\\\pi': 'π', '\\\\pm': '±', '\\\\times': '×',
+    '\\\\neq': '≠', '\\\\ne': '≠', '\\\\leq': '≤', '\\\\geq': '≥',
+    '\\\\degree': '°', '\\\\cdot': '·', '\\\\infty': '∞', '\\\\approx': '≈',
+    '\\\\sum': '∑', '\\\\prod': '∏', '\\\\alpha': 'α', '\\\\beta': 'β',
+    '\\\\gamma': 'γ', '\\\\delta': 'δ', '\\\\sigma': 'σ', '\\\\phi': 'φ', '\\\\omega': 'ω',
+    '\\\\eta': 'η', '\\\\rho': 'র', '\\\\lambda': 'λ', '\\\\mu': 'μ',
+    '\\\\div': '÷', '\\\\rightarrow': '→', '\\\\to': '→', '\\\\arrow': '→',
+    '\\\\in': '∈', '\\\\mathbb\\{N\\}': 'ℕ', '\\\\mathbb\\{R\\}': 'ℝ', '\\\\mathbb\\{Z\\}': 'ℤ',
+    '\\\\mathbb\\{Q\\}': 'ℚ', '\\\\subset': '⊂', '\\\\subseteq': '⊆', '\\\\cup': '∪',
+    '\\\\cap': '∩', '\\\\emptyset': '∅', '\\\\forall': '∀', '\\\\exists': '∃', 
+    '\\\\Rightarrow': '⇒', '\\\\leftarrow': '←', '\\\\Leftarrow': '⇐', 
+    '\\\\leftrightarrow': '↔', '\\\\Leftrightarrow': '⇔',
+    '\\\\left': '', '\\\\right': '', '\\\\%': '%', '\\\\setminus': '\\', '\\\\backslash': '\\',
+    '\\\\propto': '∝', '\\\\parallel': '∥', '\\\\perp': '⊥'
+  };
+  Object.entries(symbolMap).forEach(([key, val]) => { formatted = formatted.replace(new RegExp(key, 'g'), val); });
+  formatted = formatted.replace(/\\dot\{([^}]+)\}/g, '<span class="math-dot">$1</span>');
+  formatted = formatted.replace(/\\/g, '');
+  return formatted;
+}
+
+export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, isEnglish: boolean, type?: string): string {
+  const clean = stripAnswers(rawText);
+  const qNum = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
+  
+  // 1. Creative Question (CQ): contains ক., খ., গ., ঘ.
+  const hasK = /(?:\n|\s|^)ক[.)]/.test(clean);
+  const hasKh = /(?:\n|\s|^)খ[.)]/.test(clean);
+  
+  if ((hasK && hasKh) || type === 'creative') {
+    const matchK = clean.search(/(?:\n|\s|^)ক[.)]/);
+    const stimulus = matchK !== -1 ? clean.substring(0, matchK).trim() : clean;
+    const subPart = matchK !== -1 ? clean.substring(matchK) : '';
+    
+    const extractPart = (currentM: string, nextM?: string, defaultMark: string = '১') => {
+      const reg = new RegExp(`(?:\\n|\\s|^)${currentM}[.)]\\s*([\\s\\S]*?)(?=(?:\\n|\\s|^)(?:${nextM || '$'})[.)]|$)`);
+      const m = subPart.match(reg);
+      if (!m) return null;
+      let text = m[1].trim();
+      let mark = defaultMark;
+      const markMatch = text.match(/\[\s*([১-৪1-4])\s*\]\s*$/);
+      if (markMatch) {
+        mark = markMatch[1];
+        text = text.replace(/\[\s*([১-৪1-4])\s*\]\s*$/, '').trim();
+      }
+      return { text, mark };
+    };
+    
+    const partA = extractPart('ক', 'খ', '১');
+    const partB = extractPart('খ', 'গ', '২');
+    const partC = extractPart('গ', 'ঘ', '৩');
+    const partD = extractPart('ঘ', undefined, '৪');
+    
+    return `<div class="cq-container my-3 font-kalpurush" style="margin: 12px 0 16px 0;">
+  <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px;">
+    <span style="font-weight: bold; min-width: 24px; flex-shrink: 0;">${qNum}</span>
+    <div style="flex: 1; text-align: justify; line-height: 1.6;">${formatMath(stimulus)}</div>
+  </div>
+  <div style="padding-left: 24px; display: flex; flex-direction: column; gap: 5px; font-size: 0.98em;">
+    ${partA ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>ক.</strong> ${formatMath(partA.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partA.mark}</span></div>` : ''}
+    ${partB ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>খ.</strong> ${formatMath(partB.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partB.mark}</span></div>` : ''}
+    ${partC ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>গ.</strong> ${formatMath(partC.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partC.mark}</span></div>` : ''}
+    ${partD ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>ঘ.</strong> ${formatMath(partD.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partD.mark}</span></div>` : ''}
+  </div>
+</div>`;
+  }
+  
+  // 2. MCQ Question: contains ক) খ) or (ক) (খ)
+  const hasOptions = /\(?ক[.)\)]/.test(clean) && /\(?খ[.)\)]/.test(clean);
+  if (hasOptions || type === 'mcq') {
+    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+    const qLine = lines[0] || '';
+    const otherLines = lines.slice(1).join(' ');
+    
+    const extractOpt = (letter: string, nextLetter?: string) => {
+      const reg = new RegExp(`\\(?${letter}[.)\\)]\\s*([\\s\\S]*?)(?=\\(?(?:${nextLetter || '$'})[.)\\)]|$)`);
+      const m = otherLines.match(reg);
+      return m ? m[1].trim() : '';
+    };
+    
+    const optA = extractOpt('ক', 'খ');
+    const optB = extractOpt('খ', 'গ');
+    const optC = extractOpt('গ', 'ঘ');
+    const optD = extractOpt('ঘ', undefined);
+    
+    return `<div class="mcq-container my-2.5 font-kalpurush" style="margin: 10px 0 12px 0;">
+  <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px;">
+    <span style="font-weight: bold; min-width: 24px;">${qNum}</span>
+    <div style="flex: 1; font-weight: bold; line-height: 1.5;">${formatMath(qLine)}</div>
+  </div>
+  ${optA ? `<div style="padding-left: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 0.95em;">
+    <div>(ক) ${formatMath(optA)}</div>
+    <div>(খ) ${formatMath(optB)}</div>
+    <div>(গ) ${formatMath(optC)}</div>
+    <div>(ঘ) ${formatMath(optD)}</div>
+  </div>` : ''}
+</div>`;
+  }
+  
+  // 3. Short / Other Question with mark
+  let mark = '';
+  let bodyText = clean;
+  const markMatch = clean.match(/\[\s*([১-৪1-4])\s*\]\s*$/);
+  if (markMatch) {
+    mark = markMatch[1];
+    bodyText = clean.replace(/\[\s*([১-৪1-4])\s*\]\s*$/, '').trim();
+  }
+  
+  return `<div class="short-container my-2 font-kalpurush" style="margin: 8px 0 10px 0;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+    <div style="display: flex; align-items: flex-start; gap: 6px; flex: 1;">
+      <span style="font-weight: bold; min-width: 24px;">${qNum}</span>
+      <div style="flex: 1; text-align: justify; line-height: 1.6;">${formatMath(bodyText).replace(/\n/g, '<br/>')}</div>
+    </div>
+    ${mark ? `<span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${mark}</span>` : ''}
+  </div>
+</div>`;
+}

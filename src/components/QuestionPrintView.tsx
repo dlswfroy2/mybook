@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { formatQuestionToBoardStandardHtml, stripAnswers } from '@/lib/question-formatter';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { Button } from '@/components/ui/button';
