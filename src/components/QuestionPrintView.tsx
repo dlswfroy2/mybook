@@ -1420,6 +1420,40 @@ function EditableContentArea({
         }
         return;
       }
+
+      // Check if cursor is inside a flex container or flex child
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let node: Node | null = sel.anchorNode;
+        let isInsideFlex = false;
+        while (node && node !== el) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const h = node as HTMLElement;
+            const style = window.getComputedStyle(h);
+            if (style.display === 'flex' || style.display === 'inline-flex') {
+              isInsideFlex = true;
+              break;
+            }
+          }
+          node = node.parentNode;
+        }
+
+        if (isInsideFlex) {
+          e.preventDefault();
+          document.execCommand('insertParagraph', false);
+          const range = sel.getRangeAt(0);
+          let currentEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? (range.startContainer as HTMLElement)
+            : range.startContainer.parentElement;
+          if (currentEl) {
+            currentEl.style.display = 'block';
+            currentEl.style.width = '100%';
+          }
+          setTimeout(() => checkAndReflow(false), 50);
+          return;
+        }
+      }
+
       setTimeout(() => checkAndReflow(false), 50);
       return;
     }
@@ -2769,6 +2803,17 @@ export function QuestionPrintView({
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .paper { color: black !important; }
+          .content-area .cq-item > div,
+          .content-area .cq-item div,
+          .content-area .short-item div {
+            display: block !important;
+          }
+          .content-area .cq-mark,
+          .content-area .short-mark {
+            float: right !important;
+            display: inline-block !important;
+            user-select: none !important;
+          }
         }
         @media print {
           html, body {

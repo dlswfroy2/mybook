@@ -138,16 +138,27 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const partC = extractPart('গ', 'ঘ', '৩');
     const partD = extractPart('ঘ', undefined, '৪');
     
-    return `<div class="cq-item my-3 font-kalpurush" style="margin: 12px 0 16px 0; page-break-inside: avoid;">
-  <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
-    <span style="font-weight: bold; min-width: 26px; flex-shrink: 0; font-size: 1.05em;">${qNum}</span>
-    <div style="flex: 1; text-align: justify; line-height: 1.65;">${formatMath(stimulus)}</div>
-  </div>
-  <div style="padding-left: 28px; display: flex; flex-direction: column; gap: 5px; font-size: 0.98em;">
-    ${partA ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>ক.</strong> ${formatMath(partA.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partA.mark}</span></div>` : ''}
-    ${partB ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>খ.</strong> ${formatMath(partB.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partB.mark}</span></div>` : ''}
-    ${partC ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>গ.</strong> ${formatMath(partC.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partC.mark}</span></div>` : ''}
-    ${partD ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>ঘ.</strong> ${formatMath(partD.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partD.mark}</span></div>` : ''}
+    return `<div class="cq-item my-3 font-kalpurush" style="margin: 12px 0 16px 0; page-break-inside: avoid; display: block;">
+  <p class="cq-stimulus" style="margin: 0 0 6px 0; line-height: 1.65; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
+    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(stimulus)}
+  </p>
+  <div class="cq-sub-questions" style="padding-left: 28px; display: block;">
+    ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+      <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partA.mark}</span>
+      <strong>ক.</strong> ${formatMath(partA.text)}
+    </p>` : ''}
+    ${partB ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+      <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partB.mark}</span>
+      <strong>খ.</strong> ${formatMath(partB.text)}
+    </p>` : ''}
+    ${partC ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+      <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partC.mark}</span>
+      <strong>গ.</strong> ${formatMath(partC.text)}
+    </p>` : ''}
+    ${partD ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+      <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partD.mark}</span>
+      <strong>ঘ.</strong> ${formatMath(partD.text)}
+    </p>` : ''}
   </div>
 </div>`;
   }
@@ -170,12 +181,11 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const optC = extractOpt('গ', 'ঘ');
     const optD = extractOpt('ঘ', undefined);
     
-    return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid;">
-  <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
-    <span style="font-weight: bold; min-width: 26px; flex-shrink: 0;">${qNum}</span>
-    <div style="flex: 1; font-weight: bold; line-height: 1.5;">${formatMath(qLine)}</div>
-  </div>
-  ${optA ? `<div style="padding-left: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.95em;">
+    return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
+  <p style="margin: 0 0 4px 0; font-weight: bold; line-height: 1.5; padding-left: 28px; text-indent: -28px; display: block;">
+    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(qLine)}
+  </p>
+  ${optA ? `<div class="mcq-options" style="padding-left: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.95em;">
     <div>(ক) ${formatMath(optA)}</div>
     <div>(খ) ${formatMath(optB)}</div>
     <div>(গ) ${formatMath(optC)}</div>
@@ -193,13 +203,10 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     bodyText = clean.replace(/\[\s*([১-৪1-4])\s*\]\s*$/, '').trim();
   }
   
-  return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid;">
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-    <div style="display: flex; align-items: flex-start; gap: 8px; flex: 1;">
-      <span style="font-weight: bold; min-width: 26px; flex-shrink: 0;">${qNum}</span>
-      <div style="flex: 1; text-align: justify; line-height: 1.6;">${formatMath(bodyText).replace(/\n/g, '<br/>')}</div>
-    </div>
-    ${mark ? `<span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${mark}</span>` : ''}
-  </div>
+  return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
+  <p style="margin: 0; line-height: 1.6; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
+    ${mark ? `<span class="short-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${mark}</span>` : ''}
+    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(bodyText)}
+  </p>
 </div>`;
 }

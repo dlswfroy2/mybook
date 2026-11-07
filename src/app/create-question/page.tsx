@@ -1646,6 +1646,17 @@ function CreateQuestionContent() {
           .math-sqrt-stem { border-top: 0.5pt solid black; padding-top: 1px; }
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
+          .cq-item > div,
+          .cq-item div,
+          .short-item div {
+            display: block !important;
+          }
+          .cq-mark,
+          .short-mark {
+            float: right !important;
+            display: inline-block !important;
+            user-select: none !important;
+          }
         }
         @media print {
           html, body {
