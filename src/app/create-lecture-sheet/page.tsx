@@ -1826,6 +1826,7 @@ function CreateLectureSheetContent() {
   const watermarkInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const measurementRef = useRef<HTMLDivElement>(null);
+  const hasInitiallyPaginatedRef = useRef(false);
   
   const softwareDocRef = useMemo(() => doc(db, 'config', 'software'), [db]);
   const { data: softwareConfig } = useDoc(softwareDocRef);
@@ -2581,26 +2582,28 @@ function CreateLectureSheetContent() {
     setPageStyles(initialStyles);
     setManualPages(initialManual);
     setRepaginateVersion(v => v + 1);
-  }, [
-    globalFontSize,
-    globalLineHeight,
-    pageStyles,
-    activeEditIdx,
-    mT,
-    mB,
-    mL,
-    mR,
-    manualPages,
-    data.content
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFontSize, globalLineHeight, pageStyles, activeEditIdx, mT, mB, mL, mR, manualPages]);
 
-  // Initial pagination when entering Print Mode
+  // Reset pagination guard when user exits Print Mode so re-entering triggers fresh pagination
+  useEffect(() => {
+    if (!isPrintMode) {
+      hasInitiallyPaginatedRef.current = false;
+      setManualPages({});
+      setPaginatedPages([]);
+    }
+  }, [isPrintMode]);
+
+    // Initial pagination when entering Print Mode — fires only ONCE per print session
   useEffect(() => {
     if (!isPrintMode || !data.content || !measurementRef.current) return;
+    if (hasInitiallyPaginatedRef.current) return; // already done — don't re-run on user edits
     if (paginatedPages.length === 0 || Object.keys(manualPages).length === 0) {
+      hasInitiallyPaginatedRef.current = true;
       repaginateDocument();
     }
-  }, [isPrintMode, data.content, paginatedPages.length, manualPages, repaginateDocument]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPrintMode, data.content]); // minimal: only triggers on first print-mode entry
 
   const handleAddNextPage = useCallback((initialContent: string = '') => {
     setPaginatedPages(prev => {
@@ -4467,13 +4470,9 @@ function CreateLectureSheetContent() {
                         onFocus={() => setActiveEditIdx(idx)}
                         onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
                         onBlur={(val) => {
-                          setManualPages(prev => {
-                            const updated = { ...prev, [idx]: val };
-                            const sorted = Object.keys(updated).map(Number).sort((a, b) => a - b);
-                            const combined = sorted.map(k => updated[k] || '').filter(Boolean).join('\n\n');
-                            setData(d => ({ ...d, content: combined }));
-                            return updated;
-                          });
+                          // Only keep manualPages in sync. Do NOT call setData here —
+                          // updating data.content triggers repaginateDocument which wipes all edits.
+                          setManualPages(prev => ({ ...prev, [idx]: val }));
                         }}
                         onAddNextPage={handleAddNextPage}
                         onRemoveEmptyPage={handleRemoveEmptyPage}
