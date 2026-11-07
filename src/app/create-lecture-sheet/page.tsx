@@ -1742,6 +1742,94 @@ function EditableContentArea({
     return () => document.removeEventListener('selectionchange', handleSelChange);
   }, [updateActiveLineIndent]);
 
+  // Table Drag & Drop across any page
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement | null;
+      const container = target?.closest('.custom-table-container') as HTMLElement | null;
+      if (container) {
+        (window as any).__draggedTable = container;
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('text/plain', 'custom-table');
+          e.dataTransfer.effectAllowed = 'move';
+        }
+        container.style.opacity = '0.4';
+      }
+    };
+
+    const handleDragEnd = (e: DragEvent) => {
+      const container = (window as any).__draggedTable as HTMLElement | null;
+      if (container) {
+        container.style.opacity = '1';
+        (window as any).__draggedTable = null;
+      }
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      if ((window as any).__draggedTable) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      const dragged = (window as any).__draggedTable as HTMLElement | null;
+      if (!dragged) return;
+      e.preventDefault();
+      dragged.style.opacity = '1';
+
+      const targetArea = el;
+      const sourceArea = dragged.closest('.content-area') as HTMLElement | null;
+
+      // Find drop location within targetArea
+      let dropNode: Node | null = null;
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        if (range) dropNode = range.startContainer;
+      } else if ((document as any).caretPositionFromPoint) {
+        const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
+        if (pos) dropNode = pos.offsetNode;
+      }
+
+      if (!dropNode && targetArea.contains(e.target as Node)) {
+        dropNode = e.target as Node;
+      }
+
+      let blockNode: Node | null = dropNode;
+      while (blockNode && blockNode.parentNode !== targetArea) {
+        blockNode = blockNode.parentNode;
+      }
+
+      if (blockNode === dragged) return;
+
+      if (blockNode && blockNode.parentNode === targetArea) {
+        targetArea.insertBefore(dragged, blockNode);
+      } else {
+        targetArea.appendChild(dragged);
+      }
+
+      (window as any).__draggedTable = null;
+
+      if (sourceArea) sourceArea.dispatchEvent(new Event('input', { bubbles: true }));
+      if (targetArea !== sourceArea) targetArea.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    el.addEventListener('dragstart', handleDragStart);
+    el.addEventListener('dragend', handleDragEnd);
+    el.addEventListener('dragover', handleDragOver);
+    el.addEventListener('drop', handleDrop);
+
+    return () => {
+      el.removeEventListener('dragstart', handleDragStart);
+      el.removeEventListener('dragend', handleDragEnd);
+      el.removeEventListener('dragover', handleDragOver);
+      el.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
   const moveParagraph = useCallback((fromIdx: number, direction: 'up' | 'down') => {
     const el = ref.current;
     if (!el) return;

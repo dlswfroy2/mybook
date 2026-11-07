@@ -48,6 +48,7 @@ import Tesseract from 'tesseract.js';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
+import { QuestionPrintView } from '@/components/QuestionPrintView';
 
 type Question = {
   id: string;
@@ -526,95 +527,35 @@ function CreateQuestionContent() {
       </div>
 
       {isPrintMode && (
-        <div className="print-view-container flex flex-col h-screen fixed inset-0 top-0 left-0 bg-slate-100 z-[40] font-kalpurush overflow-hidden">
-          <header className="no-print h-14 bg-white border-b flex items-center justify-between px-6 shrink-0 shadow-sm z-50">
-             <div className="flex items-center gap-3">
-               <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center"><Eye className="w-5 h-5" /></div>
-               <h3 className="font-bold text-lg">প্রিন্ট প্রিভিউ ও লেআউট - {meta.institution || appName}</h3>
-             </div>
-             <div className="flex gap-3">
-               <Button variant="outline" size="sm" onClick={() => router.back()} className="gap-2 font-bold border-primary text-primary bg-white"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button>
-               <Button size="sm" onClick={handleSaveToDb} disabled={saving} className="gap-2 font-bold bg-green-600 hover:bg-green-700 px-4">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} সেভ</Button>
-               <Button size="sm" onClick={() => window.print()} className="gap-2 font-bold bg-primary px-6"><Printer className="w-4 h-4" /> প্রিন্ট করুন</Button>
-             </div>
-          </header>
-          <main className="flex-1 overflow-y-auto bg-slate-200 pt-16 pb-24 flex flex-col items-center gap-10">
-             <div className="paper shadow-2xl bg-white relative overflow-hidden p-[0.7in] font-kalpurush" style={{ width: '8.27in', minHeight: '11.69in' }}>
-                <header className="text-center border-b-2 border-black pb-2 mb-6">
-                  <h1 className="font-black text-[24pt] text-black leading-tight uppercase">{meta.institution || appName}</h1>
-                  <h2 className="text-[15pt] font-bold text-black mt-2 underline">{meta.exam}</h2>
-                  <div className="flex justify-between items-center text-[12pt] font-bold mt-6 px-4">
-                    <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
-                     {questionsB.length > 0 && <span className="text-[14pt] font-black border-2 border-black px-3 py-0.5">সেট: ক (A)</span>}
-                    <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11pt] font-bold mt-2 px-4 italic border-t pt-1 border-dashed border-slate-300">
-                    <span>সময়: {meta.time}</span>
-                    <span>পূর্ণমান: {toBengaliNumber(meta.totalMarks)}</span>
-                  </div>
-                </header>
-                
-                <div className="space-y-8 text-black text-[11pt]">
-                   {questions.length > 0 ? (
-                     questions.map((q, idx) => (
-                       <div key={q.id} className="space-y-3">
-                         <div className="flex gap-2 font-bold">
-                           <span className="shrink-0">{isEnglish ? (idx + 1) : toBengaliNumber(idx + 1)}.</span>
-                           <div 
-                             className="flex-1 whitespace-pre-wrap leading-relaxed text-justify"
-                             dangerouslySetInnerHTML={{ __html: formatMath(q.content) }}
-                           />
-                         </div>
-                       </div>
-                     ))
-                   ) : (
-                     <div className="text-center py-20 text-slate-400">কোনো প্রশ্ন পাওয়া যায়নি।</div>
-                   )}
-                </div>
-                
-                <footer className="mt-auto pt-10 flex justify-between text-[8pt] font-bold text-slate-400">
-                  <span>মুদ্রিত তারিখ: {format(new Date(), 'dd/MM/yyyy')}</span>
-                  <span>{appName} - ডিজিটাল প্রশ্ন ব্যাংক</span>
-                </footer>
-             </div>
-
-             {/* ── SET B page (only if Set B has questions) ── */}
-             {questionsB.length > 0 && (
-               <div className="paper shadow-2xl bg-white relative overflow-hidden p-[0.7in] font-kalpurush set-b-page" style={{ width: '8.27in', minHeight: '11.69in' }}>
-                  <header className="text-center border-b-2 border-black pb-2 mb-6">
-                    <h1 className="font-black text-[24pt] text-black leading-tight uppercase">{meta.institution || appName}</h1>
-                    <h2 className="text-[15pt] font-bold text-black mt-2 underline">{meta.exam}</h2>
-                    <div className="flex justify-between items-center text-[12pt] font-bold mt-6 px-4">
-                      <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
-                      <span className="text-[14pt] font-black border-2 border-black px-3 py-0.5">সেট: খ (B)</span>
-                      <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[11pt] font-bold mt-2 px-4 italic border-t pt-1 border-dashed border-slate-300">
-                      <span>সময়: {meta.time}</span>
-                      <span>পূর্ণমান: {toBengaliNumber(meta.totalMarks)}</span>
-                    </div>
-                  </header>
-                  <div className="space-y-8 text-black text-[11pt]">
-                     {questionsB.map((q, idx) => (
-                       <div key={q.id} className="space-y-3">
-                         <div className="flex gap-2 font-bold">
-                           <span className="shrink-0">{isEnglish ? (idx + 1) : toBengaliNumber(idx + 1)}.</span>
-                           <div className="flex-1 whitespace-pre-wrap leading-relaxed text-justify" dangerouslySetInnerHTML={{ __html: formatMath(q.content) }} />
-                         </div>
-                       </div>
-                     ))}
-                  </div>
-                  <footer className="mt-auto pt-10 flex justify-between text-[8pt] font-bold text-slate-400">
-                    <span>মুদ্রিত তারিখ: {format(new Date(), 'dd/MM/yyyy')}</span>
-                    <span>{appName} - ডিজিটাল প্রশ্ন ব্যাংক</span>
-                  </footer>
-               </div>
-             )}
-          </main>
-        </div>
+        <QuestionPrintView
+          meta={meta}
+          questions={questions}
+          questionsB={questionsB}
+          appName={appName}
+          softwareConfig={softwareConfig}
+          onSave={async (updatedContent, styles) => {
+            if (!user || !db) return;
+            const docId = editId || doc(collection(db, 'questions')).id;
+            const dataToSave: any = {
+              ...meta,
+              content: updatedContent,
+              pageStyles: styles,
+              userId: user.uid,
+              updatedAt: serverTimestamp(),
+              isMcq: questions.some(q => q.type === 'mcq'),
+            };
+            if (!editId) dataToSave.createdAt = serverTimestamp();
+            await setDoc(doc(db, 'questions', docId), dataToSave, { merge: true });
+            if (!editId) router.replace(`/create-question?id=${docId}&print=true`);
+          }}
+          onBack={() => {
+            const p = new URLSearchParams(window.location.search);
+            p.delete('print');
+            router.push(`${window.location.pathname}?${p.toString()}`);
+          }}
+        />
       )}
-
-      <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{ __html: `
         @media screen {
           .math-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.85em; margin: 0 2px; }
           .math-num { border-bottom: 0.5pt solid black; padding: 0 1px; }
