@@ -789,10 +789,32 @@ function CreateQuestionContent() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">পরীক্ষার নাম</label>
+                    <Select 
+                      value={['সাপ্তাহিক পরীক্ষা', 'মাসিক পরীক্ষা', 'মডেল টেস্ট', '১ম সাময়িক পরীক্ষা', '২য় সাময়িক পরীক্ষা', 'অর্ধ-বার্ষিক পরীক্ষা', 'বার্ষিক পরীক্ষা', 'প্রাক-নির্বাচনি পরীক্ষা', 'নির্বাচনি (টেস্ট) পরীক্ষা', 'ক্লাস টেস্ট'].includes(meta.exam) ? meta.exam : 'custom'} 
+                      onValueChange={v => {
+                        if (v !== 'custom') setMeta(prev => ({...prev, exam: v}));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="পরীক্ষা বেছে নিন" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="সাপ্তাহিক পরীক্ষা" className="text-xs font-bold">সাপ্তাহিক পরীক্ষা</SelectItem>
+                        <SelectItem value="মাসিক পরীক্ষা" className="text-xs font-bold">মাসিক পরীক্ষা</SelectItem>
+                        <SelectItem value="মডেল টেস্ট" className="text-xs font-bold">মডেল টেস্ট</SelectItem>
+                        <SelectItem value="১ম সাময়িক পরীক্ষা" className="text-xs font-bold">১ম সাময়িক পরীক্ষা</SelectItem>
+                        <SelectItem value="২য় সাময়িক পরীক্ষা" className="text-xs font-bold">২য় সাময়িক পরীক্ষা</SelectItem>
+                        <SelectItem value="অর্ধ-বার্ষিক পরীক্ষা" className="text-xs font-bold">অর্ধ-বার্ষিক পরীক্ষা</SelectItem>
+                        <SelectItem value="বার্ষিক পরীক্ষা" className="text-xs font-bold">বার্ষিক পরীক্ষা</SelectItem>
+                        <SelectItem value="প্রাক-নির্বাচনি পরীক্ষা" className="text-xs font-bold">প্রাক-নির্বাচনি পরীক্ষা</SelectItem>
+                        <SelectItem value="নির্বাচনি (টেস্ট) পরীক্ষা" className="text-xs font-bold">নির্বাচনি (টেস্ট) পরীক্ষা</SelectItem>
+                        <SelectItem value="ক্লাস টেস্ট" className="text-xs font-bold">ক্লাস টেস্ট</SelectItem>
+                        <SelectItem value="custom" className="text-xs font-bold">কাস্টম নাম লিখুন...</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Input 
                       value={meta.exam || ''} 
                       onChange={e => setMeta(prev => ({...prev, exam: e.target.value}))} 
-                      className="h-8 text-xs font-bold" 
+                      placeholder="পরীক্ষার নাম..." 
+                      className="h-8 text-xs font-bold mt-1" 
                     />
                   </div>
                   <div className="space-y-1">
@@ -810,22 +832,92 @@ function CreateQuestionContent() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">অধ্যায়</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700">অধ্যায় নির্বাচন (একাধিক যুক্ত করুন)</label>
+                      {chapters.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedChapters.length === chapters.length) {
+                              setSelectedChapters([]);
+                              setMeta(prev => ({ ...prev, chapter: '' }));
+                            } else {
+                              setSelectedChapters([...chapters]);
+                              setMeta(prev => ({ ...prev, chapter: chapters.join(', ') }));
+                            }
+                          }}
+                          className="text-[10px] text-indigo-600 hover:underline font-bold"
+                        >
+                          {selectedChapters.length === chapters.length ? 'মুছুন' : 'সব অধ্যায়'}
+                        </button>
+                      )}
+                    </div>
                     {chapters.length > 0 ? (
-                      <Select onValueChange={v => setMeta(prev => ({...prev, chapter: v}))} value={meta.chapter}>
-                        <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="অধ্যায় বেছে নিন" /></SelectTrigger>
-                        <SelectContent className="max-h-56">
-                          {chapters.map(ch => <SelectItem key={ch} value={ch} className="text-xs font-bold">{ch}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input value={meta.chapter || ''} onChange={e => setMeta(prev => ({...prev, chapter: e.target.value}))} placeholder="যেমন: প্রথম অধ্যায়" className="h-8 text-xs font-bold" />
-                    )}
+                      <div className="border border-slate-200 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1 bg-slate-50/60">
+                        {chapters.map(ch => {
+                          const isChecked = selectedChapters.includes(ch) || (meta.chapter && meta.chapter.includes(ch));
+                          return (
+                            <label key={ch} className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-white p-1 rounded transition-colors select-none">
+                              <Checkbox
+                                checked={Boolean(isChecked)}
+                                onCheckedChange={(c) => {
+                                  let updated = isChecked 
+                                    ? selectedChapters.filter(item => item !== ch)
+                                    : [...selectedChapters, ch];
+                                  setSelectedChapters(updated);
+                                  setMeta(prev => ({ ...prev, chapter: updated.join(', ') }));
+                                }}
+                              />
+                              <span className="leading-tight text-slate-800">{ch}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    <Input 
+                      value={meta.chapter || ''} 
+                      onChange={e => {
+                        setMeta(prev => ({ ...prev, chapter: e.target.value }));
+                        setSelectedChapters(e.target.value.split(',').map(s => s.trim()).filter(Boolean));
+                      }} 
+                      placeholder="যেমন: ১ম অধ্যায়, ২য় অধ্যায়..." 
+                      className="h-8 text-xs font-bold mt-1" 
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">সময়</label>
-                      <Input value={meta.time || ''} onChange={e => setMeta(prev => ({...prev, time: e.target.value}))} className="h-8 text-xs font-bold" />
+                      <Select 
+                        value={['২০ মিনিট', '২৫ মিনিট', '৩০ মিনিট', '৪০ মিনিট', '৪৫ মিনিট', '৫০ মিনিট', '১ ঘণ্টা', '১ ঘণ্টা ১৫ মিনিট', '১ ঘণ্টা ২০ মিনিট', '১ ঘণ্টা ৩০ মিনিট', '১ ঘণ্টা ৪৫ মিনিট', '২ ঘণ্টা', '২ ঘণ্টা ১৫ মিনিট', '২ ঘণ্টা ৩০ মিনিট', '৩ ঘণ্টা'].includes(meta.time) ? meta.time : 'custom'} 
+                        onValueChange={v => {
+                          if (v !== 'custom') setMeta(prev => ({...prev, time: v}));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="সময়" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="২০ মিনিট" className="text-xs font-bold">২০ মিনিট</SelectItem>
+                          <SelectItem value="২৫ মিনিট" className="text-xs font-bold">২৫ মিনিট</SelectItem>
+                          <SelectItem value="৩০ মিনিট" className="text-xs font-bold">৩০ মিনিট</SelectItem>
+                          <SelectItem value="৪০ মিনিট" className="text-xs font-bold">৪০ মিনিট</SelectItem>
+                          <SelectItem value="৪৫ মিনিট" className="text-xs font-bold">৪৫ মিনিট</SelectItem>
+                          <SelectItem value="৫০ মিনিট" className="text-xs font-bold">৫০ মিনিট</SelectItem>
+                          <SelectItem value="১ ঘণ্টা" className="text-xs font-bold">১ ঘণ্টা</SelectItem>
+                          <SelectItem value="১ ঘণ্টা ১৫ মিনিট" className="text-xs font-bold">১ ঘণ্টা ১৫ মিনিট</SelectItem>
+                          <SelectItem value="১ ঘণ্টা ২০ মিনিট" className="text-xs font-bold">১ ঘণ্টা ২০ মিনিট</SelectItem>
+                          <SelectItem value="১ ঘণ্টা ৩০ মিনিট" className="text-xs font-bold">১ ঘণ্টা ৩০ মিনিট</SelectItem>
+                          <SelectItem value="২ ঘণ্টা" className="text-xs font-bold">২ ঘণ্টা</SelectItem>
+                          <SelectItem value="২ ঘণ্টা ১৫ মিনিট" className="text-xs font-bold">২ ঘণ্টা ১৫ মিনিট</SelectItem>
+                          <SelectItem value="২ ঘণ্টা ৩০ মিনিট" className="text-xs font-bold">২ ঘণ্টা ৩০ মিনিট</SelectItem>
+                          <SelectItem value="৩ ঘণ্টা" className="text-xs font-bold">৩ ঘণ্টা</SelectItem>
+                          <SelectItem value="custom" className="text-xs font-bold">কাস্টম...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        value={meta.time || ''} 
+                        onChange={e => setMeta(prev => ({...prev, time: e.target.value}))} 
+                        placeholder="যেমন: ২ ঘণ্টা ৩০ মিনিট" 
+                        className="h-8 text-xs font-bold mt-1" 
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">পূর্ণমান</label>
@@ -1233,24 +1325,58 @@ function CreateQuestionContent() {
               {/* Chapter & Difficulty */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-700">📖 অধ্যায় নির্বাচন</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-700">📖 অধ্যায় নির্বাচন (একসাথে একাধিক সম্ভব)</label>
+                    {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allCh = getChaptersForSubject(aiAssistantClassId, aiAssistantSubject);
+                          if (aiAssistantChapters.length === allCh.length) {
+                            setAiAssistantChapters([]);
+                            setAiAssistantChapter('');
+                          } else {
+                            setAiAssistantChapters([...allCh]);
+                            setAiAssistantChapter(allCh.join(', '));
+                          }
+                        }}
+                        className="text-[10px] text-purple-700 hover:underline font-bold"
+                      >
+                        {aiAssistantChapters.length === getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).length ? 'মুছুন' : 'সব অধ্যায়'}
+                      </button>
+                    )}
+                  </div>
                   {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).length > 0 ? (
-                    <Select value={aiAssistantChapter} onValueChange={setAiAssistantChapter}>
-                      <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200"><SelectValue placeholder="অধ্যায় বেছে নিন" /></SelectTrigger>
-                      <SelectContent className="max-h-56">
-                        {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).map((ch) => (
-                          <SelectItem key={ch} value={ch} className="font-bold text-xs">{ch}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      placeholder="অধ্যায়ের নাম বা নম্বর লিখুন..."
-                      value={aiAssistantChapter}
-                      onChange={e => setAiAssistantChapter(e.target.value)}
-                      className="h-9 font-bold text-xs bg-slate-50 border-purple-200"
-                    />
-                  )}
+                    <div className="border border-purple-200 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1 bg-slate-50">
+                      {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).map(ch => {
+                        const isChecked = aiAssistantChapters.includes(ch) || (aiAssistantChapter && aiAssistantChapter.includes(ch));
+                        return (
+                          <label key={ch} className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-purple-50 p-1 rounded transition-colors select-none">
+                            <Checkbox
+                              checked={Boolean(isChecked)}
+                              onCheckedChange={(c) => {
+                                let updated = isChecked
+                                  ? aiAssistantChapters.filter(item => item !== ch)
+                                  : [...aiAssistantChapters, ch];
+                                setAiAssistantChapters(updated);
+                                setAiAssistantChapter(updated.join(', '));
+                              }}
+                            />
+                            <span className="leading-tight text-slate-800">{ch}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  <Input
+                    placeholder="অধ্যায়ের নাম বা নম্বর লিখুন..."
+                    value={aiAssistantChapter}
+                    onChange={e => {
+                      setAiAssistantChapter(e.target.value);
+                      setAiAssistantChapters(e.target.value.split(',').map(s => s.trim()).filter(Boolean));
+                    }}
+                    className="h-8 font-bold text-xs bg-slate-50 border-purple-200 mt-1"
+                  />
                 </div>
 
                 <div className="space-y-1">
