@@ -2304,6 +2304,7 @@ function CreateLectureSheetContent() {
   const [currentDetectedFontSize, setCurrentDetectedFontSize] = useState<number>(10.5);
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
+  const effectiveZoom = typeof previewZoom === 'number' && previewZoom <= 2 ? Math.round(previewZoom * 100) : (previewZoom || 100);
   const [showRuler, setShowRuler] = useState(true);
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
@@ -4076,24 +4077,72 @@ function CreateLectureSheetContent() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* ফন্ট সাইজ কন্ট্রোল */}
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5" title="ফন্ট সাইজ পরিবর্তন করুন">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newSize = Math.max(6, (parseFloat(fontSizeDraft) || globalFontSize) - 0.5);
+                    setFontSizeDraft(String(newSize));
+                    handleGlobalFontSizeChange(String(newSize));
+                  }}
+                  className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+                  title="ফন্ট ছোট করুন"
+                >−</button>
+                <input
+                  type="number"
+                  min={6} max={72} step={0.5}
+                  value={fontSizeDraft || globalFontSize}
+                  onChange={e => {
+                    setFontSizeDraft(e.target.value);
+                  }}
+                  onBlur={e => {
+                    if (e.target.value) handleGlobalFontSizeChange(e.target.value);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
+                      handleGlobalFontSizeChange((e.target as HTMLInputElement).value);
+                    }
+                  }}
+                  className="w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
+                  title="ফন্ট সাইজ লিখুন (pt)"
+                />
+                <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newSize = Math.min(72, (parseFloat(fontSizeDraft) || globalFontSize) + 0.5);
+                    setFontSizeDraft(String(newSize));
+                    handleGlobalFontSizeChange(String(newSize));
+                  }}
+                  className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+                  title="ফন্ট বড় করুন"
+                >+</button>
+              </div>
+
               {/* জুম কন্ট্রোল */}
               <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setPreviewZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
-                  className="p-1 hover:bg-white rounded text-slate-600"
-                  title="জুম আউট"
+                  onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
+                  className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
+                  title="জুম কমান"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-[11px] font-bold px-1.5 min-w-[45px] text-center text-slate-700">
-                  {Math.round(previewZoom * 100)}%
-                </span>
                 <button
                   type="button"
-                  onClick={() => setPreviewZoom(z => Math.min(2.0, parseFloat((z + 0.1).toFixed(1))))}
-                  className="p-1 hover:bg-white rounded text-slate-600"
-                  title="জুম ইন"
+                  onClick={() => setPreviewZoom(100)}
+                  className="text-[11px] font-bold px-1.5 min-w-[50px] text-center text-slate-700 hover:text-indigo-600 cursor-pointer transition-colors"
+                  title="ক্লিক করে ১০০% রিসেট করুন"
+                >
+                  {toBengaliNumber(effectiveZoom)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom(Math.min(200, effectiveZoom + 10))}
+                  className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
+                  title="জুম বাড়ান"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
