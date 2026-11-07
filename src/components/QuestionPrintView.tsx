@@ -569,6 +569,13 @@ function getContentRight(el: HTMLElement): number {
     const right = childRect.right - elRect.left;
     if (right > maxRight) maxRight = right;
   }
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const rect = range.getBoundingClientRect();
+    const rangeRight = rect.right - elRect.left;
+    if (rangeRight > maxRight) maxRight = rangeRight;
+  } catch {}
   return maxRight;
 }
 
@@ -1204,6 +1211,9 @@ function EditableContentArea({
     if (ref.current && !isLoadedRef.current) {
       ref.current.innerHTML = formatMath(stripDirtyHtml(initialHtml));
       isLoadedRef.current = true;
+      setTimeout(() => {
+        checkAndReflow(false);
+      }, 60);
     }
   }, []);
 
@@ -2194,35 +2204,47 @@ export function QuestionPrintView({
 
     container.innerHTML = finalBlocks.map((b, i) => `<div class="measure-block" data-idx="${i}" style="margin: 0 0 4px 0;">${b}</div>`).join('');
 
-    const headerSpacePx = 135;
-    const footerSpacePx = 65;
-    const topicSpacePx = 60;
     const totalPageHeightPx = baseHeight * 96;
-    const colHeightPx = Math.max(200, totalPageHeightPx - (marginT * 96) - (marginB * 96) - headerSpacePx - footerSpacePx);
 
-    const getPageCapacity = (pageIdx: number) => {
-      const baseColH = (pageIdx === 0) ? (colHeightPx - topicSpacePx) : colHeightPx;
-      return Math.max(150, baseColH * currentCols);
+    const getBaseColH = (pIdx: number) => {
+      // Header: Page 0 has full institutional header (~145px); subsequent pages have compact header (~28px)
+      const pageHeaderH = (pIdx === 0) ? 145 : 28;
+      const pageFooterH = 35;
+      const availableH = totalPageHeightPx - (marginT * 96) - (marginB * 96) - pageHeaderH - pageFooterH;
+      // Safety margin of 14px so questions at the bottom of a column never overflow into an invisible extra column
+      return Math.max(150, availableH - 14);
     };
 
     const measureLines = container.querySelectorAll('.measure-block');
     const newPages: string[] = [];
     let currentPageBlocks: string[] = [];
-    let currentHeight = 0;
     let pageIndex = 0;
+    let currentColIdx = 0; // 0 to (currentCols - 1)
+    let currentColH = 0;
 
     measureLines.forEach((line, idx) => {
       const h = (line as HTMLElement).offsetHeight || 24;
-      const capacity = getPageCapacity(pageIndex);
+      const maxColH = getBaseColH(pageIndex);
 
-      if (currentHeight > 0 && currentHeight + h > capacity) {
-        newPages.push(currentPageBlocks.join(''));
-        pageIndex++;
-        currentPageBlocks = [finalBlocks[idx]];
-        currentHeight = h;
+      if (currentColH > 0 && currentColH + h > maxColH) {
+        // Does not fit in current column!
+        if (currentColIdx + 1 < currentCols) {
+          // Advance to next column on the same page
+          currentColIdx++;
+          currentColH = h;
+          currentPageBlocks.push(finalBlocks[idx]);
+        } else {
+          // All columns on this page are filled! Push current page and advance to next page
+          newPages.push(currentPageBlocks.join(''));
+          pageIndex++;
+          currentPageBlocks = [finalBlocks[idx]];
+          currentColIdx = 0;
+          currentColH = h;
+        }
       } else {
+        // Fits in current column
         currentPageBlocks.push(finalBlocks[idx]);
-        currentHeight += h;
+        currentColH += h;
       }
     });
 
