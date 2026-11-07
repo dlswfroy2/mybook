@@ -79,18 +79,16 @@ function stripDirtyHtml(html: string): string {
   if (typeof window === 'undefined') return html;
   if (!html) return '';
 
-  // 1. Repair any corrupted artifacts or leaked KaTeX internal tags
+  // 1. Repair any corrupted artifacts, leaked tags, or broken p style tags
   let cleaned = html
+    .replace(/<\/p\s*>\s*<\s*p\s*style\s*=[^>]*0px0px4px[^>]*>/gi, '<br/>')
+    .replace(/<\/p\s*>\s*<\s*p\s*style\s*=[^>]*margin[^>]*>/gi, '<br/>')
+    .replace(/<\s*p\s*style\s*=[^>]*0px0px4px[^>]*>/gi, '')
     .replace(/<=""\s*span="">/gi, '')
     .replace(/<\/span">/gi, '')
     .replace(/<span\s+a<=""\s*span="">/gi, '')
-    .replace(/=""/g, '')
     .replace(/data-index-in-node="[^"]*"/gi, '')
-    .replace(/<spanclass="[^"]*"[^>]*>/gi, '')
-    .replace(/<spanstyle="[^"]*"[^>]*>/gi, '')
-    .replace(/&lt;spanclass="[^"]*"[^&]*&gt;/gi, '')
-    .replace(/&lt;spanstyle="[^"]*"[^&]*&gt;/gi, '')
-    .replace(/&lt;\/span&gt;/gi, '')
+    .replace(/&lt;(\/?(?:p|span|div|b|strong|em|h[1-6]))&gt;/gi, '<$1>')
     .replace(/ba\\right\)\^n/g, '(ab)^n');
 
   if (!/<[a-z][\s\S]*>/i.test(cleaned)) return cleaned;
@@ -323,10 +321,16 @@ function formatMath(text: string): string {
   if (!text) return '';
   text = stripDirtyHtml(text);
 
-  // If text already contains KaTeX HTML, return directly without running regex
-  if (text.includes('class="katex"') || text.includes("class='katex'")) {
-    return text;
-  }
+  // Convert markdown bold **text** to <strong>text</strong>
+  text = text.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+
+  // Convert markdown headers
+  text = text.replace(/^###\s*(.+)$/gm, '<h4 style="font-weight: bold; margin: 6px 0 2px 0;">$1</h4>');
+  text = text.replace(/^##\s*(.+)$/gm, '<h3 style="font-weight: bold; margin: 8px 0 3px 0;">$1</h3>');
+  text = text.replace(/^#\s*(.+)$/gm, '<h2 style="font-weight: bold; margin: 10px 0 4px 0;">$1</h2>');
+
+  // Convert markdown blockquotes > text
+  text = text.replace(/^>\s*(.+)$/gm, '<p style="margin: 0 0 4px 0; padding-left: 0.25in; border-left: 2px solid #cbd5e1;">$1</p>');
 
   // Repair unbalanced LaTeX (e.g. \left( without matching \right)
   text = repairLatex(text);
@@ -1194,7 +1198,7 @@ function EditableContentArea({
   // Load initial content once on mount, then trigger initial reflow check including font readiness
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
-      ref.current.innerHTML = stripDirtyHtml(initialHtml);
+      ref.current.innerHTML = formatMath(stripDirtyHtml(initialHtml));
       isLoadedRef.current = true;
       setTimeout(() => checkAndReflow(false), 100);
       if (typeof document !== 'undefined' && document.fonts) {
@@ -2322,12 +2326,15 @@ function CreateLectureSheetContent() {
     
     if (Object.keys(manualPages).length > 0) {
       const sortedIndices = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
-      setPaginatedPages(sortedIndices.map(idx => manualPages[idx]));
+      setPaginatedPages(sortedIndices.map(idx => formatMath(manualPages[idx])));
       return;
     }
 
     const container = measurementRef.current;
-    const contentHtml = formatMath(data.content);
+    const rawFormatted = formatMath(data.content);
+    const contentHtml = /<(p|div|h[1-6]|table|blockquote|li)[^>]*>/i.test(rawFormatted)
+      ? rawFormatted
+      : rawFormatted.split('\n').map(l => l.trim() ? `<p style="margin: 0 0 4px 0;">${l}</p>` : '<p style="margin: 0 0 4px 0;"><br/></p>').join('');
     const marginT = parseFloat(String(mT)) || 0.5, marginL = parseFloat(String(mL)) || 0.5, marginR = parseFloat(String(mR)) || 0.5;
     
     container.style.width = (8.27 - marginL - marginR) + 'in';
@@ -2568,7 +2575,6 @@ function CreateLectureSheetContent() {
     return html
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/\s{2,}/g, ' ')
-      .replace(/> </g, '><')
       .trim();
   };
 
@@ -3236,7 +3242,7 @@ function CreateLectureSheetContent() {
 
             <div className="space-y-3">
               <Button onClick={handleSave} disabled={saving || activeCreationMode === 'pdf'} className="w-full gap-2 font-bold h-11"><Save className="w-4 h-4" /> সেভ করুন (Ctrl+S)</Button>
-              <Button onClick={() => { if(!data.content) return; const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} variant="outline" className="w-full gap-2 border-primary text-primary font-bold h-11" disabled={activeCreationMode === 'pdf'}><Eye className="w-4 h-4" /> প্রিন্ট প্রিভিউ</Button>
+              <Button onClick={() => { if(!data.content) return; setManualPages({}); const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} variant="outline" className="w-full gap-2 border-primary text-primary font-bold h-11" disabled={activeCreationMode === 'pdf'}><Eye className="w-4 h-4" /> প্রিন্ট প্রিভিউ</Button>
             </div>
           </aside>
 
@@ -3751,7 +3757,7 @@ function CreateLectureSheetContent() {
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
                       <EditableContentArea
-                        initialHtml={manualPages[idx] !== undefined ? manualPages[idx] : pageHtml}
+                        initialHtml={formatMath(manualPages[idx] !== undefined ? manualPages[idx] : pageHtml)}
                         style={style}
                         cols={cols}
                         hasRule={hasRule}
