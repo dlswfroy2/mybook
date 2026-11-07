@@ -1929,6 +1929,12 @@ function CreateLectureSheetContent() {
         content: generatedDoc.trim(),
       }));
 
+      // প্রিন্ট প্রিভিউ মোডে থাকলে সাথে সাথে নতুন জেনারেট হওয়া শিট পেজগুলোতে বিন্যস্ত করা
+      if (isPrintMode) {
+        hasInitiallyPaginatedRef.current = true;
+        repaginateDocument({ sourceContent: generatedDoc.trim() });
+      }
+
       setAiModalOpen(false);
       toast({
         title: 'লেকচার শিট তৈরি সফল! 🎉',
