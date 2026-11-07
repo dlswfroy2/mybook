@@ -170,7 +170,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
   <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
-    <strong style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(qLine)}
+    <strong contenteditable="false" style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(qLine)}
   </p>
   ${(optA || optB || optC || optD) ? `
   <div class="mcq-options-row" style="padding-left: 24px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
@@ -216,7 +216,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     return `<div class="cq-item my-3 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
   <p class="cq-stimulus" style="margin: 0 0 5px 0; line-height: 1.6; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
-    <strong style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(stimulus)}
+    <strong contenteditable="false" style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(stimulus)}
   </p>
   <div class="cq-sub-questions" style="padding-left: 24px; display: block;">
     ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
@@ -251,7 +251,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
   <p style="margin: 0; line-height: 1.6; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
     ${mark ? `<span class="short-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${mark}</span>` : ''}
-    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(bodyText)}
+    <strong contenteditable="false" style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(bodyText)}
   </p>
 </div>`;
 }

@@ -1474,6 +1474,54 @@ function EditableContentArea({
         return;
       }
 
+      // ✅ CQ-sub paragraph রক্ষা: Enter press করলে cq-mark span যেন নতুন <p>-এ না যায়
+      {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          let cqSubNode: HTMLElement | null = null;
+          let scanNode: Node | null = sel.anchorNode;
+          while (scanNode && scanNode !== el) {
+            if (scanNode.nodeType === Node.ELEMENT_NODE && (scanNode as HTMLElement).classList?.contains('cq-sub')) {
+              cqSubNode = scanNode as HTMLElement;
+              break;
+            }
+            scanNode = scanNode.parentNode;
+          }
+          if (cqSubNode) {
+            e.preventDefault();
+            const range = sel.getRangeAt(0);
+            // mark span সংগ্রহ করি (এটা cq-sub-এ থাকবে)
+            const markSpan = cqSubNode.querySelector('.cq-mark');
+            // cursor-পরবর্তী content extract করি (mark span বাদ দিয়ে)
+            const afterRange = document.createRange();
+            afterRange.setStart(range.endContainer, range.endOffset);
+            if (markSpan) {
+              afterRange.setEndBefore(markSpan);
+            } else {
+              afterRange.selectNodeContents(cqSubNode);
+              afterRange.setStart(range.endContainer, range.endOffset);
+            }
+            const afterFrag = afterRange.extractContents();
+            // নতুন plain <p> তৈরি করি (cq-mark ছাড়া)
+            const newP = document.createElement('p');
+            newP.style.margin = '0 0 4px 0';
+            newP.appendChild(afterFrag);
+            if (!newP.textContent?.trim() && !newP.querySelector('img,table')) {
+              newP.innerHTML = '<br/>';
+            }
+            cqSubNode.parentNode?.insertBefore(newP, cqSubNode.nextSibling);
+            // cursor নতুন paragraph-এ নিয়ে যাই
+            const newRange = document.createRange();
+            newRange.selectNodeContents(newP);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            setTimeout(() => checkAndReflow(false), 50);
+            return;
+          }
+        }
+      }
+
       // Check if cursor is inside a flex container or flex child
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
@@ -1534,6 +1582,48 @@ function EditableContentArea({
     if (e.key === 'Backspace') {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+
+        // ✅ CQ-sub paragraph রক্ষা: Backspace-এ cq-mark span হারানো বন্ধ করা
+        // cursor যদি কোনো .cq-sub <p>-এর একদম শুরুতে থাকে, merge হতে দেওয়া হবে না
+        {
+          const range = sel.getRangeAt(0);
+          let cqSubNode: HTMLElement | null = null;
+          let scanNode: Node | null = sel.anchorNode;
+          while (scanNode && scanNode !== el) {
+            if (scanNode.nodeType === Node.ELEMENT_NODE && (scanNode as HTMLElement).classList?.contains('cq-sub')) {
+              cqSubNode = scanNode as HTMLElement;
+              break;
+            }
+            scanNode = scanNode.parentNode;
+          }
+          if (cqSubNode) {
+            const preRange = document.createRange();
+            preRange.selectNodeContents(cqSubNode);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const textBeforeCursor = preRange.toString().replace(/[\u00A0\s]/g, '');
+            if (textBeforeCursor.length === 0) {
+              // cursor cq-sub শুরুতে আছে: merge করতে দেব না
+              e.preventDefault();
+              const prevSib = cqSubNode.previousElementSibling as HTMLElement | null;
+              if (prevSib) {
+                const newRange = document.createRange();
+                // cq-mark span আছে কিনা দেখি, থাকলে তার আগে cursor রাখি
+                const mark = prevSib.querySelector('.cq-mark');
+                if (mark && mark.previousSibling) {
+                  newRange.setStartAfter(mark.previousSibling);
+                  newRange.collapse(true);
+                } else {
+                  newRange.selectNodeContents(prevSib);
+                  newRange.collapse(false);
+                }
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+              }
+              return;
+            }
+          }
+        }
+
         let blockNode: HTMLElement | null = null;
         let curr: Node | null = sel.anchorNode;
         while (curr && curr !== el) {
