@@ -577,6 +577,19 @@ function getContentBottom(el: HTMLElement): number {
   return maxBottom;
 }
 
+function getContentRight(el: HTMLElement): number {
+  if (el.childNodes.length === 0) return 0;
+  let maxRight = 0;
+  const elRect = el.getBoundingClientRect();
+  for (let i = 0; i < el.children.length; i++) {
+    const child = el.children[i] as HTMLElement;
+    const childRect = child.getBoundingClientRect();
+    const right = childRect.right - elRect.left;
+    if (right > maxRight) maxRight = right;
+  }
+  return maxRight;
+}
+
 interface WordRulerProps {
   paperWidthInches: number;
   marginLeft: number;
@@ -1070,25 +1083,37 @@ function EditableContentArea({
         }
       }
 
-      // 1. OVERFLOW: content exceeds available page clientHeight
-      const currentBottom = getContentBottom(el);
-      if (el.scrollHeight > maxH + 3 || currentBottom > maxH + 3) {
+      const isColumnMode = cols > 1;
+      const isElOverflowing = () => {
+        if (isColumnMode) {
+          if (el.scrollWidth > el.clientWidth + 6) return true;
+          if (el.scrollHeight > maxH + 4) return true;
+          const maxR = getContentRight(el);
+          if (maxR > el.clientWidth + 6) return true;
+          return false;
+        }
+        const curBottom = getContentBottom(el);
+        return (el.scrollHeight > maxH + 3 || curBottom > maxH + 3);
+      };
+
+      // 1. OVERFLOW: content exceeds available page clientHeight or column capacity
+      if (isElOverflowing()) {
         const overflowNodes: Node[] = [];
 
-        // Remove last child nodes until content fits inside maxH
-        while ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && el.childNodes.length > 1) {
+        // Remove last child nodes until content fits inside page
+        while (isElOverflowing() && el.childNodes.length > 1) {
           const last = el.lastChild;
           if (!last) break;
           el.removeChild(last);
           overflowNodes.unshift(last);
         }
 
-        // If single large child remains and still overflows (e.g. a large div or table), extract its child nodes
-        if ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
+        // If single large child remains and still overflows, extract its child nodes
+        if (isElOverflowing() && el.firstChild && el.firstChild.nodeType === Node.ELEMENT_NODE) {
           const onlyChild = el.firstChild as HTMLElement;
           if (onlyChild.childNodes.length > 1) {
             const innerOverflow: Node[] = [];
-            while ((el.scrollHeight > maxH + 3 || getContentBottom(el) > maxH + 3) && onlyChild.childNodes.length > 1) {
+            while (isElOverflowing() && onlyChild.childNodes.length > 1) {
               const last = onlyChild.lastChild;
               if (!last) break;
               onlyChild.removeChild(last);
@@ -1118,7 +1143,7 @@ function EditableContentArea({
             onSyncPageContent(pageIndex, el.innerHTML);
             onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
             setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1 } }));
+              window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
             }, 30);
           } else {
             onSyncPageContent(pageIndex, el.innerHTML);
@@ -1126,55 +1151,48 @@ function EditableContentArea({
           }
         }
       }
-      // 2. UNDERFLOW: empty space available in this page, pull up from next page
+      // 2. UNDERFLOW: empty space available in this page, pull up from next page (Word-like text pulling)
       else if (allowUnderflow) {
-        const curBottom = getContentBottom(el);
-        const availableSpace = maxH - curBottom;
-        if (availableSpace > 30) {
-          const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
-          if (nextEl && nextEl.childNodes.length > 0) {
-            // If nextEl content is wrapped in a single container element, unwrap it first
-            if (nextEl.childNodes.length === 1 && nextEl.firstChild && nextEl.firstChild.nodeType === Node.ELEMENT_NODE) {
-              const wrapper = nextEl.firstChild as HTMLElement;
-              if (wrapper.tagName === 'DIV' || wrapper.tagName === 'SECTION' || wrapper.tagName === 'ARTICLE') {
-                if (wrapper.childNodes.length > 1) {
-                  while (wrapper.firstChild) {
-                    nextEl.insertBefore(wrapper.firstChild, wrapper);
-                  }
-                  nextEl.removeChild(wrapper);
+        const nextEl = document.querySelector(`.paper-idx-${pageIndex + 1} .content-area`) as HTMLDivElement | null;
+        if (nextEl && nextEl.childNodes.length > 0) {
+          // If nextEl content is wrapped in a single container element, unwrap it first
+          if (nextEl.childNodes.length === 1 && nextEl.firstChild && nextEl.firstChild.nodeType === Node.ELEMENT_NODE) {
+            const wrapper = nextEl.firstChild as HTMLElement;
+            if (wrapper.tagName === 'DIV' || wrapper.tagName === 'SECTION' || wrapper.tagName === 'ARTICLE') {
+              if (wrapper.childNodes.length > 1) {
+                while (wrapper.firstChild) {
+                  nextEl.insertBefore(wrapper.firstChild, wrapper);
                 }
+                nextEl.removeChild(wrapper);
               }
             }
+          }
 
-            let movedCount = 0;
-            while (nextEl.childNodes.length > 0) {
-              const firstNode = nextEl.firstChild!;
-              el.appendChild(firstNode);
-              const newBottom = getContentBottom(el);
-              if (newBottom > maxH + 2 || el.scrollHeight > maxH + 2) {
-                // Exceeded page capacity, put back to nextEl
-                nextEl.insertBefore(firstNode, nextEl.firstChild);
-                break;
-              }
-              movedCount++;
-              if (maxH - newBottom < 15) {
-                break;
-              }
+          let movedCount = 0;
+          while (nextEl.childNodes.length > 0) {
+            const firstNode = nextEl.firstChild!;
+            el.appendChild(firstNode);
+            if (isElOverflowing()) {
+              // Exceeded page capacity, put back to nextEl
+              nextEl.insertBefore(firstNode, nextEl.firstChild);
+              break;
             }
-            if (movedCount > 0) {
-              onSyncPageContent(pageIndex, el.innerHTML);
-              onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
-              const nextText = nextEl.innerText?.trim() || '';
-              const nextHtmlClean = nextEl.innerHTML.replace(/<[^>]*>/g, '').trim();
-              if (nextText === '' && nextHtmlClean === '' && nextEl.querySelectorAll('img, table').length === 0) {
-                if (totalPages > 1) {
-                  onRemoveEmptyPage(pageIndex + 1);
-                }
-              } else {
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
-                }, 30);
+            movedCount++;
+          }
+
+          if (movedCount > 0) {
+            onSyncPageContent(pageIndex, el.innerHTML);
+            onSyncPageContent(pageIndex + 1, nextEl.innerHTML);
+            const nextText = nextEl.innerText?.trim() || '';
+            const nextHtmlClean = nextEl.innerHTML.replace(/<[^>]*>/g, '').trim();
+            if (nextText === '' && nextHtmlClean === '' && nextEl.querySelectorAll('img, table').length === 0) {
+              if (totalPages > 1) {
+                onRemoveEmptyPage(pageIndex + 1);
               }
+            } else {
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: pageIndex + 1, allowUnderflow: true } }));
+              }, 30);
             }
           }
         }
@@ -1182,7 +1200,7 @@ function EditableContentArea({
     } finally {
       isReflowingRef.current = false;
     }
-  }, [pageIndex, totalPages, onAddNextPage, onRemoveEmptyPage, onSyncPageContent]);
+  }, [pageIndex, totalPages, cols, onAddNextPage, onRemoveEmptyPage, onSyncPageContent]);
 
   // Listen to custom reflow-page events dispatched from adjacent pages
   useEffect(() => {
@@ -1194,6 +1212,15 @@ function EditableContentArea({
     window.addEventListener('reflow-page', handleReflowEvent);
     return () => window.removeEventListener('reflow-page', handleReflowEvent);
   }, [pageIndex, checkAndReflow]);
+
+  // Trigger auto-reflow when font size, line height, columns, or margins change on this page
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+    const timer = setTimeout(() => {
+      checkAndReflow(true);
+    }, 40);
+    return () => clearTimeout(timer);
+  }, [style.fontSize, style.lineHeight, cols, style.mL, style.mR, style.mT, style.mB, checkAndReflow]);
 
   // Load initial content once on mount, then trigger initial reflow check including font readiness
   useEffect(() => {
@@ -2395,12 +2422,22 @@ function CreateLectureSheetContent() {
   }, [isPrintMode, data.content, mT, mB, mL, mR, globalFontSize, globalLineHeight]);
 
   const handleAddNextPage = useCallback((initialContent: string = '') => {
-    setPaginatedPages(prev => [...prev, initialContent]);
+    setPaginatedPages(prev => {
+      const nextIdx = prev.length;
+      setPageStyles(styles => ({
+        ...styles,
+        [nextIdx]: styles[nextIdx - 1] || styles[0] || { fontSize: globalFontSize, lineHeight: globalLineHeight, columns: 1 }
+      }));
+      return [...prev, initialContent];
+    });
     setManualPages(prev => {
       const nextIdx = Object.keys(prev).length;
       return { ...prev, [nextIdx]: initialContent };
     });
-  }, []);
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: paginatedPages.length, allowUnderflow: true } }));
+    }, 80);
+  }, [globalFontSize, globalLineHeight, paginatedPages.length]);
 
   const handleRemoveEmptyPage = useCallback((idxToRemove: number) => {
     setPaginatedPages(prev => {
@@ -2879,8 +2916,38 @@ function CreateLectureSheetContent() {
     catch (err) { toast({variant: "destructive", title: "ত্রুটি", description: "লোগো প্রসেস করা সম্ভব হয়নি।"}); }
   };
 
-  const handleGlobalFontSizeChange = (size: string) => { const val = parseFloat(size); if (!isNaN(val)) { setGlobalFontSize(val); setPageStyles((prev: any) => { const updated: any = { ...prev }; Object.keys(updated).forEach(idx => { updated[parseInt(idx)] = { ...updated[parseInt(idx)], fontSize: val }; }); return updated; }); } };
-  const handleGlobalLineHeightChange = (val: string) => { const num = parseFloat(val); if (!isNaN(num)) { setGlobalLineHeight(num); setPageStyles((prev: any) => { const updated: any = { ...prev }; Object.keys(updated).forEach(idx => { updated[parseInt(idx)] = { ...updated[parseInt(idx)], lineHeight: num }; }); return updated; }); } };
+  const handleGlobalFontSizeChange = (size: string) => {
+    const val = parseFloat(size);
+    if (!isNaN(val)) {
+      setGlobalFontSize(val);
+      setPageStyles((prev: any) => {
+        const updated: any = { ...prev };
+        Object.keys(updated).forEach(idx => {
+          updated[parseInt(idx)] = { ...updated[parseInt(idx)], fontSize: val };
+        });
+        return updated;
+      });
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
+      }, 50);
+    }
+  };
+  const handleGlobalLineHeightChange = (val: string) => {
+    const num = parseFloat(val);
+    if (!isNaN(num)) {
+      setGlobalLineHeight(num);
+      setPageStyles((prev: any) => {
+        const updated: any = { ...prev };
+        Object.keys(updated).forEach(idx => {
+          updated[parseInt(idx)] = { ...updated[parseInt(idx)], lineHeight: num };
+        });
+        return updated;
+      });
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
+      }, 50);
+    }
+  };
 
   if (loading || userLoading) return <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]"><Loader2 className="w-12 h-12 animate-spin text-primary mb-4" /><p className="font-bold">অ্যাক্সেস চেক করা হচ্ছে...</p></div>;
 
@@ -3523,6 +3590,9 @@ function CreateLectureSheetContent() {
                   updatePageStyle(i, 'columnRule', !!hasRule);
                 });
               }
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
+              }, 60);
             }}
             currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
             onOrientationChange={(orient) => {
@@ -3533,6 +3603,9 @@ function CreateLectureSheetContent() {
               } else {
                 paginatedPages.forEach((_, i) => { updatePageStyle(i, 'orientation', orient); });
               }
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
+              }, 60);
             }}
             onMarginPresetChange={(preset) => {
               const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
@@ -3552,6 +3625,9 @@ function CreateLectureSheetContent() {
                   updatePageStyle(i, 'mL', mVal); updatePageStyle(i, 'mR', mVal);
                 });
               }
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
+              }, 60);
             }}
             currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
             onPageBorderChange={(border) => {
@@ -3776,7 +3852,7 @@ function CreateLectureSheetContent() {
                     </div>
                  </div>
                )})}
-               <div className="no-print pt-4 pb-10"><Button onClick={() => setPaginatedPages(prev => [...prev, ""])} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
+               <div className="no-print pt-4 pb-10"><Button onClick={() => handleAddNextPage("")} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
             </main>
             </div>
           </div>
