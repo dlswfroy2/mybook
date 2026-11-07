@@ -11,7 +11,14 @@ export function stripAnswers(text: string): string {
     .replace(/\(\s*(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)[^)]*\)/gi, '')
     .replace(/(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)\s*:\s*[^\n]+/gi, '')
     .replace(/(?:সঠিক\s*উত্তর|উত্তরঃ?|উত্তর)\s*[:=]\s*[ক-ঘA-D1-4][^\n]*/gi, '')
+    .replace(/(?:\n|^)\s*উত্তরঃ?\s*[^\n]+/gi, '')
+    .replace(/(?:\n|^)\s*উত্তর\s*:[^\n]+/gi, '')
     .trim();
+}
+
+export function cleanQuestionNumbering(text: string): string {
+  if (!text) return '';
+  return text.replace(/^[০-৯\d]+\s*[।.)]\s*(?:[০-৯\d]+\s*[।.)]\s*)?/, '').trim();
 }
 
 function formatMath(text: string): string {
@@ -50,8 +57,57 @@ function formatMath(text: string): string {
   return formatted;
 }
 
-export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, isEnglish: boolean, type?: string): string {
+export function parseGeneratedQuestions(rawText: string): { type: 'creative' | 'short' | 'mcq'; content: string }[] {
   const clean = stripAnswers(rawText);
+  // Match question numbers at boundary: e.g. "১। ", "১. ", "\n১। "
+  const regex = /(?:^|\n)\s*(?:[০-৯\d]+)\s*[।.)]\s*(?:[০-৯\d]+\s*[।.)]\s*)?/g;
+  const matches: { index: number; length: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(clean)) !== null) {
+    matches.push({ index: m.index, length: m[0].length });
+  }
+
+  if (matches.length <= 1) {
+    const paragraphs = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length <= 1) {
+      const p = clean.trim();
+      const isCq = (p.includes('ক.') || p.includes('ক)')) && (p.includes('খ.') || p.includes('খ)'));
+      const isMcq = (p.includes('(ক)') || p.includes('ক)')) && (p.includes('(খ)') || p.includes('খ)')) && (p.includes('(গ)') || p.includes('গ)'));
+      return [{
+        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
+        content: cleanQuestionNumbering(p)
+      }];
+    }
+    return paragraphs.map(p => {
+      const isCq = (p.includes('ক.') || p.includes('ক)')) && (p.includes('খ.') || p.includes('খ)'));
+      const isMcq = (p.includes('(ক)') || p.includes('ক)')) && (p.includes('(খ)') || p.includes('খ)')) && (p.includes('(গ)') || p.includes('গ)'));
+      return {
+        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
+        content: cleanQuestionNumbering(p)
+      };
+    });
+  }
+
+  const items: { type: 'creative' | 'short' | 'mcq'; content: string }[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index + matches[i].length;
+    const end = (i + 1 < matches.length) ? matches[i + 1].index : clean.length;
+    const chunk = clean.substring(start, end).trim();
+    if (chunk) {
+      const isCq = (chunk.includes('ক.') || chunk.includes('ক)')) && (chunk.includes('খ.') || chunk.includes('খ)'));
+      const isMcq = (chunk.includes('(ক)') || chunk.includes('ক)')) && (chunk.includes('(খ)') || chunk.includes('খ)')) && (chunk.includes('(গ)') || chunk.includes('গ)'));
+      items.push({
+        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
+        content: cleanQuestionNumbering(chunk)
+      });
+    }
+  }
+
+  return items;
+}
+
+export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, isEnglish: boolean, type?: string): string {
+  const clean = cleanQuestionNumbering(stripAnswers(rawText));
   const qNum = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
   
   // 1. Creative Question (CQ): contains ক., খ., গ., ঘ.
@@ -82,21 +138,21 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const partC = extractPart('গ', 'ঘ', '৩');
     const partD = extractPart('ঘ', undefined, '৪');
     
-    return `<div class="cq-container my-3 font-kalpurush" style="margin: 12px 0 16px 0;">
-  <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px;">
-    <span style="font-weight: bold; min-width: 24px; flex-shrink: 0;">${qNum}</span>
-    <div style="flex: 1; text-align: justify; line-height: 1.6;">${formatMath(stimulus)}</div>
+    return `<div class="cq-item my-3 font-kalpurush" style="margin: 12px 0 16px 0; page-break-inside: avoid;">
+  <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+    <span style="font-weight: bold; min-width: 26px; flex-shrink: 0; font-size: 1.05em;">${qNum}</span>
+    <div style="flex: 1; text-align: justify; line-height: 1.65;">${formatMath(stimulus)}</div>
   </div>
-  <div style="padding-left: 24px; display: flex; flex-direction: column; gap: 5px; font-size: 0.98em;">
-    ${partA ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>ক.</strong> ${formatMath(partA.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partA.mark}</span></div>` : ''}
-    ${partB ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>খ.</strong> ${formatMath(partB.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partB.mark}</span></div>` : ''}
-    ${partC ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>গ.</strong> ${formatMath(partC.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partC.mark}</span></div>` : ''}
-    ${partD ? `<div style="display: flex; justify-content: space-between; align-items: flex-start;"><div style="flex: 1; text-align: justify; line-height: 1.5;"><strong>ঘ.</strong> ${formatMath(partD.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${partD.mark}</span></div>` : ''}
+  <div style="padding-left: 28px; display: flex; flex-direction: column; gap: 5px; font-size: 0.98em;">
+    ${partA ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>ক.</strong> ${formatMath(partA.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partA.mark}</span></div>` : ''}
+    ${partB ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>খ.</strong> ${formatMath(partB.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partB.mark}</span></div>` : ''}
+    ${partC ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>গ.</strong> ${formatMath(partC.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partC.mark}</span></div>` : ''}
+    ${partD ? `<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;"><div style="flex: 1; text-align: justify; line-height: 1.55;"><strong>ঘ.</strong> ${formatMath(partD.text)}</div><span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${partD.mark}</span></div>` : ''}
   </div>
 </div>`;
   }
   
-  // 2. MCQ Question: contains ক) খ) or (ক) (খ)
+  // 2. MCQ Question
   const hasOptions = /\(?ক[.)\)]/.test(clean) && /\(?খ[.)\)]/.test(clean);
   if (hasOptions || type === 'mcq') {
     const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
@@ -114,12 +170,12 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const optC = extractOpt('গ', 'ঘ');
     const optD = extractOpt('ঘ', undefined);
     
-    return `<div class="mcq-container my-2.5 font-kalpurush" style="margin: 10px 0 12px 0;">
-  <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px;">
-    <span style="font-weight: bold; min-width: 24px;">${qNum}</span>
+    return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid;">
+  <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
+    <span style="font-weight: bold; min-width: 26px; flex-shrink: 0;">${qNum}</span>
     <div style="flex: 1; font-weight: bold; line-height: 1.5;">${formatMath(qLine)}</div>
   </div>
-  ${optA ? `<div style="padding-left: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 0.95em;">
+  ${optA ? `<div style="padding-left: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.95em;">
     <div>(ক) ${formatMath(optA)}</div>
     <div>(খ) ${formatMath(optB)}</div>
     <div>(গ) ${formatMath(optC)}</div>
@@ -137,13 +193,13 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     bodyText = clean.replace(/\[\s*([১-৪1-4])\s*\]\s*$/, '').trim();
   }
   
-  return `<div class="short-container my-2 font-kalpurush" style="margin: 8px 0 10px 0;">
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-    <div style="display: flex; align-items: flex-start; gap: 6px; flex: 1;">
-      <span style="font-weight: bold; min-width: 24px;">${qNum}</span>
+  return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+    <div style="display: flex; align-items: flex-start; gap: 8px; flex: 1;">
+      <span style="font-weight: bold; min-width: 26px; flex-shrink: 0;">${qNum}</span>
       <div style="flex: 1; text-align: justify; line-height: 1.6;">${formatMath(bodyText).replace(/\n/g, '<br/>')}</div>
     </div>
-    ${mark ? `<span style="font-weight: bold; min-width: 24px; text-align: right; padding-left: 8px;">${mark}</span>` : ''}
+    ${mark ? `<span style="font-weight: bold; min-width: 24px; text-align: right; flex-shrink: 0;">${mark}</span>` : ''}
   </div>
 </div>`;
 }

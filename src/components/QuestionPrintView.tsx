@@ -1891,20 +1891,21 @@ export function QuestionPrintView({
 
   // Convert questions array to HTML string
   const initialContent = useMemo(() => {
+    if (meta.content && meta.content.trim()) {
+      return meta.content;
+    }
     const parts: string[] = [];
     questions.forEach((q, idx) => {
-      const num = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
-      parts.push(`<div class="question-block my-2" style="margin: 10px 0;"><p style="margin: 0 0 4px 0; font-weight: bold;"><span style="display: inline-block; min-width: 24px;">${num}</span> ${q.content || ''}</p></div>`);
+      parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
     });
     if (questionsB && questionsB.length > 0) {
       parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
       questionsB.forEach((q, idx) => {
-        const num = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
-        parts.push(`<div class="question-block my-2" style="margin: 10px 0;"><p style="margin: 0 0 4px 0; font-weight: bold;"><span style="display: inline-block; min-width: 24px;">${num}</span> ${q.content || ''}</p></div>`);
+        parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
       });
     }
     return parts.join('\n\n');
-  }, [questions, questionsB, isEnglish]);
+  }, [questions, questionsB, isEnglish, meta.content]);
 
   const [documentContent, setDocumentContent] = useState(initialContent);
 
@@ -2052,8 +2053,14 @@ export function QuestionPrintView({
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
           const tag = el.tagName.toUpperCase();
-          if (/^(P|H[1-6]|TABLE|BLOCKQUOTE|UL|OL|LI|DIV|HR|SECTION|ARTICLE)$/.test(tag)) {
+          if (el.classList.contains('cq-item') || el.classList.contains('mcq-item') || el.classList.contains('short-item') || el.classList.contains('custom-table-container')) {
             blocks.push(el.outerHTML);
+          } else if (/^(P|H[1-6]|TABLE|BLOCKQUOTE|UL|OL|LI|DIV|HR|SECTION|ARTICLE)$/.test(tag)) {
+            if (el.querySelector('.cq-item, .mcq-item, .short-item, .custom-table-container')) {
+              extractBlocks(el);
+            } else {
+              blocks.push(el.outerHTML);
+            }
           } else {
             extractBlocks(el);
           }

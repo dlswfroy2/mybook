@@ -55,7 +55,7 @@ import { generatePracticeQuestions } from '@/ai/flows/generate-practice-question
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
-import { formatQuestionToBoardStandardHtml, stripAnswers } from '@/lib/question-formatter';
+import { formatQuestionToBoardStandardHtml, stripAnswers, parseGeneratedQuestions } from '@/lib/question-formatter';
 import { format } from 'date-fns';
 
 type Question = {
@@ -167,15 +167,13 @@ function CreateQuestionContent() {
     const parts: string[] = [];
     if (qList.length > 0) {
       qList.forEach((q, idx) => {
-        const num = isEng ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
-        parts.push(`<div class="question-block my-2.5 p-2 rounded hover:bg-slate-50 transition-colors" data-qid="${q.id}"><p style="margin: 0; font-weight: bold; line-height: 1.6;"><span style="display: inline-block; min-width: 24px;">${num}</span> ${q.content || ''}</p></div>`);
+        parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
       });
     }
     if (qbList.length > 0) {
       parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
       qbList.forEach((q, idx) => {
-        const num = isEng ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
-        parts.push(`<div class="question-block my-2.5 p-2 rounded hover:bg-slate-50 transition-colors" data-qid="${q.id}"><p style="margin: 0; font-weight: bold; line-height: 1.6;"><span style="display: inline-block; min-width: 24px;">${num}</span> ${q.content || ''}</p></div>`);
+        parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
       });
     }
     const res = parts.join('\n');
@@ -258,20 +256,27 @@ function CreateQuestionContent() {
       });
 
       if (generated) {
-        const snippet = `<div class="ai-generated-block my-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">${generated.replace(/\n/g, '<br/>')}</div>`;
-        insertSnippet(snippet);
-        // Also add as a question card
-        const newQ: Question = {
+        // Strip any answers and parse into individual board-standard questions
+        const parsedQuestions = parseGeneratedQuestions(generated);
+        const newQList: Question[] = parsedQuestions.map(pq => ({
           id: Math.random().toString(36).substr(2, 9),
-          type: aiQuestionTypes.creative ? 'creative' : aiQuestionTypes.mcq ? 'mcq' : 'short',
-          content: generated,
+          type: pq.type,
+          content: pq.content,
           imageUrl: '',
           section: meta.currentSection
-        };
-        if (activeSet === 'B') setQuestionsB(prev => [...prev, newQ]);
-        else setQuestions(prev => [...prev, newQ]);
+        }));
 
-        toast({ title: 'AI প্রশ্ন তৈরি সম্পন্ন! ✨', description: `মোট ${totalAiQuestionsCount}টি প্রশ্ন সফলভাবে যুক্ত হয়েছে।` });
+        if (activeSet === 'B') {
+          const updatedB = [...questionsB, ...newQList];
+          setQuestionsB(updatedB);
+          syncQuestionsToContent(questions, updatedB);
+        } else {
+          const updatedA = [...questions, ...newQList];
+          setQuestions(updatedA);
+          syncQuestionsToContent(updatedA, questionsB);
+        }
+
+        toast({ title: 'AI প্রশ্ন তৈরি সম্পন্ন! ✨', description: `মোট ${newQList.length}টি প্রশ্ন নির্ভুল ফরম্যাটে যুক্ত হয়েছে।` });
         setAiAssistantOpen(false);
         setAiAssistantPrompt('');
       }
