@@ -1670,11 +1670,13 @@ function CreateQuestionContent() {
             position: static !important;
           }
           .no-print,
-          nav,
-          header,
-          aside,
           .no-print * {
             display: none !important;
+          }
+          .paper-institutional-header,
+          .paper header {
+            display: block !important;
+            visibility: visible !important;
           }
           body > div,
           #__next,

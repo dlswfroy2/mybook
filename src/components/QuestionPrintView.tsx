@@ -2658,7 +2658,7 @@ export function QuestionPrintView({
                   <div className="relative z-10 flex flex-col h-full text-black">
                     {/* Header */}
                     {idx === 0 ? (
-                      <header className="text-center border-b-2 border-black pb-1 mb-2">
+                      <header className="paper-institutional-header text-center border-b-2 border-black pb-1 mb-2">
                         <h1 className="font-black text-[22px] text-black leading-tight uppercase">
                           {meta.institution || appName}
                         </h1>
@@ -2827,11 +2827,13 @@ export function QuestionPrintView({
             position: static !important;
           }
           .no-print,
-          nav,
-          header,
-          aside,
           .no-print * {
             display: none !important;
+          }
+          .paper-institutional-header,
+          .paper header {
+            display: block !important;
+            visibility: visible !important;
           }
           /* Reset all parent containers so the browser paginates naturally across multiple sheets */
           body > div,
