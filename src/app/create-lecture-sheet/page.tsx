@@ -17,7 +17,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { 
   Printer, 
   Save, 
@@ -53,7 +56,11 @@ import {
   Mic,
   MicOff,
   QrCode,
-  LayoutTemplate
+  LayoutTemplate,
+  Plus,
+  Minus,
+  HelpCircle,
+  ListChecks
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateLectureSheet, expandLectureContent } from '@/ai/flows/generate-lecture-sheet-flow';
@@ -1945,6 +1952,61 @@ function CreateLectureSheetContent() {
   const [aiAssistantType, setAiAssistantType] = useState<'bullet_points' | 'detailed' | 'qa' | 'formula_examples'>('bullet_points');
   const [isAiExpanding, setIsAiExpanding] = useState(false);
 
+  // New multi-type question assistant states
+  const [aiAssistantMode, setAiAssistantMode] = useState<'questions' | 'notes'>('questions');
+  const [aiAssistantClassId, setAiAssistantClassId] = useState<string>('9');
+  const [aiAssistantSubject, setAiAssistantSubject] = useState<string>('সাধারণ গণিত');
+  const [aiAssistantChapter, setAiAssistantChapter] = useState<string>('');
+  const [aiAssistantDifficulty, setAiAssistantDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('medium');
+  const [aiQuestionTypes, setAiQuestionTypes] = useState({
+    creative: true,
+    creativeCount: 2,
+    short: true,
+    shortCount: 5,
+    mcq: true,
+    mcqCount: 10,
+    knowledge: false,
+    knowledgeCount: 4,
+    fillInBlanks: false,
+    fillInBlanksCount: 5,
+  });
+
+  const totalAiQuestionsCount = useMemo(() => {
+    let count = 0;
+    if (aiQuestionTypes.creative) count += Number(aiQuestionTypes.creativeCount) || 0;
+    if (aiQuestionTypes.short) count += Number(aiQuestionTypes.shortCount) || 0;
+    if (aiQuestionTypes.mcq) count += Number(aiQuestionTypes.mcqCount) || 0;
+    if (aiQuestionTypes.knowledge) count += Number(aiQuestionTypes.knowledgeCount) || 0;
+    if (aiQuestionTypes.fillInBlanks) count += Number(aiQuestionTypes.fillInBlanksCount) || 0;
+    return count;
+  }, [aiQuestionTypes]);
+
+  const handleOpenAiAssistant = useCallback(() => {
+    if (data.classId) {
+      setAiAssistantClassId(data.classId);
+      const subs = getSubjectsForClass(data.classId);
+      if (data.subject && subs.includes(data.subject)) {
+        setAiAssistantSubject(data.subject);
+        const chaps = getChaptersForSubject(data.classId, data.subject);
+        if (data.topic && chaps.includes(data.topic)) {
+          setAiAssistantChapter(data.topic);
+        } else if (chaps.length > 0) {
+          setAiAssistantChapter(chaps[0]);
+        }
+      } else if (subs.length > 0) {
+        setAiAssistantSubject(subs[0]);
+        const chaps = getChaptersForSubject(data.classId, subs[0]);
+        if (chaps.length > 0) setAiAssistantChapter(chaps[0]);
+      }
+    } else {
+      const subs = getSubjectsForClass(aiAssistantClassId);
+      if (subs.length > 0 && !subs.includes(aiAssistantSubject)) {
+        setAiAssistantSubject(subs[0]);
+      }
+    }
+    setAiAssistantOpen(true);
+  }, [data.classId, data.subject, data.topic, aiAssistantClassId, aiAssistantSubject]);
+
   const insertLectureSnippet = useCallback((snippet: string) => {
     const targetIdx = activeEditIdx !== null ? activeEditIdx : 0;
     setPaginatedPages(prev => {
@@ -2049,18 +2111,28 @@ function CreateLectureSheetContent() {
   }, [qrUrl, qrSize, qrCaption, insertLectureSnippet, toast]);
 
   const handleAiExpandContent = useCallback(async () => {
-    if (!aiAssistantPrompt.trim()) return;
     setIsAiExpanding(true);
     try {
       const generated = await expandLectureContent({
         topicPrompt: aiAssistantPrompt.trim(),
-        className: data.classId,
-        subject: data.subject,
+        className: aiAssistantClassId,
+        subject: aiAssistantSubject,
+        chapter: aiAssistantChapter,
+        difficulty: aiAssistantDifficulty,
+        mode: aiAssistantMode,
+        questionCounts: aiAssistantMode === 'questions' ? {
+          creative: aiQuestionTypes.creative ? aiQuestionTypes.creativeCount : 0,
+          short: aiQuestionTypes.short ? aiQuestionTypes.shortCount : 0,
+          mcq: aiQuestionTypes.mcq ? aiQuestionTypes.mcqCount : 0,
+          knowledge: aiQuestionTypes.knowledge ? aiQuestionTypes.knowledgeCount : 0,
+          fillInBlanks: aiQuestionTypes.fillInBlanks ? aiQuestionTypes.fillInBlanksCount : 0,
+        } : undefined,
+        totalQuestions: totalAiQuestionsCount,
         type: aiAssistantType
       });
       if (generated) {
         insertLectureSnippet(`<div class="ai-generated-block" style="margin: 8px 0;">${generated.replace(/\n/g, '<br/>')}</div>`);
-        toast({ title: 'AI কন্টেন্ট তৈরি হয়েছে! ✨', description: 'সফলভাবে এডিটরে কন্টেন্ট যুক্ত করা হয়েছে।' });
+        toast({ title: 'AI কন্টেন্ট তৈরি সম্পন্ন! ✨', description: 'প্রশ্নমালা এডিটরে সফলভাবে যুক্ত হয়েছে।' });
         setAiAssistantOpen(false);
         setAiAssistantPrompt('');
       }
@@ -2069,7 +2141,19 @@ function CreateLectureSheetContent() {
     } finally {
       setIsAiExpanding(false);
     }
-  }, [aiAssistantPrompt, data.classId, data.subject, aiAssistantType, insertLectureSnippet, toast]);
+  }, [
+    aiAssistantPrompt,
+    aiAssistantClassId,
+    aiAssistantSubject,
+    aiAssistantChapter,
+    aiAssistantDifficulty,
+    aiAssistantMode,
+    aiQuestionTypes,
+    totalAiQuestionsCount,
+    aiAssistantType,
+    insertLectureSnippet,
+    toast
+  ]);
 
   const LECTURE_TEMPLATES = useMemo(() => [
     {
@@ -3131,53 +3215,464 @@ function CreateLectureSheetContent() {
 
                 {/* AI Assistant Content Expander Dialog */}
                 <Dialog open={aiAssistantOpen} onOpenChange={setAiAssistantOpen}>
-                  <DialogContent className="font-kalpurush max-w-lg bg-white border-2 border-purple-200">
-                    <DialogHeader>
-                      <DialogTitle className="text-lg font-black flex items-center gap-2 text-purple-950">
-                        <Sparkles className="h-5 w-5 text-purple-600" /> AI কন্টেন্ট সহকারী
-                      </DialogTitle>
+                  <DialogContent className="font-kalpurush max-w-2xl max-h-[92vh] overflow-y-auto bg-white border-2 border-purple-200 p-5 sm:p-6 custom-scrollbar">
+                    <DialogHeader className="border-b pb-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <DialogTitle className="text-xl font-black flex items-center gap-2 text-purple-950">
+                          <Sparkles className="h-5 w-5 text-purple-600 animate-pulse" /> AI কন্টেন্ট ও প্রশ্ন সহকারী
+                        </DialogTitle>
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-bold text-xs px-2.5 py-0.5">
+                          NCTB কারিকুলাম ও বোর্ড স্ট্যান্ডার্ড
+                        </Badge>
+                      </div>
+                      <DialogDescription className="text-xs text-slate-500 font-bold mt-1">
+                        শ্রেণি, বিষয়, অধ্যায় ও কাঠিন্য মান অনুযায়ী এক ক্লিকে যেকোনো ধরণের প্রশ্ন ও লেকচার নোট তৈরি করুন।
+                      </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                      <p className="text-xs text-slate-600 font-bold">
-                        যেকোনো টপিক বা ধারণা লিখুন, AI তাৎক্ষণিকভাবে লেকচার শিট উপযোগী পরিচ্ছন্ন বাংলা নোট তৈরি করে দেবে।
-                      </p>
+
+                    <div className="space-y-4 py-3">
+                      {/* ১. মোড নির্বাচন (প্রশ্নমালা বনাম লেকচার নোট) */}
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setAiAssistantMode('questions')}
+                          className={cn(
+                            "flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2",
+                            aiAssistantMode === 'questions'
+                              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                          )}
+                        >
+                          <HelpCircle className="w-3.5 h-3.5" /> বহু-ধরণের প্রশ্ন সম্ভার তৈরি
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAiAssistantMode('notes')}
+                          className={cn(
+                            "flex-1 py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2",
+                            aiAssistantMode === 'notes'
+                              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                          )}
+                        >
+                          <BookOpen className="w-3.5 h-3.5" /> লেকচার নোট ও সারসংক্ষেপ
+                        </button>
+                      </div>
+
+                      {/* ২. ড্রপডাউন: শ্রেণি ও বিষয় */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* শ্রেণি ড্রপডাউন বাটন */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                            🎓 শ্রেণি নির্বাচন করুন *
+                          </label>
+                          <Select
+                            value={aiAssistantClassId}
+                            onValueChange={(val) => {
+                              setAiAssistantClassId(val);
+                              const availableSubs = getSubjectsForClass(val);
+                              if (availableSubs.length > 0) {
+                                setAiAssistantSubject(availableSubs[0]);
+                                const chaps = getChaptersForSubject(val, availableSubs[0]);
+                                if (chaps.length > 0) setAiAssistantChapter(chaps[0]);
+                                else setAiAssistantChapter('');
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200">
+                              <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CLASSES.map((c) => (
+                                <SelectItem key={c.id} value={c.id} className="font-bold text-xs">
+                                  {c.label} শ্রেণি
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* বিষয় ড্রপডাউন বাটন */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                            📚 বিষয় নির্বাচন করুন *
+                          </label>
+                          <Select
+                            value={aiAssistantSubject}
+                            onValueChange={(val) => {
+                              setAiAssistantSubject(val);
+                              const chaps = getChaptersForSubject(aiAssistantClassId, val);
+                              if (chaps.length > 0) setAiAssistantChapter(chaps[0]);
+                              else setAiAssistantChapter('');
+                            }}
+                          >
+                            <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200">
+                              <SelectValue placeholder="বিষয় নির্বাচন করুন" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getSubjectsForClass(aiAssistantClassId).map((s) => (
+                                <SelectItem key={s} value={s} className="font-bold text-xs">
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* ৩. ড্রপডাউন: অধ্যায় ও প্রশ্নের কাঠিন্য মান */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* অধ্যায় ড্রপডাউন বাটন */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                            📖 অধ্যায় নির্বাচন
+                          </label>
+                          {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).length > 0 ? (
+                            <Select value={aiAssistantChapter} onValueChange={setAiAssistantChapter}>
+                              <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200">
+                                <SelectValue placeholder="অধ্যায় বেছে নিন" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-56">
+                                {getChaptersForSubject(aiAssistantClassId, aiAssistantSubject).map((ch) => (
+                                  <SelectItem key={ch} value={ch} className="font-bold text-xs">
+                                    {ch}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              placeholder="অধ্যায়ের নাম বা নম্বর লিখুন..."
+                              value={aiAssistantChapter}
+                              onChange={e => setAiAssistantChapter(e.target.value)}
+                              className="h-9 font-bold text-xs bg-slate-50 border-purple-200"
+                            />
+                          )}
+                        </div>
+
+                        {/* কাঠিন্য মান ড্রপডাউন বাটন */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                            🎯 প্রশ্নের কাঠিন্য মান (Difficulty)
+                          </label>
+                          <Select
+                            value={aiAssistantDifficulty}
+                            onValueChange={(val: any) => setAiAssistantDifficulty(val)}
+                          >
+                            <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="easy" className="font-bold text-xs">🟢 সহজ মান (Easy - প্রাথমিক ধারণা ও মূল বই)</SelectItem>
+                              <SelectItem value="medium" className="font-bold text-xs">🟡 মধ্যম মান (Medium - বোর্ড পরীক্ষার আদর্শ মান)</SelectItem>
+                              <SelectItem value="hard" className="font-bold text-xs">🔴 কঠিন মান (Hard - উচ্চতর চিন্তন ও বিশ্লেষণ)</SelectItem>
+                              <SelectItem value="mixed" className="font-bold text-xs">🟣 মিশ্র মান (Mixed - সহজ, মধ্যম ও কঠিন সমন্বিত)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* ৪. এক সাথে এক বা একাধিক ধরনের প্রশ্ন ও তাদের সংখ্যা নিয়ন্ত্রণ */}
+                      {aiAssistantMode === 'questions' ? (
+                        <div className="p-4 rounded-xl border-2 border-purple-100 bg-purple-50/30 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                              <ListChecks className="w-4 h-4 text-purple-600" /> প্রশ্নের ধরণ নির্বাচন ও কোনটি কয়টি তৈরি হবে:
+                            </span>
+                            <Badge className="bg-purple-600 hover:bg-purple-700 text-white font-black text-xs px-2.5 py-0.5">
+                              মোট প্রশ্ন: {toBengaliNumber(totalAiQuestionsCount)}টি
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            {/* সৃজনশীল প্রশ্ন */}
+                            <div className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                              aiQuestionTypes.creative ? "bg-white border-purple-300 shadow-xs" : "bg-slate-50/60 border-slate-200 opacity-60"
+                            )}>
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox
+                                  checked={aiQuestionTypes.creative}
+                                  onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, creative: !!c }))}
+                                />
+                                <span className="text-xs font-black text-slate-800">📝 সৃজনশীল প্রশ্ন (CQ)</span>
+                              </label>
+                              {aiQuestionTypes.creative && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, creativeCount: Math.max(1, prev.creativeCount - 1) }))}
+                                  >
+                                    <Minus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={aiQuestionTypes.creativeCount}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 1;
+                                      setAiQuestionTypes(prev => ({ ...prev, creativeCount: val }));
+                                    }}
+                                    className="h-6 w-10 text-center font-bold text-xs p-0 no-arrows border-purple-200"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, creativeCount: Math.min(20, prev.creativeCount + 1) }))}
+                                  >
+                                    <Plus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <span className="text-[11px] font-bold text-slate-500 ml-1">টি</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* সংক্ষিপ্ত প্রশ্ন */}
+                            <div className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                              aiQuestionTypes.short ? "bg-white border-purple-300 shadow-xs" : "bg-slate-50/60 border-slate-200 opacity-60"
+                            )}>
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox
+                                  checked={aiQuestionTypes.short}
+                                  onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, short: !!c }))}
+                                />
+                                <span className="text-xs font-black text-slate-800">✍️ সংক্ষিপ্ত প্রশ্নাবলী</span>
+                              </label>
+                              {aiQuestionTypes.short && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, shortCount: Math.max(1, prev.shortCount - 1) }))}
+                                  >
+                                    <Minus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={aiQuestionTypes.shortCount}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 1;
+                                      setAiQuestionTypes(prev => ({ ...prev, shortCount: val }));
+                                    }}
+                                    className="h-6 w-10 text-center font-bold text-xs p-0 no-arrows border-purple-200"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, shortCount: Math.min(50, prev.shortCount + 1) }))}
+                                  >
+                                    <Plus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <span className="text-[11px] font-bold text-slate-500 ml-1">টি</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* বহুনির্বাচনী প্রশ্ন (MCQ) */}
+                            <div className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                              aiQuestionTypes.mcq ? "bg-white border-purple-300 shadow-xs" : "bg-slate-50/60 border-slate-200 opacity-60"
+                            )}>
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox
+                                  checked={aiQuestionTypes.mcq}
+                                  onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, mcq: !!c }))}
+                                />
+                                <span className="text-xs font-black text-slate-800">🔘 বহুনির্বাচনী (MCQ)</span>
+                              </label>
+                              {aiQuestionTypes.mcq && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, mcqCount: Math.max(1, prev.mcqCount - 1) }))}
+                                  >
+                                    <Minus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={aiQuestionTypes.mcqCount}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 1;
+                                      setAiQuestionTypes(prev => ({ ...prev, mcqCount: val }));
+                                    }}
+                                    className="h-6 w-10 text-center font-bold text-xs p-0 no-arrows border-purple-200"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, mcqCount: Math.min(50, prev.mcqCount + 1) }))}
+                                  >
+                                    <Plus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <span className="text-[11px] font-bold text-slate-500 ml-1">টি</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* জ্ঞান ও অনুধাবনমূলক প্রশ্ন */}
+                            <div className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border transition-all",
+                              aiQuestionTypes.knowledge ? "bg-white border-purple-300 shadow-xs" : "bg-slate-50/60 border-slate-200 opacity-60"
+                            )}>
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox
+                                  checked={aiQuestionTypes.knowledge}
+                                  onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, knowledge: !!c }))}
+                                />
+                                <span className="text-xs font-black text-slate-800">❓ জ্ঞান ও অনুধাবনমূলক</span>
+                              </label>
+                              {aiQuestionTypes.knowledge && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, knowledgeCount: Math.max(1, prev.knowledgeCount - 1) }))}
+                                  >
+                                    <Minus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={aiQuestionTypes.knowledgeCount}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 1;
+                                      setAiQuestionTypes(prev => ({ ...prev, knowledgeCount: val }));
+                                    }}
+                                    className="h-6 w-10 text-center font-bold text-xs p-0 no-arrows border-purple-200"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, knowledgeCount: Math.min(30, prev.knowledgeCount + 1) }))}
+                                  >
+                                    <Plus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <span className="text-[11px] font-bold text-slate-500 ml-1">টি</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* শূন্যস্থান পূরণ */}
+                            <div className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border transition-all col-span-1 sm:col-span-2",
+                              aiQuestionTypes.fillInBlanks ? "bg-white border-purple-300 shadow-xs" : "bg-slate-50/60 border-slate-200 opacity-60"
+                            )}>
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <Checkbox
+                                  checked={aiQuestionTypes.fillInBlanks}
+                                  onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, fillInBlanks: !!c }))}
+                                />
+                                <span className="text-xs font-black text-slate-800">✏️ শূন্যস্থান পূরণ</span>
+                              </label>
+                              {aiQuestionTypes.fillInBlanks && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, fillInBlanksCount: Math.max(1, prev.fillInBlanksCount - 1) }))}
+                                  >
+                                    <Minus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={aiQuestionTypes.fillInBlanksCount}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 1;
+                                      setAiQuestionTypes(prev => ({ ...prev, fillInBlanksCount: val }));
+                                    }}
+                                    className="h-6 w-10 text-center font-bold text-xs p-0 no-arrows border-purple-200"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-md hover:bg-purple-50"
+                                    onClick={() => setAiQuestionTypes(prev => ({ ...prev, fillInBlanksCount: Math.min(30, prev.fillInBlanksCount + 1) }))}
+                                  >
+                                    <Plus className="w-3 h-3 text-purple-700" />
+                                  </Button>
+                                  <span className="text-[11px] font-bold text-slate-500 ml-1">টি</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* লেকচার নোট ও সারসংক্ষেপের ধরণ */
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-700">নোট ও সারসংক্ষেপের ধরণ</label>
+                          <Select value={aiAssistantType} onValueChange={(v: any) => setAiAssistantType(v)}>
+                            <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-purple-200">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="bullet_points" className="font-bold text-xs">📌 গুরুত্বপূর্ণ বুলেট পয়েন্ট ও সারসংক্ষেপ</SelectItem>
+                              <SelectItem value="detailed" className="font-bold text-xs">📖 বিস্তারিত সহজ আলোচনা</SelectItem>
+                              <SelectItem value="qa" className="font-bold text-xs">❓ জ্ঞান ও অনুধাবনমূলক প্রশ্নোত্তর</SelectItem>
+                              <SelectItem value="formula_examples" className="font-bold text-xs">📐 গাণিতিক সূত্র ও উদাহরণ সমস্যা</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* ৫. টপিক বা বিশেষ নির্দেশনা (ঐচ্ছিক) */}
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">টপিক বা প্রম্পট *</label>
+                        <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span>টপিক বা বিশেষ নির্দেশনা (ঐচ্ছিক)</span>
+                          <span className="text-[10px] text-slate-400 font-normal">যেমন: নির্দিষ্ট সূত্র, উপপাদ্য বা সমাধানসহ</span>
+                        </label>
                         <Textarea
-                          placeholder="যেমন: আর্কিমিডিসের সূত্র ও প্লবতার বিস্তারিত ব্যাখ্যা..."
+                          placeholder="যেমন: গতিশক্তি ও বিভব শক্তির সমীকরণ ও বাস্তব উদাহরণসহ সমাধান..."
                           value={aiAssistantPrompt}
                           onChange={e => setAiAssistantPrompt(e.target.value)}
-                          className="min-h-[80px] text-xs font-bold"
+                          className="min-h-[65px] text-xs font-bold bg-slate-50 border-purple-200"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">কন্টেন্টের ধরণ</label>
-                        <Select value={aiAssistantType} onValueChange={(v: any) => setAiAssistantType(v)}>
-                          <SelectTrigger className="h-9 font-bold text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bullet_points" className="font-bold text-xs">📌 গুরুত্বপূর্ণ বুলেট পয়েন্ট ও সারসংক্ষেপ</SelectItem>
-                            <SelectItem value="detailed" className="font-bold text-xs">📖 বিস্তারিত সহজ আলোচনা</SelectItem>
-                            <SelectItem value="qa" className="font-bold text-xs">❓ জ্ঞান ও অনুধাবনমূলক প্রশ্নোত্তর</SelectItem>
-                            <SelectItem value="formula_examples" className="font-bold text-xs">📐 গাণিতিক সূত্র ও উদাহরণ সমস্যা</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                      <Button variant="outline" size="sm" onClick={() => setAiAssistantOpen(false)}>বাতিল</Button>
+
+                    <DialogFooter className="gap-2 sm:gap-0 border-t pt-3">
+                      <Button variant="outline" size="sm" onClick={() => setAiAssistantOpen(false)} className="font-bold">
+                        বাতিল
+                      </Button>
                       <Button
                         onClick={handleAiExpandContent}
-                        disabled={isAiExpanding || !aiAssistantPrompt.trim()}
-                        className="font-bold bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                        disabled={isAiExpanding || (aiAssistantMode === 'questions' && totalAiQuestionsCount === 0)}
+                        className="font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white gap-2 shadow-sm"
                       >
                         {isAiExpanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
-                        {isAiExpanding ? "জেনারেট হচ্ছে..." : "এডিটরে যুক্ত করুন"}
+                        {isAiExpanding ? "প্রশ্ন তৈরি হচ্ছে..." : "এডিটরে যুক্ত করুন"}
                       </Button>
                     </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                  </DialogContent>                </Dialog>
 
                 {/* AI Lecture Sheet Dialog */}
                 <Dialog open={aiModalOpen} onOpenChange={setAiModalOpen}>
@@ -3460,7 +3955,7 @@ function CreateLectureSheetContent() {
                       {/* AI Assistant */}
                       <Button
                         type="button"
-                        onClick={() => setAiAssistantOpen(true)}
+                        onClick={handleOpenAiAssistant}
                         size="sm"
                         className="h-8 gap-1.5 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
                         title="টপিক অনুযায়ী AI দিয়ে কন্টেন্ট সম্প্রসারণ করুন"
