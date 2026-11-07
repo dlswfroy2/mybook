@@ -2435,7 +2435,7 @@ export function QuestionPrintView({
       </header>
 
       {/* Main Print Body */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="print-body-row flex-1 flex overflow-hidden">
         {/* ── Left Sidebar Menubar ── */}
         <aside
           className={cn(
@@ -2527,7 +2527,7 @@ export function QuestionPrintView({
         </aside>
 
         {/* ── Main Canvas Area with Dynamic Pages ── */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="print-canvas-col flex-1 flex flex-col overflow-hidden relative">
           <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
             {showRuler && (
               <div className="no-print sticky top-0 z-40 bg-slate-200/95 backdrop-blur-xs pb-3 pt-1 flex justify-center w-full shadow-xs">
@@ -2771,12 +2771,79 @@ export function QuestionPrintView({
           .paper { color: black !important; }
         }
         @media print {
-          html, body { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; width: 100% !important; }
-          .no-print { display: none !important; }
-          .print-view-container { position: absolute !important; top: 0 !important; left: 0 !important; margin: 0 !important; padding: 0 !important; background: white !important; width: 100% !important; height: auto !important; overflow: visible !important; }
-          .print-main-area { background: white !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; display: block !important; height: auto !important; position: static !important; width: 100% !important; }
-          .paper { position: relative !important; margin: 0 !important; box-shadow: none !important; width: 8.27in !important; height: 11.69in !important; page-break-after: always !important; break-after: page !important; break-inside: avoid !important; display: block !important; box-sizing: border-box !important; border: none !important; overflow: hidden !important; }
-          @page { size: A4; margin: 0 !important; }
+          html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            width: 100% !important;
+            overflow: visible !important;
+            position: static !important;
+          }
+          .no-print,
+          nav,
+          header,
+          aside,
+          .no-print * {
+            display: none !important;
+          }
+          /* Reset all parent containers so the browser paginates naturally across multiple sheets */
+          body > div,
+          #__next,
+          .min-h-screen,
+          .print-view-container,
+          .print-body-row,
+          .print-canvas-col {
+            position: static !important;
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            width: 100% !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+          .print-main-area {
+            position: static !important;
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            width: 100% !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+            zoom: 1 !important;
+            transform: none !important;
+            gap: 0 !important;
+          }
+          .paper {
+            position: relative !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: block !important;
+            box-sizing: border-box !important;
+            border: none !important;
+            overflow: hidden !important;
+          }
+          .paper:last-of-type,
+          .paper:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+          @page {
+            size: auto;
+            margin: 0 !important;
+          }
         }
       `}} />
     </div>

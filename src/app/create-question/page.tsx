@@ -1648,9 +1648,41 @@ function CreateQuestionContent() {
           .math-sub { font-size: 0.7em; vertical-align: sub; }
         }
         @media print {
-          html, body { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; width: 100% !important; }
-          .no-print { display: none !important; }
-          @page { size: A4; margin: 0 !important; }
+          html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            width: 100% !important;
+            overflow: visible !important;
+            position: static !important;
+          }
+          .no-print,
+          nav,
+          header,
+          aside,
+          .no-print * {
+            display: none !important;
+          }
+          body > div,
+          #__next,
+          .min-h-screen {
+            position: static !important;
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            width: 100% !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+          }
+          @page {
+            size: auto;
+            margin: 0 !important;
+          }
         }
       `}} />
     </div>
