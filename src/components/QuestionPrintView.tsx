@@ -1705,6 +1705,34 @@ function EditableContentArea({
     return () => document.removeEventListener('selectionchange', handleSelChange);
   }, [updateActiveLineIndent]);
 
+  useEffect(() => {
+    const handleApplyIndent = (e: any) => {
+      const el = ref.current;
+      if (!el || !(document.activeElement === el || el.contains(document.activeElement))) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      let node: Node | null = sel.anchorNode;
+      let blockNode: HTMLElement | null = null;
+      while (node && node !== el) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const h = node as HTMLElement;
+          if (/^(P|H[1-6]|DIV|LI|BLOCKQUOTE)$/.test(h.tagName)) {
+            blockNode = h;
+            break;
+          }
+        }
+        node = node.parentNode;
+      }
+      if (blockNode && e.detail && typeof e.detail.indentInches === 'number') {
+        blockNode.style.marginLeft = `${e.detail.indentInches}in`;
+        checkAndReflow(true);
+        if (onSyncPageContent) onSyncPageContent(pageIndex, el.innerHTML);
+      }
+    };
+    window.addEventListener('apply-line-indent', handleApplyIndent);
+    return () => window.removeEventListener('apply-line-indent', handleApplyIndent);
+  }, [checkAndReflow, onSyncPageContent, pageIndex]);
+
   // Table Drag & Drop across any page
   useEffect(() => {
     const el = ref.current;
@@ -1983,6 +2011,21 @@ export function QuestionPrintView({
     return () => window.removeEventListener('wheel', handleWheelZoom);
   }, []);
 
+  useEffect(() => {
+    const handleIndentDetected = (e: any) => {
+      if (e.detail) {
+        if (typeof e.detail.indentInches === 'number') {
+          setActiveLineIndent(e.detail.indentInches);
+        }
+        if (typeof e.detail.rulerPosInches === 'number') {
+          setActiveRulerPos(e.detail.rulerPosInches);
+        }
+      }
+    };
+    window.addEventListener('active-line-indent-detected', handleIndentDetected);
+    return () => window.removeEventListener('active-line-indent-detected', handleIndentDetected);
+  }, []);
+
   const updatePageStyle = useCallback((idx: number, key: string, val: any) => { 
     setPageStyles(prev => {
       const current = prev[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, columns: 1, columnRule: false, orientation: 'portrait', border: 'none' };
@@ -2252,6 +2295,11 @@ export function QuestionPrintView({
   const currentOrientation = currentPaperStyle.orientation || 'portrait';
   const currentPageSize = currentPaperStyle.pageSize || 'a4';
   const currentPageBorder = currentPaperStyle.border || 'none';
+  const currentMarginL = currentPaperStyle.mL !== undefined ? currentPaperStyle.mL : (parseFloat(String(printSettings.marginLeft)) || 0.5);
+  const currentMarginR = currentPaperStyle.mR !== undefined ? currentPaperStyle.mR : (parseFloat(String(printSettings.marginRight)) || 0.5);
+  const currentBaseWidth = currentPageSize === 'letter' ? 8.5 : currentPageSize === 'legal' ? 8.5 : 8.27;
+  const currentBaseHeight = currentPageSize === 'letter' ? 11.0 : currentPageSize === 'legal' ? 14.0 : 11.69;
+  const currentPaperWidth = currentOrientation === 'landscape' ? currentBaseHeight : currentBaseWidth;
 
   return (
     <div className="print-view-container flex flex-col h-screen fixed inset-0 top-0 left-0 bg-slate-100 z-[40] font-kalpurush overflow-hidden select-none">
@@ -2481,6 +2529,42 @@ export function QuestionPrintView({
         {/* ── Main Canvas Area with Dynamic Pages ── */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
           <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
+            {showRuler && (
+              <div className="no-print sticky top-0 z-40 bg-slate-200/95 backdrop-blur-xs pb-3 pt-1 flex justify-center w-full shadow-xs">
+                <WordRuler
+                  paperWidthInches={currentPaperWidth}
+                  marginLeft={currentMarginL}
+                  marginRight={currentMarginR}
+                  zoomLevel={effectiveZoom}
+                  onMarginChange={(left, right) => {
+                    if (applyScope === 'all') {
+                      paginatedPages.forEach((_, i) => {
+                        updatePageStyle(i, 'mL', left);
+                        updatePageStyle(i, 'mR', right);
+                      });
+                    } else {
+                      const targetIdx = activeEditIdx ?? 0;
+                      updatePageStyle(targetIdx, 'mL', left);
+                      updatePageStyle(targetIdx, 'mR', right);
+                    }
+                    setPrintSettings((prev: any) => ({ ...prev, marginLeft: left, marginRight: right }));
+                    repaginateDocument({ newMargin: left });
+                  }}
+                  tabStops={tabStops}
+                  onTabStopsChange={setTabStops}
+                  activeLineIndent={activeLineIndent}
+                  activeRulerPos={activeRulerPos}
+                  onLineIndentChange={(newIndent) => {
+                    setActiveLineIndent(newIndent);
+                    window.dispatchEvent(
+                      new CustomEvent('apply-line-indent', {
+                        detail: { indentInches: newIndent }
+                      })
+                    );
+                  }}
+                />
+              </div>
+            )}
             {paginatedPages.map((pageHtml, idx) => {
               const style = pageStyles[idx] || pageStyles[0] || {};
               const marginT = style.mT !== undefined ? style.mT : (parseFloat(String(printSettings.marginTop)) || 0.5);
