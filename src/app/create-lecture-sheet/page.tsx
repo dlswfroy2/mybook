@@ -1876,7 +1876,23 @@ function CreateLectureSheetContent() {
       if (result.summary) {
         generatedDoc += `<p><strong>পাঠের সারসংক্ষেপ:</strong> ${result.summary}</p>\n\n`;
       }
-      if (result.keyConcepts && result.keyConcepts.length > 0) {
+      if (result.topics && result.topics.length > 0) {
+        generatedDoc += `<h4><strong>পাঠ্যবইয়ের অধ্যায়ভিত্তিক সকল টপিক ও বিস্তারিত আলোচনা:</strong></h4>\n`;
+        result.topics.forEach((t) => {
+          generatedDoc += `<div style="margin-bottom: 14px;">\n`;
+          generatedDoc += `<p><strong>${t.topicNumber ? `${t.topicNumber} ` : ''}${t.topicTitle}:</strong> ${t.detailedExplanation}</p>\n`;
+          if (t.examples && t.examples.length > 0) {
+            t.examples.forEach((ex, exIdx) => {
+              if (typeof ex === 'string') {
+                generatedDoc += `<p style="padding-left: 12px; margin: 3px 0; color: #1e293b;"><em>উদাহরণ ${toBengaliNumber(exIdx + 1)}:</em> ${ex}</p>\n`;
+              } else if (ex && ex.question) {
+                generatedDoc += `<p style="padding-left: 12px; margin: 3px 0; color: #1e293b;"><em>উদাহরণ ${toBengaliNumber(exIdx + 1)}:</em> ${ex.question}<br/><strong>সমাধান:</strong> ${ex.solution}</p>\n`;
+              }
+            });
+          }
+          generatedDoc += `</div>\n`;
+        });
+      } else if (result.keyConcepts && result.keyConcepts.length > 0) {
         generatedDoc += `<h4><strong>মূল আলোচ্য বিষয় ও সংজ্ঞাসমূহ:</strong></h4>\n`;
         result.keyConcepts.forEach((c) => {
           generatedDoc += `<p>• <strong>${c.heading}:</strong> ${c.details}</p>\n`;
