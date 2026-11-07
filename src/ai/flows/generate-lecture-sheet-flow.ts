@@ -54,6 +54,18 @@ function cleanMarkdownSymbols(text: string): string {
 
 import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
 
+/**
+ * Executes an AI generation request with a strict timeout to prevent slow/hanging API models.
+ */
+async function generateWithTimeout(client: any, options: any, timeoutMs = 12000): Promise<any> {
+  return Promise.race([
+    client.generate(options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`AI generation timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+}
+
 export interface LectureTopicItem {
   topicNumber: string; // যেমন: "১.১", "১.২" ... "১.২০"
   topicTitle: string; // যেমন: "বাস্তব সংখ্যার ধারণা ও শ্রেণিবিন্যাস"
@@ -163,10 +175,11 @@ Output must be in JSON format only (no markdown backticks):
 }`;
 
   const availableKeys = getAvailableApiKeys();
+  // gemini-flash-lite-latest responds in 2-3 seconds; fastest and most responsive model
   const candidateModels = [
+    'googleai/gemini-flash-lite-latest',
     'googleai/gemini-flash-latest',
     'googleai/gemini-3.5-flash',
-    'googleai/gemini-flash-lite-latest',
   ];
 
   let rawText = '';
@@ -175,15 +188,19 @@ Output must be in JSON format only (no markdown backticks):
     for (const model of candidateModels) {
       try {
         const client = createAiClient(key, model);
-        const resp = await client.generate({
-          model,
-          prompt,
-          config: { 
-            responseMimeType: 'application/json',
-            maxOutputTokens: 8192,
-            temperature: 0.2,
+        const resp = await generateWithTimeout(
+          client,
+          {
+            model,
+            prompt,
+            config: { 
+              responseMimeType: 'application/json',
+              maxOutputTokens: 6144,
+              temperature: 0.2,
+            },
           },
-        });
+          15000 // 15s max timeout to prevent hangs
+        );
         rawText = resp.text?.trim() || '';
         if (rawText) break;
       } catch (err) {}
@@ -376,10 +393,11 @@ ${input.chapter ? `অধ্যায়: ${input.chapter}` : ''}
   }
 
   const availableKeys = getAvailableApiKeys();
+  // gemini-flash-lite-latest responds in 2-3 seconds; ultra-fast response
   const candidateModels = [
+    'googleai/gemini-flash-lite-latest',
     'googleai/gemini-flash-latest',
     'googleai/gemini-3.5-flash',
-    'googleai/gemini-flash-lite-latest',
   ];
 
   let rawText = '';
@@ -387,14 +405,18 @@ ${input.chapter ? `অধ্যায়: ${input.chapter}` : ''}
     for (const model of candidateModels) {
       try {
         const client = createAiClient(key, model);
-        const resp = await client.generate({
-          model,
-          prompt,
-          config: {
-            maxOutputTokens: 8192,
-            temperature: 0.2,
+        const resp = await generateWithTimeout(
+          client,
+          {
+            model,
+            prompt,
+            config: {
+              maxOutputTokens: 4096,
+              temperature: 0.2,
+            },
           },
-        });
+          12000 // 12s max timeout
+        );
         rawText = resp.text?.trim() || '';
         if (rawText) break;
       } catch (err) {}
