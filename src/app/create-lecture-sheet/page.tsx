@@ -1213,14 +1213,7 @@ function EditableContentArea({
     return () => window.removeEventListener('reflow-page', handleReflowEvent);
   }, [pageIndex, checkAndReflow]);
 
-  // Trigger auto-reflow when font size, line height, columns, or margins change on this page
-  useEffect(() => {
-    if (!isLoadedRef.current) return;
-    const timer = setTimeout(() => {
-      checkAndReflow(true);
-    }, 40);
-    return () => clearTimeout(timer);
-  }, [style.fontSize, style.lineHeight, cols, style.mL, style.mR, style.mT, style.mB, checkAndReflow]);
+
 
   // Load initial content once on mount, then trigger initial reflow check including font readiness
   useEffect(() => {
@@ -2348,78 +2341,166 @@ function CreateLectureSheetContent() {
   const mL = printSettings.marginLeft;
   const mR = printSettings.marginRight;
 
-  useEffect(() => {
-    if (!isPrintMode || !data.content || !measurementRef.current) return;
-    
-    if (Object.keys(manualPages).length > 0) {
-      const sortedIndices = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
-      setPaginatedPages(sortedIndices.map(idx => formatMath(manualPages[idx])));
-      return;
-    }
+  // Bulletproof full-document repagination: preserves 100% of questions/content across all font sizes, columns, and layout changes
+  const repaginateDocument = useCallback((opts?: {
+    newFontSize?: number;
+    newLineHeight?: number;
+    newCols?: number;
+    newOrientation?: string;
+    newMargin?: number;
+    sourceContent?: string;
+  }) => {
+    if (!measurementRef.current) return;
+
+    const currentFontSize = opts?.newFontSize ?? globalFontSize;
+    const currentLineHeight = opts?.newLineHeight ?? globalLineHeight;
+    const firstStyle = pageStyles[0] || pageStyles[activeEditIdx !== null ? activeEditIdx : 0] || {};
+    const currentCols = opts?.newCols ?? firstStyle.columns ?? 1;
+    const currentOrientation = opts?.newOrientation ?? firstStyle.orientation ?? 'portrait';
+    const isLandscape = currentOrientation === 'landscape';
+
+    const baseWidth = isLandscape ? 11.69 : 8.27;
+    const baseHeight = isLandscape ? 8.27 : 11.69;
+
+    const marginT = opts?.newMargin ?? (parseFloat(String(mT)) || 0.5);
+    const marginB = opts?.newMargin ?? (parseFloat(String(mB)) || 0.5);
+    const marginL = opts?.newMargin ?? (parseFloat(String(mL)) || 0.5);
+    const marginR = opts?.newMargin ?? (parseFloat(String(mR)) || 0.5);
+
+    const totalContentWidthInches = Math.max(2, baseWidth - marginL - marginR);
+    const colGapInches = 0.35;
+    const colWidthInches = currentCols > 1
+      ? Math.max(1, (totalContentWidthInches - (currentCols - 1) * colGapInches) / currentCols)
+      : totalContentWidthInches;
 
     const container = measurementRef.current;
-    const rawFormatted = formatMath(data.content);
-    const contentHtml = /<(p|div|h[1-6]|table|blockquote|li)[^>]*>/i.test(rawFormatted)
-      ? rawFormatted
-      : rawFormatted.split('\n').map(l => l.trim() ? `<p style="margin: 0 0 4px 0;">${l}</p>` : '<p style="margin: 0 0 4px 0;"><br/></p>').join('');
-    const marginT = parseFloat(String(mT)) || 0.5, marginL = parseFloat(String(mL)) || 0.5, marginR = parseFloat(String(mR)) || 0.5;
-    
-    container.style.width = (8.27 - marginL - marginR) + 'in';
-    container.style.fontSize = globalFontSize + 'pt';
-    container.style.lineHeight = String(globalLineHeight);
-    
-    // Split content by block tags or newlines
-    let tempBlocks: string[] = [];
-    if (/<(p|div|h[1-6]|table|blockquote|li)[^>]*>/i.test(contentHtml)) {
-      const parserDiv = document.createElement('div');
-      parserDiv.innerHTML = contentHtml;
-      Array.from(parserDiv.childNodes).forEach(node => {
+    container.style.width = colWidthInches + 'in';
+    container.style.fontSize = currentFontSize + 'pt';
+    container.style.lineHeight = String(currentLineHeight);
+
+    // Retrieve master document content without losing any question
+    let sourceText = opts?.sourceContent;
+    if (!sourceText) {
+      if (Object.keys(manualPages).length > 0) {
+        const sorted = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
+        const combined = sorted.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
+        sourceText = combined.trim() ? combined : data.content;
+      } else {
+        sourceText = data.content || '';
+      }
+    }
+
+    if (!sourceText || !sourceText.trim()) return;
+
+    const rawFormatted = formatMath(sourceText);
+
+    // Extract blocks cleanly (ensuring each question/heading is an atomic unit)
+    const blocks: string[] = [];
+    const parserDiv = document.createElement('div');
+    parserDiv.innerHTML = rawFormatted;
+
+    const extractBlocks = (parent: HTMLElement) => {
+      Array.from(parent.childNodes).forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          tempBlocks.push((node as HTMLElement).outerHTML);
+          const el = node as HTMLElement;
+          const tag = el.tagName.toUpperCase();
+          if (/^(P|H[1-6]|TABLE|BLOCKQUOTE|UL|OL|LI|DIV|HR|SECTION|ARTICLE)$/.test(tag)) {
+            blocks.push(el.outerHTML);
+          } else {
+            extractBlocks(el);
+          }
         } else if (node.textContent && node.textContent.trim()) {
-          tempBlocks.push(`<p>${node.textContent}</p>`);
+          blocks.push(`<p style="margin: 0 0 4px 0;">${node.textContent.trim()}</p>`);
         }
       });
-    }
-    if (tempBlocks.length === 0) {
-      tempBlocks = contentHtml.split('\n').filter(l => l.trim() !== '');
-    }
-    container.innerHTML = tempBlocks.map(block => `<div class="measure-line" style="min-height: 1.2em;">${block}</div>`).join('');
-    
-    const headerSpace = 135, footerSpace = 65, topicSpacePx = 65, totalPageHeightPx = 11.69 * 96;
-    const availableHeightPx = totalPageHeightPx - (marginT * 96) - (parseFloat(String(mB)) * 96) - headerSpace - footerSpace;
-    
+    };
+    extractBlocks(parserDiv);
+
+    const finalBlocks = blocks.length > 0
+      ? blocks
+      : rawFormatted.split(/\r?\n/).filter(l => l.trim() !== '').map(l => `<p style="margin: 0 0 4px 0;">${l}</p>`);
+
+    // Measure each block's height at the current column width and font size
+    container.innerHTML = finalBlocks.map((b, i) => `<div class="measure-block" data-idx="${i}" style="margin: 0 0 4px 0;">${b}</div>`).join('');
+
+    const headerSpacePx = 135;
+    const footerSpacePx = 65;
+    const topicSpacePx = 60;
+    const totalPageHeightPx = baseHeight * 96;
+    const colHeightPx = Math.max(200, totalPageHeightPx - (marginT * 96) - (marginB * 96) - headerSpacePx - footerSpacePx);
+
+    const getPageCapacity = (pageIdx: number) => {
+      const baseColH = (pageIdx === 0) ? (colHeightPx - topicSpacePx) : colHeightPx;
+      return Math.max(150, baseColH * currentCols);
+    };
+
+    const measureLines = container.querySelectorAll('.measure-block');
     const newPages: string[] = [];
-    let currentChunk = "", currentHeight = 0;
-    const lines = container.querySelectorAll('.measure-line');
-    
-    lines.forEach((line) => {
-      const h = (line as HTMLElement).offsetHeight || 18;
-      const effectiveLimit = (newPages.length === 0) ? (availableHeightPx - topicSpacePx) : availableHeightPx;
-      if (currentHeight > 0 && currentHeight + h > effectiveLimit) { 
-        if (currentChunk.trim() !== "") newPages.push(currentChunk); 
-        currentChunk = line.innerHTML + "<br/>"; 
-        currentHeight = h; 
-      }
-      else { 
-        currentChunk += line.innerHTML + "<br/>"; 
-        currentHeight += h; 
+    let currentPageBlocks: string[] = [];
+    let currentHeight = 0;
+    let pageIndex = 0;
+
+    measureLines.forEach((line, idx) => {
+      const h = (line as HTMLElement).offsetHeight || 24;
+      const capacity = getPageCapacity(pageIndex);
+
+      if (currentHeight > 0 && currentHeight + h > capacity) {
+        newPages.push(currentPageBlocks.join(''));
+        pageIndex++;
+        currentPageBlocks = [finalBlocks[idx]];
+        currentHeight = h;
+      } else {
+        currentPageBlocks.push(finalBlocks[idx]);
+        currentHeight += h;
       }
     });
-    if (currentChunk.trim() !== "") newPages.push(currentChunk);
-    
+
+    if (currentPageBlocks.length > 0) {
+      newPages.push(currentPageBlocks.join(''));
+    }
+
     const pagesToRender = newPages.length > 0 ? newPages : [""];
     setPaginatedPages(pagesToRender);
-    
-    const initialStyles: Record<number, any> = {}, initialManual: Record<number, string> = {};
-    pagesToRender.forEach((p, i) => { 
-      initialStyles[i] = pageStyles[i] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: marginT, mB: mB, mL: marginL, mR: marginR, columns: 1, columnRule: false, orientation: 'portrait', border: 'none' }; 
-      initialManual[i] = p; 
-    });
-    setPageStyles(initialStyles); 
-    setManualPages(initialManual);
 
-  }, [isPrintMode, data.content, mT, mB, mL, mR, globalFontSize, globalLineHeight]);
+    const initialStyles: Record<number, any> = {};
+    const initialManual: Record<number, string> = {};
+    pagesToRender.forEach((p, i) => {
+      initialStyles[i] = {
+        ...(pageStyles[i] || pageStyles[0] || {}),
+        fontSize: currentFontSize,
+        lineHeight: currentLineHeight,
+        columns: currentCols,
+        orientation: currentOrientation,
+        mT: marginT,
+        mB: marginB,
+        mL: marginL,
+        mR: marginR,
+      };
+      initialManual[i] = p;
+    });
+
+    setPageStyles(initialStyles);
+    setManualPages(initialManual);
+  }, [
+    globalFontSize,
+    globalLineHeight,
+    pageStyles,
+    activeEditIdx,
+    mT,
+    mB,
+    mL,
+    mR,
+    manualPages,
+    data.content
+  ]);
+
+  // Initial pagination when entering Print Mode
+  useEffect(() => {
+    if (!isPrintMode || !data.content || !measurementRef.current) return;
+    if (paginatedPages.length === 0 || Object.keys(manualPages).length === 0) {
+      repaginateDocument();
+    }
+  }, [isPrintMode, data.content, paginatedPages.length, manualPages, repaginateDocument]);
 
   const handleAddNextPage = useCallback((initialContent: string = '') => {
     setPaginatedPages(prev => {
@@ -2920,32 +3001,14 @@ function CreateLectureSheetContent() {
     const val = parseFloat(size);
     if (!isNaN(val)) {
       setGlobalFontSize(val);
-      setPageStyles((prev: any) => {
-        const updated: any = { ...prev };
-        Object.keys(updated).forEach(idx => {
-          updated[parseInt(idx)] = { ...updated[parseInt(idx)], fontSize: val };
-        });
-        return updated;
-      });
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
-      }, 50);
+      repaginateDocument({ newFontSize: val });
     }
   };
   const handleGlobalLineHeightChange = (val: string) => {
     const num = parseFloat(val);
     if (!isNaN(num)) {
       setGlobalLineHeight(num);
-      setPageStyles((prev: any) => {
-        const updated: any = { ...prev };
-        Object.keys(updated).forEach(idx => {
-          updated[parseInt(idx)] = { ...updated[parseInt(idx)], lineHeight: num };
-        });
-        return updated;
-      });
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
-      }, 50);
+      repaginateDocument({ newLineHeight: num });
     }
   };
 
@@ -2953,7 +3016,7 @@ function CreateLectureSheetContent() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
-      <div ref={measurementRef} className="fixed invisible pointer-none whitespace-pre-wrap text-[10.5pt] font-kalpurush" style={{ width: '7.27in', lineHeight: '1.2' }} />
+      <div ref={measurementRef} className="font-kalpurush" style={{ position: 'fixed', top: '-10000px', left: '-10000px', visibility: 'hidden', pointerEvents: 'none', width: '7.27in', lineHeight: '1.2' }} />
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         <header className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-4">
@@ -3576,58 +3639,16 @@ function CreateLectureSheetContent() {
             currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
             currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
             onColumnsChange={(cols, hasRule) => {
-              if (applyScope === 'all') {
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'columns', cols);
-                  updatePageStyle(i, 'columnRule', !!hasRule);
-                });
-              } else if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'columns', cols);
-                updatePageStyle(activeEditIdx, 'columnRule', !!hasRule);
-              } else {
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'columns', cols);
-                  updatePageStyle(i, 'columnRule', !!hasRule);
-                });
-              }
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
-              }, 60);
+              repaginateDocument({ newCols: cols });
             }}
             currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
             onOrientationChange={(orient) => {
-              if (applyScope === 'all') {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'orientation', orient); });
-              } else if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'orientation', orient);
-              } else {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'orientation', orient); });
-              }
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
-              }, 60);
+              repaginateDocument({ newOrientation: orient });
             }}
             onMarginPresetChange={(preset) => {
               const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
-              if (applyScope === 'all') {
-                setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'mT', mVal); updatePageStyle(i, 'mB', mVal);
-                  updatePageStyle(i, 'mL', mVal); updatePageStyle(i, 'mR', mVal);
-                });
-              } else if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'mT', mVal); updatePageStyle(activeEditIdx, 'mB', mVal);
-                updatePageStyle(activeEditIdx, 'mL', mVal); updatePageStyle(activeEditIdx, 'mR', mVal);
-              } else {
-                setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
-                paginatedPages.forEach((_, i) => {
-                  updatePageStyle(i, 'mT', mVal); updatePageStyle(i, 'mB', mVal);
-                  updatePageStyle(i, 'mL', mVal); updatePageStyle(i, 'mR', mVal);
-                });
-              }
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('reflow-page', { detail: { pageIndex: 0, allowUnderflow: true } }));
-              }, 60);
+              setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
+              repaginateDocument({ newMargin: mVal });
             }}
             currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
             onPageBorderChange={(border) => {
@@ -3673,15 +3694,9 @@ function CreateLectureSheetContent() {
                   el.parentNode?.removeChild(el);
                 });
               } else {
-                if (applyScope === 'all') {
-                  setGlobalFontSize(size);
-                  paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
-                } else if (activeEditIdx !== null) {
-                  updatePageStyle(activeEditIdx, 'fontSize', size);
-                } else {
-                  setGlobalFontSize(size);
-                  paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
-                }
+                setGlobalFontSize(size);
+                paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
+                repaginateDocument({ newFontSize: size });
               }
             }}
             onIndentChange={(_dir, delta) => handleLineIndentChange(Math.max(0, activeLineIndent + delta))}
