@@ -145,14 +145,13 @@ function stripDirtyHtml(html: string): string {
     }
   });
 
-  // 5. Convert <li> inside lists to independent controllable <p> with margin-left
+  // 5. Convert <li> inside lists to clean <p> without artificial margins
   tmp.querySelectorAll('ul, ol').forEach((list) => {
     if (list.closest('table')) return;
     const frag = document.createDocumentFragment();
     list.querySelectorAll('li').forEach((li) => {
       const p = document.createElement('p');
       p.style.margin = '0 0 4px 0';
-      p.style.marginLeft = '0.35in';
       p.innerHTML = li.innerHTML;
       frag.appendChild(p);
     });
@@ -161,17 +160,15 @@ function stripDirtyHtml(html: string): string {
     }
   });
 
-  // 6. Convert blockquotes to independent <p> with margin-left
+  // 6. Convert blockquotes to clean <p> without artificial margins
   tmp.querySelectorAll('blockquote').forEach((bq) => {
     const frag = document.createDocumentFragment();
     Array.from(bq.childNodes).forEach((child) => {
       if (child.nodeType === Node.ELEMENT_NODE) {
-        (child as HTMLElement).style.marginLeft = '0.35in';
         frag.appendChild(child);
       } else if (child.textContent?.trim()) {
         const p = document.createElement('p');
         p.style.margin = '0 0 4px 0';
-        p.style.marginLeft = '0.35in';
         p.textContent = child.textContent;
         frag.appendChild(p);
       }
@@ -181,16 +178,14 @@ function stripDirtyHtml(html: string): string {
     }
   });
 
-  // 7. Convert Gemini leading non-breaking spaces or tabs into clean, adjustable margin-left
+  // 7. Strip unwanted artificial leading tabs/whitespace from AI - do NOT inject margin-left!
   tmp.querySelectorAll('p, div').forEach((block) => {
     if (block.closest('table') || block.closest('.katex') || block.closest('.math-frac')) return;
-    const match = block.innerHTML.match(/^([\s\t]|&nbsp;|&emsp;|&ensp;|\u00A0|\u2003)+/i);
-    if (match && match[0].length >= 2) {
-      const currentMl = parseFloat((block as HTMLElement).style.marginLeft || '0') || 0;
-      if (currentMl === 0) {
-        (block as HTMLElement).style.marginLeft = '0.35in';
-      }
-      block.innerHTML = block.innerHTML.replace(/^([\s\t]|&nbsp;|&emsp;|&ensp;|\u00A0|\u2003)+/i, '');
+    // Clean any leading tabs or excessive whitespace without creating artificial indents
+    block.innerHTML = block.innerHTML.replace(/^([\t]|&emsp;|&ensp;|\u2003)+/i, '');
+    // If the block was given an artificial margin-left (e.g. 0.35in, 0.25in), clear it
+    if ((block as HTMLElement).style && (block as HTMLElement).style.marginLeft) {
+      (block as HTMLElement).style.marginLeft = '';
     }
   });
 
@@ -1234,21 +1229,9 @@ function EditableContentArea({
     const lines = clean.split('\n');
     const htmlLines = lines.map((line) => {
       if (line.trim() === '') return '<p style="margin:0 0 4px 0;padding:0"><br/></p>';
-
-      const leadingMatch = line.match(/^([\s\t]|&nbsp;|&emsp;)+/);
-      let indentStyle = '';
-      let contentLine = line;
-      if (leadingMatch && leadingMatch[0].length >= 2) {
-        const spaceCount = leadingMatch[0].replace(/\t/g, '    ').length;
-        const indentInches = Math.min(2.0, Math.round((spaceCount * 0.08) * 16) / 16);
-        if (indentInches > 0) {
-          indentStyle = `margin-left:${indentInches}in;`;
-        }
-        contentLine = line.slice(leadingMatch[0].length);
-      }
-
+      const contentLine = line.replace(/^[\t\s]+/, '');
       const formatted = formatMath(contentLine);
-      return `<p style="margin:0 0 4px 0;padding:0;${indentStyle}">${formatted}</p>`;
+      return `<p style="margin:0 0 4px 0;padding:0;">${formatted}</p>`;
     });
     return htmlLines.join('');
   };
@@ -1757,10 +1740,6 @@ function EditableContentArea({
         } else if (ml.endsWith('px')) {
           indentInches = (parseFloat(ml) || 0) / 96;
         }
-      }
-      if (indentInches === 0) {
-        const pageML = parseFloat(String(style.mL || 0.5)) || 0.5;
-        indentInches = Math.max(0, Math.round((rulerPos - pageML) * 16) / 16);
       }
 
       // Real-time font size detection at cursor:

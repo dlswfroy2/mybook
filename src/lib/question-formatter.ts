@@ -128,10 +128,10 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   const clean = cleanQuestionNumbering(stripAnswers(rawText));
   const qNum = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
 
-  const hasK = /(?:^|\n|\s)(?:\(?ক[.)\]]|\(ক\))/i.test(clean);
-  const hasKh = /(?:^|\n|\s)(?:\(?খ[.)\]]|\(খ\))/i.test(clean);
-  const hasG = /(?:^|\n|\s)(?:\(?গ[.)\]]|\(গ\))/i.test(clean);
-  const hasGh = /(?:^|\n|\s)(?:\(?ঘ[.)\]]|\(ঘ\))/i.test(clean);
+  const hasK = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?ক[.)\]]|\(ক\))/i.test(clean);
+  const hasKh = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?খ[.)\]]|\(খ\))/i.test(clean);
+  const hasG = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?গ[.)\]]|\(গ\))/i.test(clean);
+  const hasGh = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?ঘ[.)\]]|\(ঘ\))/i.test(clean);
 
   // Check if explicitly MCQ or has 4 distinct options without CQ action verbs
   const isExplicitMcq = type === 'mcq';
@@ -148,12 +148,12 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
   // 1. MCQ Question Format (Row Grid, ZERO individual marks!)
   if (isExplicitMcq || looksLikeMcq) {
-    const firstOptMatch = clean.search(/(?:^|\n|\s)(?:\(?ক[.)\]]|\(ক\))/i);
+    const firstOptMatch = clean.search(/(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?ক[.)\]]|\(ক\))/i);
     const qLine = firstOptMatch !== -1 ? clean.substring(0, firstOptMatch).trim() : clean;
     const optionsPart = firstOptMatch !== -1 ? clean.substring(firstOptMatch) : '';
 
     const extractOpt = (letter: string, nextLetter?: string) => {
-      const reg = new RegExp(`(?:^|\\n|\\s)(?:\\(?${letter}[.)\\]]|\\(${letter}\\))\\s*([\\s\\S]*?)(?=(?:^|\\n|\\s)(?:\\(?${nextLetter || '$'}[.)\\]]|\\(${nextLetter || '$'}\\))|$)`, 'i');
+      const reg = new RegExp(`(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)(?:\\(?${letter}[.)\\]]|\\(${letter}\\))\\s*([\\s\\S]*?)(?=(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)(?:\\(?${nextLetter || '$'}[.)\\]]|\\(${nextLetter || '$'}\\))|$)`, 'i');
       const m = optionsPart.match(reg);
       if (!m) return '';
       return m[1].replace(/\[\s*[১-৪1-4]\s*\]\s*$/, '').trim();
@@ -169,11 +169,11 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const gridCols = maxLen <= 28 ? 4 : maxLen <= 60 ? 2 : 1;
 
     return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
-  <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
-    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(qLine)}
+  <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
+    <strong style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(qLine)}
   </p>
   ${(optA || optB || optC || optD) ? `
-  <div class="mcq-options-row" style="padding-left: 28px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
+  <div class="mcq-options-row" style="padding-left: 24px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
     <div><strong>(ক)</strong> ${formatMath(optA)}</div>
     <div><strong>(খ)</strong> ${formatMath(optB)}</div>
     <div><strong>(গ)</strong> ${formatMath(optC)}</div>
@@ -184,15 +184,22 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
   // 2. Creative Question (CQ): Stimulus + ক, খ, গ, ঘ with Marks ১, ২, ৩, ৪
   if (isExplicitCq || (hasK && hasKh)) {
-    const matchK = clean.search(/(?:\n|\s|^)ক[.)]/);
+    const regK = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)\s*(?=\(?ক[.)\]]|\(ক\))/i;
+    const matchK = clean.search(regK);
     const stimulus = matchK !== -1 ? clean.substring(0, matchK).trim() : clean;
     const subPart = matchK !== -1 ? clean.substring(matchK) : '';
 
     const extractPart = (currentM: string, nextM?: string, defaultMark: string = '১') => {
-      const reg = new RegExp(`(?:\\n|\\s|^)${currentM}[.)]\\s*([\\s\\S]*?)(?=(?:\\n|\\s|^)(?:${nextM || '$'})[.)]|$)`);
+      const nextPattern = nextM
+        ? `(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)\\s*(?:\\(?${nextM}[.)\\]]|\\(${nextM}\\))`
+        : '$';
+      const reg = new RegExp(
+        `(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)\\s*(?:\\(?${currentM}[.)\\]]|\\(${currentM}\\))\\s*([\\s\\S]*?)(?=${nextPattern})`,
+        'i'
+      );
       const m = subPart.match(reg);
       if (!m) return null;
-      let text = m[1].trim();
+      let text = m[1].replace(/<\/?p[^>]*>/gi, '').trim();
       let mark = defaultMark;
       const markMatch = text.match(/\[\s*([১-৪1-4])\s*\]\s*$/);
       if (markMatch) {
@@ -207,24 +214,24 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const partC = extractPart('গ', 'ঘ', '৩');
     const partD = extractPart('ঘ', undefined, '৪');
 
-    return `<div class="cq-item my-3 font-kalpurush" style="margin: 12px 0 16px 0; page-break-inside: avoid; display: block;">
-  <p class="cq-stimulus" style="margin: 0 0 6px 0; line-height: 1.65; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
-    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(stimulus)}
+    return `<div class="cq-item my-3 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
+  <p class="cq-stimulus" style="margin: 0 0 5px 0; line-height: 1.6; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
+    <strong style="display: inline-block; width: 24px;">${qNum}</strong>${formatMath(stimulus)}
   </p>
-  <div class="cq-sub-questions" style="padding-left: 28px; display: block;">
-    ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+  <div class="cq-sub-questions" style="padding-left: 24px; display: block;">
+    ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
       <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partA.mark}</span>
       <strong>ক.</strong> ${formatMath(partA.text)}
     </p>` : ''}
-    ${partB ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+    ${partB ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
       <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partB.mark}</span>
       <strong>খ.</strong> ${formatMath(partB.text)}
     </p>` : ''}
-    ${partC ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+    ${partC ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
       <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partC.mark}</span>
       <strong>গ.</strong> ${formatMath(partC.text)}
     </p>` : ''}
-    ${partD ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.55; text-align: justify; display: block;">
+    ${partD ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
       <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partD.mark}</span>
       <strong>ঘ.</strong> ${formatMath(partD.text)}
     </p>` : ''}
