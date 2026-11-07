@@ -328,13 +328,16 @@ function formatMath(text: string): string {
   if (!text) return '';
   text = stripDirtyHtml(text);
 
+  // Clean markdown headers like # or ## or ### into bold title (even if inside <p>)
+  text = text.replace(/(?:^|<p[^>]*>)\s*#{1,6}\s*(.*?)(?:<\/p>|$)/gim, '<p style="font-weight: bold; font-size: 1.1em; margin: 6px 0 3px 0;">$1</p>');
+  text = text.replace(/^#{1,6}\s*(.+)$/gm, '<p style="font-weight: bold; font-size: 1.1em; margin: 6px 0 3px 0;">$1</p>');
+
   // Convert markdown bold **text** to <strong>text</strong>
   text = text.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/(^|[^\*])\*([^\*]+?)\*([^\*]|$)/g, '$1<strong>$2</strong>$3');
 
-  // Convert markdown headers
-  text = text.replace(/^###\s*(.+)$/gm, '<h4 style="font-weight: bold; margin: 6px 0 2px 0;">$1</h4>');
-  text = text.replace(/^##\s*(.+)$/gm, '<h3 style="font-weight: bold; margin: 8px 0 3px 0;">$1</h3>');
-  text = text.replace(/^#\s*(.+)$/gm, '<h2 style="font-weight: bold; margin: 10px 0 4px 0;">$1</h2>');
+  // Convert bullet points starting with * or - into clean •
+  text = text.replace(/(?:^|<p[^>]*>)\s*[\*\-]\s+/gim, '<p style="margin: 0 0 4px 0;">• ');
 
   // Convert markdown blockquotes > text
   text = text.replace(/^>\s*(.+)$/gm, '<p style="margin: 0 0 4px 0; padding-left: 0.25in; border-left: 2px solid #cbd5e1;">$1</p>');
@@ -482,6 +485,9 @@ function formatMath(text: string): string {
     .replace(/\\mathbb\{Z\}/g, 'ℤ')
     .replace(/\\mathbb\{Q\}/g, 'ℚ')
     .replace(/\\mathbb\{C\}/g, 'ℂ');
+
+  // Strip any remaining unwanted stray * and # characters (ensuring no * or # remains in text)
+  text = text.replace(/[*#]/g, '');
 
   return text;
 }
@@ -1222,17 +1228,11 @@ function EditableContentArea({
 
 
 
-  // Load initial content once on mount, then trigger initial reflow check including font readiness
+  // Load initial content once on mount
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
       ref.current.innerHTML = formatMath(stripDirtyHtml(initialHtml));
       isLoadedRef.current = true;
-      setTimeout(() => checkAndReflow(false), 100);
-      if (typeof document !== 'undefined' && document.fonts) {
-        document.fonts.ready.then(() => {
-          setTimeout(() => checkAndReflow(false), 50);
-        });
-      }
     }
   }, []);
 
@@ -1952,6 +1952,9 @@ function CreateLectureSheetContent() {
   const [aiAssistantType, setAiAssistantType] = useState<'bullet_points' | 'detailed' | 'qa' | 'formula_examples'>('bullet_points');
   const [isAiExpanding, setIsAiExpanding] = useState(false);
 
+  // Repaginate version to force-refresh all pages instantaneously on font/col changes
+  const [repaginateVersion, setRepaginateVersion] = useState(0);
+
   // New multi-type question assistant states
   const [aiAssistantMode, setAiAssistantMode] = useState<'questions' | 'notes'>('questions');
   const [aiAssistantClassId, setAiAssistantClassId] = useState<string>('9');
@@ -2462,15 +2465,16 @@ function CreateLectureSheetContent() {
     container.style.fontSize = currentFontSize + 'pt';
     container.style.lineHeight = String(currentLineHeight);
 
-    // Retrieve master document content without losing any question
+    // Retrieve master document content (always prioritize full data.content so no questions get dropped)
     let sourceText = opts?.sourceContent;
     if (!sourceText) {
-      if (Object.keys(manualPages).length > 0) {
+      if (data.content && data.content.trim()) {
+        sourceText = data.content;
+      } else if (Object.keys(manualPages).length > 0) {
         const sorted = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
-        const combined = sorted.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
-        sourceText = combined.trim() ? combined : data.content;
+        sourceText = sorted.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
       } else {
-        sourceText = data.content || '';
+        sourceText = '';
       }
     }
 
@@ -2565,6 +2569,7 @@ function CreateLectureSheetContent() {
 
     setPageStyles(initialStyles);
     setManualPages(initialManual);
+    setRepaginateVersion(v => v + 1);
   }, [
     globalFontSize,
     globalLineHeight,
@@ -3644,19 +3649,7 @@ function CreateLectureSheetContent() {
                         </div>
                       )}
 
-                      {/* ৫. টপিক বা বিশেষ নির্দেশনা (ঐচ্ছিক) */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                          <span>টপিক বা বিশেষ নির্দেশনা (ঐচ্ছিক)</span>
-                          <span className="text-[10px] text-slate-400 font-normal">যেমন: নির্দিষ্ট সূত্র, উপপাদ্য বা সমাধানসহ</span>
-                        </label>
-                        <Textarea
-                          placeholder="যেমন: গতিশক্তি ও বিভব শক্তির সমীকরণ ও বাস্তব উদাহরণসহ সমাধান..."
-                          value={aiAssistantPrompt}
-                          onChange={e => setAiAssistantPrompt(e.target.value)}
-                          className="min-h-[65px] text-xs font-bold bg-slate-50 border-purple-200"
-                        />
-                      </div>
+
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0 border-t pt-3">
@@ -4331,7 +4324,7 @@ function CreateLectureSheetContent() {
                  const cols = style.columns || 1;
                  const hasRule = style.columnRule || false;
                  return (
-                 <div key={idx} className={cn(`paper paper-idx-${idx} shadow-2xl bg-white relative overflow-hidden shrink-0 group transition-all`, activeEditIdx === idx && "ring-4 ring-blue-500 shadow-blue-200")} style={{ width: pWidth, height: pHeight, padding: `${marginT}in ${marginR}in ${marginB}in ${marginL}in`, lineHeight: '1.2', boxSizing: 'border-box', border: borderCss }}>
+                 <div key={`paper-${idx}-v${repaginateVersion}`} className={cn(`paper paper-idx-${idx} shadow-2xl bg-white relative overflow-hidden shrink-0 group transition-all`, activeEditIdx === idx && "ring-4 ring-blue-500 shadow-blue-200")} style={{ width: pWidth, height: pHeight, padding: `${marginT}in ${marginR}in ${marginB}in ${marginL}in`, lineHeight: '1.2', boxSizing: 'border-box', border: borderCss }}>
                     <div className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 flex gap-2"><Button size="sm" variant={activeEditIdx === idx ? 'default' : 'secondary'} className="gap-2 font-bold shadow-lg" onClick={() => setActiveEditIdx(idx)}><Edit3 className="w-3.5 h-3.5" /> এডিট করুন</Button><Button size="sm" variant="destructive" className="gap-2 font-bold shadow-lg" onClick={() => { if(!confirm("মুছে ফেলবেন?")) return; const newP = paginatedPages.filter((_, i) => i !== idx); setPaginatedPages(newP); }}><Trash2 className="w-3.5 h-3.5" /> মুছে ফেলুন</Button></div>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden" style={{ opacity: (printSettings.watermarkOpacity || 0) / 100, transform: `rotate(${printSettings.watermarkRotation || 0}deg)`, whiteSpace: 'nowrap' }}>
                       {printSettings.watermarkType === 'image' && printSettings.watermarkImageUrl ? (<img src={printSettings.watermarkImageUrl} alt="Watermark" style={{ width: `${printSettings.watermarkImageSize || 70}%`, height: 'auto', objectFit: 'contain' }} />) : (<span className="font-black text-black" style={{ fontSize: `${(printSettings.watermarkImageSize || 80) * 1.2}pt` }}>{printSettings.watermarkText || data.institution || softwareConfig?.appName || 'টপ গ্রেড'}</span>)}
@@ -4343,6 +4336,7 @@ function CreateLectureSheetContent() {
                       </header>
                       {idx === 0 && <h2 className="text-[13pt] font-bold text-center underline uppercase mb-4">{data.topic || 'লেকচার শিট'}</h2>}
                       <EditableContentArea
+                        key={`editable-${idx}-v${repaginateVersion}`}
                         initialHtml={formatMath(manualPages[idx] !== undefined ? manualPages[idx] : pageHtml)}
                         style={style}
                         cols={cols}
@@ -4352,7 +4346,15 @@ function CreateLectureSheetContent() {
                         totalPages={paginatedPages.length}
                         onFocus={() => setActiveEditIdx(idx)}
                         onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
-                        onBlur={(val) => setManualPages(prev => ({ ...prev, [idx]: val }))}
+                        onBlur={(val) => {
+                          setManualPages(prev => {
+                            const updated = { ...prev, [idx]: val };
+                            const sorted = Object.keys(updated).map(Number).sort((a, b) => a - b);
+                            const combined = sorted.map(k => updated[k] || '').filter(Boolean).join('\n\n');
+                            setData(d => ({ ...d, content: combined }));
+                            return updated;
+                          });
+                        }}
                         onAddNextPage={handleAddNextPage}
                         onRemoveEmptyPage={handleRemoveEmptyPage}
                         onFocusPage={handleFocusPage}
