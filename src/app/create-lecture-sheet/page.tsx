@@ -2305,7 +2305,8 @@ function CreateLectureSheetContent() {
   const [currentDetectedFontSize, setCurrentDetectedFontSize] = useState<number>(10.5);
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
-  const effectiveZoom = typeof previewZoom === 'number' && previewZoom <= 2 ? Math.round(previewZoom * 100) : (previewZoom || 100);
+  // previewZoom সবসময় integer ৫০-২০০ রেঞ্জে থাকবে
+  const effectiveZoom = Math.round(Math.max(50, Math.min(200, Number(previewZoom) || 100)));
   const [showRuler, setShowRuler] = useState(true);
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
@@ -2445,6 +2446,7 @@ function CreateLectureSheetContent() {
     newFontSize?: number;
     newLineHeight?: number;
     newCols?: number;
+    newColumnRule?: boolean;
     newOrientation?: string;
     newMargin?: number;
     sourceContent?: string;
@@ -4319,7 +4321,15 @@ function CreateLectureSheetContent() {
                     currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
                     currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
                     onColumnsChange={(cols, hasRule) => {
-                      repaginateDocument({ newCols: cols });
+                      repaginateDocument({ newCols: cols, newColumnRule: hasRule });
+                      // Also update all existing page styles immediately (non-repaginated pages)
+                      if (applyScope === 'all') {
+                        paginatedPages.forEach((_, i) => {
+                          updatePageStyle(i, 'columnRule', cols > 1 ? (hasRule ? '1.5px solid #000' : undefined) : undefined);
+                        });
+                      } else if (activeEditIdx !== null) {
+                        updatePageStyle(activeEditIdx, 'columnRule', cols > 1 ? (hasRule ? '1.5px solid #000' : undefined) : undefined);
+                      }
                     }}
                     currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
                     onOrientationChange={(orient) => {
@@ -4431,7 +4441,7 @@ function CreateLectureSheetContent() {
                   })()}
                 </div>
               )}
-              <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: previewZoom !== 100 ? `${previewZoom}%` : undefined }}>
+              <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
                 {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, pageSize: 'a4' };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
