@@ -1259,7 +1259,12 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(true), 40);
+      setTimeout(() => {
+        checkAndReflow(true);
+        if (onSyncPageContent && ref.current) {
+          onSyncPageContent(pageIndex, ref.current.innerHTML);
+        }
+      }, 40);
       return;
     }
 
@@ -1271,7 +1276,12 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(true), 40);
+      setTimeout(() => {
+        checkAndReflow(true);
+        if (onSyncPageContent && ref.current) {
+          onSyncPageContent(pageIndex, ref.current.innerHTML);
+        }
+      }, 40);
       return;
     }
 
@@ -1289,7 +1299,12 @@ function EditableContentArea({
       range.collapse(false);
       sel.removeAllRanges();
       sel.addRange(range);
-      setTimeout(() => checkAndReflow(true), 40);
+      setTimeout(() => {
+        checkAndReflow(true);
+        if (onSyncPageContent && ref.current) {
+          onSyncPageContent(pageIndex, ref.current.innerHTML);
+        }
+      }, 40);
     }
   };
 
@@ -1297,7 +1312,10 @@ function EditableContentArea({
     if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
     inputTimerRef.current = setTimeout(() => {
       checkAndReflow(true);
-    }, 100);
+      if (onSyncPageContent && ref.current) {
+        onSyncPageContent(pageIndex, ref.current.innerHTML);
+      }
+    }, 60);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -1889,7 +1907,12 @@ function EditableContentArea({
         onKeyDown={handleKeyDown}
         onInput={handleInput}
         onCut={() => {
-          setTimeout(() => checkAndReflow(true), 60);
+          setTimeout(() => {
+            checkAndReflow(true);
+            if (onSyncPageContent && ref.current) {
+              onSyncPageContent(pageIndex, ref.current.innerHTML);
+            }
+          }, 60);
         }}
         onPaste={handlePaste}
         onBlur={(e) => {
@@ -2106,13 +2129,30 @@ export function QuestionPrintView({
 
     let sourceText = opts?.sourceContent;
     if (!sourceText) {
-      if (documentContent && documentContent.trim()) {
-        sourceText = documentContent;
-      } else if (Object.keys(manualPages).length > 0) {
-        const sorted = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
-        sourceText = sorted.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
-      } else {
-        sourceText = initialContent;
+      // 1. First priority: Capture directly from live DOM of all .content-area elements
+      const contentAreas = typeof document !== 'undefined' ? document.querySelectorAll('.content-area') : null;
+      if (contentAreas && contentAreas.length > 0) {
+        const liveTexts: string[] = [];
+        contentAreas.forEach(ca => {
+          const html = ca.innerHTML.trim();
+          if (html) liveTexts.push(html);
+        });
+        if (liveTexts.length > 0) {
+          sourceText = liveTexts.join('\n\n');
+        }
+      }
+
+      // 2. Second priority: manualPages state if DOM was not present or empty
+      if (!sourceText) {
+        const manualKeys = Object.keys(manualPages).map(Number).filter(k => manualPages[k] && manualPages[k].trim());
+        if (manualKeys.length > 0) {
+          manualKeys.sort((a, b) => a - b);
+          sourceText = manualKeys.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
+        } else if (documentContent && documentContent.trim()) {
+          sourceText = documentContent;
+        } else {
+          sourceText = initialContent;
+        }
       }
     }
 
@@ -2213,6 +2253,7 @@ export function QuestionPrintView({
 
     setPageStyles(initialStyles);
     setManualPages(initialManual);
+    setDocumentContent(sourceText);
     setRepaginateVersion(v => v + 1);
   }, [globalFontSize, globalLineHeight, pageStyles, activeEditIdx, documentContent, initialContent, manualPages]);
 
@@ -2268,14 +2309,34 @@ export function QuestionPrintView({
   };
 
   const handleSyncPageContent = (pageIndex: number, content: string) => {
-    setManualPages(prev => ({ ...prev, [pageIndex]: content }));
+    setManualPages(prev => {
+      const updated = { ...prev, [pageIndex]: content };
+      const sortedKeys = Object.keys(updated).map(Number).sort((a, b) => a - b);
+      const full = sortedKeys.map(k => updated[k] || '').filter(Boolean).join('\n\n');
+      setDocumentContent(full);
+      return updated;
+    });
   };
 
   const handleSaveDocument = async () => {
     setSaving(true);
     try {
-      const sortedKeys = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
-      const fullText = sortedKeys.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
+      const contentAreas = typeof document !== 'undefined' ? document.querySelectorAll('.content-area') : null;
+      let fullText = '';
+      if (contentAreas && contentAreas.length > 0) {
+        const liveTexts: string[] = [];
+        contentAreas.forEach(ca => {
+          const html = ca.innerHTML.trim();
+          if (html) liveTexts.push(html);
+        });
+        if (liveTexts.length > 0) {
+          fullText = liveTexts.join('\n\n');
+        }
+      }
+      if (!fullText) {
+        const sortedKeys = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
+        fullText = sortedKeys.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
+      }
       await onSave(fullText, pageStyles);
       toast({ title: 'সফল!', description: 'প্রশ্নপত্র সফলভাবে সেভ করা হয়েছে।' });
     } catch (err: any) {
@@ -2555,6 +2616,8 @@ export function QuestionPrintView({
                   updatePageStyle(activeEditIdx, 'pageSize', size);
                 }
               }}
+              currentFontSize={globalFontSize}
+              onFontSizeChange={(size) => handleGlobalFontSizeChange(String(size))}
 
             />
           </div>
@@ -2695,7 +2758,13 @@ export function QuestionPrintView({
                       onFocus={() => setActiveEditIdx(idx)}
                       onClick={() => { if (activeEditIdx !== idx) setActiveEditIdx(idx); }}
                       onBlur={(val) => {
-                        setManualPages(prev => ({ ...prev, [idx]: val }));
+                        setManualPages(prev => {
+                          const updated = { ...prev, [idx]: val };
+                          const sorted = Object.keys(updated).map(Number).sort((a, b) => a - b);
+                          const full = sorted.map(k => updated[k] || '').filter(Boolean).join('\n\n');
+                          setDocumentContent(full);
+                          return updated;
+                        });
                       }}
                       onAddNextPage={handleAddNextPage}
                       onRemoveEmptyPage={handleRemoveEmptyPage}
