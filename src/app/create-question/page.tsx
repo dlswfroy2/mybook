@@ -1026,7 +1026,7 @@ function CreateQuestionContent() {
                         <h2 className="text-base font-bold text-black mt-1 underline">
                           {meta.exam || 'পরীক্ষা'}
                         </h2>
-                        <div className="flex justify-between items-center text-xs font-bold mt-4 px-2">
+                        <div className="flex justify-center items-center gap-6 sm:gap-8 text-xs font-bold mt-3 px-2">
                           <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
                           {questionsB.length > 0 && <span className="text-xs font-black border border-black px-2 py-0.5">সেট: ক (A)</span>}
                           <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>

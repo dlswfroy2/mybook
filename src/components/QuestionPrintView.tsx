@@ -2665,8 +2665,8 @@ export function QuestionPrintView({
                         <h2 className="text-[13pt] font-bold text-black mt-1 underline">
                           {meta.exam}
                         </h2>
-                        <div className="flex justify-between items-center text-[10pt] font-bold mt-2 px-2">
-                          <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''} শ্রেণি</span>
+                        <div className="flex justify-center items-center gap-6 sm:gap-8 text-[10.5pt] font-bold mt-2 px-2">
+                          <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
                           {questionsB.length > 0 && <span className="text-[11pt] font-black border border-black px-2 py-0.5">সেট: ক (A)</span>}
                           <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
                         </div>
