@@ -257,7 +257,10 @@ function CreateQuestionContent() {
 
       if (generated) {
         // Strip any answers and parse into individual board-standard questions
-        const parsedQuestions = parseGeneratedQuestions(generated);
+        const defaultType: 'creative' | 'mcq' | 'short' = 
+          aiQuestionTypes.mcq ? 'mcq' : 
+          aiQuestionTypes.creative ? 'creative' : 'short';
+        const parsedQuestions = parseGeneratedQuestions(generated, defaultType);
         const newQList: Question[] = parsedQuestions.map(pq => ({
           id: Math.random().toString(36).substr(2, 9),
           type: pq.type,

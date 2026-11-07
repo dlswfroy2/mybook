@@ -43,8 +43,8 @@ function formatMath(text: string): string {
     '\\\\gamma': 'γ', '\\\\delta': 'δ', '\\\\sigma': 'σ', '\\\\phi': 'φ', '\\\\omega': 'ω',
     '\\\\eta': 'η', '\\\\rho': 'র', '\\\\lambda': 'λ', '\\\\mu': 'μ',
     '\\\\div': '÷', '\\\\rightarrow': '→', '\\\\to': '→', '\\\\arrow': '→',
-    '\\\\in': '∈', '\\\\mathbb\\{N\\}': 'ℕ', '\\\\mathbb\\{R\\}': 'ℝ', '\\\\mathbb\\{Z\\}': 'ℤ',
-    '\\\\mathbb\\{Q\\}': 'ℚ', '\\\\subset': '⊂', '\\\\subseteq': '⊆', '\\\\cup': '∪',
+    '\\\\in': '∈', '\\\\mathbb\{N\}': 'ℕ', '\\\\mathbb\{R\}': 'ℝ', '\\\\mathbb\{Z\}': 'ℤ',
+    '\\\\mathbb\{Q\}': 'ℚ', '\\\\subset': '⊂', '\\\\subseteq': '⊆', '\\\\cup': '∪',
     '\\\\cap': '∩', '\\\\emptyset': '∅', '\\\\forall': '∀', '\\\\exists': '∃', 
     '\\\\Rightarrow': '⇒', '\\\\leftarrow': '←', '\\\\Leftarrow': '⇐', 
     '\\\\leftrightarrow': '↔', '\\\\Leftrightarrow': '⇔',
@@ -57,7 +57,7 @@ function formatMath(text: string): string {
   return formatted;
 }
 
-export function parseGeneratedQuestions(rawText: string): { type: 'creative' | 'short' | 'mcq'; content: string }[] {
+export function parseGeneratedQuestions(rawText: string, defaultType?: 'creative' | 'short' | 'mcq'): { type: 'creative' | 'short' | 'mcq'; content: string }[] {
   const clean = stripAnswers(rawText);
   // Match question numbers at boundary: e.g. "১। ", "১. ", "\n১। "
   const regex = /(?:^|\n)\s*(?:[০-৯\d]+)\s*[।.)]\s*(?:[০-৯\d]+\s*[।.)]\s*)?/g;
@@ -67,25 +67,45 @@ export function parseGeneratedQuestions(rawText: string): { type: 'creative' | '
     matches.push({ index: m.index, length: m[0].length });
   }
 
+  const determineType = (text: string): 'creative' | 'short' | 'mcq' => {
+    if (defaultType) return defaultType;
+    const hasK = /(?:^|\n|\s)(?:\(?ক[.)\]]|\(ক\))/i.test(text);
+    const hasKh = /(?:^|\n|\s)(?:\(?খ[.)\]]|\(খ\))/i.test(text);
+    const hasG = /(?:^|\n|\s)(?:\(?গ[.)\]]|\(গ\))/i.test(text);
+    const hasGh = /(?:^|\n|\s)(?:\(?ঘ[.)\]]|\(ঘ\))/i.test(text);
+
+    if (hasK && hasKh && hasG && hasGh) {
+      const isMcqPattern = text.includes('(ক)') || 
+                           text.includes('নিচের কোনটি') || 
+                           text.includes('কোনটি?') || 
+                           text.includes('কত?') || 
+                           text.includes('মান কত');
+      const isCqPattern = text.includes('উদ্দীপক') || 
+                          text.includes('প্রমাণ কর') || 
+                          text.includes('বিশ্লেষণ কর') || 
+                          text.includes('ব্যাখ্যা কর') || 
+                          text.includes('বিবৃত কর');
+      if (isMcqPattern && !isCqPattern) return 'mcq';
+      if (isCqPattern) return 'creative';
+      return 'mcq'; // Default to mcq if 4 options are present
+    }
+    if (hasK && hasKh) return 'creative';
+    return 'short';
+  };
+
   if (matches.length <= 1) {
     const paragraphs = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
     if (paragraphs.length <= 1) {
       const p = clean.trim();
-      const isCq = (p.includes('ক.') || p.includes('ক)')) && (p.includes('খ.') || p.includes('খ)'));
-      const isMcq = (p.includes('(ক)') || p.includes('ক)')) && (p.includes('(খ)') || p.includes('খ)')) && (p.includes('(গ)') || p.includes('গ)'));
       return [{
-        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
+        type: determineType(p),
         content: cleanQuestionNumbering(p)
       }];
     }
-    return paragraphs.map(p => {
-      const isCq = (p.includes('ক.') || p.includes('ক)')) && (p.includes('খ.') || p.includes('খ)'));
-      const isMcq = (p.includes('(ক)') || p.includes('ক)')) && (p.includes('(খ)') || p.includes('খ)')) && (p.includes('(গ)') || p.includes('গ)'));
-      return {
-        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
-        content: cleanQuestionNumbering(p)
-      };
-    });
+    return paragraphs.map(p => ({
+      type: determineType(p),
+      content: cleanQuestionNumbering(p)
+    }));
   }
 
   const items: { type: 'creative' | 'short' | 'mcq'; content: string }[] = [];
@@ -94,10 +114,8 @@ export function parseGeneratedQuestions(rawText: string): { type: 'creative' | '
     const end = (i + 1 < matches.length) ? matches[i + 1].index : clean.length;
     const chunk = clean.substring(start, end).trim();
     if (chunk) {
-      const isCq = (chunk.includes('ক.') || chunk.includes('ক)')) && (chunk.includes('খ.') || chunk.includes('খ)'));
-      const isMcq = (chunk.includes('(ক)') || chunk.includes('ক)')) && (chunk.includes('(খ)') || chunk.includes('খ)')) && (chunk.includes('(গ)') || chunk.includes('গ)'));
       items.push({
-        type: isCq ? 'creative' : isMcq ? 'mcq' : 'short',
+        type: determineType(chunk),
         content: cleanQuestionNumbering(chunk)
       });
     }
@@ -109,16 +127,67 @@ export function parseGeneratedQuestions(rawText: string): { type: 'creative' | '
 export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, isEnglish: boolean, type?: string): string {
   const clean = cleanQuestionNumbering(stripAnswers(rawText));
   const qNum = isEnglish ? `${idx + 1}.` : `${toBengaliNumber(idx + 1)}।`;
-  
-  // 1. Creative Question (CQ): contains ক., খ., গ., ঘ.
-  const hasK = /(?:\n|\s|^)ক[.)]/.test(clean);
-  const hasKh = /(?:\n|\s|^)খ[.)]/.test(clean);
-  
-  if ((hasK && hasKh) || type === 'creative') {
+
+  const hasK = /(?:^|\n|\s)(?:\(?ক[.)\]]|\(ক\))/i.test(clean);
+  const hasKh = /(?:^|\n|\s)(?:\(?খ[.)\]]|\(খ\))/i.test(clean);
+  const hasG = /(?:^|\n|\s)(?:\(?গ[.)\]]|\(গ\))/i.test(clean);
+  const hasGh = /(?:^|\n|\s)(?:\(?ঘ[.)\]]|\(ঘ\))/i.test(clean);
+
+  // Check if explicitly MCQ or has 4 distinct options without CQ action verbs
+  const isExplicitMcq = type === 'mcq';
+  const isExplicitCq = type === 'creative';
+  const looksLikeMcq = hasK && hasKh && hasG && hasGh && !isExplicitCq && (
+    isExplicitMcq ||
+    clean.includes('(ক)') ||
+    clean.includes('নিচের কোনটি') ||
+    clean.includes('কোনটি?') ||
+    clean.includes('কত?') ||
+    clean.includes('মান কত') ||
+    (!clean.includes('প্রমাণ কর') && !clean.includes('বিশ্লেষণ কর') && !clean.includes('ব্যাখ্যা কর'))
+  );
+
+  // 1. MCQ Question Format (Row Grid, ZERO individual marks!)
+  if (isExplicitMcq || looksLikeMcq) {
+    const firstOptMatch = clean.search(/(?:^|\n|\s)(?:\(?ক[.)\]]|\(ক\))/i);
+    const qLine = firstOptMatch !== -1 ? clean.substring(0, firstOptMatch).trim() : clean;
+    const optionsPart = firstOptMatch !== -1 ? clean.substring(firstOptMatch) : '';
+
+    const extractOpt = (letter: string, nextLetter?: string) => {
+      const reg = new RegExp(`(?:^|\\n|\\s)(?:\\(?${letter}[.)\\]]|\\(${letter}\\))\\s*([\\s\\S]*?)(?=(?:^|\\n|\\s)(?:\\(?${nextLetter || '$'}[.)\\]]|\\(${nextLetter || '$'}\\))|$)`, 'i');
+      const m = optionsPart.match(reg);
+      if (!m) return '';
+      return m[1].replace(/\[\s*[১-৪1-4]\s*\]\s*$/, '').trim();
+    };
+
+    const optA = extractOpt('ক', 'খ');
+    const optB = extractOpt('খ', 'গ');
+    const optC = extractOpt('গ', 'ঘ');
+    const optD = extractOpt('ঘ', undefined);
+
+    const maxLen = Math.max(optA.length, optB.length, optC.length, optD.length);
+    // 4 columns in 1 row if short options, 2 columns if medium, 1 column if long
+    const gridCols = maxLen <= 28 ? 4 : maxLen <= 60 ? 2 : 1;
+
+    return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
+  <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
+    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(qLine)}
+  </p>
+  ${(optA || optB || optC || optD) ? `
+  <div class="mcq-options-row" style="padding-left: 28px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
+    <div><strong>(ক)</strong> ${formatMath(optA)}</div>
+    <div><strong>(খ)</strong> ${formatMath(optB)}</div>
+    <div><strong>(গ)</strong> ${formatMath(optC)}</div>
+    <div><strong>(ঘ)</strong> ${formatMath(optD)}</div>
+  </div>` : ''}
+</div>`;
+  }
+
+  // 2. Creative Question (CQ): Stimulus + ক, খ, গ, ঘ with Marks ১, ২, ৩, ৪
+  if (isExplicitCq || (hasK && hasKh)) {
     const matchK = clean.search(/(?:\n|\s|^)ক[.)]/);
     const stimulus = matchK !== -1 ? clean.substring(0, matchK).trim() : clean;
     const subPart = matchK !== -1 ? clean.substring(matchK) : '';
-    
+
     const extractPart = (currentM: string, nextM?: string, defaultMark: string = '১') => {
       const reg = new RegExp(`(?:\\n|\\s|^)${currentM}[.)]\\s*([\\s\\S]*?)(?=(?:\\n|\\s|^)(?:${nextM || '$'})[.)]|$)`);
       const m = subPart.match(reg);
@@ -132,12 +201,12 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
       }
       return { text, mark };
     };
-    
+
     const partA = extractPart('ক', 'খ', '১');
     const partB = extractPart('খ', 'গ', '২');
     const partC = extractPart('গ', 'ঘ', '৩');
     const partD = extractPart('ঘ', undefined, '৪');
-    
+
     return `<div class="cq-item my-3 font-kalpurush" style="margin: 12px 0 16px 0; page-break-inside: avoid; display: block;">
   <p class="cq-stimulus" style="margin: 0 0 6px 0; line-height: 1.65; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
     <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(stimulus)}
@@ -162,38 +231,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   </div>
 </div>`;
   }
-  
-  // 2. MCQ Question
-  const hasOptions = /\(?ক[.)\)]/.test(clean) && /\(?খ[.)\)]/.test(clean);
-  if (hasOptions || type === 'mcq') {
-    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-    const qLine = lines[0] || '';
-    const otherLines = lines.slice(1).join(' ');
-    
-    const extractOpt = (letter: string, nextLetter?: string) => {
-      const reg = new RegExp(`\\(?${letter}[.)\\)]\\s*([\\s\\S]*?)(?=\\(?(?:${nextLetter || '$'})[.)\\)]|$)`);
-      const m = otherLines.match(reg);
-      return m ? m[1].trim() : '';
-    };
-    
-    const optA = extractOpt('ক', 'খ');
-    const optB = extractOpt('খ', 'গ');
-    const optC = extractOpt('গ', 'ঘ');
-    const optD = extractOpt('ঘ', undefined);
-    
-    return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
-  <p style="margin: 0 0 4px 0; font-weight: bold; line-height: 1.5; padding-left: 28px; text-indent: -28px; display: block;">
-    <strong style="display: inline-block; width: 28px;">${qNum}</strong>${formatMath(qLine)}
-  </p>
-  ${optA ? `<div class="mcq-options" style="padding-left: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 0.95em;">
-    <div>(ক) ${formatMath(optA)}</div>
-    <div>(খ) ${formatMath(optB)}</div>
-    <div>(গ) ${formatMath(optC)}</div>
-    <div>(ঘ) ${formatMath(optD)}</div>
-  </div>` : ''}
-</div>`;
-  }
-  
+
   // 3. Short / Other Question with mark
   let mark = '';
   let bodyText = clean;
@@ -202,7 +240,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     mark = markMatch[1];
     bodyText = clean.replace(/\[\s*([১-৪1-4])\s*\]\s*$/, '').trim();
   }
-  
+
   return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
   <p style="margin: 0; line-height: 1.6; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
     ${mark ? `<span class="short-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${mark}</span>` : ''}
