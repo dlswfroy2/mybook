@@ -1,3 +1,8 @@
+'use server';
+
+/**
+ * @fileOverview AI Flow for generating professional NCTB Board Standard Lecture Sheets, Creative Questions & Model Tests.
+ */
 
 function cleanMarkdownSymbols(text: string): string {
   if (!text) return '';
@@ -13,11 +18,6 @@ function cleanMarkdownSymbols(text: string): string {
     // Remove any remaining stray * or # symbols
     .replace(/[*#]/g, '');
 }
-'use server';
-
-/**
- * @fileOverview AI Flow for generating professional NCTB Board Standard Lecture Sheets, Creative Questions & Model Tests.
- */
 
 import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
 
