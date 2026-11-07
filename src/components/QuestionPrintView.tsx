@@ -89,6 +89,13 @@ function stripDirtyHtml(html: string): string {
       return;
     }
 
+    // Clean accidental block marginLeft on questions from legacy tab handler
+    if (el.classList.contains('mcq-item') || el.classList.contains('cq-item') || el.classList.contains('short-item')) {
+      if ((el as HTMLElement).style.marginLeft) {
+        (el as HTMLElement).style.marginLeft = '';
+      }
+    }
+
     // Safely remove any Gemini data attributes or event handlers
     Array.from(el.attributes).forEach((attr) => {
       if (attr.name.startsWith('data-') || attr.name.startsWith('on')) {
@@ -1400,35 +1407,70 @@ function EditableContentArea({
           return;
         }
 
-        // Table cell না হলে: কারসর যে লাইনে আছে সেই লাইনের মার্জিন সামনে/পিছনে সরান (Tab = সামনে, Shift+Tab = পিছনে)
+        // Table cell না হলে: Word-এর মতো কারসর পজিশনে ৪টি নন-ব্রেকিং স্পেস (ট্যাব স্পেস) দিন
         e.preventDefault();
-        let targetBlock: HTMLElement | null = null;
-        let currNode: Node | null = sel.anchorNode;
-        while (currNode && currNode !== el) {
-          if (currNode.nodeType === Node.ELEMENT_NODE && (currNode as HTMLElement).parentElement === el) {
-            targetBlock = currNode as HTMLElement;
-            break;
+
+        // Shift + Tab: কোনো মার্জিন বা পূর্ববর্তী ট্যাব স্পেস মুছুন (Outdent / Delete Tab)
+        if (e.shiftKey) {
+          let targetBlock: HTMLElement | null = null;
+          let currNode: Node | null = sel.anchorNode;
+          while (currNode && currNode !== el) {
+            if (currNode.nodeType === Node.ELEMENT_NODE && (currNode as HTMLElement).parentElement === el) {
+              targetBlock = currNode as HTMLElement;
+              break;
+            }
+            currNode = currNode.parentNode;
           }
-          currNode = currNode.parentNode;
-        }
-        if (targetBlock) {
-          if (e.shiftKey) {
-            // Shift + Tab: সরাসরি পাতার শুরুতে রিসেট করুন
+          if (targetBlock && (targetBlock.style.marginLeft || targetBlock.style.textIndent)) {
             targetBlock.style.marginLeft = '';
             targetBlock.style.paddingLeft = '';
             targetBlock.style.textIndent = '';
-            targetBlock.innerHTML = targetBlock.innerHTML.replace(/^(\s|&nbsp;|\u00A0)+/, '');
             onSyncPageContent(pageIndex, el.innerHTML);
             setTimeout(updateActiveLineIndent, 30);
-          } else {
-            // Tab: ০.২৫ ইঞ্চি ডানে ইনডেন্ট করুন
-            const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
-            const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
-            const newInches = Math.round((currentInches + 0.25) * 16) / 16;
-            targetBlock.style.marginLeft = `${newInches}in`;
-            onSyncPageContent(pageIndex, el.innerHTML);
-            setTimeout(updateActiveLineIndent, 30);
+            return;
           }
+
+          if (sel.rangeCount > 0 && sel.isCollapsed) {
+            const range = sel.getRangeAt(0);
+            const node = range.startContainer;
+            if (node.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
+              const text = node.textContent || '';
+              const before = text.substring(0, range.startOffset);
+              const spaceMatch = before.match(/([\s\u00A0]{1,4})$/);
+              if (spaceMatch) {
+                const deleteLen = spaceMatch[0].length;
+                const newText = text.substring(0, range.startOffset - deleteLen) + text.substring(range.startOffset);
+                node.textContent = newText;
+                const newOffset = range.startOffset - deleteLen;
+                range.setStart(node, newOffset);
+                range.setEnd(node, newOffset);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                onSyncPageContent(pageIndex, el.innerHTML);
+                setTimeout(updateActiveLineIndent, 30);
+                return;
+              }
+            }
+          }
+          return;
+        }
+
+        // সাধারণ Tab: কারসরের স্থানে ৪টি স্পেস (Word-like Tab space) যোগ করুন
+        if (sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const tabNode = document.createTextNode('\u00A0\u00A0\u00A0\u00A0');
+          range.insertNode(tabNode);
+          range.setStartAfter(tabNode);
+          range.setEndAfter(tabNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+
+          onSyncPageContent(pageIndex, el.innerHTML);
+          setTimeout(() => {
+            checkAndReflow(true);
+            updateActiveLineIndent();
+          }, 30);
         }
         return;
       }
