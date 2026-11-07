@@ -80,6 +80,12 @@ import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
 
 export interface WordToolbarProps {
+  mode?: 'ribbon' | 'sidebar';
+  externalTab?: 'home' | 'insert' | 'layout';
+  onExternalTabChange?: (tab: 'home' | 'insert' | 'layout') => void;
+  applyScope?: 'single' | 'all';
+  onApplyScopeChange?: (scope: 'single' | 'all') => void;
+  onResetLineIndent?: () => void;
   onAddPage?: () => void;
   onDeletePage?: () => void;
   activePageIndex?: number | null;
@@ -112,6 +118,12 @@ export interface WordToolbarProps {
 }
 
 export function WordToolbar({
+  mode = 'sidebar',
+  externalTab,
+  onExternalTabChange,
+  applyScope = 'all',
+  onApplyScopeChange,
+  onResetLineIndent,
   onAddPage,
   onDeletePage,
   activePageIndex = 0,
@@ -141,7 +153,12 @@ export function WordToolbar({
   onFontSizeChange,
   className
 }: WordToolbarProps) {
-  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
+  const [internalTab, setInternalTab] = useState<'home' | 'insert' | 'layout'>('home');
+  const activeTab = externalTab || internalTab;
+  const setActiveTab = (t: 'home' | 'insert' | 'layout') => {
+    if (onExternalTabChange) onExternalTabChange(t);
+    else setInternalTab(t);
+  };
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
@@ -665,6 +682,534 @@ export function WordToolbar({
     exec('formatBlock', tag);
   };
 
+  // ────────────────── SIDEBAR MODE RENDER ──────────────────
+  if (mode === 'sidebar') {
+    return (
+      <div className={cn("flex flex-col h-full bg-white select-none font-kalpurush overflow-hidden text-slate-800", className)}>
+        {/* Navigation Tabs (only if not controlled externally) */}
+        {!externalTab && (
+          <div className="grid grid-cols-3 border-b bg-slate-50 text-xs font-black p-1 gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className={cn("py-2 px-1 rounded-md transition-all text-center flex items-center justify-center gap-1.5", activeTab === 'home' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800")}
+            >
+              <Type className="w-3.5 h-3.5" />
+              <span>হোম</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('layout')}
+              className={cn("py-2 px-1 rounded-md transition-all text-center flex items-center justify-center gap-1.5", activeTab === 'layout' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800")}
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span>লেআউট</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('insert')}
+              className={cn("py-2 px-1 rounded-md transition-all text-center flex items-center justify-center gap-1.5", activeTab === 'insert' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800")}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>ইনসার্ট</span>
+            </button>
+          </div>
+        )}
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
+          {/* ═══════════ TAB 1: HOME ═══════════ */}
+          {activeTab === 'home' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              {/* Section 1: Font & Formatting */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Type className="w-3.5 h-3.5 text-indigo-600" /> ফন্ট ও টেক্সট সাইজ
+                </h4>
+                
+                {/* Font Family */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500">ফন্ট ফ্যামিলি</label>
+                  <select
+                    className="w-full h-8 text-xs font-bold bg-white rounded-md border border-slate-200 px-2 outline-none focus:border-indigo-500"
+                    onChange={e => handleFontFamily(e.target.value)}
+                    defaultValue="'Kalpurush', sans-serif"
+                  >
+                    {FONT_FAMILIES.map(f => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Font Size Buttons */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-slate-500">ফন্ট সাইজ (pt)</label>
+                    <span className="text-xs font-black text-indigo-600">{currentFontSize}pt</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[9, 10, 10.5, 11, 12, 14, 16, 18, 20, 24].map(sz => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          if (onFontSizeChange) onFontSizeChange(sz);
+                          else handleFontSize(sz);
+                        }}
+                        className={cn(
+                          "h-7 text-[10px] font-bold rounded border transition-all",
+                          Number(currentFontSize) === sz ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                        )}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Text Formatting Toolbar */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold text-slate-500">টেক্সট স্টাইল</label>
+                  <div className="flex flex-wrap gap-1 bg-white p-1 rounded-md border border-slate-200">
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('bold')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100 font-bold" title="বোল্ড (Ctrl+B)"><Bold className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('italic')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100 italic" title="ইটালিক (Ctrl+I)"><Italic className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('underline')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100 underline" title="আন্ডারলাইন (Ctrl+U)"><Underline className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('strikeThrough')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100" title="মাঝখান দিয়ে কাটা"><Strikethrough className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('subscript')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100" title="সাবস্ক্রিপ্ট (পাদটীকা)"><Subscript className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('superscript')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100" title="সুপারস্ক্রিপ্ট (পাওয়ার)"><Superscript className="w-3.5 h-3.5" /></button>
+                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('removeFormat')} className="h-7 w-7 rounded flex items-center justify-center hover:bg-slate-100 text-red-500" title="ফরম্যাটিং মুছুন"><RemoveFormatting className="w-3.5 h-3.5" /></button>
+                  </div>
+                </div>
+
+                {/* Text & Highlight Color */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500">টেক্সট রং</label>
+                    <div className="flex items-center gap-1">
+                      <input type="color" defaultValue="#000000" onChange={e => exec('foreColor', e.target.value)} className="w-8 h-7 rounded border border-slate-200 cursor-pointer p-0 bg-white" />
+                      <div className="flex gap-0.5">
+                        {['#000000', '#1e3a8a', '#dc2626', '#16a34a'].map(col => (
+                          <button key={col} type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('foreColor', col)} className="w-4 h-7 rounded-sm border border-slate-300" style={{ backgroundColor: col }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500">হাইলাইট রং</label>
+                    <div className="flex gap-1">
+                      {['#fef08a', '#bbf7d0', '#bae6fd', '#fbcfe8'].map(col => (
+                        <button key={col} type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('hiliteColor', col)} className="flex-1 h-7 rounded-sm border border-slate-300" style={{ backgroundColor: col }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Paragraph & Alignment */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <AlignLeft className="w-3.5 h-3.5 text-indigo-600" /> প্যারাগ্রাফ ও সাজসজ্জা
+                </h4>
+
+                {/* Alignment */}
+                <div className="flex gap-1 bg-white p-1 rounded-md border border-slate-200">
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('justifyLeft')} className="flex-1 h-7 rounded flex items-center justify-center hover:bg-slate-100" title="বামে"><AlignLeft className="w-3.5 h-3.5" /></button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('justifyCenter')} className="flex-1 h-7 rounded flex items-center justify-center hover:bg-slate-100" title="মাঝে"><AlignCenter className="w-3.5 h-3.5" /></button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('justifyRight')} className="flex-1 h-7 rounded flex items-center justify-center hover:bg-slate-100" title="ডানে"><AlignRight className="w-3.5 h-3.5" /></button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('justifyFull')} className="flex-1 h-7 rounded flex items-center justify-center hover:bg-slate-100" title="সমান (Justify)"><AlignJustify className="w-3.5 h-3.5" /></button>
+                </div>
+
+                {/* Line Spacing */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500">লাইন স্পেসিং</label>
+                  <div className="grid grid-cols-5 gap-1">
+                    {LINE_SPACINGS.map(sp => (
+                      <button
+                        key={sp.value}
+                        type="button"
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          const activeEl = document.querySelector('.content-area:focus') || document.querySelector('.paper.ring-4 .content-area');
+                          if (activeEl instanceof HTMLElement) activeEl.style.lineHeight = sp.value;
+                        }}
+                        className="h-7 text-[10px] font-bold rounded border bg-white text-slate-700 border-slate-200 hover:border-indigo-400"
+                      >
+                        {sp.value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lists & Indents */}
+                <div className="flex flex-wrap gap-1">
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('insertUnorderedList')} className="flex-1 h-7 text-[11px] font-bold rounded border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center gap-1" title="বুলেট লিস্ট"><List className="w-3.5 h-3.5 text-indigo-600" /> বুলেট</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('insertOrderedList')} className="flex-1 h-7 text-[11px] font-bold rounded border border-slate-200 bg-white hover:bg-slate-100 flex items-center justify-center gap-1" title="নম্বর লিস্ট"><ListOrdered className="w-3.5 h-3.5 text-indigo-600" /> ১, ২, ৩</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('outdent')} className="h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100" title="ইন্ডেন্ট কমান"><Outdent className="w-3.5 h-3.5" /></button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('indent')} className="h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100" title="ইন্ডেন্ট বাড়ান"><Indent className="w-3.5 h-3.5" /></button>
+                </div>
+
+                {/* Return to Line Start Button */}
+                {onResetLineIndent && (
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={onResetLineIndent}
+                    className="w-full h-7 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    ⬅ পাতার শুরুতে ফিরিয়ে আনুন
+                  </button>
+                )}
+              </div>
+
+              {/* Section 3: Headings & Undo */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Heading1 className="w-3.5 h-3.5 text-indigo-600" /> হেডিং ও হিস্টোরি
+                </h4>
+                <div className="grid grid-cols-4 gap-1">
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => handleHeading('h1')} className="h-7 text-[10px] font-black rounded border border-slate-200 bg-white hover:bg-slate-100">H1</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => handleHeading('h2')} className="h-7 text-[10px] font-black rounded border border-slate-200 bg-white hover:bg-slate-100">H2</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => handleHeading('h3')} className="h-7 text-[10px] font-black rounded border border-slate-200 bg-white hover:bg-slate-100">H3</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => handleHeading('p')} className="h-7 text-[10px] font-bold rounded border border-slate-200 bg-white hover:bg-slate-100">প্যারাগ্রাফ</button>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('undo')} className="flex-1 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 font-bold text-[11px] flex items-center justify-center gap-1"><Undo className="w-3 h-3" /> আনডু (Ctrl+Z)</button>
+                  <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => exec('redo')} className="flex-1 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 font-bold text-[11px] flex items-center justify-center gap-1"><Redo className="w-3 h-3" /> রিডু (Ctrl+Y)</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════ TAB 2: LAYOUT ═══════════ */}
+          {activeTab === 'layout' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              {/* Section 1: Apply Scope */}
+              {onApplyScopeChange && (
+                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 space-y-2">
+                  <span className="text-[11px] font-black text-amber-900 uppercase">সেটিংস প্রয়োগের পরিধি</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onApplyScopeChange('single')}
+                      className={cn("flex-1 py-1.5 rounded-lg border font-bold text-[11px] transition-all", applyScope === 'single' ? "bg-blue-600 text-white border-blue-600 shadow-xs" : "bg-white text-slate-700 border-slate-300")}
+                    >
+                      📄 এই পাতায়
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onApplyScopeChange('all')}
+                      className={cn("flex-1 py-1.5 rounded-lg border font-bold text-[11px] transition-all", applyScope === 'all' ? "bg-indigo-600 text-white border-indigo-600 shadow-xs" : "bg-white text-slate-700 border-slate-300")}
+                    >
+                      📑 সব পাতায়
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-amber-800 font-bold">
+                    {applyScope === 'all' ? '✓ মার্জিন ও কলাম সকল পাতায় একযোগে প্রয়োগ হবে' : '• শুধুমাত্র বর্তমান পাতায় প্রয়োগ হবে'}
+                  </p>
+                </div>
+              )}
+
+              {/* Section 2: Page Setup */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Columns2 className="w-3.5 h-3.5 text-indigo-600" /> পেজ সেটআপ ও মার্জিন
+                </h4>
+
+                {/* Margins */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500">মার্জিন প্রিসেট</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button type="button" onClick={() => onMarginPresetChange?.('normal')} className="h-7 text-[10px] font-bold rounded border bg-white border-slate-200 hover:border-indigo-400">সাধারণ (০.৫")</button>
+                    <button type="button" onClick={() => onMarginPresetChange?.('narrow')} className="h-7 text-[10px] font-bold rounded border bg-white border-slate-200 hover:border-indigo-400">সরু (০.২৫")</button>
+                    <button type="button" onClick={() => onMarginPresetChange?.('wide')} className="h-7 text-[10px] font-bold rounded border bg-white border-slate-200 hover:border-indigo-400">প্রশস্ত (১.০")</button>
+                  </div>
+                </div>
+
+                {/* Columns */}
+                <div className="space-y-1 pt-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-slate-500">কলাম সংখ্যা</label>
+                    <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" checked={currentColumnRule} onChange={e => onColumnsChange?.(currentColumns, e.target.checked)} className="rounded" /> কলামের দাগ
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[1, 2, 3].map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => onColumnsChange?.(c, currentColumnRule)}
+                        className={cn(
+                          "h-8 text-xs font-black rounded-lg border transition-all flex items-center justify-center gap-1",
+                          currentColumns === c ? "bg-indigo-600 text-white border-indigo-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                        )}
+                      >
+                        {c === 1 ? <Square className="w-3.5 h-3.5" /> : c === 2 ? <Columns2 className="w-3.5 h-3.5" /> : <Columns3 className="w-3.5 h-3.5" />}
+                        <span>{c} কলাম</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Orientation & Size */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500">ওরিয়েন্টেশন</label>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => onOrientationChange?.('portrait')} className={cn("flex-1 h-7 rounded border font-bold text-[10px] flex items-center justify-center gap-1", currentOrientation === 'portrait' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-200")}>
+                        <RectangleVertical className="w-3 h-3" /> খাড়া
+                      </button>
+                      <button type="button" onClick={() => onOrientationChange?.('landscape')} className={cn("flex-1 h-7 rounded border font-bold text-[10px] flex items-center justify-center gap-1", currentOrientation === 'landscape' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-200")}>
+                        <RectangleHorizontal className="w-3 h-3" /> শোয়ানো
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500">পেজ সাইজ</label>
+                    <select
+                      className="w-full h-7 text-xs font-bold bg-white rounded border border-slate-200 px-1.5 outline-none"
+                      value={currentPageSize}
+                      onChange={e => onPageSizeChange?.(e.target.value as any)}
+                    >
+                      <option value="a4">A4 (বোর্ড)</option>
+                      <option value="letter">Letter</option>
+                      <option value="legal">Legal</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Page Border */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold text-slate-500">পেজ বর্ডার</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    <button type="button" onClick={() => onPageBorderChange?.('none')} className={cn("h-7 rounded border font-bold text-[10px]", currentPageBorder === 'none' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200")}>বর্ডারহীন</button>
+                    <button type="button" onClick={() => onPageBorderChange?.('thin')} className={cn("h-7 rounded border font-bold text-[10px]", currentPageBorder === 'thin' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200")}>চিকন</button>
+                    <button type="button" onClick={() => onPageBorderChange?.('double')} className={cn("h-7 rounded border font-bold text-[10px]", currentPageBorder === 'double' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200")}>ডাবল</button>
+                    <button type="button" onClick={() => onPageBorderChange?.('box')} className={cn("h-7 rounded border font-bold text-[10px]", currentPageBorder === 'box' ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200")}>বক্স ফ্রেম</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Page Management Actions */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" /> পাতা ব্যবস্থাপনা
+                </h4>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onAddPage}
+                    className="flex-1 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> নতুন পাতা যোগ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDeletePage}
+                    className="flex-1 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> পাতা মুছুন
+                  </button>
+                </div>
+                {onInsertPageBreak && (
+                  <button
+                    type="button"
+                    onClick={onInsertPageBreak}
+                    className="w-full h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center gap-1"
+                  >
+                    <Split className="w-3 h-3 text-indigo-600" /> এই স্থান হতে পরবর্তী পাতায় পাঠান (Page Break)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════ TAB 3: INSERT & TABLES ═══════════ */}
+          {activeTab === 'insert' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              {/* Section 1: Table & Row/Col Controls */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <TableIcon className="w-3.5 h-3.5 text-indigo-600" /> টেবিল ও সারি-কলাম টুলস
+                </h4>
+
+                {/* Create Table Button */}
+                <button
+                  type="button"
+                  onClick={() => setTableDialogOpen(true)}
+                  className="w-full h-8 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" /> নতুন টেবিল তৈরি করুন
+                </button>
+
+                {/* Row & Column Actions */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-bold text-slate-500">সারি ও কলাম বাড়ানো/কমানো</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => insertTableRow(true)}
+                      className="h-8 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 font-bold text-xs flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-indigo-600" /> সারি বাড়ান
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={deleteTableRow}
+                      className="h-8 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 font-bold text-xs flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <Minus className="w-3.5 h-3.5 text-red-500" /> সারি কমান
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => insertTableColumn(true)}
+                      className="h-8 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 font-bold text-xs flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-indigo-600" /> কলাম বাড়ান
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={deleteTableColumn}
+                      className="h-8 rounded-lg bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 font-bold text-xs flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <Minus className="w-3.5 h-3.5 text-red-500" /> কলাম কমান
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table Width & Cell Size */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-bold text-slate-500">টেবিলের প্রস্থ</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    <button type="button" onClick={() => setTableWidth('100%')} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">১০০%</button>
+                    <button type="button" onClick={() => setTableWidth('80%')} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">৮০%</button>
+                    <button type="button" onClick={() => setTableWidth('60%')} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">৬০%</button>
+                    <button type="button" onClick={() => setTableWidth('auto')} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">অটো</button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={deleteActiveTable}
+                  className="w-full h-7 rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] flex items-center justify-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" /> সম্পূর্ণ টেবিলটি মুছে ফেলুন
+                </button>
+              </div>
+
+              {/* Section 2: Special Content Elements */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> বিশেষ উপাদান ইনসার্ট
+                </h4>
+
+                {/* MCQ 4-Option Grid */}
+                <button
+                  type="button"
+                  onClick={handleInsertMcqGrid}
+                  className="w-full h-8 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                >
+                  🔘 MCQ ৪-অপশন গ্রিড (ক, খ, গ, ঘ)
+                </button>
+
+                {/* Callout Note Boxes */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500">নোট ও বিশেষ বক্স</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {CALLOUT_BOXES.map(box => (
+                      <button
+                        key={box.title}
+                        type="button"
+                        onClick={() => handleInsertCallout(box)}
+                        className="h-8 rounded border font-bold text-[10px] flex items-center justify-center gap-1"
+                        style={{ borderColor: box.border, backgroundColor: box.bg, color: box.border }}
+                      >
+                        <span>{box.icon}</span> <span>{box.label.replace(':', '')}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fraction, Date, Image */}
+                <div className="grid grid-cols-3 gap-1 pt-1">
+                  <button type="button" onClick={handleInsertFraction} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">½ ভগ্নাংশ</button>
+                  <button type="button" onClick={() => handleInsertDate(true)} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100">📅 আজকের তারিখ</button>
+                  <button type="button" onClick={() => setImageDialogOpen(true)} className="h-7 text-[10px] font-bold rounded border bg-white hover:bg-slate-100 flex items-center justify-center gap-1"><ImageIcon className="w-3 h-3 text-indigo-600" /> ছবি</button>
+                </div>
+              </div>
+
+              {/* Section 3: Math & Science Symbols */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Calculator className="w-3.5 h-3.5 text-indigo-600" /> গণিত ও বিজ্ঞান প্রতীক প্যালেট
+                </h4>
+                <div className="grid grid-cols-8 gap-1 bg-white p-2 rounded-lg border border-slate-200">
+                  {MATH_SYMBOLS.slice(0, 32).map(sym => (
+                    <button
+                      key={sym}
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => insertHtmlAtCursor(`${sym}&nbsp;`)}
+                      className="h-7 text-xs font-bold hover:bg-indigo-50 hover:text-indigo-700 rounded transition-colors flex items-center justify-center"
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dialogs */}
+        <Dialog open={tableDialogOpen} onOpenChange={setTableDialogOpen}>
+          <DialogContent className="sm:max-w-md font-kalpurush">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-indigo-900 font-bold"><TableIcon className="w-5 h-5 text-indigo-600" /> নতুন টেবিল তৈরি করুন</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label className="text-xs font-bold">সারি (Rows)</Label><Input type="number" min={1} max={20} value={tableRows} onChange={e => setTableRows(parseInt(e.target.value) || 1)} className="font-bold" /></div>
+                <div className="space-y-1"><Label className="text-xs font-bold">কলাম (Columns)</Label><Input type="number" min={1} max={10} value={tableCols} onChange={e => setTableCols(parseInt(e.target.value) || 1)} className="font-bold" /></div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setTableDialogOpen(false)}>বাতিল</Button>
+              <Button size="sm" onClick={() => handleInsertTable(tableRows, tableCols)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">টেবিল যোগ করুন</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+          <DialogContent className="sm:max-w-md font-kalpurush">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-bold"><ImageIcon className="w-5 h-5 text-indigo-600" /> ছবি যুক্ত করুন</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold">কম্পিউটার থেকে ছবি আপলোড</Label>
+                <input type="file" ref={imageFileInputRef} accept="image/*" onChange={handleImageUpload} className="w-full text-xs" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold">অথবা ছবির ওয়েব লিংক (URL)</Label>
+                <Input placeholder="https://example.com/image.png" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="text-xs" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setImageDialogOpen(false)}>বাতিল</Button>
+              <Button size="sm" onClick={handleInsertImageUrl} disabled={!imageUrl.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">যুক্ত করুন</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ────────────────── RIBBON MODE RENDER (Fallback) ──────────────────
   return (
     <div className={cn("no-print bg-slate-50 border-b border-slate-200 shadow-sm z-40 select-none font-kalpurush", className)}>
       {/* ── Word Ribbon Tabs ── */}

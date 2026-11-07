@@ -60,7 +60,15 @@ import {
   Plus,
   Minus,
   HelpCircle,
-  ListChecks
+  ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ZoomIn,
+  ZoomOut,
+  Ruler,
+  Home as HomeIcon,
+  Columns as LayoutIcon,
+  PlusSquare
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateLectureSheet, expandLectureContent } from '@/ai/flows/generate-lecture-sheet-flow';
@@ -1954,6 +1962,8 @@ function CreateLectureSheetContent() {
 
   // Repaginate version to force-refresh all pages instantaneously on font/col changes
   const [repaginateVersion, setRepaginateVersion] = useState(0);
+  const [sidebarTab, setSidebarTab] = useState<'home' | 'layout' | 'insert' | 'watermark'>('layout');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // New multi-type question assistant states
   const [aiAssistantMode, setAiAssistantMode] = useState<'questions' | 'notes'>('questions');
@@ -4046,220 +4056,281 @@ function CreateLectureSheetContent() {
 
       {isPrintMode && (
         <div className="print-view-container flex flex-col h-screen fixed inset-0 top-0 left-0 bg-slate-100 z-[40] font-kalpurush overflow-hidden">
-          <header className="no-print h-14 bg-white border-b flex items-center justify-between px-6 shrink-0 shadow-sm z-50 select-none">
-             <div className="flex items-center gap-3">
-               <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center"><Eye className="w-5 h-5" /></div>
-               <h3 className="font-bold text-lg">প্রিন্ট প্রিভিউ ও লেআউট - {data.institution || softwareConfig?.appName || 'টপ গ্রেড'}</h3>
-             </div>
-             <div className="flex gap-3">
-               <Button variant="outline" size="sm" onClick={() => router.back()} className="gap-2 font-bold border-primary text-primary bg-white"><ArrowLeft className="w-4 h-4" /> ফিরে যান</Button>
-               <Button size="sm" onClick={handleSave} disabled={saving} className="gap-2 font-bold bg-green-600 hover:bg-green-700 px-4">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} সেভ (Ctrl+S)</Button>
-               <Button size="sm" onClick={() => window.print()} className="gap-2 font-bold bg-primary px-6"><Printer className="w-4 h-4" /> প্রিন্ট করুন</Button>
-             </div>
+          <header className="no-print h-12 bg-white border-b flex items-center justify-between px-4 shrink-0 shadow-sm z-50 select-none">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(prev => !prev)}
+                className="h-8 w-8 text-slate-600 hover:text-slate-900"
+                title={sidebarOpen ? "সাইড মেনুবার লুকান" : "সাইড মেনুবার দেখান"}
+              >
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+              </Button>
+              <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center">
+                <Eye className="w-4 h-4" />
+              </div>
+              <h3 className="font-bold text-sm hidden sm:inline text-slate-800 truncate max-w-xs md:max-w-md">
+                প্রিন্ট প্রিভিউ ও লেআউট {data.topic ? `- ${data.topic}` : ''}
+              </h3>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* জুম কন্ট্রোল */}
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
+                  className="p-1 hover:bg-white rounded text-slate-600"
+                  title="জুম আউট"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[11px] font-bold px-1.5 min-w-[45px] text-center text-slate-700">
+                  {Math.round(previewZoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom(z => Math.min(2.0, parseFloat((z + 0.1).toFixed(1))))}
+                  className="p-1 hover:bg-white rounded text-slate-600"
+                  title="জুম ইন"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* রুলার টগল */}
+              <Button
+                variant={showRuler ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setShowRuler(prev => !prev)}
+                className={cn("h-8 text-xs font-bold gap-1 px-2.5", showRuler && "bg-indigo-100 text-indigo-700")}
+                title="রুলার দেখান / লুকান"
+              >
+                <Ruler className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">রুলার</span>
+              </Button>
+
+              {/* পেজ সংখ্যা ব্যাজ */}
+              <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hidden md:block">
+                মোট পাতা: {toBengaliNumber(paginatedPages.length)}
+              </div>
+
+              {/* ফিরে যান, সেভ এবং প্রিন্ট বাটন */}
+              <Button variant="outline" size="sm" onClick={() => router.back()} className="h-8 gap-1.5 font-bold border-slate-300 text-slate-700 bg-white">
+                <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving} className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-3">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ
+              </Button>
+              <Button size="sm" onClick={() => window.print()} className="h-8 gap-1.5 font-bold bg-primary hover:bg-primary/90 text-white px-4">
+                <Printer className="w-3.5 h-3.5" /> প্রিন্ট
+              </Button>
+            </div>
           </header>
 
-          {/* Microsoft Word Ribbon Toolbar */}
-          {/* সব পাতায় / এই পাতায় apply scope toggle */}
-          <div className="no-print flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs font-bold shrink-0 select-none">
-            <span className="text-amber-800 font-black">সেটিংস প্রয়োগ:</span>
-            <button
-              type="button"
-              onClick={() => setApplyScope('single')}
-              className={cn(
-                "px-3 py-0.5 rounded-full border font-bold transition-all text-[11px]",
-                applyScope === 'single'
-                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-300 hover:border-blue-400"
-              )}
-            >
-              📄 এই পাতায়
-            </button>
-            <button
-              type="button"
-              onClick={() => setApplyScope('all')}
-              className={cn(
-                "px-3 py-0.5 rounded-full border font-bold transition-all text-[11px]",
-                applyScope === 'all'
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-300 hover:border-indigo-400"
-              )}
-            >
-              📑 সব পাতায়
-            </button>
-            {applyScope === 'all' && (
-              <span className="text-indigo-700 text-[10px] font-bold ml-1 animate-pulse">
-                ✓ সকল পাতায় একযোগে প্রয়োগ হবে
-              </span>
-            )}
-            {applyScope === 'single' && activeEditIdx !== null && (
-              <span className="text-blue-700 text-[10px] font-bold ml-1">
-                পাতা {activeEditIdx + 1} এ প্রয়োগ হবে
-              </span>
-            )}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleLineIndentChange(0)}
-              className="px-2.5 py-0.5 rounded-full border border-amber-300 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-950 font-bold transition-all text-[11px] flex items-center gap-1 shadow-xs ml-auto cursor-pointer"
-              title="কারসর থাকা লাইন বা নির্বাচিত লাইনগুলোকে সরাসরি পাতার শুরুতে ফিরিয়ে আনুন"
-            >
-              ⬅ পাতার শুরুতে আনুন
-            </button>
-          </div>
-          <WordToolbar
-            onAddPage={() => setPaginatedPages(prev => [...prev, ""])}
-            onDeletePage={() => {
-              if (activeEditIdx === null) {
-                if (paginatedPages.length <= 1) return;
-                const newP = paginatedPages.slice(0, -1);
-                setPaginatedPages(newP);
-                return;
-              }
-              if (!confirm(`পাতা ${activeEditIdx + 1} মুছে ফেলবেন?`)) return;
-              const newP = paginatedPages.filter((_, i) => i !== activeEditIdx);
-              setPaginatedPages(newP);
-              setActiveEditIdx(null);
-            }}
-            activePageIndex={activeEditIdx}
-            totalPages={paginatedPages.length}
-            zoomLevel={previewZoom}
-            onZoomChange={setPreviewZoom}
-            currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
-            currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
-            onColumnsChange={(cols, hasRule) => {
-              repaginateDocument({ newCols: cols });
-            }}
-            currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
-            onOrientationChange={(orient) => {
-              repaginateDocument({ newOrientation: orient });
-            }}
-            onMarginPresetChange={(preset) => {
-              const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
-              setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
-              repaginateDocument({ newMargin: mVal });
-            }}
-            currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
-            onPageBorderChange={(border) => {
-              if (applyScope === 'all') {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
-              } else if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'border', border);
-              } else {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
-              }
-            }}
-            showRuler={showRuler}
-            onToggleRuler={() => setShowRuler(prev => !prev)}
-            currentPageSize={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.pageSize || 'a4'}
-            onPageSizeChange={(size) => {
-              if (applyScope === 'all') {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
-              } else if (activeEditIdx !== null) {
-                updatePageStyle(activeEditIdx, 'pageSize', size);
-              } else {
-                paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
-              }
-            }}
-            onInsertPageBreak={() => {
-              handleAddNextPage('<p><br/></p>');
-              setTimeout(() => {
-                const nextIdx = (activeEditIdx !== null ? activeEditIdx : 0) + 1;
-                handleFocusPage(nextIdx, 'start');
-              }, 60);
-            }}
-            currentFontSize={currentDetectedFontSize}
-            onFontSizeChange={(size) => {
-              setCurrentDetectedFontSize(size);
-              setFontSizeDraft(String(size));
-              const sel = window.getSelection();
-              if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-                document.execCommand('fontSize', false, '7');
-                document.querySelectorAll('font[size="7"]').forEach(el => {
-                  const span = document.createElement('span');
-                  span.style.fontSize = `${size}pt`;
-                  el.parentNode?.insertBefore(span, el);
-                  while (el.firstChild) span.appendChild(el.firstChild);
-                  el.parentNode?.removeChild(el);
-                });
-              } else {
-                setGlobalFontSize(size);
-                paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
-                repaginateDocument({ newFontSize: size });
-              }
-            }}
-            onIndentChange={(_dir, delta) => handleLineIndentChange(Math.max(0, activeLineIndent + delta))}
-          />
           <div className="flex-1 flex overflow-hidden">
-            <aside className="no-print w-80 bg-white border-r overflow-y-auto p-6 space-y-8 shrink-0 pb-16 custom-scrollbar">
-               {activeEditIdx !== null && pageStyles[activeEditIdx] ? (
-                 <div className="space-y-6 animate-in slide-in-from-left-4 duration-300">
-                    <div className="flex items-center justify-between"><h4 className="text-xs font-black text-blue-600 uppercase flex items-center gap-2"><Edit3 className="w-3.5 h-3.5" /> পাতা {toBengaliNumber(activeEditIdx + 1)} টুলস</h4><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActiveEditIdx(null)}><X className="w-3 h-3" /></Button></div>
-                    <div className="p-4 rounded-xl border-2 border-blue-100 bg-blue-50/30 space-y-6">
-                      <div className="space-y-4"><label className="text-[10px] font-black text-slate-500 uppercase">পেজ মার্জিন (ইঞ্চি)</label><div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-[9px] font-bold">উপরে</label><Input type="text" value={pageStyles[activeEditIdx].mT} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) updatePageStyle(activeEditIdx!, 'mT', v); }} className="h-7 text-xs font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[9px] font-bold">নিচে</label><Input type="text" value={pageStyles[activeEditIdx].mB} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) updatePageStyle(activeEditIdx!, 'mB', v); }} className="h-7 text-xs font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[9px] font-bold">বামে</label><Input type="text" value={pageStyles[activeEditIdx].mL} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) updatePageStyle(activeEditIdx!, 'mL', v); }} className="h-7 text-xs font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[9px] font-bold">ডানে</label><Input type="text" value={pageStyles[activeEditIdx].mR} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) updatePageStyle(activeEditIdx!, 'mR', v); }} className="h-7 text-xs font-bold no-arrows" /></div></div></div>
-                      <Separator className="bg-blue-100" />
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-500 flex justify-between">ফন্ট সাইজ (pt) <span>{toBengaliNumber(pageStyles[activeEditIdx].fontSize)}pt</span></label>
-                        <Input type="text" value={fontSizeDraft} onChange={e => { const val = e.target.value; if (val === '' || /^\d*\.?\d*$/.test(val)) { setFontSizeDraft(val); handleFormatting('fontSize', val); } }} className="h-8 text-xs font-bold no-arrows mb-2" />
-                        <Slider value={[pageStyles[activeEditIdx].fontSize]} min={1} max={100} step={0.5} onValueChange={([v]) => { handleFormatting('fontSize', v.toString()); setFontSizeDraft(v.toString()); }} />
+            {/* ═══════════ স্ট্যান্ডার্ড বাম সাইড মেনুবার ═══════════ */}
+            <aside
+              className={cn(
+                "no-print bg-white border-r flex flex-col shrink-0 transition-all duration-300 z-30 font-kalpurush select-none",
+                sidebarOpen ? "w-80 lg:w-88" : "w-0 overflow-hidden border-none"
+              )}
+            >
+              {/* সাইড মেনুবার ৪টি ট্যাব */}
+              <div className="grid grid-cols-4 border-b bg-slate-50 text-xs font-black p-1 gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSidebarTab('home')}
+                  className={cn(
+                    "py-2 px-1 rounded-lg transition-all text-center flex flex-col items-center gap-1",
+                    sidebarTab === 'home' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  <HomeIcon className="w-4 h-4" />
+                  <span className="text-[11px]">হোম</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSidebarTab('layout')}
+                  className={cn(
+                    "py-2 px-1 rounded-lg transition-all text-center flex flex-col items-center gap-1",
+                    sidebarTab === 'layout' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  <LayoutIcon className="w-4 h-4" />
+                  <span className="text-[11px]">লেআউট</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSidebarTab('insert')}
+                  className={cn(
+                    "py-2 px-1 rounded-lg transition-all text-center flex flex-col items-center gap-1",
+                    sidebarTab === 'insert' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  <PlusSquare className="w-4 h-4" />
+                  <span className="text-[11px]">ইনসার্ট</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSidebarTab('watermark')}
+                  className={cn(
+                    "py-2 px-1 rounded-lg transition-all text-center flex flex-col items-center gap-1",
+                    sidebarTab === 'watermark' ? "bg-white text-indigo-700 shadow-xs border border-slate-200" : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span className="text-[11px]">জলছাপ</span>
+                </button>
+              </div>
+
+              {/* নির্বাচিত পাতা নির্দেশক ব্যানার */}
+              {activeEditIdx !== null && (
+                <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between text-xs font-bold text-indigo-900 shrink-0">
+                  <span>✏️ পাতা {toBengaliNumber(activeEditIdx + 1)} এডিট হচ্ছে</span>
+                  <button type="button" onClick={() => setActiveEditIdx(null)} className="text-[11px] text-indigo-600 hover:text-indigo-900 underline">রিলিজ করুন</button>
+                </div>
+              )}
+
+              {/* ট্যাব কন্টেন্ট কনটেইনার */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {sidebarTab === 'watermark' ? (
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar text-xs">
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4">
+                      <h4 className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1.5">
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" /> জলছাপ সেটিংস
+                      </h4>
+
+                      <div className="flex gap-2">
+                        <Button variant={printSettings.watermarkType === 'text' ? 'default' : 'outline'} className="flex-1 h-8 text-[11px] font-bold gap-1" onClick={() => setPrintSettings((p: any) => ({...p, watermarkType: 'text'}))}><Type className="w-3 h-3" /> টেক্সট</Button>
+                        <Button variant={printSettings.watermarkType === 'image' ? 'default' : 'outline'} className="flex-1 h-8 text-[11px] font-bold gap-1" onClick={() => setPrintSettings((p: any) => ({...p, watermarkType: 'image'}))}><ImageIcon className="w-3 h-3" /> লোগো</Button>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-500 flex justify-between">লাইন স্পেসিং <span>{toBengaliNumber(pageStyles[activeEditIdx].lineHeight)}</span></label>
-                        <Input type="text" value={lineHeightDraft} onChange={e => { const val = e.target.value; if (val === '' || /^\d*\.?\d*$/.test(val)) { setLineHeightDraft(val); handleFormatting('lineHeight', val); } }} className="h-8 text-xs font-bold no-arrows mb-2" />
-                        <Slider value={[pageStyles[activeEditIdx].lineHeight]} min={0.5} max={5.0} step={0.1} onValueChange={([v]) => { handleFormatting('lineHeight', v.toString()); setLineHeightDraft(v.toString()); }} />
+                      
+                      {printSettings.watermarkType === 'text' ? (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500">জলছাপ টেক্সট</label>
+                          <Input value={printSettings.watermarkText || ''} onChange={e => setPrintSettings((p: any) => ({...p, watermarkText: e.target.value}))} placeholder="প্রতিষ্ঠানের নাম" className="h-8 text-xs font-bold" />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500">লোগো ছবি আপলোড</label>
+                          <input type="file" ref={watermarkInputRef} className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
+                          <Button variant="outline" size="sm" className="w-full h-8 gap-2 border-primary text-primary font-bold text-xs" onClick={() => watermarkInputRef.current?.click()}>
+                            <Camera className="w-3.5 h-3.5" /> ছবি নির্বাচন করুন
+                          </Button>
+                          {printSettings.watermarkImageUrl && <div className="mt-2 h-12 w-full bg-white rounded border flex items-center justify-center p-1"><img src={printSettings.watermarkImageUrl} className="max-h-full object-contain" /></div>}
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">ঘূর্ণন কোণ (এঙ্গেল)</label>
+                        <Input type="number" value={printSettings.watermarkRotation} onChange={e => setPrintSettings((p: any) => ({...p, watermarkRotation: parseInt(e.target.value) || 0}))} className="h-8 text-xs font-bold" />
                       </div>
-                      <div className="flex items-center justify-between"><label className="text-[10px] font-bold text-slate-500 uppercase">টেক্সট স্টাইল</label><div className="flex gap-2"><Button variant={pageStyles[activeEditIdx].bold ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('bold')}><Bold className="w-4 h-4" /></Button><Button variant={pageStyles[activeEditIdx].italic ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('italic')}><Italic className="w-4 h-4" /></Button><Button variant={pageStyles[activeEditIdx].underline ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => handleFormatting('underline')}><Underline className="w-4 h-4" /></Button></div></div>
-                      <div className="space-y-2"><label className="text-[10px] font-bold text-slate-500 uppercase">রং (Color)</label><div className="flex items-center gap-3"><input type="color" value={pageStyles[activeEditIdx].color} onChange={(e) => handleFormatting('foreColor', e.target.value)} className="w-10 h-8 rounded border-0 cursor-pointer p-0" /><span className="text-[10px] font-mono font-bold uppercase">{pageStyles[activeEditIdx].color}</span></div></div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 flex justify-between">জলছাপ সাইজ (%) <span>{toBengaliNumber(printSettings.watermarkImageSize)}%</span></label>
+                        <Slider value={[printSettings.watermarkImageSize || 70]} min={10} max={200} step={1} onValueChange={([v]) => setPrintSettings((p: any) => ({...p, watermarkImageSize: v}))} />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 flex justify-between">জলছাপ ব্রাইটনেস / অপাসিটি <span>{toBengaliNumber(printSettings.watermarkOpacity)}%</span></label>
+                        <Slider value={[printSettings.watermarkOpacity || 10]} min={0} max={100} step={1} onValueChange={([v]) => setPrintSettings((p: any) => ({...p, watermarkOpacity: v}))} />
+                      </div>
                     </div>
-                 </div>
-               ) : (
-                 <div className="space-y-8 animate-in fade-in duration-500">
-                   <div className="space-y-4"><h4 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2"><Type className="w-3.5 h-3.5" /> গ্লোবাল ফন্ট সাইজ</h4><div className="p-4 rounded-xl border-2 border-slate-100 bg-slate-50/30 space-y-3"><div className="flex justify-between items-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">ফন্ট সাইজ (pt)</label><span className="text-xs font-black text-primary">{toBengaliNumber(globalFontSize)}pt</span></div><Input type="text" value={fontSizeDraft} onChange={e => { const val = e.target.value; if (val === '' || /^\d*\.?\d*$/.test(val)) { setFontSizeDraft(val); handleGlobalFontSizeChange(val); } }} className="h-8 text-xs font-bold no-arrows mb-2" /><Slider value={[globalFontSize]} min={1} max={100} step={0.5} onValueChange={([v]) => { handleGlobalFontSizeChange(v.toString()); setFontSizeDraft(v.toString()); }} /></div></div>
-                   <div className="space-y-4"><h4 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2"><Rows3 className="w-3.5 h-3.5" /> গ্লোবাল লাইন স্পেসিং</h4><div className="p-4 rounded-xl border-2 border-slate-100 bg-slate-50/30 space-y-3"><div className="flex justify-between items-center"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">লাইন স্পেসিং</label><span className="text-xs font-black text-primary">{toBengaliNumber(globalLineHeight)}</span></div><Input type="text" value={lineHeightDraft} onChange={e => { const val = e.target.value; if (val === '' || /^\d*\.?\d*$/.test(val)) { setLineHeightDraft(val); handleGlobalLineHeightChange(val); } }} className="h-8 text-xs font-bold no-arrows mb-2" /><Slider value={[globalLineHeight]} min={0.5} max={5.0} step={0.1} onValueChange={([v]) => { handleGlobalLineHeightChange(v.toString()); setLineHeightDraft(v.toString()); }} /></div></div>
-                   <Separator /><div className="space-y-4"><h4 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2"><Settings2 className="w-3.5 h-3.5" /> গ্লোবাল মার্জিন</h4><div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-[10px] font-bold">উপরে</label><Input type="text" value={printSettings.marginTop} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) setPrintSettings((p: any) => ({...p, marginTop: v})); }} className="h-8 font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[10px] font-bold">নিচে</label><Input type="text" value={printSettings.marginBottom} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) setPrintSettings((p: any) => ({...p, marginBottom: v})); }} className="h-8 font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[10px] font-bold">বামে</label><Input type="text" value={printSettings.marginLeft} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) setPrintSettings((p: any) => ({...p, marginLeft: v})); }} className="h-8 font-bold no-arrows" /></div><div className="space-y-1"><label className="text-[10px] font-bold">ডানে</label><Input type="text" value={printSettings.marginRight} onChange={e => { const v = e.target.value; if(v==='' || /^\d*\.?\d*$/.test(v)) setPrintSettings((p: any) => ({...p, marginRight: v})); }} className="h-8 font-bold no-arrows" /></div></div></div>
-                 </div>
-               )}
-
-               <Separator className="my-6" />
-               <div className="space-y-4">
-                 <h4 className="text-xs font-black text-slate-500 uppercase flex items-center gap-2"><SlidersHorizontal className="w-3.5 h-3.5" /> জলছাপ সেটিংস</h4>
-                 <div className="p-4 rounded-xl border-2 border-slate-100 bg-slate-50/30 space-y-4">
-                   <div className="flex gap-2">
-                     <Button variant={printSettings.watermarkType === 'text' ? 'default' : 'outline'} className="flex-1 h-8 text-[10px] font-bold gap-1" onClick={() => setPrintSettings((p: any) => ({...p, watermarkType: 'text'}))}><Type className="w-3 h-3" /> টেক্সট</Button>
-                     <Button variant={printSettings.watermarkType === 'image' ? 'default' : 'outline'} className="flex-1 h-8 text-[10px] font-bold gap-1" onClick={() => setPrintSettings((p: any) => ({...p, watermarkType: 'image'}))}><ImageIcon className="w-3 h-3" /> লোগো</Button>
-                   </div>
-                   
-                   {printSettings.watermarkType === 'text' ? (
-                     <div className="space-y-1">
-                       <label className="text-[10px] font-bold">জলছাপ টেক্সট</label>
-                       <Input value={printSettings.watermarkText || ''} onChange={e => setPrintSettings((p: any) => ({...p, watermarkText: e.target.value}))} placeholder="প্রতিষ্ঠানের নাম" className="h-8 text-xs font-bold" />
-                     </div>
-                   ) : (
-                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold">লোগো আপলোড</label>
-                       <input type="file" ref={watermarkInputRef} className="hidden" accept="image/*" onChange={handleWatermarkUpload} />
-                       <Button variant="outline" size="sm" className="w-full h-8 gap-2 border-primary text-primary font-bold text-[10px]" onClick={() => watermarkInputRef.current?.click()}>
-                         <Camera className="w-3 h-3" /> ছবি নির্বাচন করুন
-                       </Button>
-                       {printSettings.watermarkImageUrl && <div className="mt-2 h-10 w-full bg-white rounded border flex items-center justify-center p-1"><img src={printSettings.watermarkImageUrl} className="max-h-full object-contain" /></div>}
-                     </div>
-                   )}
-
-                   <div className="space-y-1">
-                     <label className="text-[10px] font-bold">জলছাপ এঙ্গেল</label>
-                     <Input type="number" value={printSettings.watermarkRotation} onChange={e => setPrintSettings((p: any) => ({...p, watermarkRotation: parseInt(e.target.value) || 0}))} className="h-8 text-xs font-bold" />
-                   </div>
-
-                   <div className="space-y-2">
-                     <label className="text-[10px] font-bold flex justify-between">জলছাপ সাইজ (%) <span>{toBengaliNumber(printSettings.watermarkImageSize)}%</span></label>
-                     <Slider value={[printSettings.watermarkImageSize || 70]} min={10} max={200} step={1} onValueChange={([v]) => setPrintSettings((p: any) => ({...p, watermarkImageSize: v}))} />
-                   </div>
-
-                   <div className="space-y-2">
-                     <label className="text-[10px] font-bold flex justify-between">জলছাপ ব্রাইটনেস <span>{toBengaliNumber(printSettings.watermarkOpacity)}%</span></label>
-                     <Slider value={[printSettings.watermarkOpacity || 10]} min={0} max={100} step={1} onValueChange={([v]) => setPrintSettings((p: any) => ({...p, watermarkOpacity: v}))} />
-                   </div>
-                 </div>
-               </div>
+                  </div>
+                ) : (
+                  <WordToolbar
+                    mode="sidebar"
+                    externalTab={sidebarTab}
+                    onExternalTabChange={(t) => setSidebarTab(t)}
+                    applyScope={applyScope}
+                    onApplyScopeChange={setApplyScope}
+                    onResetLineIndent={() => handleLineIndentChange(0)}
+                    onAddPage={() => setPaginatedPages(prev => [...prev, ""])}
+                    onDeletePage={() => {
+                      if (activeEditIdx === null) {
+                        if (paginatedPages.length <= 1) return;
+                        const newP = paginatedPages.slice(0, -1);
+                        setPaginatedPages(newP);
+                        return;
+                      }
+                      if (!confirm(`পাতা ${activeEditIdx + 1} মুছে ফেলবেন?`)) return;
+                      const newP = paginatedPages.filter((_, i) => i !== activeEditIdx);
+                      setPaginatedPages(newP);
+                      setActiveEditIdx(null);
+                    }}
+                    activePageIndex={activeEditIdx}
+                    totalPages={paginatedPages.length}
+                    zoomLevel={previewZoom}
+                    onZoomChange={setPreviewZoom}
+                    currentColumns={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columns || 1}
+                    currentColumnRule={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.columnRule || false}
+                    onColumnsChange={(cols, hasRule) => {
+                      repaginateDocument({ newCols: cols });
+                    }}
+                    currentOrientation={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.orientation || 'portrait'}
+                    onOrientationChange={(orient) => {
+                      repaginateDocument({ newOrientation: orient });
+                    }}
+                    onMarginPresetChange={(preset) => {
+                      const mVal = preset === 'narrow' ? 0.25 : preset === 'wide' ? 1.0 : 0.5;
+                      setPrintSettings((p: any) => ({ ...p, marginTop: mVal, marginBottom: mVal, marginLeft: mVal, marginRight: mVal }));
+                      repaginateDocument({ newMargin: mVal });
+                    }}
+                    currentPageBorder={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.border || 'none'}
+                    onPageBorderChange={(border) => {
+                      if (applyScope === 'all') {
+                        paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
+                      } else if (activeEditIdx !== null) {
+                        updatePageStyle(activeEditIdx, 'border', border);
+                      } else {
+                        paginatedPages.forEach((_, i) => { updatePageStyle(i, 'border', border); });
+                      }
+                    }}
+                    showRuler={showRuler}
+                    onToggleRuler={() => setShowRuler(prev => !prev)}
+                    currentPageSize={pageStyles[activeEditIdx !== null ? activeEditIdx : 0]?.pageSize || 'a4'}
+                    onPageSizeChange={(size) => {
+                      if (applyScope === 'all') {
+                        paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
+                      } else if (activeEditIdx !== null) {
+                        updatePageStyle(activeEditIdx, 'pageSize', size);
+                      } else {
+                        paginatedPages.forEach((_, i) => { updatePageStyle(i, 'pageSize', size); });
+                      }
+                    }}
+                    onInsertPageBreak={() => {
+                      handleAddNextPage('<p><br/></p>');
+                      setTimeout(() => {
+                        const nextIdx = (activeEditIdx !== null ? activeEditIdx : 0) + 1;
+                        handleFocusPage(nextIdx, 'start');
+                      }, 60);
+                    }}
+                    currentFontSize={currentDetectedFontSize}
+                    onFontSizeChange={(size) => {
+                      setCurrentDetectedFontSize(size);
+                      setFontSizeDraft(String(size));
+                      const sel = window.getSelection();
+                      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                        document.execCommand('fontSize', false, '7');
+                        document.querySelectorAll('font[size="7"]').forEach(el => {
+                          const span = document.createElement('span');
+                          span.style.fontSize = `${size}pt`;
+                          el.parentNode?.insertBefore(span, el);
+                          while (el.firstChild) span.appendChild(el.firstChild);
+                          el.parentNode?.removeChild(el);
+                        });
+                      } else {
+                        setGlobalFontSize(size);
+                        paginatedPages.forEach((_, i) => updatePageStyle(i, 'fontSize', size));
+                        repaginateDocument({ newFontSize: size });
+                      }
+                    }}
+                    onIndentChange={(_dir, delta) => handleLineIndentChange(Math.max(0, activeLineIndent + delta))}
+                  />
+                )}
+              </div>
             </aside>
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Horizontal Interactive Word Ruler - Fixed at Top, Never Overlaps Content */}
