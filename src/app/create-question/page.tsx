@@ -55,7 +55,7 @@ import { generatePracticeQuestions } from '@/ai/flows/generate-practice-question
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
-import { formatQuestionToBoardStandardHtml, stripAnswers, parseGeneratedQuestions } from '@/lib/question-formatter';
+import { formatQuestionToBoardStandardHtml, stripAnswers, parseGeneratedQuestions, ensureQuestionIntegrity } from '@/lib/question-formatter';
 import { format } from 'date-fns';
 
 type Question = {
@@ -696,6 +696,171 @@ function CreateQuestionContent() {
 
   const isEnglish = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
 
+  const handleGoToPrint = useCallback(() => {
+    if (contentEditableRef.current) {
+      ensureQuestionIntegrity(contentEditableRef.current, Boolean(isEnglish));
+      const currentHtml = contentEditableRef.current.innerHTML;
+      setDocumentContent(currentHtml);
+      setMeta(prev => ({ ...prev, content: currentHtml }));
+    }
+    const p = new URLSearchParams(window.location.search);
+    p.set('print', 'true');
+    if (editId) p.set('id', editId);
+    router.push(`${window.location.pathname}?${p.toString()}`);
+  }, [isEnglish, editId, router]);
+
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = contentEditableRef.current;
+    if (!el) return;
+
+    // 1. Enter key: protect CQ sub-questions and marks
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let cqSubNode: HTMLElement | null = null;
+        let scanNode: Node | null = sel.anchorNode;
+        while (scanNode && scanNode !== el) {
+          if (scanNode.nodeType === Node.ELEMENT_NODE && (scanNode as HTMLElement).classList?.contains('cq-sub')) {
+            cqSubNode = scanNode as HTMLElement;
+            break;
+          }
+          scanNode = scanNode.parentNode;
+        }
+
+        if (cqSubNode) {
+          e.preventDefault();
+          const range = sel.getRangeAt(0);
+
+          const afterRange = document.createRange();
+          afterRange.setStart(range.startContainer, range.startOffset);
+          afterRange.setEnd(cqSubNode, cqSubNode.childNodes.length);
+          const afterFrag = afterRange.extractContents();
+
+          const newP = document.createElement('p');
+          newP.style.margin = '0 0 4px 0';
+          newP.style.lineHeight = '1.5';
+          newP.appendChild(afterFrag);
+          if (!newP.textContent?.trim() && !newP.querySelector('img,table')) {
+            newP.innerHTML = '<br/>';
+          }
+          cqSubNode.parentNode?.insertBefore(newP, cqSubNode.nextSibling);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(newP);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          ensureQuestionIntegrity(el, Boolean(isEnglish));
+          return;
+        }
+      }
+    }
+
+    // 2. Backspace key: protect .q-num and .cq-sub mark/label
+    if (e.key === 'Backspace') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        const sc = range.startContainer;
+        const so = range.startOffset;
+
+        const isQNum = (node: Node | null) => {
+          if (!node) return false;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const elem = node as HTMLElement;
+            return (
+              elem.classList?.contains('q-num') ||
+              elem.getAttribute?.('contenteditable') === 'false' ||
+              (elem.nodeName === 'STRONG' && /^[০-৯\d]+[।.)]/.test(elem.textContent || ''))
+            );
+          }
+          return false;
+        };
+
+        let currNode: Node | null = sc;
+        let currOffset = so;
+        let precededByQNum = false;
+
+        while (currNode && currNode !== el) {
+          if (currOffset === 0) {
+            if (isQNum(currNode.previousSibling)) {
+              precededByQNum = true;
+              break;
+            }
+            const parent: Node | null = currNode.parentNode;
+            if (parent && parent !== el) {
+              currOffset = Array.prototype.indexOf.call(parent.childNodes, currNode);
+              currNode = parent;
+              continue;
+            }
+          } else if (currNode.nodeType === Node.ELEMENT_NODE && currOffset > 0) {
+            const child = currNode.childNodes[currOffset - 1];
+            if (isQNum(child)) {
+              precededByQNum = true;
+              break;
+            }
+          }
+          break;
+        }
+
+        if (precededByQNum) {
+          e.preventDefault();
+          return;
+        }
+
+        let cqSubNode: HTMLElement | null = null;
+        let scanNode: Node | null = sel.anchorNode;
+        while (scanNode && scanNode !== el) {
+          if (scanNode.nodeType === Node.ELEMENT_NODE && (
+            (scanNode as HTMLElement).classList?.contains('cq-sub') ||
+            /(?:^|\s)(?:ক\.|খ\.|গ\.|ঘ\.)/.test((scanNode as HTMLElement).textContent || '')
+          )) {
+            cqSubNode = scanNode as HTMLElement;
+            break;
+          }
+          scanNode = scanNode.parentNode;
+        }
+
+        if (cqSubNode) {
+          const labelEl = cqSubNode.querySelector('strong');
+          let isAtOrBeforeLabel = false;
+          if (labelEl) {
+            try {
+              const cmp = range.comparePoint(labelEl, 0);
+              if (cmp <= 0) {
+                isAtOrBeforeLabel = true;
+              } else if (range.startContainer === labelEl.firstChild && range.startOffset === 0) {
+                isAtOrBeforeLabel = true;
+              } else if (range.startContainer.previousSibling === labelEl && range.startOffset === 0) {
+                isAtOrBeforeLabel = true;
+              }
+            } catch {}
+          } else {
+            const preRange = document.createRange();
+            preRange.setStart(cqSubNode, 0);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            const textBefore = preRange.toString().replace(/[\u00A0\s১-৪1-4]/g, '');
+            if (textBefore.length <= 2) isAtOrBeforeLabel = true;
+          }
+
+          if (isAtOrBeforeLabel) {
+            e.preventDefault();
+            const prevSib = cqSubNode.previousElementSibling as HTMLElement | null;
+            if (prevSib) {
+              const newRange = document.createRange();
+              newRange.selectNodeContents(prevSib);
+              newRange.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            }
+            return;
+          }
+        }
+      }
+    }
+  }, [isEnglish]);
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
@@ -716,12 +881,7 @@ function CreateQuestionContent() {
             </Button>
             <Button 
               variant="default" 
-              onClick={() => { 
-                const p = new URLSearchParams(window.location.search); 
-                p.set('print', 'true'); 
-                if(editId) p.set('id', editId); 
-                router.push(`${window.location.pathname}?${p.toString()}`); 
-              }} 
+              onClick={handleGoToPrint} 
               className="gap-2 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
             >
               <Printer className="w-4 h-4" /> প্রিন্ট ও পেজ লেআউট
@@ -1007,12 +1167,7 @@ function CreateQuestionContent() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
-                        const p = new URLSearchParams(window.location.search);
-                        p.set('print', 'true');
-                        if (editId) p.set('id', editId);
-                        router.push(`${window.location.pathname}?${p.toString()}`);
-                      }}
+                      onClick={handleGoToPrint}
                       className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7"
                     >
                       পূর্ণাঙ্গ ওয়ার্ড ভিউতে খুলুন ↗
@@ -1045,7 +1200,16 @@ function CreateQuestionContent() {
                         ref={contentEditableRef}
                         contentEditable
                         suppressContentEditableWarning
+                        onKeyDown={handleEditorKeyDown}
+                        onInput={(e) => {
+                          const newHtml = e.currentTarget.innerHTML;
+                          setDocumentContent(newHtml);
+                          setMeta(prev => ({ ...prev, content: newHtml }));
+                        }}
                         onBlur={(e) => {
+                          if (contentEditableRef.current) {
+                            ensureQuestionIntegrity(contentEditableRef.current, Boolean(isEnglish));
+                          }
                           const newHtml = e.currentTarget.innerHTML;
                           setDocumentContent(newHtml);
                           setMeta(prev => ({ ...prev, content: newHtml }));
@@ -1192,12 +1356,7 @@ function CreateQuestionContent() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} সেভ করুন
               </Button>
               <Button 
-                onClick={() => { 
-                  const p = new URLSearchParams(window.location.search); 
-                  p.set('print', 'true'); 
-                  if(editId) p.set('id', editId); 
-                  router.push(`${window.location.pathname}?${p.toString()}`); 
-                }} 
+                onClick={handleGoToPrint} 
                 variant="secondary" 
                 className="gap-2 px-10 shadow-lg font-black bg-indigo-50 border-2 border-indigo-300 text-indigo-900 hover:bg-indigo-100"
               >

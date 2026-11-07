@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { formatQuestionToBoardStandardHtml, stripAnswers } from '@/lib/question-formatter';
+import { formatQuestionToBoardStandardHtml, stripAnswers, ensureQuestionIntegrity } from '@/lib/question-formatter';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { Button } from '@/components/ui/button';
@@ -1212,6 +1212,7 @@ function EditableContentArea({
   useEffect(() => {
     if (ref.current && !isLoadedRef.current) {
       ref.current.innerHTML = formatMath(stripDirtyHtml(initialHtml));
+      ensureQuestionIntegrity(ref.current, Boolean(style?.isEnglish));
       isLoadedRef.current = true;
       setTimeout(() => {
         checkAndReflow(false);
@@ -1474,7 +1475,7 @@ function EditableContentArea({
         return;
       }
 
-      // ✅ CQ-sub paragraph রক্ষা: Enter press করলে cq-mark span যেন নতুন <p>-এ না যায়
+      // ✅ CQ-sub paragraph & question Enter handling
       {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
@@ -1490,32 +1491,31 @@ function EditableContentArea({
           if (cqSubNode) {
             e.preventDefault();
             const range = sel.getRangeAt(0);
-            // mark span সংগ্রহ করি (এটা cq-sub-এ থাকবে)
-            const markSpan = cqSubNode.querySelector('.cq-mark');
-            // cursor-পরবর্তী content extract করি (mark span বাদ দিয়ে)
+
+            // Extract content from cursor to end of cqSubNode
             const afterRange = document.createRange();
-            afterRange.setStart(range.endContainer, range.endOffset);
-            if (markSpan) {
-              afterRange.setEndBefore(markSpan);
-            } else {
-              afterRange.selectNodeContents(cqSubNode);
-              afterRange.setStart(range.endContainer, range.endOffset);
-            }
+            afterRange.setStart(range.startContainer, range.startOffset);
+            afterRange.setEnd(cqSubNode, cqSubNode.childNodes.length);
             const afterFrag = afterRange.extractContents();
-            // নতুন plain <p> তৈরি করি (cq-mark ছাড়া)
+
+            // Create new paragraph below
             const newP = document.createElement('p');
             newP.style.margin = '0 0 4px 0';
+            newP.style.lineHeight = '1.5';
             newP.appendChild(afterFrag);
             if (!newP.textContent?.trim() && !newP.querySelector('img,table')) {
               newP.innerHTML = '<br/>';
             }
             cqSubNode.parentNode?.insertBefore(newP, cqSubNode.nextSibling);
-            // cursor নতুন paragraph-এ নিয়ে যাই
+
+            // Move cursor to start of new paragraph
             const newRange = document.createRange();
             newRange.selectNodeContents(newP);
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
+
+            ensureQuestionIntegrity(el, Boolean(style?.isEnglish));
             setTimeout(() => checkAndReflow(false), 50);
             return;
           }
@@ -1583,39 +1583,102 @@ function EditableContentArea({
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
 
-        // ✅ CQ-sub paragraph রক্ষা: Backspace-এ cq-mark span হারানো বন্ধ করা
-        // cursor যদি কোনো .cq-sub <p>-এর একদম শুরুতে থাকে, merge হতে দেওয়া হবে না
+        // 🛑 ১. প্রশ্নের ক্রমিক নম্বর (১।, ২।, ইত্যাদি) ব্যাকস্পেস চেপে মুছে ফেলা বন্ধ করা
+        {
+          const range = sel.getRangeAt(0);
+          const sc = range.startContainer;
+          const so = range.startOffset;
+
+          const isQNum = (node: Node | null) => {
+            if (!node) return false;
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const elem = node as HTMLElement;
+              return (
+                elem.classList?.contains('q-num') ||
+                elem.getAttribute?.('contenteditable') === 'false' ||
+                (elem.nodeName === 'STRONG' && /^[০-৯\d]+[।.)]/.test(elem.textContent || ''))
+              );
+            }
+            return false;
+          };
+
+          let currNode: Node | null = sc;
+          let currOffset = so;
+          let precededByQNum = false;
+
+          while (currNode && currNode !== el) {
+            if (currOffset === 0) {
+              if (isQNum(currNode.previousSibling)) {
+                precededByQNum = true;
+                break;
+              }
+              const parent: Node | null = currNode.parentNode;
+              if (parent && parent !== el) {
+                currOffset = Array.prototype.indexOf.call(parent.childNodes, currNode);
+                currNode = parent;
+                continue;
+              }
+            } else if (currNode.nodeType === Node.ELEMENT_NODE && currOffset > 0) {
+              const child = currNode.childNodes[currOffset - 1];
+              if (isQNum(child)) {
+                precededByQNum = true;
+                break;
+              }
+            }
+            break;
+          }
+
+          if (precededByQNum) {
+            e.preventDefault();
+            return;
+          }
+        }
+
+        // 🛑 ২. CQ উপ-প্রশ্ন (ক., খ., গ., ঘ.) ও ডানদিকের মান ব্যাকস্পেস দিয়ে মুছে যাওয়া বা মার্জ হওয়া বন্ধ করা
         {
           const range = sel.getRangeAt(0);
           let cqSubNode: HTMLElement | null = null;
           let scanNode: Node | null = sel.anchorNode;
           while (scanNode && scanNode !== el) {
-            if (scanNode.nodeType === Node.ELEMENT_NODE && (scanNode as HTMLElement).classList?.contains('cq-sub')) {
+            if (scanNode.nodeType === Node.ELEMENT_NODE && (
+              (scanNode as HTMLElement).classList?.contains('cq-sub') ||
+              /(?:^|\s)(?:ক\.|খ\.|গ\.|ঘ\.)/.test((scanNode as HTMLElement).textContent || '')
+            )) {
               cqSubNode = scanNode as HTMLElement;
               break;
             }
             scanNode = scanNode.parentNode;
           }
+
           if (cqSubNode) {
-            const preRange = document.createRange();
-            preRange.selectNodeContents(cqSubNode);
-            preRange.setEnd(range.startContainer, range.startOffset);
-            const textBeforeCursor = preRange.toString().replace(/[\u00A0\s]/g, '');
-            if (textBeforeCursor.length === 0) {
-              // cursor cq-sub শুরুতে আছে: merge করতে দেব না
+            const labelEl = cqSubNode.querySelector('strong');
+            let isAtOrBeforeLabel = false;
+            if (labelEl) {
+              try {
+                const cmp = range.comparePoint(labelEl, 0);
+                if (cmp <= 0) {
+                  isAtOrBeforeLabel = true;
+                } else if (range.startContainer === labelEl.firstChild && range.startOffset === 0) {
+                  isAtOrBeforeLabel = true;
+                } else if (range.startContainer.previousSibling === labelEl && range.startOffset === 0) {
+                  isAtOrBeforeLabel = true;
+                }
+              } catch {}
+            } else {
+              const preRange = document.createRange();
+              preRange.setStart(cqSubNode, 0);
+              preRange.setEnd(range.startContainer, range.startOffset);
+              const textBefore = preRange.toString().replace(/[\u00A0\s১-৪1-4]/g, '');
+              if (textBefore.length <= 2) isAtOrBeforeLabel = true;
+            }
+
+            if (isAtOrBeforeLabel) {
               e.preventDefault();
               const prevSib = cqSubNode.previousElementSibling as HTMLElement | null;
               if (prevSib) {
                 const newRange = document.createRange();
-                // cq-mark span আছে কিনা দেখি, থাকলে তার আগে cursor রাখি
-                const mark = prevSib.querySelector('.cq-mark');
-                if (mark && mark.previousSibling) {
-                  newRange.setStartAfter(mark.previousSibling);
-                  newRange.collapse(true);
-                } else {
-                  newRange.selectNodeContents(prevSib);
-                  newRange.collapse(false);
-                }
+                newRange.selectNodeContents(prevSib);
+                newRange.collapse(false);
                 sel.removeAllRanges();
                 sel.addRange(newRange);
               }
@@ -2098,6 +2161,22 @@ export function QuestionPrintView({
   // Convert questions array to HTML string
   const initialContent = useMemo(() => {
     if (meta.content && meta.content.trim()) {
+      if (meta.content.includes('cq-item') || meta.content.includes('mcq-item') || meta.content.includes('q-num') || meta.content.includes('cq-stimulus')) {
+        return meta.content;
+      }
+      if (questions && questions.length > 0) {
+        const parts: string[] = [];
+        questions.forEach((q, idx) => {
+          parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
+        });
+        if (questionsB && questionsB.length > 0) {
+          parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
+          questionsB.forEach((q, idx) => {
+            parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
+          });
+        }
+        return parts.join('\n\n');
+      }
       return meta.content;
     }
     const parts: string[] = [];
@@ -2285,6 +2364,7 @@ export function QuestionPrintView({
     const blocks: string[] = [];
     const parserDiv = document.createElement('div');
     parserDiv.innerHTML = rawFormatted;
+    ensureQuestionIntegrity(parserDiv, Boolean(isEnglish));
 
     const extractBlocks = (parent: HTMLElement) => {
       Array.from(parent.childNodes).forEach(node => {
@@ -3005,6 +3085,15 @@ export function QuestionPrintView({
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .paper { color: black !important; }
+          .content-area .q-num,
+          .content-area strong[contenteditable="false"] {
+            display: inline-block !important;
+            width: 24px !important;
+            min-width: 24px !important;
+            font-weight: bold !important;
+            color: black !important;
+            user-select: none !important;
+          }
           .content-area .cq-item > div,
           .content-area .cq-item div,
           .content-area .short-item div {
