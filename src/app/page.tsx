@@ -1504,38 +1504,163 @@ export default function Home() {
   const { data: allLectureSheets } = useCollection(lQuery);
 
   const recentActivity = useMemo(() => {
-    const items: { type: string; label: string; subLabel: string; href: string; time: any; icon: string; color: string }[] = [];
-    allLectureSheets?.forEach((sheet: any) => {
-      items.push({ type: 'lecture_sheet', label: sheet.topic || sheet.subject || 'লেকচার শিট',
-        subLabel: ((sheet.classId ? 'শ্রেণি ' + sheet.classId : '') + ' ' + (sheet.subject || '')).trim(),
-        href: '/create-lecture-sheet?id=' + sheet.id,
-        time: sheet.updatedAt || sheet.createdAt, icon: 'book', color: 'emerald' });
-    });
-    allPdfSheets?.forEach((pdf: any) => {
-      items.push({ type: 'pdf', label: pdf.fileName || pdf.chapterName || 'আপলোড করা ফাইল',
-        subLabel: ((pdf.classId ? 'শ্রেণি ' + pdf.classId : '') + ' ' + (pdf.subject || '')).trim(),
-        href: '/my-questions', time: pdf.uploadedAt || pdf.createdAt, icon: 'upload', color: 'blue' });
-    });
-    allQuestions?.forEach((q: any) => {
-      items.push({ type: 'question', label: q.chapter || q.subject || 'প্রশ্নপত্র',
-        subLabel: ((q.classId ? 'শ্রেণি ' + q.classId : '') + ' ' + (q.subject || '')).trim(),
-        href: '/my-questions', time: q.createdAt || q.updatedAt, icon: 'question', color: 'red' });
-    });
-    const getTimeMs = (t: any): number => {
+    const items: { type: string; label: string; subLabel: string; href: string; time: any; timeMs: number; icon: string; color: string }[] = [];
+
+    const getTimestampMs = (t: any): number => {
       if (!t) return 0;
       try {
+        if (typeof t === 'number') {
+          return t > 1e11 ? t : t * 1000;
+        }
         if (typeof t.toDate === 'function') {
           const d = t.toDate();
-          return !isNaN(d.getTime()) ? d.getTime() : 0;
+          return !isNaN(d?.getTime?.()) ? d.getTime() : 0;
         }
-        if (t.seconds) return t.seconds * 1000;
+        if (t.seconds !== undefined) {
+          return Number(t.seconds) * 1000;
+        }
+        if (t._seconds !== undefined) {
+          return Number(t._seconds) * 1000;
+        }
+        if (typeof t === 'string') {
+          const parsed = Date.parse(t);
+          return !isNaN(parsed) ? parsed : 0;
+        }
         const d = new Date(t);
         return !isNaN(d.getTime()) ? d.getTime() : 0;
       } catch {
         return 0;
       }
     };
-    items.sort((a, b) => getTimeMs(b.time) - getTimeMs(a.time));
+
+    allLectureSheets?.forEach((sheet: any) => {
+      let label = '';
+      if (sheet.topic && sheet.subject) {
+        label = `${sheet.subject} - ${sheet.topic}`;
+      } else if (sheet.topic) {
+        label = sheet.topic;
+      } else if (sheet.subject) {
+        label = `${sheet.subject} - লেকচার শিট`;
+      } else {
+        label = 'লেকচার শিট';
+      }
+
+      const subParts: string[] = [];
+      if (sheet.classId) {
+        const cls = CLASSES.find((c: any) => c.id === sheet.classId);
+        subParts.push(cls?.label ? `${cls.label} শ্রেণি` : `শ্রেণি ${sheet.classId}`);
+      }
+      if (sheet.chapter) {
+        subParts.push(`অধ্যায়: ${sheet.chapter}`);
+      }
+      if (sheet.institution && subParts.length < 3) {
+        subParts.push(sheet.institution);
+      }
+      const subLabel = subParts.join(' • ');
+
+      const href = sheet.id ? `/create-lecture-sheet?id=${sheet.id}` : '/my-questions';
+      const updatedMs = getTimestampMs(sheet.updatedAt);
+      const createdMs = getTimestampMs(sheet.createdAt);
+      const timeMs = Math.max(updatedMs, createdMs);
+      const time = updatedMs >= createdMs ? (sheet.updatedAt || sheet.createdAt) : (sheet.createdAt || sheet.updatedAt);
+
+      items.push({
+        type: 'lecture_sheet',
+        label,
+        subLabel,
+        href,
+        time,
+        timeMs: timeMs || (Date.now() - 60000),
+        icon: 'book',
+        color: 'emerald'
+      });
+    });
+
+    allPdfSheets?.forEach((pdf: any) => {
+      const label = pdf.chapterName || pdf.fileName || pdf.topic || 'আপলোড করা ফাইল';
+      const subParts: string[] = [];
+      if (pdf.classId) {
+        const cls = CLASSES.find((c: any) => c.id === pdf.classId);
+        subParts.push(cls?.label ? `${cls.label} শ্রেণি` : `শ্রেণি ${pdf.classId}`);
+      }
+      if (pdf.subject) {
+        subParts.push(pdf.subject);
+      }
+      if (pdf.chapterName && label !== pdf.chapterName) {
+        subParts.push(pdf.chapterName);
+      }
+      const subLabel = subParts.join(' • ');
+      const href = '/my-questions';
+
+      const uploadedMs = getTimestampMs(pdf.uploadedAt);
+      const updatedMs = getTimestampMs(pdf.updatedAt);
+      const createdMs = getTimestampMs(pdf.createdAt);
+      const timeMs = Math.max(uploadedMs, updatedMs, createdMs);
+      const time = pdf.uploadedAt || pdf.updatedAt || pdf.createdAt;
+
+      items.push({
+        type: 'pdf',
+        label,
+        subLabel,
+        href,
+        time,
+        timeMs: timeMs || (Date.now() - 86400000),
+        icon: 'upload',
+        color: 'blue'
+      });
+    });
+
+    allQuestions?.forEach((q: any) => {
+      let label = '';
+      if (q.subject && q.chapter) {
+        label = `${q.subject} - ${q.chapter}`;
+      } else if (q.subject) {
+        label = `${q.subject}${q.exam ? ` (${q.exam})` : ' প্রশ্নপত্র'}`;
+      } else if (q.chapter) {
+        label = q.chapter;
+      } else if (q.exam) {
+        label = `${q.exam} - প্রশ্নপত্র`;
+      } else if (q.title) {
+        label = q.title;
+      } else {
+        label = 'প্রশ্নপত্র';
+      }
+
+      const subParts: string[] = [];
+      if (q.classId) {
+        const cls = CLASSES.find((c: any) => c.id === q.classId);
+        subParts.push(cls?.label ? `${cls.label} শ্রেণি` : `শ্রেণি ${q.classId}`);
+      }
+      if (q.exam && !label.includes(q.exam)) {
+        subParts.push(q.exam);
+      }
+      if (q.totalMarks || q.marks) {
+        subParts.push(`পূর্ণমান: ${toBengaliNumber(q.totalMarks || q.marks)}`);
+      }
+      if (q.institution && subParts.length < 3 && !label.includes(q.institution)) {
+        subParts.push(q.institution);
+      }
+      const subLabel = subParts.join(' • ');
+
+      const href = q.id ? `/create-question?id=${q.id}&print=true` : '/my-questions';
+      const updatedMs = getTimestampMs(q.updatedAt);
+      const createdMs = getTimestampMs(q.createdAt);
+      const timeMs = Math.max(updatedMs, createdMs);
+      const time = updatedMs >= createdMs ? (q.updatedAt || q.createdAt) : (q.createdAt || q.updatedAt);
+
+      items.push({
+        type: 'question',
+        label,
+        subLabel,
+        href,
+        time,
+        timeMs: timeMs || (Date.now() - 60000),
+        icon: 'question',
+        color: 'red'
+      });
+    });
+
+    items.sort((a, b) => b.timeMs - a.timeMs);
     return items.slice(0, 6);
   }, [allLectureSheets, allPdfSheets, allQuestions]);
 
@@ -2203,18 +2328,22 @@ export default function Home() {
             {recentActivity.map((item, i) => {
               let timeStr = '';
               try {
-                if (item.time) {
-                  let d: Date | null = null;
+                let d: Date | null = null;
+                if (item.timeMs && item.timeMs > 0) {
+                  d = new Date(item.timeMs);
+                } else if (item.time) {
                   if (typeof item.time?.toDate === 'function') {
                     d = item.time.toDate();
-                  } else if (item.time?.seconds) {
-                    d = new Date(item.time.seconds * 1000);
+                  } else if (item.time?.seconds !== undefined) {
+                    d = new Date(Number(item.time.seconds) * 1000);
+                  } else if (item.time?._seconds !== undefined) {
+                    d = new Date(Number(item.time._seconds) * 1000);
                   } else {
                     d = new Date(item.time);
                   }
-                  if (d && !isNaN(d.getTime())) {
-                    timeStr = format(d, 'dd MMM, HH:mm', { locale: bn });
-                  }
+                }
+                if (d && !isNaN(d.getTime())) {
+                  timeStr = format(d, 'dd MMM, HH:mm', { locale: bn });
                 }
               } catch (e) {
                 timeStr = '';

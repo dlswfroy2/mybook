@@ -1788,6 +1788,15 @@ function CreateQuestionContent() {
               isMcq: questions.some(q => q.type === 'mcq'),
             };
             if (!editId) dataToSave.createdAt = serverTimestamp();
+            if (questions && questions.length > 0) {
+              dataToSave.questions = questions.map(q => ({
+                id: q.id,
+                type: q.type,
+                content: q.content,
+                imageUrl: q.imageUrl || '',
+                section: q.section || ''
+              }));
+            }
             await setDoc(doc(db, 'questions', docId), dataToSave, { merge: true });
             if (!editId) router.replace(`/create-question?id=${docId}&print=true`);
           }}
