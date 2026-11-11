@@ -1430,13 +1430,46 @@ function EditableContentArea({
             onSyncPageContent(pageIndex, el.innerHTML);
             setTimeout(updateActiveLineIndent, 30);
           } else {
-            // Tab: ০.২৫ ইঞ্চি ডানে ইনডেন্ট করুন
-            const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
-            const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
-            const newInches = Math.round((currentInches + 0.25) * 16) / 16;
-            targetBlock.style.marginLeft = `${newInches}in`;
-            onSyncPageContent(pageIndex, el.innerHTML);
-            setTimeout(updateActiveLineIndent, 30);
+            // Tab: ট্রু ট্যাব-স্টপ মেকানিজম — কারসর পজিশনে ইনলাইন স্প্যান দিয়ে পরবর্তী ট্যাব স্টপে লাফ দিন
+            const sel2 = window.getSelection();
+            if (sel2 && sel2.rangeCount > 0) {
+              const tabRange = sel2.getRangeAt(0);
+              tabRange.deleteContents();
+              const cursorRect2 = tabRange.getBoundingClientRect();
+              const elRect2 = el.getBoundingClientRect();
+              const zoom2 = (style?.zoom || 100) / 100;
+              const cursorInches2 = (cursorRect2.left - elRect2.left) / (96 * zoom2);
+              let nextStop2: number | null = null;
+              if (Array.isArray((style as any)?._tabStops) && (style as any)._tabStops.length > 0) {
+                nextStop2 = (style as any)._tabStops.find((s: number) => s > cursorInches2 + 0.05) ?? null;
+              }
+              if (nextStop2 === null) {
+                nextStop2 = Math.ceil((cursorInches2 + 0.05) / 0.5) * 0.5;
+              }
+              const gapInches2 = Math.max(0.1, nextStop2 - cursorInches2);
+              const gapPx2 = Math.round(gapInches2 * 96 * zoom2);
+              const tabSpan2 = document.createElement('span');
+              tabSpan2.style.display = 'inline-block';
+              tabSpan2.style.width = gapPx2 + 'px';
+              tabSpan2.style.minWidth = gapPx2 + 'px';
+              tabSpan2.innerHTML = '\u200B';
+              tabRange.insertNode(tabSpan2);
+              const afterRange2 = document.createRange();
+              afterRange2.setStartAfter(tabSpan2);
+              afterRange2.collapse(true);
+              sel2.removeAllRanges();
+              sel2.addRange(afterRange2);
+              onSyncPageContent(pageIndex, el.innerHTML);
+              setTimeout(updateActiveLineIndent, 30);
+            } else {
+              // fallback: ব্লক মার্জিন ইনডেন্ট
+              const currentPx = parseFloat(targetBlock.style.marginLeft || '0') || 0;
+              const currentInches = currentPx > 0 ? (targetBlock.style.marginLeft.endsWith('in') ? currentPx : currentPx / 96) : 0;
+              const newInches = Math.round((currentInches + 0.25) * 16) / 16;
+              targetBlock.style.marginLeft = `${newInches}in`;
+              onSyncPageContent(pageIndex, el.innerHTML);
+              setTimeout(updateActiveLineIndent, 30);
+            }
           }
         }
         return;
@@ -3215,6 +3248,20 @@ function CreateLectureSheetContent() {
   const handleGlobalFontSizeChange = (size: string) => {
     const val = parseFloat(size);
     if (!isNaN(val)) {
+      // ✅ Feature 3: Immutable State — ফন্ট সাইজ বদলানোর আগে লাইভ DOM থেকে সব কন্টেন্ট সংরক্ষণ
+      if (typeof document !== 'undefined') {
+        const contentAreas = document.querySelectorAll('.content-area');
+        if (contentAreas && contentAreas.length > 0) {
+          setManualPages((prev: Record<number, string>) => {
+            const updated = { ...prev };
+            contentAreas.forEach((ca, idx) => {
+              const html = (ca as HTMLElement).innerHTML?.trim();
+              if (html) updated[idx] = html;
+            });
+            return updated;
+          });
+        }
+      }
       setGlobalFontSize(val);
       repaginateDocument({ newFontSize: val });
     }

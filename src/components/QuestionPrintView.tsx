@@ -1439,16 +1439,45 @@ function EditableContentArea({
           return;
         }
 
-        // সাধারণ Tab: কারসরের স্থানে ৪টি স্পেস (Word-like Tab space) যোগ করুন
+        // সাধারণ Tab: ট্রু ট্যাব-স্টপ মেকানিজম (Word-এর মতো কারসর পজিশনে সঠিক গ্যাপ)
         if (sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
           range.deleteContents();
-          const tabNode = document.createTextNode('\u00A0\u00A0\u00A0\u00A0');
-          range.insertNode(tabNode);
-          range.setStartAfter(tabNode);
-          range.setEndAfter(tabNode);
+
+          // কারসরের বর্তমান X পজিশন (ইঞ্চিতে) বের করি
+          const cursorRect = range.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const zoomFactor = (style?.zoom || 100) / 100;
+          const cursorInches = (cursorRect.left - elRect.left) / (96 * zoomFactor);
+
+          // রুলার ট্যাব স্টপ থেকে পরবর্তী ট্যাব পজিশন বের করি
+          const availableTabStops: number[] = (style as any)?._tabStops || [];
+          let nextStop: number | null = null;
+
+          if (availableTabStops.length > 0) {
+            nextStop = availableTabStops.find((s: number) => s > cursorInches + 0.05) ?? null;
+          }
+
+          // কাস্টম ট্যাব স্টপ না থাকলে ০.৫ ইঞ্চি গ্রিড
+          if (nextStop === null) {
+            nextStop = Math.ceil((cursorInches + 0.05) / 0.5) * 0.5;
+          }
+
+          const gapInches = Math.max(0.1, nextStop - cursorInches);
+          const gapPx = Math.round(gapInches * 96 * zoomFactor);
+
+          const tabSpan = document.createElement('span');
+          tabSpan.style.display = 'inline-block';
+          tabSpan.style.width = gapPx + 'px';
+          tabSpan.style.minWidth = gapPx + 'px';
+          tabSpan.innerHTML = '\u200B';
+
+          range.insertNode(tabSpan);
+          const afterRange = document.createRange();
+          afterRange.setStartAfter(tabSpan);
+          afterRange.collapse(true);
           sel.removeAllRanges();
-          sel.addRange(range);
+          sel.addRange(afterRange);
 
           onSyncPageContent(pageIndex, el.innerHTML);
           setTimeout(() => {
@@ -1809,7 +1838,43 @@ function EditableContentArea({
     }
 
     // 6. Delete key -> pull up text if at end of page or deleting content
+    // ✅ Feature 4: Atomic Caret — q-num এর আগে Delete চাপলে মুছে যাবে না
     if (e.key === 'Delete') {
+      const selD = window.getSelection();
+      if (selD && selD.rangeCount > 0 && selD.isCollapsed) {
+        const rangeD = selD.getRangeAt(0);
+        const scD = rangeD.startContainer;
+        const soD = rangeD.startOffset;
+
+        const isQNumNode = (node: Node | null): boolean => {
+          if (!node) return false;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const elem = node as HTMLElement;
+            return (
+              elem.classList?.contains('q-num') ||
+              elem.getAttribute?.('contenteditable') === 'false' ||
+              (elem.nodeName === 'STRONG' && /^[০-৯\d]+[।.)]/.test(elem.textContent || ''))
+            );
+          }
+          return false;
+        };
+
+        let nextSiblingIsQNum = false;
+        if (scD.nodeType === Node.TEXT_NODE) {
+          if (soD >= (scD.textContent?.length || 0)) {
+            if (isQNumNode(scD.nextSibling)) nextSiblingIsQNum = true;
+          }
+        } else if (scD.nodeType === Node.ELEMENT_NODE) {
+          const childAtCursor = scD.childNodes[soD];
+          if (isQNumNode(childAtCursor)) nextSiblingIsQNum = true;
+        }
+
+        if (nextSiblingIsQNum) {
+          e.preventDefault();
+          return;
+        }
+      }
+
       if (isCursorAtEnd(el) && pageIndex < totalPages - 1) {
         e.preventDefault();
         checkAndReflow(true);
@@ -2480,6 +2545,20 @@ export function QuestionPrintView({
   const handleGlobalFontSizeChange = (sizeStr: string) => {
     const size = parseFloat(sizeStr);
     if (isNaN(size) || size < 6 || size > 72) return;
+    // ✅ Feature 3: Immutable State — ফন্ট সাইজ বদলানোর আগে লাইভ DOM থেকে সব কন্টেন্ট সংরক্ষণ
+    if (typeof document !== 'undefined') {
+      const contentAreas = document.querySelectorAll('.content-area');
+      if (contentAreas && contentAreas.length > 0) {
+        setManualPages(prev => {
+          const updated = { ...prev };
+          contentAreas.forEach((ca, idx) => {
+            const html = (ca as HTMLElement).innerHTML?.trim();
+            if (html) updated[idx] = html;
+          });
+          return updated;
+        });
+      }
+    }
     setGlobalFontSize(size);
     setFontSizeDraft(sizeStr);
     repaginateDocument({ newFontSize: size });
