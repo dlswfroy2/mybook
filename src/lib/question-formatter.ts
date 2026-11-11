@@ -259,11 +259,22 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = false, startIndex = 0) {
   if (!container || typeof window === 'undefined') return;
 
+  // ✅ আলাদা ক্রমিক: CQ, MCQ, Short এর জন্য আলাদা counter
+  // CQ, MCQ, Short সবগুলো পাতায় থাকলে প্রতিটির জন্য ১ থেকে শুরু হয়
+  const hasMultipleTypes = (
+    container.querySelector('.cq-item') !== null &&
+    (container.querySelector('.mcq-item') !== null || container.querySelector('.short-item') !== null)
+  ) || (
+    container.querySelector('.mcq-item') !== null &&
+    container.querySelector('.short-item') !== null
+  );
+
   // 1. Process structured CQ items
   const cqItems = Array.from(container.querySelectorAll('.cq-item'));
   if (cqItems.length > 0) {
     cqItems.forEach((cq, qIdx) => {
-      const actualIdx = startIndex + qIdx;
+      // আলাদা টাইপ থাকলে CQ ১ থেকে শুরু, না হলে startIndex থেকে
+      const actualIdx = hasMultipleTypes ? qIdx : startIndex + qIdx;
       const qNumStr = isEnglish ? `${actualIdx + 1}.` : `${toBengaliNumber(actualIdx + 1)}।`;
       const stimulus = cq.querySelector('.cq-stimulus') || cq.firstElementChild;
       if (stimulus) {
@@ -322,7 +333,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
   // 2. Process structured MCQ items
   const mcqItems = Array.from(container.querySelectorAll('.mcq-item'));
   mcqItems.forEach((mcq, mIdx) => {
-    const actualIdx = startIndex + mIdx;
+    // আলাদা টাইপ থাকলে MCQ ১ থেকে শুরু, না হলে startIndex থেকে
+    const actualIdx = hasMultipleTypes ? mIdx : startIndex + mIdx;
     const qNumStr = isEnglish ? `${actualIdx + 1}.` : `${toBengaliNumber(actualIdx + 1)}।`;
     const qPara = mcq.querySelector('.mcq-question') || mcq.firstElementChild;
     if (qPara) {
@@ -357,6 +369,24 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
       }
     }
   });
+
+  // 2b. Process structured Short items (separate counter)
+  const shortItems = Array.from(container.querySelectorAll('.short-item'));
+  if (shortItems.length > 0 && hasMultipleTypes) {
+    shortItems.forEach((si, sIdx) => {
+      const qNumStr = isEnglish ? `${sIdx + 1}.` : `${toBengaliNumber(sIdx + 1)}।`;
+      const qPara = si.querySelector('p') || si.firstElementChild;
+      if (qPara) {
+        let numEl = qPara.querySelector('strong.q-num, strong[contenteditable="false"]');
+        if (numEl && !numEl.textContent?.trim()) {
+          numEl.textContent = qNumStr;
+        } else if (numEl) {
+          numEl.setAttribute('contenteditable', 'false');
+          numEl.classList.add('q-num');
+        }
+      }
+    });
+  }
 
   // 3. Fallback: Loose paragraphs if .cq-item wrapper was removed or content is unwrapped
   if (cqItems.length === 0 && mcqItems.length === 0) {

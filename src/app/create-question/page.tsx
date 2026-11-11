@@ -166,14 +166,27 @@ function CreateQuestionContent() {
     const isEng = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
     const parts: string[] = [];
     if (qList.length > 0) {
-      qList.forEach((q, idx) => {
+      // ✅ আলাদা ক্রমিক: একই পেপারে CQ/Short/MCQ থাকলে প্রতিটির counter আলাদা ১ থেকে শুরু
+      const hasMultipleTypes = new Set(qList.map(q => q.type)).size > 1;
+      const typeCounters: Record<string, number> = {};
+      qList.forEach((q) => {
+        const t = q.type || 'creative';
+        if (typeCounters[t] === undefined) typeCounters[t] = 0;
+        const idx = hasMultipleTypes ? typeCounters[t] : (typeCounters['_all'] = (typeCounters['_all'] ?? -1) + 1, typeCounters['_all']);
         parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
+        if (hasMultipleTypes) typeCounters[t]++;
       });
     }
     if (qbList.length > 0) {
       parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-      qbList.forEach((q, idx) => {
+      const hasMultipleTypesB = new Set(qbList.map(q => q.type)).size > 1;
+      const typeCountersB: Record<string, number> = {};
+      qbList.forEach((q) => {
+        const t = q.type || 'creative';
+        if (typeCountersB[t] === undefined) typeCountersB[t] = 0;
+        const idx = hasMultipleTypesB ? typeCountersB[t] : (typeCountersB['_all'] = (typeCountersB['_all'] ?? -1) + 1, typeCountersB['_all']);
         parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
+        if (hasMultipleTypesB) typeCountersB[t]++;
       });
     }
     const res = parts.join('\n');

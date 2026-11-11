@@ -2230,29 +2230,45 @@ export function QuestionPrintView({
         return meta.content;
       }
       if (questions && questions.length > 0) {
-        const parts: string[] = [];
-        questions.forEach((q, idx) => {
-          parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
-        });
+        // ✅ আলাদা ক্রমিক: CQ/Short/MCQ আলাদা counter
+        const buildPartsInner = (qList: any[]) => {
+          const hasMulti = new Set(qList.map((q: any) => q.type)).size > 1;
+          const tCnt: Record<string, number> = {};
+          return qList.map((q: any) => {
+            const t = q.type || 'creative';
+            if (tCnt[t] === undefined) tCnt[t] = 0;
+            const idx = hasMulti ? tCnt[t] : (tCnt['_all'] = (tCnt['_all'] ?? -1) + 1, tCnt['_all']);
+            const html = formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type);
+            if (hasMulti) tCnt[t]++;
+            return html;
+          });
+        };
+        const parts: string[] = buildPartsInner(questions);
         if (questionsB && questionsB.length > 0) {
           parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-          questionsB.forEach((q, idx) => {
-            parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
-          });
+          buildPartsInner(questionsB).forEach(h => parts.push(h));
         }
         return parts.join('\n\n');
       }
       return meta.content;
     }
-    const parts: string[] = [];
-    questions.forEach((q, idx) => {
-      parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
-    });
+    // ✅ আলাদা ক্রমিক: CQ/Short/MCQ আলাদা counter
+    const buildParts = (qList: any[]) => {
+      const hasMultipleTypes = new Set(qList.map((q: any) => q.type)).size > 1;
+      const typeCounters: Record<string, number> = {};
+      return qList.map((q: any) => {
+        const t = q.type || 'creative';
+        if (typeCounters[t] === undefined) typeCounters[t] = 0;
+        const idx = hasMultipleTypes ? typeCounters[t] : (typeCounters['_all'] = (typeCounters['_all'] ?? -1) + 1, typeCounters['_all']);
+        const html = formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type);
+        if (hasMultipleTypes) typeCounters[t]++;
+        return html;
+      });
+    };
+    const parts: string[] = buildParts(questions);
     if (questionsB && questionsB.length > 0) {
       parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-      questionsB.forEach((q, idx) => {
-        parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type));
-      });
+      buildParts(questionsB).forEach(h => parts.push(h));
     }
     return parts.join('\n\n');
   }, [questions, questionsB, isEnglish, meta.content]);
