@@ -133,21 +133,29 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   const hasG = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?গ[.)\]]|\(গ\))/i.test(clean);
   const hasGh = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?ঘ[.)\]]|\(ঘ\))/i.test(clean);
 
-  // Check if explicitly MCQ or has 4 distinct options without CQ action verbs
+  // CQ detection: Check explicit type or CQ action verbs
+  const hasCqVerbs = clean.includes('উদ্দীপক') || 
+                     clean.includes('প্রমাণ কর') || 
+                     clean.includes('বিশ্লেষণ কর') || 
+                     clean.includes('ব্যাখ্যা কর') || 
+                     clean.includes('বিবৃত কর') ||
+                     clean.includes('নির্ণয় কর') ||
+                     clean.includes('নির্ণয় কর') ||
+                     clean.includes('দেখাও যে') ||
+                     clean.includes('প্রকাশ কর') ||
+                     clean.includes('চিহ্নিত কর');
+
   const isExplicitMcq = type === 'mcq';
   const isExplicitCq = type === 'creative';
-  const looksLikeMcq = hasK && hasKh && hasG && hasGh && !isExplicitCq && (
-    isExplicitMcq ||
-    clean.includes('(ক)') ||
-    clean.includes('নিচের কোনটি') ||
-    clean.includes('কোনটি?') ||
-    clean.includes('কত?') ||
-    clean.includes('মান কত') ||
-    (!clean.includes('প্রমাণ কর') && !clean.includes('বিশ্লেষণ কর') && !clean.includes('ব্যাখ্যা কর'))
+  const looksLikeMcq = !isExplicitCq && hasK && hasKh && (
+    isExplicitMcq || 
+    ((clean.includes('নিচের কোনটি') || clean.includes('কোনটি?') || clean.includes('কত?')) && !hasCqVerbs)
   );
 
+  const isCq = isExplicitCq || (!looksLikeMcq && hasK && hasKh);
+
   // 1. MCQ Question Format (Row Grid, ZERO individual marks!)
-  if (isExplicitMcq || looksLikeMcq) {
+  if (looksLikeMcq && !isCq) {
     const firstOptMatch = clean.search(/(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)(?:\(?ক[.)\]]|\(ক\))/i);
     const qLine = firstOptMatch !== -1 ? clean.substring(0, firstOptMatch).trim() : clean;
     const optionsPart = firstOptMatch !== -1 ? clean.substring(firstOptMatch) : '';
@@ -165,15 +173,14 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
     const optD = extractOpt('ঘ', undefined);
 
     const maxLen = Math.max(optA.length, optB.length, optC.length, optD.length);
-    // 4 columns in 1 row if short options, 2 columns if medium, 1 column if long
     const gridCols = maxLen <= 28 ? 4 : maxLen <= 60 ? 2 : 1;
 
     return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
-  <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
-    <strong class="q-num" contenteditable="false" style="display: inline-block; width: 24px; user-select: none;">${qNum}</strong>${formatMath(qLine)}
+  <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; display: block;">
+    <strong class="q-num" contenteditable="false" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px; user-select: none;">${qNum}</strong>${formatMath(qLine)}
   </p>
   ${(optA || optB || optC || optD) ? `
-  <div class="mcq-options-row" style="padding-left: 24px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
+  <div class="mcq-options-row" style="padding-left: 20px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
     <div><strong>(ক)</strong> ${formatMath(optA)}</div>
     <div><strong>(খ)</strong> ${formatMath(optB)}</div>
     <div><strong>(গ)</strong> ${formatMath(optC)}</div>
@@ -183,15 +190,17 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   }
 
   // 2. Creative Question (CQ): Stimulus + ক, খ, গ, ঘ with Marks ১, ২, ৩, ৪
-  if (isExplicitCq || (hasK && hasKh)) {
+  if (isCq) {
     const regK = /(?:^|[\n\r\s>]|<br\s*\/?>|<p[^>]*>)\s*(?=\(?ক[.)\]]|\(ক\))/i;
     const matchK = clean.search(regK);
     const stimulus = matchK !== -1 ? clean.substring(0, matchK).trim() : clean;
     const subPart = matchK !== -1 ? clean.substring(matchK) : '';
 
     const extractPart = (currentM: string, nextM?: string, defaultMark: string = '১') => {
-      const nextPattern = nextM
-        ? `(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)\\s*(?:\\(?${nextM}[.)\\]]|\\(${nextM}\\))`
+      const effectiveNextM = (nextM === 'ঘ' && !hasGh) ? undefined :
+                             (nextM === 'গ' && !hasG) ? undefined : nextM;
+      const nextPattern = effectiveNextM
+        ? `(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)\\s*(?:\\(?${effectiveNextM}[.)\\]]|\\(${effectiveNextM}\\))`
         : '$';
       const reg = new RegExp(
         `(?:^|[\\n\\r\\s>]|<br\\s*\\/?>|<p[^>]*>)\\s*(?:\\(?${currentM}[.)\\]]|\\(${currentM}\\))\\s*([\\s\\S]*?)(?=${nextPattern})`,
@@ -211,14 +220,14 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     const partA = extractPart('ক', 'খ', '১');
     const partB = extractPart('খ', 'গ', '২');
-    const partC = extractPart('গ', 'ঘ', '৩');
-    const partD = extractPart('ঘ', undefined, '৪');
+    const partC = extractPart('গ', hasGh ? 'ঘ' : undefined, '৩');
+    const partD = hasGh ? extractPart('ঘ', undefined, '৪') : null;
 
     return `<div class="cq-item my-3 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
-  <p class="cq-stimulus" style="margin: 0 0 5px 0; line-height: 1.6; text-align: justify; padding-left: 24px; text-indent: -24px; display: block;">
-    <strong class="q-num" contenteditable="false" style="display: inline-block; width: 24px; user-select: none;">${qNum}</strong>${formatMath(stimulus)}
+  <p class="cq-stimulus" style="margin: 0 0 5px 0; line-height: 1.6; text-align: justify; display: block;">
+    <strong class="q-num" contenteditable="false" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px; user-select: none;">${qNum}</strong>${formatMath(stimulus)}
   </p>
-  <div class="cq-sub-questions" style="padding-left: 24px; display: block;">
+  <div class="cq-sub-questions" style="padding-left: 20px; display: block;">
     ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
       <span class="cq-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${partA.mark}</span>
       <strong>ক.</strong> ${formatMath(partA.text)}
@@ -249,9 +258,9 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   }
 
   return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
-  <p style="margin: 0; line-height: 1.6; text-align: justify; padding-left: 28px; text-indent: -28px; display: block;">
+  <p style="margin: 0; line-height: 1.6; text-align: justify; display: block;">
     ${mark ? `<span class="short-mark" contenteditable="false" style="float: right; font-weight: bold; margin-left: 12px; user-select: none;">${mark}</span>` : ''}
-    <strong class="q-num" contenteditable="false" style="display: inline-block; width: 28px; user-select: none;">${qNum}</strong>${formatMath(bodyText)}
+    <strong class="q-num" contenteditable="false" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px; user-select: none;">${qNum}</strong>${formatMath(bodyText)}
   </p>
 </div>`;
 }
@@ -259,53 +268,47 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = false, startIndex = 0) {
   if (!container || typeof window === 'undefined') return;
 
-  // ✅ আলাদা ক্রমিক: CQ, MCQ, Short এর জন্য আলাদা counter
-  // CQ, MCQ, Short সবগুলো পাতায় থাকলে প্রতিটির জন্য ১ থেকে শুরু হয়
-  const hasMultipleTypes = (
-    container.querySelector('.cq-item') !== null &&
-    (container.querySelector('.mcq-item') !== null || container.querySelector('.short-item') !== null)
-  ) || (
-    container.querySelector('.mcq-item') !== null &&
-    container.querySelector('.short-item') !== null
-  );
-
+  // ✅ আলাদা ক্রমিক: CQ, Short, MCQ প্রতিটির counter আলাদা ১ থেকে শুরু
   // 1. Process structured CQ items
   const cqItems = Array.from(container.querySelectorAll('.cq-item'));
   if (cqItems.length > 0) {
     cqItems.forEach((cq, qIdx) => {
-      // আলাদা টাইপ থাকলে CQ ১ থেকে শুরু, না হলে startIndex থেকে
-      const actualIdx = hasMultipleTypes ? qIdx : startIndex + qIdx;
-      const qNumStr = isEnglish ? `${actualIdx + 1}.` : `${toBengaliNumber(actualIdx + 1)}।`;
+      const qNumStr = isEnglish ? `${qIdx + 1}.` : `${toBengaliNumber(qIdx + 1)}।`;
       const stimulus = cq.querySelector('.cq-stimulus') || cq.firstElementChild;
       if (stimulus) {
+        (stimulus as HTMLElement).style.textIndent = '';
+        (stimulus as HTMLElement).style.paddingLeft = '';
         let numEl = stimulus.querySelector('strong.q-num, strong[contenteditable="false"]');
         if (!numEl) {
           const firstStrong = stimulus.querySelector('strong');
           if (firstStrong && /^[০-৯\d]+[।.)]/.test(firstStrong.textContent?.trim() || '')) {
             firstStrong.setAttribute('contenteditable', 'false');
             firstStrong.classList.add('q-num');
+            firstStrong.textContent = qNumStr;
             (firstStrong as HTMLElement).style.display = 'inline-block';
-            (firstStrong as HTMLElement).style.width = '24px';
+            (firstStrong as HTMLElement).style.minWidth = '24px';
+            (firstStrong as HTMLElement).style.marginRight = '4px';
             (firstStrong as HTMLElement).style.userSelect = 'none';
           } else {
+            // Strip plain text number from start of stimulus
+            stimulus.innerHTML = stimulus.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
             const strong = document.createElement('strong');
             strong.setAttribute('contenteditable', 'false');
             strong.className = 'q-num';
             strong.style.display = 'inline-block';
-            strong.style.width = '24px';
+            strong.style.minWidth = '24px';
+            strong.style.marginRight = '4px';
             strong.style.userSelect = 'none';
             strong.textContent = qNumStr;
             stimulus.insertBefore(strong, stimulus.firstChild);
           }
         } else {
-          // If existing number is empty or whitespace, restore it
-          if (!numEl.textContent?.trim()) {
-            numEl.textContent = qNumStr;
-          }
+          numEl.textContent = qNumStr;
           numEl.classList.add('q-num');
           numEl.setAttribute('contenteditable', 'false');
           (numEl as HTMLElement).style.display = 'inline-block';
-          (numEl as HTMLElement).style.width = '24px';
+          (numEl as HTMLElement).style.minWidth = '24px';
+          (numEl as HTMLElement).style.marginRight = '4px';
           (numEl as HTMLElement).style.userSelect = 'none';
         }
       }
@@ -323,84 +326,119 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
           (markSpan as HTMLElement).style.cssText = 'float: right; font-weight: bold; margin-left: 12px; user-select: none;';
           markSpan.textContent = expectedMark;
           sub.insertBefore(markSpan, sub.firstChild);
-        } else if (!markSpan.textContent?.trim()) {
-          markSpan.textContent = expectedMark;
+        } else {
+          if (!markSpan.textContent?.trim()) {
+            markSpan.textContent = expectedMark;
+          }
+          (markSpan as HTMLElement).style.cssText = 'float: right; font-weight: bold; margin-left: 12px; user-select: none;';
         }
       });
     });
   }
 
-  // 2. Process structured MCQ items
-  const mcqItems = Array.from(container.querySelectorAll('.mcq-item'));
-  mcqItems.forEach((mcq, mIdx) => {
-    // আলাদা টাইপ থাকলে MCQ ১ থেকে শুরু, না হলে startIndex থেকে
-    const actualIdx = hasMultipleTypes ? mIdx : startIndex + mIdx;
-    const qNumStr = isEnglish ? `${actualIdx + 1}.` : `${toBengaliNumber(actualIdx + 1)}।`;
-    const qPara = mcq.querySelector('.mcq-question') || mcq.firstElementChild;
-    if (qPara) {
-      let numEl = qPara.querySelector('strong.q-num, strong[contenteditable="false"]');
-      if (!numEl) {
-        const firstStrong = qPara.querySelector('strong');
-        if (firstStrong && /^[০-৯\d]+[।.)]/.test(firstStrong.textContent?.trim() || '')) {
-          firstStrong.setAttribute('contenteditable', 'false');
-          firstStrong.classList.add('q-num');
-          (firstStrong as HTMLElement).style.display = 'inline-block';
-          (firstStrong as HTMLElement).style.width = '24px';
-          (firstStrong as HTMLElement).style.userSelect = 'none';
-        } else {
-          const strong = document.createElement('strong');
-          strong.setAttribute('contenteditable', 'false');
-          strong.className = 'q-num';
-          strong.style.display = 'inline-block';
-          strong.style.width = '24px';
-          strong.style.userSelect = 'none';
-          strong.textContent = qNumStr;
-          qPara.insertBefore(strong, qPara.firstChild);
-        }
-      } else {
-        if (!numEl.textContent?.trim()) {
-          numEl.textContent = qNumStr;
-        }
-        numEl.classList.add('q-num');
-        numEl.setAttribute('contenteditable', 'false');
-        (numEl as HTMLElement).style.display = 'inline-block';
-        (numEl as HTMLElement).style.width = '24px';
-        (numEl as HTMLElement).style.userSelect = 'none';
-      }
-    }
-  });
-
-  // 2b. Process structured Short items (separate counter)
+  // 2. Process structured Short items (separate counter starting from 1)
   const shortItems = Array.from(container.querySelectorAll('.short-item'));
-  if (shortItems.length > 0 && hasMultipleTypes) {
+  if (shortItems.length > 0) {
     shortItems.forEach((si, sIdx) => {
       const qNumStr = isEnglish ? `${sIdx + 1}.` : `${toBengaliNumber(sIdx + 1)}।`;
       const qPara = si.querySelector('p') || si.firstElementChild;
       if (qPara) {
+        (qPara as HTMLElement).style.textIndent = '';
+        (qPara as HTMLElement).style.paddingLeft = '';
         let numEl = qPara.querySelector('strong.q-num, strong[contenteditable="false"]');
-        if (numEl && !numEl.textContent?.trim()) {
+        if (!numEl) {
+          const firstStrong = qPara.querySelector('strong');
+          if (firstStrong && /^[০-৯\d]+[।.)]/.test(firstStrong.textContent?.trim() || '')) {
+            firstStrong.setAttribute('contenteditable', 'false');
+            firstStrong.classList.add('q-num');
+            firstStrong.textContent = qNumStr;
+            (firstStrong as HTMLElement).style.display = 'inline-block';
+            (firstStrong as HTMLElement).style.minWidth = '24px';
+            (firstStrong as HTMLElement).style.marginRight = '4px';
+            (firstStrong as HTMLElement).style.userSelect = 'none';
+          } else {
+            qPara.innerHTML = qPara.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
+            const strong = document.createElement('strong');
+            strong.setAttribute('contenteditable', 'false');
+            strong.className = 'q-num';
+            strong.style.display = 'inline-block';
+            strong.style.minWidth = '24px';
+            strong.style.marginRight = '4px';
+            strong.style.userSelect = 'none';
+            strong.textContent = qNumStr;
+            qPara.insertBefore(strong, qPara.firstChild);
+          }
+        } else {
           numEl.textContent = qNumStr;
-        } else if (numEl) {
-          numEl.setAttribute('contenteditable', 'false');
           numEl.classList.add('q-num');
+          numEl.setAttribute('contenteditable', 'false');
+          (numEl as HTMLElement).style.display = 'inline-block';
+          (numEl as HTMLElement).style.minWidth = '24px';
+          (numEl as HTMLElement).style.marginRight = '4px';
+          (numEl as HTMLElement).style.userSelect = 'none';
         }
       }
     });
   }
 
-  // 3. Fallback: Loose paragraphs if .cq-item wrapper was removed or content is unwrapped
-  if (cqItems.length === 0 && mcqItems.length === 0) {
+  // 3. Process structured MCQ items (separate counter starting from 1)
+  const mcqItems = Array.from(container.querySelectorAll('.mcq-item'));
+  if (mcqItems.length > 0) {
+    mcqItems.forEach((mcq, mIdx) => {
+      const qNumStr = isEnglish ? `${mIdx + 1}.` : `${toBengaliNumber(mIdx + 1)}।`;
+      const qPara = mcq.querySelector('.mcq-question') || mcq.firstElementChild;
+      if (qPara) {
+        (qPara as HTMLElement).style.textIndent = '';
+        (qPara as HTMLElement).style.paddingLeft = '';
+        let numEl = qPara.querySelector('strong.q-num, strong[contenteditable="false"]');
+        if (!numEl) {
+          const firstStrong = qPara.querySelector('strong');
+          if (firstStrong && /^[০-৯\d]+[।.)]/.test(firstStrong.textContent?.trim() || '')) {
+            firstStrong.setAttribute('contenteditable', 'false');
+            firstStrong.classList.add('q-num');
+            firstStrong.textContent = qNumStr;
+            (firstStrong as HTMLElement).style.display = 'inline-block';
+            (firstStrong as HTMLElement).style.minWidth = '24px';
+            (firstStrong as HTMLElement).style.marginRight = '4px';
+            (firstStrong as HTMLElement).style.userSelect = 'none';
+          } else {
+            qPara.innerHTML = qPara.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
+            const strong = document.createElement('strong');
+            strong.setAttribute('contenteditable', 'false');
+            strong.className = 'q-num';
+            strong.style.display = 'inline-block';
+            strong.style.minWidth = '24px';
+            strong.style.marginRight = '4px';
+            strong.style.userSelect = 'none';
+            strong.textContent = qNumStr;
+            qPara.insertBefore(strong, qPara.firstChild);
+          }
+        } else {
+          numEl.textContent = qNumStr;
+          numEl.classList.add('q-num');
+          numEl.setAttribute('contenteditable', 'false');
+          (numEl as HTMLElement).style.display = 'inline-block';
+          (numEl as HTMLElement).style.minWidth = '24px';
+          (numEl as HTMLElement).style.marginRight = '4px';
+          (numEl as HTMLElement).style.userSelect = 'none';
+        }
+      }
+    });
+  }
+
+  // 4. Fallback: Loose paragraphs if items were unwrapped
+  if (cqItems.length === 0 && mcqItems.length === 0 && shortItems.length === 0) {
     const paras = Array.from(container.querySelectorAll('p'));
-    let currentQIdx = startIndex;
+    let cqCounter = 0;
     let currentSubIdx = 0;
     const marks = isEnglish ? ['1', '2', '3', '4'] : ['১', '২', '৩', '৪'];
 
     paras.forEach((p, pIdx) => {
       const text = p.textContent?.trim() || '';
-      const isSub = /(?:^|\s)(?:ক\.|খ\.|গ\.|ঘ\.)/.test(text) || p.classList.contains('cq-sub');
-      const isMcqOpt = /(?:^|\s)(?:\(ক\)|\(খ\)|\(গ\)|\(ঘ\))/.test(text) || p.classList.contains('mcq-options-row');
+      const isSub = /(?:^|\s)(?:(?:\(?\s*[ক-ঘ]\s*[.)\]]|\(\s*[ক-ঘ]\s*\)))/i.test(text) || p.classList.contains('cq-sub');
+      const isMultipleMcqInOneLine = text.includes('(ক)') && text.includes('(খ)');
 
-      if (isSub && !isMcqOpt) {
+      if (isSub && !isMultipleMcqInOneLine) {
         p.classList.add('cq-sub');
         let markSpan = p.querySelector('.cq-mark');
         const expectedMark = marks[currentSubIdx] || '১';
@@ -411,48 +449,56 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
           (markSpan as HTMLElement).style.cssText = 'float: right; font-weight: bold; margin-left: 12px; user-select: none;';
           markSpan.textContent = expectedMark;
           p.insertBefore(markSpan, p.firstChild);
-        } else if (!markSpan.textContent?.trim()) {
-          markSpan.textContent = expectedMark;
+        } else {
+          if (!markSpan.textContent?.trim()) {
+            markSpan.textContent = expectedMark;
+          }
+          (markSpan as HTMLElement).style.cssText = 'float: right; font-weight: bold; margin-left: 12px; user-select: none;';
         }
         currentSubIdx++;
         if (currentSubIdx >= 4) currentSubIdx = 0;
-      } else if (!isMcqOpt && text.length > 5) {
+      } else if (!isMultipleMcqInOneLine && text.length > 5) {
         const nextP = paras[pIdx + 1];
-        const nextIsSub = nextP && /(?:^|\s)(?:ক\.|খ\.|গ\.|ঘ\.)/.test(nextP.textContent?.trim() || '');
+        const nextIsSub = nextP && /(?:^|\s)(?:(?:\(?\s*[ক-ঘ]\s*[.)\]]|\(\s*[ক-ঘ]\s*\)))/i.test(nextP.textContent?.trim() || '');
         if (nextIsSub || p.classList.contains('cq-stimulus') || p.classList.contains('mcq-question')) {
           p.classList.add('cq-stimulus');
+          (p as HTMLElement).style.textIndent = '';
+          (p as HTMLElement).style.paddingLeft = '';
           currentSubIdx = 0;
-          const qNumStr = isEnglish ? `${currentQIdx + 1}.` : `${toBengaliNumber(currentQIdx + 1)}।`;
+          const qNumStr = isEnglish ? `${cqCounter + 1}.` : `${toBengaliNumber(cqCounter + 1)}।`;
           let numEl = p.querySelector('strong.q-num, strong[contenteditable="false"]');
           if (!numEl) {
             const firstStrong = p.querySelector('strong');
             if (firstStrong && /^[০-৯\d]+[।.)]/.test(firstStrong.textContent?.trim() || '')) {
               firstStrong.setAttribute('contenteditable', 'false');
               firstStrong.classList.add('q-num');
+              firstStrong.textContent = qNumStr;
               (firstStrong as HTMLElement).style.display = 'inline-block';
-              (firstStrong as HTMLElement).style.width = '24px';
+              (firstStrong as HTMLElement).style.minWidth = '24px';
+              (firstStrong as HTMLElement).style.marginRight = '4px';
               (firstStrong as HTMLElement).style.userSelect = 'none';
             } else {
+              p.innerHTML = p.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
               const strong = document.createElement('strong');
               strong.setAttribute('contenteditable', 'false');
               strong.className = 'q-num';
               strong.style.display = 'inline-block';
-              strong.style.width = '24px';
+              strong.style.minWidth = '24px';
+              strong.style.marginRight = '4px';
               strong.style.userSelect = 'none';
               strong.textContent = qNumStr;
               p.insertBefore(strong, p.firstChild);
             }
           } else {
-            if (!numEl.textContent?.trim()) {
-              numEl.textContent = qNumStr;
-            }
+            numEl.textContent = qNumStr;
             numEl.classList.add('q-num');
             numEl.setAttribute('contenteditable', 'false');
             (numEl as HTMLElement).style.display = 'inline-block';
-            (numEl as HTMLElement).style.width = '24px';
+            (numEl as HTMLElement).style.minWidth = '24px';
+            (numEl as HTMLElement).style.marginRight = '4px';
             (numEl as HTMLElement).style.userSelect = 'none';
           }
-          currentQIdx++;
+          cqCounter++;
         }
       }
     });

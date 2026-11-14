@@ -2225,52 +2225,30 @@ export function QuestionPrintView({
 
   // Convert questions array to HTML string
   const initialContent = useMemo(() => {
+    // 1. If questions array exists, always prioritize building fresh board-standard HTML from questions
+    // This guarantees separate counters for CQ, Short, and MCQ, as well as marks allocation!
+    if (questions && questions.length > 0) {
+      const buildPartsInner = (qList: any[]) => {
+        const typeCounters: Record<string, number> = {};
+        return qList.map((q: any) => {
+          const t = q.type || 'creative';
+          if (typeCounters[t] === undefined) typeCounters[t] = 0;
+          const idx = typeCounters[t];
+          typeCounters[t]++;
+          return formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type);
+        });
+      };
+      const parts: string[] = buildPartsInner(questions);
+      if (questionsB && questionsB.length > 0) {
+        parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
+        buildPartsInner(questionsB).forEach(h => parts.push(h));
+      }
+      return parts.join('\n\n');
+    }
     if (meta.content && meta.content.trim()) {
-      if (meta.content.includes('cq-item') || meta.content.includes('mcq-item') || meta.content.includes('q-num') || meta.content.includes('cq-stimulus')) {
-        return meta.content;
-      }
-      if (questions && questions.length > 0) {
-        // ✅ আলাদা ক্রমিক: CQ/Short/MCQ আলাদা counter
-        const buildPartsInner = (qList: any[]) => {
-          const hasMulti = new Set(qList.map((q: any) => q.type)).size > 1;
-          const tCnt: Record<string, number> = {};
-          return qList.map((q: any) => {
-            const t = q.type || 'creative';
-            if (tCnt[t] === undefined) tCnt[t] = 0;
-            const idx = hasMulti ? tCnt[t] : (tCnt['_all'] = (tCnt['_all'] ?? -1) + 1, tCnt['_all']);
-            const html = formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type);
-            if (hasMulti) tCnt[t]++;
-            return html;
-          });
-        };
-        const parts: string[] = buildPartsInner(questions);
-        if (questionsB && questionsB.length > 0) {
-          parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-          buildPartsInner(questionsB).forEach(h => parts.push(h));
-        }
-        return parts.join('\n\n');
-      }
       return meta.content;
     }
-    // ✅ আলাদা ক্রমিক: CQ/Short/MCQ আলাদা counter
-    const buildParts = (qList: any[]) => {
-      const hasMultipleTypes = new Set(qList.map((q: any) => q.type)).size > 1;
-      const typeCounters: Record<string, number> = {};
-      return qList.map((q: any) => {
-        const t = q.type || 'creative';
-        if (typeCounters[t] === undefined) typeCounters[t] = 0;
-        const idx = hasMultipleTypes ? typeCounters[t] : (typeCounters['_all'] = (typeCounters['_all'] ?? -1) + 1, typeCounters['_all']);
-        const html = formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEnglish), q.type);
-        if (hasMultipleTypes) typeCounters[t]++;
-        return html;
-      });
-    };
-    const parts: string[] = buildParts(questions);
-    if (questionsB && questionsB.length > 0) {
-      parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-      buildParts(questionsB).forEach(h => parts.push(h));
-    }
-    return parts.join('\n\n');
+    return '';
   }, [questions, questionsB, isEnglish, meta.content]);
 
   const [documentContent, setDocumentContent] = useState(initialContent);
@@ -3183,11 +3161,11 @@ export function QuestionPrintView({
           .content-area .q-num,
           .content-area strong[contenteditable="false"] {
             display: inline-block !important;
-            width: 24px !important;
             min-width: 24px !important;
             font-weight: bold !important;
             color: black !important;
             user-select: none !important;
+            margin-right: 4px !important;
           }
           .content-area .cq-item > div,
           .content-area .cq-item div,

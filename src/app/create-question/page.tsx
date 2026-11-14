@@ -167,26 +167,24 @@ function CreateQuestionContent() {
     const parts: string[] = [];
     if (qList.length > 0) {
       // ✅ আলাদা ক্রমিক: একই পেপারে CQ/Short/MCQ থাকলে প্রতিটির counter আলাদা ১ থেকে শুরু
-      const hasMultipleTypes = new Set(qList.map(q => q.type)).size > 1;
       const typeCounters: Record<string, number> = {};
       qList.forEach((q) => {
         const t = q.type || 'creative';
         if (typeCounters[t] === undefined) typeCounters[t] = 0;
-        const idx = hasMultipleTypes ? typeCounters[t] : (typeCounters['_all'] = (typeCounters['_all'] ?? -1) + 1, typeCounters['_all']);
+        const idx = typeCounters[t];
+        typeCounters[t]++;
         parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
-        if (hasMultipleTypes) typeCounters[t]++;
       });
     }
     if (qbList.length > 0) {
       parts.push(`<div class="set-b-header" style="page-break-before: always; margin-top: 24px; border-top: 2px dashed #000; padding-top: 12px; text-align: center; font-weight: bold; font-size: 13pt;">--- সেট: খ (B) ---</div>`);
-      const hasMultipleTypesB = new Set(qbList.map(q => q.type)).size > 1;
       const typeCountersB: Record<string, number> = {};
       qbList.forEach((q) => {
         const t = q.type || 'creative';
         if (typeCountersB[t] === undefined) typeCountersB[t] = 0;
-        const idx = hasMultipleTypesB ? typeCountersB[t] : (typeCountersB['_all'] = (typeCountersB['_all'] ?? -1) + 1, typeCountersB['_all']);
+        const idx = typeCountersB[t];
+        typeCountersB[t]++;
         parts.push(formatQuestionToBoardStandardHtml(q.content || '', idx, Boolean(isEng), q.type));
-        if (hasMultipleTypesB) typeCountersB[t]++;
       });
     }
     const res = parts.join('\n');
@@ -710,7 +708,9 @@ function CreateQuestionContent() {
   const isEnglish = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
 
   const handleGoToPrint = useCallback(() => {
-    if (contentEditableRef.current) {
+    if (questions && questions.length > 0) {
+      syncQuestionsToContent(questions, questionsB);
+    } else if (contentEditableRef.current) {
       ensureQuestionIntegrity(contentEditableRef.current, Boolean(isEnglish));
       const currentHtml = contentEditableRef.current.innerHTML;
       setDocumentContent(currentHtml);
@@ -720,7 +720,7 @@ function CreateQuestionContent() {
     p.set('print', 'true');
     if (editId) p.set('id', editId);
     router.push(`${window.location.pathname}?${p.toString()}`);
-  }, [isEnglish, editId, router]);
+  }, [questions, questionsB, syncQuestionsToContent, isEnglish, editId, router]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = contentEditableRef.current;
@@ -1830,6 +1830,15 @@ function CreateQuestionContent() {
           .math-sqrt-stem { border-top: 0.5pt solid black; padding-top: 1px; }
           .math-sup { font-size: 0.7em; vertical-align: super; }
           .math-sub { font-size: 0.7em; vertical-align: sub; }
+          .q-num,
+          strong[contenteditable="false"] {
+            display: inline-block !important;
+            min-width: 24px !important;
+            font-weight: bold !important;
+            color: black !important;
+            user-select: none !important;
+            margin-right: 4px !important;
+          }
           .cq-item > div,
           .cq-item div,
           .short-item div {
