@@ -7,6 +7,11 @@ import { getSubjects, Subject, subjectNameNormalization } from '@/lib/subjects';
 import { getAllResults, ClassResult } from '@/lib/results-data';
 import { processStudentResults, StudentProcessedResult } from '@/lib/results-calculation';
 import { getExams, Exam } from '@/lib/exam-data';
+import { 
+  getResultPublicationConfig, 
+  checkResultVisibility 
+} from '@/lib/result-publication-data';
+import { Clock, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -225,6 +230,7 @@ function MarksheetContent() {
     const searchParams = useSearchParams();
     const studentId = params.id as string;
     const db = useFirestore();
+    const { user } = useAuth();
     const { schoolInfo } = useSchoolInfo();
 
     const [student, setStudent] = useState<Student | null>(null);
@@ -232,6 +238,7 @@ function MarksheetContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [allExams, setAllExams] = useState<Exam[]>([]);
     const [watermarkOpacity, setWatermarkOpacity] = useState(0.15);
+    const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
 
     const academicYear = searchParams.get('academicYear') || new Date().getFullYear().toString();
     const initialExam = searchParams.get('examName') || 'বার্ষিক পরীক্ষা';
@@ -241,7 +248,15 @@ function MarksheetContent() {
         const fetchAllData = async () => {
             if (!db || !studentId) return;
             setIsLoading(true);
+            setBlockedNotice(null);
             try {
+                const pubConfig = await getResultPublicationConfig(db);
+                const visibility = checkResultVisibility(pubConfig, academicYear, currentExamName, !!user);
+                if (!visibility.isVisible) {
+                    setBlockedNotice(visibility.message);
+                    setIsLoading(false);
+                    return;
+                }
                 getExams(db, academicYear).then(data => setAllExams(data));
                 const studentDoc = await getDoc(doc(db, 'students', studentId));
                 if (!studentDoc.exists()) { setIsLoading(false); return; }
@@ -271,6 +286,19 @@ function MarksheetContent() {
     }, [db, studentId, academicYear, currentExamName]);
 
     if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-slate-50"><Loader2 className="animate-spin text-primary" /></div>;
+
+    if (blockedNotice) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center font-kalpurush">
+                <div className="bg-amber-100 p-4 rounded-3xl text-amber-700 mb-4 shadow-lg">
+                    <Clock className="w-12 h-12" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 mb-2">ফলাফল দেখার সুযোগ নেই</h2>
+                <p className="text-slate-600 font-bold max-w-md text-sm leading-relaxed mb-6 bg-white p-4 rounded-2xl border-2 border-slate-200 shadow-sm">{blockedNotice}</p>
+                <Button onClick={() => window.history.back()} className="font-bold">ফিরে যান</Button>
+            </div>
+        );
+    }
 
     if (!student || !processedResult) return <div className="flex items-center justify-center min-h-screen">Marksheet data not found.</div>;
 

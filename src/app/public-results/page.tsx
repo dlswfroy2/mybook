@@ -14,6 +14,13 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { Student, studentFromDoc } from '@/lib/student-data';
 import { getExams, Exam } from '@/lib/exam-data';
+import { 
+  getResultPublicationConfig, 
+  checkResultVisibility, 
+  ResultPublicationConfig,
+  formatBengaliDateTime
+} from '@/lib/result-publication-data';
+import { AlertCircle } from 'lucide-react';
 import { Loader2, Search, BookOpen, ArrowLeft, GraduationCap, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -45,6 +52,14 @@ export default function PublicResultPortalPage() {
   const [studentId, setStudentId] = useState<string>('');
   
   const [exams, setExams] = useState<Exam[]>([]);
+  const [pubConfig, setPubConfig] = useState<ResultPublicationConfig | null>(null);
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (db) {
+      getResultPublicationConfig(db).then(setPubConfig).catch(console.error);
+    }
+  }, [db]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -62,6 +77,19 @@ export default function PublicResultPortalPage() {
       toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'সবগুলো ঘর পূরণ করুন।' });
       return;
     }
+
+    // 🛑 ফলাফল প্রকাশ ও শিডিউল যাচাই
+    const visibility = checkResultVisibility(pubConfig, academicYear, examName, false);
+    if (!visibility.isVisible) {
+      setBlockedNotice(visibility.message);
+      toast({
+        variant: 'destructive',
+        title: visibility.reason === 'scheduled' ? 'ফলাফল প্রকাশের নির্ধারিত সময় হয়নি' : 'ফলাফল অপ্রকাশিত',
+        description: visibility.message
+      });
+      return;
+    }
+    setBlockedNotice(null);
 
     setIsLoading(true);
     try {

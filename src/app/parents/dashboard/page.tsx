@@ -15,6 +15,10 @@ import { getAllResults } from '@/lib/results-data';
 import { getSubjects } from '@/lib/subjects';
 import { processStudentResults } from '@/lib/results-calculation';
 import { getExams } from '@/lib/exam-data';
+import { 
+  getResultPublicationConfig, 
+  checkResultVisibility 
+} from '@/lib/result-publication-data';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { 
@@ -85,10 +89,28 @@ export default function ParentsDashboardPage() {
 
         // 3. Fetch Academic Results
         const exams = await getExams(db, student.academicYear);
+        const pubConfig = await getResultPublicationConfig(db);
         const resultsData = [];
         
         for (const exam of exams) {
             if (!exam.classes.includes(student.className)) continue;
+
+            // 🛑 চেক করুন ফলাফল প্রকাশিত নাকি শিডিউল/হাইড
+            const visibility = checkResultVisibility(pubConfig, student.academicYear, exam.name, false);
+            if (!visibility.isVisible) {
+                resultsData.push({ 
+                    exam: exam.name, 
+                    gpa: 0, 
+                    isPass: false, 
+                    grade: '-',
+                    isPending: true,
+                    pendingMessage: visibility.message,
+                    reason: visibility.reason,
+                    formattedDateTime: visibility.formattedDateTime
+                });
+                continue;
+            }
+
             const allRes = await getAllResults(db, student.academicYear, exam.name);
             const classRes = allRes.filter(r => r.className === student.className);
             if (classRes.length === 0) continue;
@@ -96,7 +118,7 @@ export default function ParentsDashboardPage() {
             const subs = getSubjects(student.className, student.group).filter(s => s.isExamSubject !== false);
             const processed = processStudentResults([student], classRes, subs);
             const myRes = processed.find(r => r.student.id === student.id);
-            if (myRes) resultsData.push({ exam: exam.name, gpa: myRes.gpa, isPass: myRes.isPass, grade: myRes.finalGrade });
+            if (myRes) resultsData.push({ exam: exam.name, gpa: myRes.gpa, isPass: myRes.isPass, grade: myRes.finalGrade, isPending: false });
         }
         setAcademicResults(resultsData);
 
@@ -179,7 +201,10 @@ export default function ParentsDashboardPage() {
                     <div>
                         <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">সর্বশেষ রেজাল্ট</p>
                         <p className="text-2xl font-black text-amber-950">
-                            {academicResults.length > 0 ? `GPA ${toBengaliNumber(academicResults[academicResults.length-1].gpa.toFixed(2))}` : 'পাবলিশ হয়নি'}
+                            {(() => {
+                                const published = academicResults.filter(r => !r.isPending);
+                                return published.length > 0 ? `GPA ${toBengaliNumber(published[published.length-1].gpa.toFixed(2))}` : 'পাবলিশ হয়নি';
+                            })()}
                         </p>
                     </div>
                 </CardContent>
@@ -211,13 +236,25 @@ export default function ParentsDashboardPage() {
                         <div className="space-y-4">
                             {academicResults.map((res, i) => (
                                 <div key={i} className="p-4 border-2 rounded-2xl flex items-center justify-between bg-slate-50 hover:border-primary/30 transition-all">
-                                    <div>
+                                    <div className="max-w-[70%]">
                                         <h4 className="font-black text-slate-800">{res.exam}</h4>
-                                        <p className={cn("text-xs font-bold", res.isPass ? "text-emerald-600" : "text-rose-600")}>
-                                            {res.isPass ? 'কৃতকার্য' : 'অকৃতকার্য'} (গ্রেড: {res.grade})
-                                        </p>
+                                        {res.isPending ? (
+                                            <p className="text-xs font-bold text-amber-700 mt-0.5">
+                                                {res.pendingMessage}
+                                            </p>
+                                        ) : (
+                                            <p className={cn("text-xs font-bold", res.isPass ? "text-emerald-600" : "text-rose-600")}>
+                                                {res.isPass ? 'কৃতকার্য' : 'অকৃতকার্য'} (গ্রেড: {res.grade})
+                                            </p>
+                                        )}
                                     </div>
-                                    <Badge className="bg-primary h-8 px-4 font-black">GPA: {toBengaliNumber(res.gpa.toFixed(2))}</Badge>
+                                    {res.isPending ? (
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-black text-xs py-1">
+                                            {res.reason === 'scheduled' ? 'নির্ধারিত সময়ে প্রকাশ' : 'অপ্রকাশিত'}
+                                        </Badge>
+                                    ) : (
+                                        <Badge className="bg-primary h-8 px-4 font-black">GPA: {toBengaliNumber(res.gpa.toFixed(2))}</Badge>
+                                    )}
                                 </div>
                             ))}
                         </div>

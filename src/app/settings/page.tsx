@@ -29,6 +29,7 @@ import {
   Calendar,
   HardDriveDownload,
   Monitor,
+  Trophy,
   ImageIcon,
   ChevronRight
 } from 'lucide-react';
@@ -40,6 +41,7 @@ import {
   GalleryManagementSettings, 
   SystemUsageInfo 
 } from '@/components/settings/BpsSettingsComponents';
+import { ResultPublicationSettings } from '@/components/settings/ResultPublicationSettings';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from '@/hooks/use-toast';
@@ -495,6 +497,7 @@ function SettingsContent() {
       items.push(
         { id: 'sheets', label: 'ফাইল আপলোড', icon: FileUp, color: 'text-blue-600 bg-blue-50' },
         { id: 'requests', label: 'অনুমোদন আবেদন', icon: Users, color: 'text-orange-600 bg-orange-50' },
+        { id: 'result-publication', label: 'ফলাফল প্রকাশ নিয়ন্ত্রণ', icon: Trophy, color: 'text-purple-600 bg-purple-50' },
         { id: 'software', label: 'সফটওয়্যার ব্র্যান্ডিং', icon: Globe, color: 'text-indigo-600 bg-indigo-50' },
         { id: 'holidays', label: 'ছুটির ক্যালেন্ডার', icon: Calendar, color: 'text-rose-600 bg-rose-50' },
         { id: 'users', label: 'ইউজার ও পারমিশন', icon: Users, color: 'text-primary bg-primary/10' },
@@ -781,6 +784,10 @@ function SettingsContent() {
                       )}
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="result-publication" className="mt-0">
+                  <ResultPublicationSettings db={db!} userEmail={user?.email || undefined} />
                 </TabsContent>
 
                 <TabsContent value="software" className="mt-0">

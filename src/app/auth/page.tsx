@@ -45,6 +45,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { 
+  AlertCircle,
   Loader2, 
   LogIn, 
   UserPlus, 
@@ -83,6 +84,12 @@ import { GalleryConfig, defaultGalleryConfig } from '@/lib/gallery-data';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useAcademicYear } from '@/context/AcademicYearContext';
+import { 
+  getResultPublicationConfig, 
+  checkResultVisibility, 
+  ResultPublicationConfig,
+  formatBengaliDateTime
+} from '@/lib/result-publication-data';
 
 const toBengaliNumber = (str: string | number | undefined | null) => {
   if (!str && str !== 0) return '';
@@ -375,6 +382,13 @@ export default function AuthPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<StudentProcessedResult | null>(null);
   const [searchSubjects, setSearchSubjects] = useState<SubjectType[]>([]);
+  const [pubConfig, setPubConfig] = useState<ResultPublicationConfig | null>(null);
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!db) return;
+    getResultPublicationConfig(db).then(setPubConfig).catch(console.error);
+  }, [db]);
 
   const appName = schoolInfo?.name || '';
   const appLogoUrl = schoolInfo?.logoUrl || '';
@@ -583,6 +597,18 @@ export default function AuthPage() {
     const bnToEn = (str: string) => str.toString().replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
     if (!db || !searchYear || !searchClass || !searchExam || !searchRoll) {
       toast({ variant: 'destructive', title: 'সকল তথ্য সঠিকভাবে দিন' });
+      return;
+    }
+
+    // 🛑 ফলাফল প্রকাশ ও শিডিউল যাচাই
+    const visibility = checkResultVisibility(pubConfig, searchYear, searchExam, false);
+    if (!visibility.isVisible) {
+      setBlockedNotice(visibility.message);
+      toast({
+        variant: 'destructive',
+        title: visibility.reason === 'scheduled' ? 'ফলাফল প্রকাশের নির্ধারিত সময় হয়নি' : 'ফলাফল অপ্রকাশিত',
+        description: visibility.message
+      });
       return;
     }
 
@@ -904,7 +930,33 @@ export default function AuthPage() {
                 </DialogTitle>
                 <DialogDescription className="text-white/70 font-bold mt-1">সঠিক তথ্য দিয়ে ডিজিটাল রেজাল্ট সামারি দেখুন</DialogDescription>
               </div>
-              <form onSubmit={handleResultSearch} className="p-8 space-y-6 bg-white">
+              <form onSubmit={handleResultSearch} className="p-8 space-y-5 bg-white">
+                {/* সার্বিক নোটিশ */}
+                {pubConfig?.globalNotice && (
+                  <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-xl text-blue-900 font-bold text-xs flex items-center gap-2">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{pubConfig.globalNotice}</span>
+                  </div>
+                )}
+
+                {/* ব্লকড বা শিডিউল নোটিশ */}
+                {blockedNotice && (
+                  <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl text-amber-950 font-bold text-xs flex items-start gap-2.5 shadow-sm">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-black text-sm text-amber-950 mb-0.5">ফলাফল দেখার সুযোগ নেই</p>
+                      <p className="text-amber-900 leading-relaxed">{blockedNotice}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* শিক্ষাবর্ষ অফ থাকলে নোটিশ */}
+                {pubConfig?.allowedAcademicYears && pubConfig.allowedAcademicYears.length > 0 && !pubConfig.allowedAcademicYears.includes(searchYear) && (
+                  <div className="p-3 bg-rose-50 border-2 border-rose-200 rounded-xl text-rose-900 font-bold text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{toBengaliNumber(searchYear)} শিক্ষাবর্ষের ফলাফল সাধারণ অনুসন্ধানের জন্য বর্তমানে উন্মুক্ত নয়।</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="font-black text-xs uppercase text-slate-600">শিক্ষাবর্ষ</Label>
@@ -927,7 +979,26 @@ export default function AuthPage() {
                   <Select value={searchExam} onValueChange={setSearchExam}>
                     <SelectTrigger className="h-11 border-2 font-bold"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
                     <SelectContent className="z-[200]">
-                      {searchExams.map(e => <SelectItem key={e.id} value={e.name} className="font-bold">{e.name}</SelectItem>)}
+                      {searchExams.map(e => {
+                        const vis = checkResultVisibility(pubConfig, searchYear, e.name, false);
+                        return (
+                          <SelectItem key={e.id} value={e.name} className="font-bold">
+                            <span className="flex items-center gap-2">
+                              <span>{e.name}</span>
+                              {vis.reason === 'scheduled' && (
+                                <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-black">
+                                  নির্ধারিত সময়
+                                </span>
+                              )}
+                              {vis.reason === 'exam_hidden' && (
+                                <span className="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-black">
+                                  হাইড
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
