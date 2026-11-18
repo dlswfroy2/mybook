@@ -1312,6 +1312,10 @@ function EditableContentArea({
   const handleInput = () => {
     if (inputTimerRef.current) clearTimeout(inputTimerRef.current);
     inputTimerRef.current = setTimeout(() => {
+      const el = ref.current;
+      if (el) {
+        ensureQuestionIntegrity(el, Boolean(style?.isEnglish));
+      }
       checkAndReflow(true);
       if (onSyncPageContent && ref.current) {
         onSyncPageContent(pageIndex, ref.current.innerHTML);
@@ -2165,6 +2169,10 @@ function EditableContentArea({
         }}
         onPaste={handlePaste}
         onBlur={(e) => {
+          const el = ref.current;
+          if (el) {
+            ensureQuestionIntegrity(el, Boolean(style?.isEnglish));
+          }
           const val = e.currentTarget.innerHTML;
           onBlur(val);
         }}
@@ -2502,7 +2510,16 @@ export function QuestionPrintView({
       newPages.push(currentPageBlocks.join(''));
     }
 
-    const pagesToRender = newPages.length > 0 ? newPages : [""];
+    // ✅ Fix: Run ensureQuestionIntegrity on each page's HTML before rendering
+    // so serial numbers (১।, ২।...) are never lost after repagination
+    const pagesWithIntegrity: string[] = newPages.length > 0 ? newPages : [""];
+    const pagesToRender = pagesWithIntegrity.map((pageHtml) => {
+      if (!pageHtml.trim()) return pageHtml;
+      const tmpDiv = document.createElement('div');
+      tmpDiv.innerHTML = pageHtml;
+      ensureQuestionIntegrity(tmpDiv, Boolean(isEnglish));
+      return tmpDiv.innerHTML;
+    });
     setPaginatedPages(pagesToRender);
 
     const initialStyles: Record<number, any> = {};
@@ -2535,6 +2552,19 @@ export function QuestionPrintView({
     hasInitiallyPaginatedRef.current = true;
     repaginateDocument({ sourceContent: initialContent });
   }, [repaginateDocument, initialContent]);
+
+  // ✅ After every repagination, run ensureQuestionIntegrity on all live content areas
+  // so serial numbers and CQ marks are never lost
+  useEffect(() => {
+    if (repaginateVersion === 0) return;
+    const timer = setTimeout(() => {
+      const contentAreas = document.querySelectorAll('.content-area');
+      contentAreas.forEach((ca) => {
+        ensureQuestionIntegrity(ca as HTMLElement, Boolean(isEnglish));
+      });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [repaginateVersion, isEnglish]);
 
   const handleGlobalFontSizeChange = (sizeStr: string) => {
     const size = parseFloat(sizeStr);
