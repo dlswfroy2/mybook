@@ -3194,7 +3194,7 @@ export function QuestionPrintView({
             min-width: 24px !important;
             font-weight: bold !important;
             color: black !important;
-            user-select: none !important;
+            user-select: text !important;
             margin-right: 4px !important;
           }
           .content-area .cq-item > div,
@@ -3206,7 +3206,7 @@ export function QuestionPrintView({
           .content-area .short-mark {
             float: right !important;
             display: inline-block !important;
-            user-select: none !important;
+            user-select: text !important;
           }
         }
         @media print {
