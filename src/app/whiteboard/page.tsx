@@ -457,30 +457,105 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
 
+    // ── Mobile & Desktop: Responsive Sidebars ──
+    const isMobile = () => window.innerWidth <= 768;
+
+    const updateToggleButtons = () => {
+      const leftCol = toolbar.classList.contains('collapsed');
+      const rightCol = rightToolbar.classList.contains('collapsed');
+      if (isMobile()) {
+        toggleSidebarBtn.innerHTML = leftCol ? '✏️ টুলস' : '✕ বন্ধ';
+        toggleRightSidebarBtn.innerHTML = rightCol ? '⚙️ অপশন' : '✕ বন্ধ';
+      } else {
+        toggleSidebarBtn.textContent = leftCol ? '▶' : '◀';
+        toggleRightSidebarBtn.textContent = rightCol ? '◀' : '▶';
+      }
+    };
+
     const adjustScrollWrapperLayout = () => {
       const leftCol = toolbar.classList.contains('collapsed');
       const rightCol = rightToolbar.classList.contains('collapsed');
       const scrollWrapper = document.getElementById('scroll-wrapper');
       if (scrollWrapper) {
-        scrollWrapper.style.left = leftCol ? '35px' : '180px';
-        scrollWrapper.style.right = rightCol ? '35px' : '175px';
+        if (isMobile()) {
+          scrollWrapper.style.left = '0px';
+          scrollWrapper.style.right = '0px';
+        } else {
+          scrollWrapper.style.left = leftCol ? '35px' : '180px';
+          scrollWrapper.style.right = rightCol ? '35px' : '175px';
+        }
       }
+      updateToggleButtons();
     };
 
+    // ── Mobile backdrop for closing sidebar ──
+    let backdropEl = document.getElementById('wb-backdrop');
+    if (!backdropEl) {
+      backdropEl = document.createElement('div');
+      backdropEl.id = 'wb-backdrop';
+      backdropEl.className = 'sidebar-backdrop';
+      document.body.appendChild(backdropEl);
+    }
+    const closeAllDrawers = () => {
+      toolbar.classList.add('collapsed');
+      rightToolbar.classList.add('collapsed');
+      if (backdropEl) backdropEl.style.display = 'none';
+      adjustScrollWrapperLayout();
+    };
+    backdropEl.addEventListener('click', closeAllDrawers);
+
     const toggleSidebarHandler = () => {
-      toolbar.classList.toggle('collapsed');
-      toggleSidebarBtn.textContent = toolbar.classList.contains('collapsed') ? '▶' : '◀';
+      const isCurrentlyCollapsed = toolbar.classList.contains('collapsed');
+      if (isCurrentlyCollapsed) {
+        toolbar.classList.remove('collapsed');
+        if (isMobile()) {
+          rightToolbar.classList.add('collapsed');
+          if (backdropEl) backdropEl.style.display = 'block';
+        }
+      } else {
+        toolbar.classList.add('collapsed');
+        if (backdropEl && rightToolbar.classList.contains('collapsed')) {
+          backdropEl.style.display = 'none';
+        }
+      }
       adjustScrollWrapperLayout();
     };
     toggleSidebarBtn.addEventListener('click', toggleSidebarHandler);
 
     const toggleRightSidebarHandler = () => {
-      rightToolbar.classList.toggle('collapsed');
-      toggleRightSidebarBtn.textContent = rightToolbar.classList.contains('collapsed') ? '◀' : '▶';
+      const isCurrentlyCollapsed = rightToolbar.classList.contains('collapsed');
+      if (isCurrentlyCollapsed) {
+        rightToolbar.classList.remove('collapsed');
+        if (isMobile()) {
+          toolbar.classList.add('collapsed');
+          if (backdropEl) backdropEl.style.display = 'block';
+        }
+      } else {
+        rightToolbar.classList.add('collapsed');
+        if (backdropEl && toolbar.classList.contains('collapsed')) {
+          backdropEl.style.display = 'none';
+        }
+      }
       adjustScrollWrapperLayout();
     };
     toggleRightSidebarBtn.addEventListener('click', toggleRightSidebarHandler);
 
+    const resizeHandler = () => {
+      if (isMobile()) {
+        toolbar.classList.add('collapsed');
+        rightToolbar.classList.add('collapsed');
+        if (backdropEl) backdropEl.style.display = 'none';
+      }
+      adjustScrollWrapperLayout();
+    };
+    window.addEventListener('resize', resizeHandler);
+
+    // Initial state on mobile
+    if (isMobile()) {
+      toolbar.classList.add('collapsed');
+      rightToolbar.classList.add('collapsed');
+      if (backdropEl) backdropEl.style.display = 'none';
+    }
     adjustScrollWrapperLayout();
 
     canvas.addEventListener('wheel', (e: WheelEvent) => {
@@ -2157,6 +2232,11 @@ export default function WhiteboardPage() {
       document.querySelectorAll('.bg-btn').forEach(btn => btn.removeEventListener('click', bgBtnHandler));
       toggleSidebarBtn.removeEventListener('click', toggleSidebarHandler);
       toggleRightSidebarBtn.removeEventListener('click', toggleRightSidebarHandler);
+      window.removeEventListener('resize', resizeHandler);
+      if (backdropEl) {
+        backdropEl.removeEventListener('click', closeAllDrawers);
+        if (backdropEl.parentNode) backdropEl.parentNode.removeChild(backdropEl);
+      }
       canvasContainer.removeEventListener('mousemove', spotlightMoveHandler);
       document.removeEventListener('mousemove', curtainMouseMoveHandler);
       document.removeEventListener('mouseup', curtainMouseUpHandler);

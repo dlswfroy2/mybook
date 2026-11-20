@@ -15,73 +15,82 @@
 
 .whiteboard-body .sidebar-toggle {
   position: fixed;
-  top: 10px;
-  z-index: 10005; /* Increased to stay above tabs */
-  background: #ee0707;
-  color: #06ec25;
-  border: 3px solid #1908fa;
-  padding: 1px 2px;
-  font-size: 20px;
-  font-weight: bold;
+  top: 56px;
+  z-index: 10005;
+  background: #1e1b4b;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 4px 0 #8b0000; /* 3D effect */
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  backdrop-filter: blur(8px);
 }
 
 .whiteboard-body .sidebar-toggle:hover {
-  background: #087bee;
+  background: #312e81;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
 .whiteboard-body .sidebar-toggle:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #8b0000;
+  transform: translateY(1px);
 }
 
 .whiteboard-body .left-toggle {
   left: 0px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 10px 10px 0;
+  border-left: none;
 }
 
 .whiteboard-body .right-toggle {
   right: 0px;
-  border-radius: 8px 0 0 8px;
+  border-radius: 10px 0 0 10px;
+  border-right: none;
 }
 
 .whiteboard-body .sidebar {
   position: fixed;
-  top: 45px;
-  bottom: 10px;
+  top: 48px;
+  bottom: 0px;
   width: 160px;
-  background: rgba(126, 113, 236, 0.95);
+  background: rgba(30, 27, 75, 0.96);
   padding: 10px;
-  border-radius: 12px;
+  border-radius: 0;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
   align-items: center;
   z-index: 10000;
   overflow-y: auto;
   box-sizing: border-box;
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .whiteboard-body .left-sidebar {
-  left: 10px;
+  left: 0;
+  border-radius: 0 12px 12px 0;
 }
 
 .whiteboard-body .left-sidebar.collapsed {
-  transform: translateX(-180px);
+  transform: translateX(-100%);
 }
 
 .whiteboard-body .right-sidebar {
-  right: 5px;
+  right: 0;
+  border-radius: 12px 0 0 12px;
 }
 
 .whiteboard-body .right-sidebar.collapsed {
-  transform: translateX(180px);
+  transform: translateX(100%);
 }
 
 .whiteboard-body .sidebar::-webkit-scrollbar {
@@ -210,13 +219,25 @@
   justify-content: flex-start;
   gap: 8px;
   overflow-x: auto;
-  padding: 8px 15px;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-blur: 10px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   position: relative;
   z-index: 10002;
   scrollbar-width: thin;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.whiteboard-body #browser-tabs-container > * {
+  flex-shrink: 0;
+}
+
+.whiteboard-body #tabs-wrapper > * {
+  flex-shrink: 0;
 }
 
 .whiteboard-body #tabs-wrapper {
@@ -583,4 +604,153 @@
   left: 320px;
   right: auto;
   z-index: 10025;
+}
+
+
+
+/* ══════════════════════════════════════════════════
+   MOBILE RESPONSIVE STYLES (max-width: 768px)
+   ══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Full screen canvas on mobile */
+  .whiteboard-body #scroll-wrapper {
+    left: 0 !important;
+    right: 0 !important;
+    top: 48px !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    padding: 10px 4px !important;
+  }
+
+  /* Sidebars act as off-canvas drawers on mobile */
+  .whiteboard-body .sidebar {
+    width: min(88vw, 320px) !important;
+    top: 48px !important;
+    bottom: 0 !important;
+    padding: 14px 10px !important;
+    gap: 8px !important;
+    border-radius: 0 !important;
+    z-index: 10015 !important;
+    box-shadow: 0 0 35px rgba(0, 0, 0, 0.75) !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+  }
+
+  .whiteboard-body .left-sidebar {
+    left: 0 !important;
+    transform: translateX(-100%) !important;
+  }
+  .whiteboard-body .left-sidebar:not(.collapsed) {
+    transform: translateX(0) !important;
+  }
+
+  .whiteboard-body .right-sidebar {
+    right: 0 !important;
+    transform: translateX(100%) !important;
+  }
+  .whiteboard-body .right-sidebar:not(.collapsed) {
+    transform: translateX(0) !important;
+  }
+
+  /* 2-column grid for tools on mobile for quick tapping */
+  .whiteboard-body .tool-group {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .whiteboard-body .bg-btn-group {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  /* Big touchable buttons */
+  .whiteboard-body .tool-btn,
+  .whiteboard-body .bg-btn,
+  .whiteboard-body .sidebar button {
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+    min-height: 38px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Floating toggle buttons on mobile */
+  .whiteboard-body .sidebar-toggle {
+    top: 56px !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    background: rgba(30, 27, 75, 0.95) !important;
+    backdrop-filter: blur(8px) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  .whiteboard-body .left-toggle {
+    left: 0 !important;
+    border-radius: 0 12px 12px 0 !important;
+  }
+
+  .whiteboard-body .right-toggle {
+    right: 0 !important;
+    border-radius: 12px 0 0 12px !important;
+  }
+
+  /* Backdrop overlay */
+  .whiteboard-body .sidebar-backdrop {
+    position: fixed;
+    inset: 48px 0 0 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 10010;
+  }
+
+  /* Header buttons on mobile */
+  .whiteboard-body #browser-tabs-container {
+    padding: 4px 8px !important;
+    gap: 6px !important;
+  }
+
+  .whiteboard-body .board-tab {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+  }
+
+  .whiteboard-body #add-board-page,
+  .whiteboard-body #delete-board-page {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+
+  /* Widgets on mobile */
+  .whiteboard-body .widget {
+    width: 94vw !important;
+    left: 3vw !important;
+    right: 3vw !important;
+    top: 54px !important;
+  }
+
+  .whiteboard-body #ai-draw-widget {
+    left: 3vw !important;
+    right: 3vw !important;
+    top: 54px !important;
+    width: auto !important;
+  }
+
+  .whiteboard-body #modal-3d .modal-content {
+    width: 95vw !important;
+    padding: 12px !important;
+  }
+  .whiteboard-body #modal-3d #container-3d {
+    height: 250px !important;
+  }
+
+  .whiteboard-body #ai-modal {
+    width: 96vw !important;
+    height: 82vh !important;
+  }
+}
+
+.whiteboard-body .sidebar-backdrop {
+  display: none;
 }

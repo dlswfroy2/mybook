@@ -21,7 +21,7 @@ function BottomNavContent() {
 
   const isPrintMode = searchParams.get('print') === 'true';
 
-  if (loading || !user || pathname === '/auth' || isPrintMode) {
+  if (loading || !user || pathname === '/auth' || pathname === '/whiteboard' || isPrintMode) {
     return null;
   }
 

@@ -107,7 +107,7 @@ function NavbarContent() {
 
   const { selectedYear, setSelectedYear, availableYears } = useAcademicYear();
 
-  if (pathname === '/auth' || isPrintMode) {
+  if (pathname === '/auth' || pathname === '/whiteboard' || isPrintMode) {
     return null;
   }
 
