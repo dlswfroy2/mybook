@@ -258,9 +258,13 @@ export function FloatingSelectionToolbar({ onSync }: FloatingSelectionToolbarPro
         top = rect.bottom + 8;
       }
 
-      let left = rect.left + (rect.width / 2) - 220;
+      const screenW = typeof window !== 'undefined' ? window.innerWidth : 800;
+      const toolbarWidth = Math.min(460, screenW - 20);
+      let left = rect.left + (rect.width / 2) - (toolbarWidth / 2);
       if (left < 10) left = 10;
-      if (left + 460 > window.innerWidth) left = window.innerWidth - 470;
+      if (left + toolbarWidth > screenW - 10) {
+        left = Math.max(10, screenW - toolbarWidth - 10);
+      }
 
       setCoords({ top, left });
       setVisible(true);
@@ -282,7 +286,7 @@ export function FloatingSelectionToolbar({ onSync }: FloatingSelectionToolbarPro
         left: `${coords.left}px`,
         zIndex: 999999,
       }}
-      className="no-print bg-slate-900/95 backdrop-blur-md text-white px-2 py-1.5 rounded-xl shadow-2xl border border-slate-700/80 flex items-center gap-1 font-kalpurush select-none animate-in fade-in zoom-in-95 duration-150"
+      className="no-print bg-slate-900/95 backdrop-blur-md text-white px-2 py-1.5 rounded-xl shadow-2xl border border-slate-700/80 flex items-center gap-1 font-kalpurush select-none animate-in fade-in zoom-in-95 duration-150 max-w-[calc(100vw-20px)] overflow-x-auto no-scrollbar touch-manipulation"
     >
       {/* Font Family Dropdown */}
       <div className="relative">

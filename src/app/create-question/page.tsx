@@ -879,42 +879,42 @@ function CreateQuestionContent() {
     <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         {/* Header */}
-        <header className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-              <FileText className="w-7 h-7" />
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+              <FileText className="w-5 h-5 sm:w-7 sm:h-7" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-indigo-950">প্রশ্নপত্র নির্মাতা ও লাইভ এডিটর</h2>
-              <p className="text-xs text-slate-500 font-bold mt-0.5">বোর্ড পরীক্ষার মানসম্পন্ন প্রশ্নপত্র তৈরি, এআই সহায়তা ও পূর্ণাঙ্গ ওয়ার্ড লেআউট</p>
+              <h2 className="text-xl sm:text-2xl font-black text-indigo-950">প্রশ্নপত্র নির্মাতা ও লাইভ এডিটর</h2>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-bold mt-0.5">বোর্ড পরীক্ষার মানসম্পন্ন প্রশ্নপত্র তৈরি, এআই সহায়তা ও পূর্ণাঙ্গ ওয়ার্ড লেআউট</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold">
-              <ArrowLeft className="w-4 h-4" /> ফিরে যান
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => router.back()} className="gap-1.5 font-bold h-9 text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
             </Button>
             <Button 
               variant="default" 
               onClick={handleGoToPrint} 
-              className="gap-2 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+              className="gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md h-9 text-xs"
             >
-              <Printer className="w-4 h-4" /> প্রিন্ট ও পেজ লেআউট
+              <Printer className="w-3.5 h-3.5" /> প্রিন্ট ও পেজ লেআউট
             </Button>
             {editId && (
-              <Button variant="outline" onClick={() => router.push(`/online-exam?id=${editId}`)} className="gap-2 font-bold border-emerald-500 text-emerald-700 hover:bg-emerald-50">
-                <GraduationCap className="w-4 h-4" /> অনলাইন পরীক্ষা
+              <Button variant="outline" onClick={() => router.push(`/online-exam?id=${editId}`)} className="gap-1.5 font-bold border-emerald-500 text-emerald-700 hover:bg-emerald-50 h-9 text-xs">
+                <GraduationCap className="w-3.5 h-3.5" /> অনলাইন পরীক্ষা
               </Button>
             )}
-            <Button variant="outline" onClick={() => router.push(editId ? `/omr-sheet?id=${editId}` : `/omr-sheet?count=${questions.length || 25}`)} className="gap-2 font-bold border-purple-500 text-purple-700 hover:bg-purple-50">
-              <CheckCircle2 className="w-4 h-4" /> OMR শিট
+            <Button variant="outline" onClick={() => router.push(editId ? `/omr-sheet?id=${editId}` : `/omr-sheet?count=${questions.length || 25}`)} className="gap-1.5 font-bold border-purple-500 text-purple-700 hover:bg-purple-50 h-9 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5" /> OMR শিট
             </Button>
           </div>
         </header>
 
         {/* 2-Column Layout: Left Sidebar + Right Main Editor Area */}
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
           {/* Left Sidebar: Controls & AI Actions */}
-          <aside className="w-full lg:w-80 shrink-0 space-y-6 sticky top-24">
+          <aside className="w-full lg:w-80 shrink-0 space-y-6 lg:sticky lg:top-24">
             <Card className="shadow-md border-indigo-100 border-2">
               <CardHeader className="bg-indigo-50/60 border-b py-3">
                 <CardTitle className="text-base flex items-center gap-2 font-bold text-indigo-900">
@@ -1115,48 +1115,48 @@ function CreateQuestionContent() {
           <div className="flex-1 min-w-0 space-y-6">
             <Tabs value={activeMainTab} onValueChange={(v: any) => setActiveMainTab(v)} className="w-full">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <TabsList className="bg-slate-100 p-1 h-10 border border-slate-200">
-                  <TabsTrigger value="editor" className="font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <Eye className="w-3.5 h-3.5" /> লাইভ প্রশ্নপত্র এডিটর
+                <TabsList className="bg-slate-100 p-1 h-auto flex flex-wrap sm:flex-nowrap border border-slate-200 w-full sm:w-auto">
+                  <TabsTrigger value="editor" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
+                    <Eye className="w-3.5 h-3.5" /> লাইভ এডিটর
                   </TabsTrigger>
-                  <TabsTrigger value="cards" className="font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <ListChecks className="w-3.5 h-3.5" /> কার্ডভিত্তিক প্রশ্ন তালিকা ({toBengaliNumber(activeSet === 'A' ? questions.length : questionsB.length)})
+                  <TabsTrigger value="cards" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
+                    <ListChecks className="w-3.5 h-3.5" /> কার্ড তালিকা ({toBengaliNumber(activeSet === 'A' ? questions.length : questionsB.length)})
                   </TabsTrigger>
-                  <TabsTrigger value="raw_code" className="font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <Code2 className="w-3.5 h-3.5" /> এইচটিএমএল কোড
+                  <TabsTrigger value="raw_code" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
+                    <Code2 className="w-3.5 h-3.5" /> কোড ভিউ
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Quick Editor Action Toolbar */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <Button
                     type="button"
                     onClick={() => setTemplateModalOpen(true)}
                     size="sm"
                     variant="outline"
-                    className="h-8 gap-1.5 font-bold border-indigo-200 text-indigo-800 hover:bg-indigo-50 text-xs"
+                    className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 hover:bg-indigo-50 text-xs px-2 sm:px-3"
                     title="রেডিমেড প্রশ্নপত্র টেমপ্লেট বেছে নিন"
                   >
-                    <LayoutTemplate className="w-3.5 h-3.5 text-indigo-600" /> টেমপ্লেট
+                    <LayoutTemplate className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden xs:inline">টেমপ্লেট</span>
                   </Button>
                   <Button
                     type="button"
                     onClick={() => setQrModalOpen(true)}
                     size="sm"
                     variant="outline"
-                    className="h-8 gap-1.5 font-bold border-purple-200 text-purple-800 hover:bg-purple-50 text-xs"
+                    className="h-8 gap-1 font-bold border-purple-200 text-purple-800 hover:bg-purple-50 text-xs px-2 sm:px-3"
                     title="প্রশ্নপত্রে QR কোড যুক্ত করুন"
                   >
-                    <QrCode className="w-3.5 h-3.5 text-purple-600" /> QR কোড
+                    <QrCode className="w-3.5 h-3.5 text-purple-600" /> <span className="hidden xs:inline">QR কোড</span>
                   </Button>
                   <Button
                     type="button"
                     onClick={handleOpenAiAssistant}
                     size="sm"
-                    className="h-8 gap-1.5 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs text-xs"
+                    className="h-8 gap-1 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs text-xs px-2 sm:px-3"
                     title="মান ও টপিক অনুযায়ী AI দিয়ে প্রশ্ন তৈরি করুন"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> AI সহকারী
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> <span>AI সহকারী</span>
                   </Button>
                   <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
                   <Button 
@@ -1164,9 +1164,9 @@ function CreateQuestionContent() {
                     disabled={isScanning} 
                     variant="outline" 
                     size="sm" 
-                    className="h-8 gap-1.5 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-bold text-xs"
+                    className="h-8 gap-1 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-bold text-xs px-2 sm:px-3"
                   >
-                    {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />} এআই স্ক্যান
+                    {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />} <span className="hidden xs:inline">স্ক্যান</span>
                   </Button>
                 </div>
               </div>
@@ -1174,22 +1174,22 @@ function CreateQuestionContent() {
               {/* Tab 1: Live Visual Paper Editor */}
               <TabsContent value="editor" className="mt-0 space-y-4">
                 <Card className="shadow-lg border-2 border-slate-200 bg-slate-100/50">
-                  <CardHeader className="py-2.5 px-4 bg-white border-b flex flex-row items-center justify-between">
-                    <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
-                      📄 লাইভ প্রিন্ট-স্টাইল লেআউট (এখানে সরাসরি ক্লিক করে সম্পাদনা বা টেবিল বসানো যাবে)
+                  <CardHeader className="py-2.5 px-3 sm:px-4 bg-white border-b flex flex-row items-center justify-between">
+                    <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 truncate">
+                      📄 লাইভ প্রিন্ট-স্টাইল লেআউট
                     </span>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={handleGoToPrint}
-                      className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7"
+                      className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
                     >
-                      পূর্ণাঙ্গ ওয়ার্ড ভিউতে খুলুন ↗
+                      ওয়ার্ড ভিউ ↗
                     </Button>
                   </CardHeader>
-                  <CardContent className="p-4 sm:p-8 flex justify-center">
+                  <CardContent className="p-2 sm:p-4 md:p-8 flex justify-center overflow-x-auto">
                     {/* Visual A4 Paper Preview */}
-                    <div className="w-full max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-8 sm:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm">
+                    <div className="w-full max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm">
                       {/* Institutional Header */}
                       <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
                         <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
@@ -1241,9 +1241,9 @@ function CreateQuestionContent() {
               {/* Tab 2: Item-by-item Cards View */}
               <TabsContent value="cards" className="mt-0 space-y-4">
                 <Card className="shadow-md border-slate-200">
-                  <CardHeader className="py-3 px-6 bg-slate-50 border-b flex flex-row items-center justify-between">
+                  <CardHeader className="py-3 px-3 sm:px-6 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-slate-800">সেট নির্বাচন:</span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-800">সেট নির্বাচন:</span>
                       <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5">
                         <button
                           type="button"
@@ -1258,7 +1258,7 @@ function CreateQuestionContent() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         type="button"
                         onClick={handleGenerateRandomPaper}
@@ -1280,7 +1280,7 @@ function CreateQuestionContent() {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="p-3 sm:p-6 space-y-4">
                     {(activeSet === 'A' ? questions : questionsB).length === 0 ? (
                       <div className="text-center py-16 text-slate-400">
                         <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
@@ -1885,12 +1885,11 @@ function CreateQuestionContent() {
           .math-sub { font-size: 0.7em; vertical-align: sub; }
           .q-num,
           strong[contenteditable="false"] {
-            display: inline-block !important;
-            min-width: 24px !important;
+            display: inline !important;
             font-weight: bold !important;
             color: black !important;
             user-select: text !important;
-            margin-right: 4px !important;
+            margin-right: 6px !important;
           }
           .cq-item > div,
           .cq-item div,

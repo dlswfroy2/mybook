@@ -37,7 +37,9 @@ import {
   Palette,
   Edit3,
   BrainCircuit,
-  Plus
+  Plus,
+  LayoutTemplate,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -2321,6 +2323,24 @@ export function QuestionPrintView({
   const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [aiTopic, setAiTopic] = useState(meta.chapter || '');
 
+  // Auto-adapt for mobile view on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false);
+      setShowRuler(false);
+      const fitZoom = Math.max(45, Math.min(100, Math.floor(((window.innerWidth - 20) / 794) * 100)));
+      setPreviewZoom(fitZoom);
+    }
+  }, []);
+
+  const handleFitToScreen = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 768;
+    const availableWidth = isMobile ? window.innerWidth - 20 : window.innerWidth - (sidebarOpen ? 340 : 40);
+    const fitZoom = Math.max(45, Math.min(150, Math.floor((availableWidth / 794) * 100)));
+    setPreviewZoom(fitZoom);
+  }, [sidebarOpen]);
+
   // Safeguard against browser / extension runaway zoom (e.g. 9960% or 10000%)
   useEffect(() => {
     const handleWheelZoom = (e: WheelEvent) => {
@@ -2731,7 +2751,7 @@ export function QuestionPrintView({
       const newHtmlBlocks = res.questions.map((q, i) => {
         const nextNum = questions.length + i + 1;
         const num = isEnglish ? `${nextNum}.` : `${toBengaliNumber(nextNum)}।`;
-        return `<div class="question-block my-2" style="margin: 10px 0;"><p style="margin: 0 0 4px 0; font-weight: bold;"><span style="display: inline-block; min-width: 24px;">${num}</span> ${q.formattedText}</p></div>`;
+        return `<div class="question-block my-2" style="margin: 10px 0;"><p style="margin: 0 0 4px 0; font-weight: bold;"><span class="q-num" style="display: inline; font-weight: bold; margin-right: 6px;">${num}</span> ${q.formattedText}</p></div>`;
       }).join('\n\n');
 
       const updated = documentContent ? (documentContent + '\n\n' + newHtmlBlocks) : newHtmlBlocks;
@@ -2764,28 +2784,28 @@ export function QuestionPrintView({
       <div ref={measurementRef} style={{ position: 'absolute', top: -99999, left: -99999, visibility: 'hidden', pointerEvents: 'none' }} />
 
       {/* ── Top Header Toolbar ── */}
-      <header className="no-print h-12 bg-white border-b flex items-center justify-between px-4 shrink-0 shadow-sm z-50 select-none">
-        <div className="flex items-center gap-3">
+      <header className="no-print h-12 bg-white border-b flex items-center justify-between px-2 sm:px-4 shrink-0 shadow-sm z-50 select-none">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSidebarOpen(prev => !prev)}
-            className="h-8 w-8 text-slate-600 hover:text-slate-900"
+            className="h-8 w-8 text-slate-600 hover:text-slate-900 shrink-0"
             title={sidebarOpen ? "সাইড মেনুবার লুকান" : "সাইড মেনুবার দেখান"}
           >
             {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
           </Button>
-          <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center shrink-0">
             <Eye className="w-4 h-4" />
           </div>
-          <h3 className="font-bold text-sm hidden sm:inline text-slate-800 truncate max-w-xs md:max-w-md">
+          <h3 className="font-bold text-sm hidden md:inline text-slate-800 truncate max-w-xs md:max-w-md">
             প্রিন্ট প্রিভিউ ও এডিটর - {meta.institution || appName}
           </h3>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-1">
           {/* Font Size +/- */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5" title="ফন্ট সাইজ পরিবর্তন করুন (সিলেক্ট করা অংশে বা পুরো পেজে)">
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5 shrink-0" title="ফন্ট সাইজ পরিবর্তন করুন (সিলেক্ট করা অংশে বা পুরো পেজে)">
             <button
               type="button"
               onMouseDown={e => e.preventDefault()}
@@ -2808,10 +2828,10 @@ export function QuestionPrintView({
                   handleSmartFontSizeChange((e.target as HTMLInputElement).value);
                 }
               }}
-              className="w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
+              className="w-9 sm:w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
               title="ফন্ট সাইজ লিখুন (pt)"
             />
-            <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
+            <span className="text-[9px] text-slate-500 font-bold pr-0.5 hidden xs:inline">pt</span>
             <button
               type="button"
               onMouseDown={e => e.preventDefault()}
@@ -2825,8 +2845,8 @@ export function QuestionPrintView({
             >+</button>
           </div>
 
-          {/* Zoom controls */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+          {/* Zoom controls with Fit to screen */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0">
             <button
               type="button"
               onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
@@ -2837,8 +2857,16 @@ export function QuestionPrintView({
             </button>
             <button
               type="button"
+              onClick={handleFitToScreen}
+              className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 transition-colors"
+              title="স্ক্রিনে ফিট করুন"
+            >
+              ফিট
+            </button>
+            <button
+              type="button"
               onClick={() => setPreviewZoom(100)}
-              className="text-[11px] font-bold px-1.5 min-w-[50px] text-center text-slate-700 hover:text-indigo-600 cursor-pointer transition-colors"
+              className="text-[11px] font-bold px-1 sm:px-1.5 min-w-[38px] sm:min-w-[50px] text-center text-slate-700 hover:text-indigo-600 cursor-pointer transition-colors"
               title="ক্লিক করে ১০০% রিসেট করুন"
             >
               {toBengaliNumber(effectiveZoom)}%
@@ -2853,55 +2881,80 @@ export function QuestionPrintView({
             </button>
           </div>
 
-          {/* Ruler Toggle */}
+          {/* Ruler Toggle - Hidden on mobile, visible on md: */}
           <Button
             variant={showRuler ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setShowRuler(prev => !prev)}
-            className={cn("h-8 text-xs font-bold gap-1 px-2.5", showRuler && "bg-indigo-100 text-indigo-700")}
+            className={cn("h-8 text-xs font-bold gap-1 px-2.5 hidden md:flex shrink-0", showRuler && "bg-indigo-100 text-indigo-700")}
             title="রুলার দেখান / লুকান"
           >
             <Ruler className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">রুলার</span>
+            <span>রুলার</span>
           </Button>
 
           {/* AI Question Assistant Button */}
           <Button
             size="sm"
             onClick={() => setAiModalOpen(true)}
-            className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 shadow-xs"
+            className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2 sm:px-3 shadow-xs shrink-0"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
             <span className="hidden sm:inline">AI সহকারী</span>
           </Button>
 
           {/* Page Count */}
-          <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hidden md:block">
+          <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hidden lg:block shrink-0">
             মোট পাতা: {toBengaliNumber(paginatedPages.length)}
           </div>
 
           {/* Back, Save, Print */}
-          <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1.5 font-bold border-slate-300 text-slate-700 bg-white">
+          <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white px-2 sm:px-3 shrink-0" title="ফিরে যান">
             <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
           </Button>
-          <Button size="sm" onClick={handleSaveDocument} disabled={saving} className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-3">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ
+          <Button size="sm" onClick={handleSaveDocument} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ করুন">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ</span>
           </Button>
-          <Button size="sm" onClick={() => window.print()} className="h-8 gap-1.5 font-bold bg-primary hover:bg-primary/90 text-white px-4">
-            <Printer className="w-3.5 h-3.5" /> প্রিন্ট
+          <Button size="sm" onClick={() => window.print()} className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2 sm:px-4 shrink-0" title="প্রিন্ট করুন">
+            <Printer className="w-3.5 h-3.5" /> <span className="hidden xs:inline">প্রিন্ট</span>
           </Button>
         </div>
       </header>
 
       {/* Main Print Body */}
-      <div className="print-body-row flex-1 flex overflow-hidden">
-        {/* ── Left Sidebar Menubar ── */}
+      <div className="print-body-row flex-1 flex overflow-hidden relative">
+        {/* Mobile backdrop for drawer sidebar */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-xs transition-opacity"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── Left Sidebar Menubar (Drawer on mobile, collapsible panel on desktop) ── */}
         <aside
           className={cn(
-            "no-print bg-white border-r flex flex-col shrink-0 transition-all duration-300 z-30 font-kalpurush select-none",
-            sidebarOpen ? "w-80 lg:w-88" : "w-0 overflow-hidden border-none"
+            "no-print bg-white flex flex-col shrink-0 transition-all duration-300 font-kalpurush select-none",
+            // Mobile: fixed slide-over drawer
+            "fixed md:static inset-y-0 left-0 z-50 md:z-30 h-full border-r",
+            "w-[85vw] max-w-[320px] md:w-80 lg:w-88 shadow-2xl md:shadow-none",
+            sidebarOpen ? "translate-x-0 md:translate-x-0" : "-translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden md:border-none"
           )}
         >
+          {/* Mobile drawer header with close button */}
+          <div className="md:hidden flex items-center justify-between px-3 py-2 border-b bg-indigo-900 text-white shrink-0">
+            <span className="font-bold text-xs flex items-center gap-1.5">
+              <LayoutTemplate className="w-4 h-4 text-amber-300" /> ফরম্যাটিং ও পেজ টুলস
+            </span>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 rounded-md hover:bg-white/20 text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* Tab buttons */}
           <div className="grid grid-cols-4 border-b bg-slate-50 text-xs font-black p-1 gap-1 shrink-0">
             <button
@@ -2988,10 +3041,10 @@ export function QuestionPrintView({
         </aside>
 
         {/* ── Main Canvas Area with Dynamic Pages ── */}
-        <div className="print-canvas-col flex-1 flex flex-col overflow-hidden relative">
-          <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
+        <div className="print-canvas-col flex-1 flex flex-col overflow-hidden relative w-full">
+          <main className="print-main-area flex-1 overflow-x-auto overflow-y-auto bg-slate-200 py-3 sm:py-6 px-1 sm:px-4 flex flex-col items-center gap-4 sm:gap-8 relative overscroll-contain" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
             {showRuler && (
-              <div className="no-print sticky top-0 z-40 bg-slate-200/95 backdrop-blur-xs pb-3 pt-1 flex justify-center w-full shadow-xs">
+              <div className="no-print sticky top-0 z-40 bg-slate-200/95 backdrop-blur-xs pb-3 pt-1 flex justify-center w-full shadow-xs overflow-x-auto no-scrollbar">
                 <WordRuler
                   paperWidthInches={currentPaperWidth}
                   marginLeft={currentMarginL}
@@ -3060,17 +3113,17 @@ export function QuestionPrintView({
                     border: borderCss
                   }}
                 >
-                  {/* Action buttons on hover */}
-                  <div className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 flex gap-2">
-                    <Button size="sm" variant={activeEditIdx === idx ? 'default' : 'secondary'} className="gap-2 font-bold shadow-lg" onClick={() => setActiveEditIdx(idx)}>
-                      <Edit3 className="w-3.5 h-3.5" /> এডিট করুন
+                  {/* Action buttons on hover / touch */}
+                  <div className="no-print absolute top-2 right-2 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 flex gap-1.5">
+                    <Button size="sm" variant={activeEditIdx === idx ? 'default' : 'secondary'} className="h-7 px-2 sm:px-3 text-xs gap-1 font-bold shadow-md" onClick={() => setActiveEditIdx(idx)}>
+                      <Edit3 className="w-3.5 h-3.5" /> <span className="hidden xs:inline">এডিট</span>
                     </Button>
-                    <Button size="sm" variant="destructive" className="gap-2 font-bold shadow-lg" onClick={() => {
+                    <Button size="sm" variant="destructive" className="h-7 px-2 sm:px-3 text-xs gap-1 font-bold shadow-md" onClick={() => {
                       if (!confirm("মুছে ফেলবেন?")) return;
                       const newP = paginatedPages.filter((_, i) => i !== idx);
                       setPaginatedPages(newP);
                     }}>
-                      <Trash2 className="w-3.5 h-3.5" /> মুছে ফেলুন
+                      <Trash2 className="w-3.5 h-3.5" /> <span className="hidden xs:inline">মুছুন</span>
                     </Button>
                   </div>
 
@@ -3146,9 +3199,9 @@ export function QuestionPrintView({
               );
             })}
 
-            <div className="no-print pt-4 pb-10">
-              <Button onClick={() => handleAddNextPage("")} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl">
-                <PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন
+            <div className="no-print pt-4 pb-10 w-full flex justify-center px-2">
+              <Button onClick={() => handleAddNextPage("")} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-14 sm:h-16 w-full max-w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl">
+                <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6" /> নতুন পাতা যোগ করুন
               </Button>
             </div>
           </main>
@@ -3238,12 +3291,11 @@ export function QuestionPrintView({
           .paper { color: black !important; }
           .content-area .q-num,
           .content-area strong[contenteditable="false"] {
-            display: inline-block !important;
-            min-width: 24px !important;
+            display: inline !important;
             font-weight: bold !important;
             color: black !important;
             user-select: text !important;
-            margin-right: 4px !important;
+            margin-right: 6px !important;
           }
           .content-area .cq-item > div,
           .content-area .cq-item div,

@@ -197,7 +197,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
   <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; display: block;">
-    <strong class="q-num" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px;">${qNum}</strong>${formatMultilineText(qLine)}
+    <strong class="q-num" style="display: inline; font-weight: bold; margin-right: 6px;">${qNum}</strong>${formatMultilineText(qLine)}
   </p>
   ${(optA || optB || optC || optD) ? `
   <div class="mcq-options-row" style="padding-left: 20px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
@@ -232,7 +232,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     return `<div class="mcq-item my-2.5 font-kalpurush" style="margin: 8px 0 12px 0; page-break-inside: avoid; display: block;">
   <p class="mcq-question" style="margin: 0 0 5px 0; font-weight: bold; line-height: 1.55; text-align: justify; display: block;">
-    <strong class="q-num" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px;">${qNum}</strong>${formatMultilineText(qLine)}
+    <strong class="q-num" style="display: inline; font-weight: bold; margin-right: 6px;">${qNum}</strong>${formatMultilineText(qLine)}
   </p>
   ${(optA || optB || optC || optD) ? `
   <div class="mcq-options-row" style="padding-left: 20px; display: grid; grid-template-columns: repeat(${gridCols}, 1fr); gap: 6px 16px; font-size: 0.98em; line-height: 1.5;">
@@ -289,7 +289,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
 
     return `<div class="cq-item my-3 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
   <p class="cq-stimulus" style="margin: 0 0 5px 0; line-height: 1.6; text-align: justify; display: block;">
-    <strong class="q-num" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px;">${qNum}</strong>${formatMultilineText(stimulus)}
+    <strong class="q-num" style="display: inline; font-weight: bold; margin-right: 6px;">${qNum}</strong>${formatMultilineText(stimulus)}
   </p>
   <div class="cq-sub-questions" style="padding-left: 20px; display: block;">
     ${partA ? `<p class="cq-sub" style="margin: 0 0 4px 0; line-height: 1.5; text-align: justify; display: block;">
@@ -324,7 +324,7 @@ export function formatQuestionToBoardStandardHtml(rawText: string, idx: number, 
   return `<div class="short-item my-2 font-kalpurush" style="margin: 10px 0 14px 0; page-break-inside: avoid; display: block;">
   <p style="margin: 0; line-height: 1.6; text-align: justify; display: block;">
     ${mark ? `<span class="short-mark" style="float: right; font-weight: bold; margin-left: 12px;">${mark}</span>` : ''}
-    <strong class="q-num" style="display: inline-block; min-width: 24px; font-weight: bold; margin-right: 4px;">${qNum}</strong>${formatMultilineText(bodyText)}
+    <strong class="q-num" style="display: inline; font-weight: bold; margin-right: 6px;">${qNum}</strong>${formatMultilineText(bodyText)}
   </p>
 </div>`;
 }
@@ -349,9 +349,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
             firstStrong.removeAttribute('contenteditable');
             firstStrong.classList.add('q-num');
             firstStrong.textContent = qNumStr;
-            (firstStrong as HTMLElement).style.display = 'inline-block';
-            (firstStrong as HTMLElement).style.minWidth = '24px';
-            (firstStrong as HTMLElement).style.marginRight = '4px';
+            (firstStrong as HTMLElement).style.display = 'inline';
+            (firstStrong as HTMLElement).style.marginRight = '6px';
             (firstStrong as HTMLElement).style.userSelect = 'text';
           } else {
             // Strip plain text number from start of stimulus
@@ -359,9 +358,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
             const strong = document.createElement('strong');
             strong.removeAttribute('contenteditable');
             strong.className = 'q-num';
-            strong.style.display = 'inline-block';
-            strong.style.minWidth = '24px';
-            strong.style.marginRight = '4px';
+            strong.style.display = 'inline';
+            strong.style.marginRight = '6px';
             strong.style.userSelect = 'text';
             strong.textContent = qNumStr;
             stimulus.insertBefore(strong, stimulus.firstChild);
@@ -370,9 +368,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
           numEl.textContent = qNumStr;
           numEl.classList.add('q-num');
           numEl.removeAttribute('contenteditable');
-          (numEl as HTMLElement).style.display = 'inline-block';
-          (numEl as HTMLElement).style.minWidth = '24px';
-          (numEl as HTMLElement).style.marginRight = '4px';
+          (numEl as HTMLElement).style.display = 'inline';
+          (numEl as HTMLElement).style.marginRight = '6px';
           (numEl as HTMLElement).style.userSelect = 'text';
         }
       }
@@ -419,18 +416,16 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
             firstStrong.removeAttribute('contenteditable');
             firstStrong.classList.add('q-num');
             firstStrong.textContent = qNumStr;
-            (firstStrong as HTMLElement).style.display = 'inline-block';
-            (firstStrong as HTMLElement).style.minWidth = '24px';
-            (firstStrong as HTMLElement).style.marginRight = '4px';
+            (firstStrong as HTMLElement).style.display = 'inline';
+            (firstStrong as HTMLElement).style.marginRight = '6px';
             (firstStrong as HTMLElement).style.userSelect = 'text';
           } else {
             qPara.innerHTML = qPara.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
             const strong = document.createElement('strong');
             strong.removeAttribute('contenteditable');
             strong.className = 'q-num';
-            strong.style.display = 'inline-block';
-            strong.style.minWidth = '24px';
-            strong.style.marginRight = '4px';
+            strong.style.display = 'inline';
+            strong.style.marginRight = '6px';
             strong.style.userSelect = 'text';
             strong.textContent = qNumStr;
             qPara.insertBefore(strong, qPara.firstChild);
@@ -439,9 +434,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
           numEl.textContent = qNumStr;
           numEl.classList.add('q-num');
           numEl.removeAttribute('contenteditable');
-          (numEl as HTMLElement).style.display = 'inline-block';
-          (numEl as HTMLElement).style.minWidth = '24px';
-          (numEl as HTMLElement).style.marginRight = '4px';
+          (numEl as HTMLElement).style.display = 'inline';
+          (numEl as HTMLElement).style.marginRight = '6px';
           (numEl as HTMLElement).style.userSelect = 'text';
         }
       }
@@ -464,18 +458,16 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
             firstStrong.removeAttribute('contenteditable');
             firstStrong.classList.add('q-num');
             firstStrong.textContent = qNumStr;
-            (firstStrong as HTMLElement).style.display = 'inline-block';
-            (firstStrong as HTMLElement).style.minWidth = '24px';
-            (firstStrong as HTMLElement).style.marginRight = '4px';
+            (firstStrong as HTMLElement).style.display = 'inline';
+            (firstStrong as HTMLElement).style.marginRight = '6px';
             (firstStrong as HTMLElement).style.userSelect = 'text';
           } else {
             qPara.innerHTML = qPara.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
             const strong = document.createElement('strong');
             strong.removeAttribute('contenteditable');
             strong.className = 'q-num';
-            strong.style.display = 'inline-block';
-            strong.style.minWidth = '24px';
-            strong.style.marginRight = '4px';
+            strong.style.display = 'inline';
+            strong.style.marginRight = '6px';
             strong.style.userSelect = 'text';
             strong.textContent = qNumStr;
             qPara.insertBefore(strong, qPara.firstChild);
@@ -484,9 +476,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
           numEl.textContent = qNumStr;
           numEl.classList.add('q-num');
           numEl.removeAttribute('contenteditable');
-          (numEl as HTMLElement).style.display = 'inline-block';
-          (numEl as HTMLElement).style.minWidth = '24px';
-          (numEl as HTMLElement).style.marginRight = '4px';
+          (numEl as HTMLElement).style.display = 'inline';
+          (numEl as HTMLElement).style.marginRight = '6px';
           (numEl as HTMLElement).style.userSelect = 'text';
         }
       }
@@ -540,18 +531,16 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
               firstStrong.removeAttribute('contenteditable');
               firstStrong.classList.add('q-num');
               firstStrong.textContent = qNumStr;
-              (firstStrong as HTMLElement).style.display = 'inline-block';
-              (firstStrong as HTMLElement).style.minWidth = '24px';
-              (firstStrong as HTMLElement).style.marginRight = '4px';
+              (firstStrong as HTMLElement).style.display = 'inline';
+              (firstStrong as HTMLElement).style.marginRight = '6px';
               (firstStrong as HTMLElement).style.userSelect = 'text';
             } else {
               p.innerHTML = p.innerHTML.replace(/^[০-৯\d]+\s*[।.)]\s*/, '');
               const strong = document.createElement('strong');
               strong.removeAttribute('contenteditable');
               strong.className = 'q-num';
-              strong.style.display = 'inline-block';
-              strong.style.minWidth = '24px';
-              strong.style.marginRight = '4px';
+              strong.style.display = 'inline';
+              strong.style.marginRight = '6px';
               strong.style.userSelect = 'text';
               strong.textContent = qNumStr;
               p.insertBefore(strong, p.firstChild);
@@ -560,9 +549,8 @@ export function ensureQuestionIntegrity(container: HTMLElement, isEnglish = fals
             numEl.textContent = qNumStr;
             numEl.classList.add('q-num');
             numEl.removeAttribute('contenteditable');
-            (numEl as HTMLElement).style.display = 'inline-block';
-            (numEl as HTMLElement).style.minWidth = '24px';
-            (numEl as HTMLElement).style.marginRight = '4px';
+            (numEl as HTMLElement).style.display = 'inline';
+            (numEl as HTMLElement).style.marginRight = '6px';
             (numEl as HTMLElement).style.userSelect = 'text';
           }
           cqCounter++;

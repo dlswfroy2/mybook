@@ -2448,8 +2448,26 @@ function CreateLectureSheetContent() {
   const [currentDetectedFontSize, setCurrentDetectedFontSize] = useState<number>(10.5);
   const [lineHeightDraft, setLineHeightDraft] = useState("");
   const [previewZoom, setPreviewZoom] = useState(100);
-  // previewZoom সবসময় integer ৫০-২০০ রেঞ্জে থাকবে
-  const effectiveZoom = Math.round(Math.max(50, Math.min(200, Number(previewZoom) || 100)));
+  // previewZoom সবসময় integer ৪০-২০০ রেঞ্জে থাকবে
+  const effectiveZoom = Math.round(Math.max(40, Math.min(200, Number(previewZoom) || 100)));
+
+  // Auto-adapt for mobile view on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false);
+      setShowRuler(false);
+      const fitZoom = Math.max(40, Math.min(100, Math.floor(((window.innerWidth - 20) / 794) * 100)));
+      setPreviewZoom(fitZoom);
+    }
+  }, []);
+
+  const handleFitToScreen = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 768;
+    const availableWidth = isMobile ? window.innerWidth - 20 : window.innerWidth - (sidebarOpen ? 340 : 40);
+    const fitZoom = Math.max(40, Math.min(150, Math.floor((availableWidth / 794) * 100)));
+    setPreviewZoom(fitZoom);
+  }, [sidebarOpen]);
   const [showRuler, setShowRuler] = useState(true);
   const [tabStops, setTabStops] = useState<number[]>([]);
   const [applyScope, setApplyScope] = useState<'single' | 'all'>('single');
@@ -3280,7 +3298,7 @@ function CreateLectureSheetContent() {
     <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
       <div ref={measurementRef} className="font-kalpurush" style={{ position: 'fixed', top: '-10000px', left: '-10000px', visibility: 'hidden', pointerEvents: 'none', width: '7.27in', lineHeight: '1.2' }} />
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
-        <header className="flex items-center justify-between border-b pb-4">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm"><BookOpen className="w-7 h-7" /></div>
             <h2 className="text-2xl font-bold text-primary">লেকচার শিট নির্মাতা</h2>
@@ -3292,7 +3310,7 @@ function CreateLectureSheetContent() {
         </header>
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
-          <aside className="w-full lg:w-80 shrink-0 space-y-6 sticky top-24">
+          <aside className="w-full lg:w-80 shrink-0 space-y-6 lg:sticky lg:top-24">
             <Card className="shadow-md border-primary/10">
               <CardHeader className="bg-primary/5 border-b py-3">
                 <CardTitle className="text-base flex items-center gap-2 font-bold text-primary"><FileText className="w-4 h-4" /> শিট সংক্রান্ত তথ্য</CardTitle>
@@ -4047,7 +4065,7 @@ function CreateLectureSheetContent() {
               <TabsContent value="text" className="animate-in fade-in duration-300">
                 <Card className="shadow-md border-2 border-indigo-100 overflow-hidden">
                   <CardHeader className="bg-slate-50 border-b p-3 px-5 flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-1">
                       <BookOpen className="w-4 h-4 text-primary" />
                       <span className="text-sm font-black text-slate-800">কন্টেন্ট এডিটর (প্রিন্ট লেআউট ভিউ)</span>
                     </div>
@@ -4219,7 +4237,7 @@ function CreateLectureSheetContent() {
 
       {isPrintMode && (
         <div className="print-view-container flex flex-col h-screen fixed inset-0 top-0 left-0 bg-slate-100 z-[40] font-kalpurush overflow-hidden">
-          <header className="no-print h-12 bg-white border-b flex items-center justify-between px-4 shrink-0 shadow-sm z-50 select-none">
+          <header className="no-print h-12 bg-white border-b flex items-center justify-between px-2 sm:px-4 shrink-0 shadow-sm z-50 select-none">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -4233,14 +4251,14 @@ function CreateLectureSheetContent() {
               <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center">
                 <Eye className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-sm hidden sm:inline text-slate-800 truncate max-w-xs md:max-w-md">
+              <h3 className="font-bold text-sm hidden md:inline text-slate-800 truncate max-w-xs md:max-w-md">
                 প্রিন্ট প্রিভিউ ও লেআউট {data.topic ? `- ${data.topic}` : ''}
               </h3>
             </div>
 
             <div className="flex items-center gap-2">
               {/* ফন্ট সাইজ কন্ট্রোল */}
-              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5" title="ফন্ট সাইজ পরিবর্তন করুন">
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5 shrink-0" title="ফন্ট সাইজ পরিবর্তন করুন">
                 <button
                   type="button"
                   onClick={() => {
@@ -4269,7 +4287,7 @@ function CreateLectureSheetContent() {
                   className="w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
                   title="ফন্ট সাইজ লিখুন (pt)"
                 />
-                <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
+                <span className="text-[9px] text-slate-500 font-bold pr-0.5 hidden xs:inline">pt</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -4283,7 +4301,8 @@ function CreateLectureSheetContent() {
               </div>
 
               {/* জুম কন্ট্রোল */}
-              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0 gap-0.5">
+                <button type="button" onClick={handleFitToScreen} className="text-[10px] font-bold px-1.5 py-0.5 bg-white text-indigo-700 hover:bg-indigo-50 rounded border border-indigo-200 transition-colors shrink-0" title="মোবাইল স্ক্রিনে ফিট করুন">ফিট</button>
                 <button
                   type="button"
                   onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
@@ -4341,13 +4360,36 @@ function CreateLectureSheetContent() {
           </header>
 
           <div className="flex-1 flex overflow-hidden">
+            {/* Backdrop on mobile */}
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/40 z-40 md:hidden backdrop-blur-xs transition-opacity"
+                onClick={() => setSidebarOpen(false)}
+              />
+            )}
             {/* ═══════════ স্ট্যান্ডার্ড বাম সাইড মেনুবার ═══════════ */}
             <aside
               className={cn(
-                "no-print bg-white border-r flex flex-col shrink-0 transition-all duration-300 z-30 font-kalpurush select-none",
-                sidebarOpen ? "w-80 lg:w-88" : "w-0 overflow-hidden border-none"
+                "no-print bg-white border-r flex flex-col shrink-0 transition-all duration-300 font-kalpurush select-none",
+                "fixed inset-y-0 left-0 z-50 md:static md:z-30",
+                sidebarOpen
+                  ? "w-[85vw] max-w-[320px] md:w-80 lg:w-88 shadow-2xl md:shadow-none translate-x-0"
+                  : "-translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden md:border-none"
               )}
             >
+              {/* Mobile drawer header with close button */}
+              <div className="md:hidden flex items-center justify-between px-3 py-2 border-b bg-indigo-900 text-white shrink-0">
+                <span className="font-bold text-xs flex items-center gap-1.5">
+                  <LayoutIcon className="w-4 h-4 text-amber-300" /> ফরম্যাটিং ও পেজ টুলস
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1 rounded-md hover:bg-white/20 text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
               {/* সাইড মেনুবার ৪টি ট্যাব */}
               <div className="grid grid-cols-4 border-b bg-slate-50 text-xs font-black p-1 gap-1 shrink-0">
                 <button
@@ -4551,7 +4593,7 @@ function CreateLectureSheetContent() {
                 )}
               </div>
             </aside>
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden w-full">
               {/* Horizontal Interactive Word Ruler - Fixed at Top, Never Overlaps Content */}
               {showRuler && (
                 <div className="no-print bg-[#1e2329] border-b border-[#121519] py-1.5 flex justify-center w-full shrink-0 shadow-md z-30">
@@ -4598,7 +4640,7 @@ function CreateLectureSheetContent() {
                   })()}
                 </div>
               )}
-              <main className="print-main-area flex-1 overflow-y-auto bg-slate-200 py-6 flex flex-col items-center gap-8 relative" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
+              <main className="print-main-area flex-1 overflow-x-auto overflow-y-auto bg-slate-200 py-3 sm:py-6 px-1 sm:px-4 flex flex-col items-center gap-4 sm:gap-8 relative overscroll-contain" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
                 {paginatedPages.map((pageHtml, idx) => {
                  const style = pageStyles[idx] || { fontSize: globalFontSize, lineHeight: globalLineHeight, bold: false, italic: false, underline: false, color: '#000000', align: 'justify', mT: 0.5, mB: 0.5, mL: 0.5, mR: 0.5, pageSize: 'a4' };
                  const marginT = parseFloat(String(style.mT)) || 0.5, marginB = parseFloat(String(style.mB)) || 0.5, marginL = parseFloat(String(style.mL)) || 0.5, marginR = parseFloat(String(style.mR)) || 0.5;
@@ -4650,7 +4692,7 @@ function CreateLectureSheetContent() {
                     </div>
                  </div>
                )})}
-               <div className="no-print pt-4 pb-10"><Button onClick={() => handleAddNextPage("")} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-16 w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-6 h-6" /> নতুন পাতা যোগ করুন</Button></div>
+               <div className="no-print pt-4 pb-10 w-full flex justify-center px-2"><Button onClick={() => handleAddNextPage("")} variant="outline" className="gap-2 border-2 border-dashed border-primary/50 text-primary font-black h-14 sm:h-16 w-full max-w-[8.27in] bg-white/50 hover:bg-white transition-all shadow-lg rounded-2xl"><PlusCircle className="w-5 h-5 sm:w-6 sm:h-6" /> নতুন পাতা যোগ করুন</Button></div>
             </main>
             </div>
           </div>

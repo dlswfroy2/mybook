@@ -833,7 +833,7 @@ function MyLibraryContent() {
       <main className="flex flex-col md:flex-row h-full w-full gap-8">
         
         {/* Sidebar Menubar */}
-        <aside className="w-full md:w-72 shrink-0 space-y-6 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+        <aside className="w-full md:w-72 shrink-0 space-y-6 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 md:sticky md:top-28 self-start">
             <h2 className="text-2xl font-black mb-4 px-4 hidden md:block text-slate-900 tracking-tight">লাইব্রেরি অপশন</h2>
             
             {/* 1. Selectors Section */}
@@ -954,7 +954,7 @@ function MyLibraryContent() {
             </div>
 
             {isSelecting && selectedDocIds.length > 0 && (
-                <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 animate-in slide-in-from-bottom-10 z-[100]">
+                <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-[94vw] max-w-lg px-2 sm:px-4 animate-in slide-in-from-bottom-10 z-[100]">
                     <Card className="bg-primary text-white shadow-2xl border-2 border-black p-4 flex items-center justify-between">
                         <div className="font-bold flex items-center gap-3">
                             <Badge variant="secondary" className="bg-white text-primary font-black border-black">{toBengaliNumber(selectedDocIds.length)} টি</Badge>
