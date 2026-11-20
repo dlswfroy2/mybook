@@ -458,17 +458,44 @@ export default function WhiteboardPage() {
     canvas.addEventListener('pointerup', stopDrawing);
 
     // ── Mobile & Desktop: Responsive Sidebars ──
-    const isMobile = () => window.innerWidth <= 768;
+    const isMobile = () => window.innerWidth <= 1024;
 
     const updateToggleButtons = () => {
       const leftCol = toolbar.classList.contains('collapsed');
       const rightCol = rightToolbar.classList.contains('collapsed');
+      
       if (isMobile()) {
-        toggleSidebarBtn.innerHTML = leftCol ? '✏️ টুলস' : '✕ বন্ধ';
-        toggleRightSidebarBtn.innerHTML = rightCol ? '⚙️ অপশন' : '✕ বন্ধ';
+        if (leftCol) {
+          toggleSidebarBtn.style.left = '0px';
+          toggleSidebarBtn.innerHTML = '✏️ টুলস';
+        } else {
+          toggleSidebarBtn.style.left = 'min(88vw, 320px)';
+          toggleSidebarBtn.innerHTML = '✕ বন্ধ';
+        }
+
+        if (rightCol) {
+          toggleRightSidebarBtn.style.right = '0px';
+          toggleRightSidebarBtn.innerHTML = '⚙️ অপশন';
+        } else {
+          toggleRightSidebarBtn.style.right = 'min(88vw, 320px)';
+          toggleRightSidebarBtn.innerHTML = '✕ বন্ধ';
+        }
       } else {
-        toggleSidebarBtn.textContent = leftCol ? '▶' : '◀';
-        toggleRightSidebarBtn.textContent = rightCol ? '◀' : '▶';
+        if (leftCol) {
+          toggleSidebarBtn.style.left = '0px';
+          toggleSidebarBtn.textContent = '▶';
+        } else {
+          toggleSidebarBtn.style.left = '160px';
+          toggleSidebarBtn.textContent = '◀';
+        }
+
+        if (rightCol) {
+          toggleRightSidebarBtn.style.right = '0px';
+          toggleRightSidebarBtn.textContent = '◀';
+        } else {
+          toggleRightSidebarBtn.style.right = '160px';
+          toggleRightSidebarBtn.textContent = '▶';
+        }
       }
     };
 
@@ -503,6 +530,29 @@ export default function WhiteboardPage() {
       adjustScrollWrapperLayout();
     };
     backdropEl.addEventListener('click', closeAllDrawers);
+
+    // Close buttons inside the sidebars
+    const closeLeftBtn = document.getElementById('close-left-sidebar-btn');
+    if (closeLeftBtn) {
+      closeLeftBtn.addEventListener('click', () => {
+        toolbar.classList.add('collapsed');
+        if (backdropEl && rightToolbar.classList.contains('collapsed')) {
+          backdropEl.style.display = 'none';
+        }
+        adjustScrollWrapperLayout();
+      });
+    }
+
+    const closeRightBtn = document.getElementById('close-right-sidebar-btn');
+    if (closeRightBtn) {
+      closeRightBtn.addEventListener('click', () => {
+        rightToolbar.classList.add('collapsed');
+        if (backdropEl && toolbar.classList.contains('collapsed')) {
+          backdropEl.style.display = 'none';
+        }
+        adjustScrollWrapperLayout();
+      });
+    }
 
     const toggleSidebarHandler = () => {
       const isCurrentlyCollapsed = toolbar.classList.contains('collapsed');
@@ -540,6 +590,14 @@ export default function WhiteboardPage() {
     };
     toggleRightSidebarBtn.addEventListener('click', toggleRightSidebarHandler);
 
+    // Clicking canvas on mobile auto-closes open drawers
+    const canvasClickHandler = () => {
+      if (isMobile() && (!toolbar.classList.contains('collapsed') || !rightToolbar.classList.contains('collapsed'))) {
+        closeAllDrawers();
+      }
+    };
+    canvas.addEventListener('pointerdown', canvasClickHandler);
+
     const resizeHandler = () => {
       if (isMobile()) {
         toolbar.classList.add('collapsed');
@@ -550,7 +608,7 @@ export default function WhiteboardPage() {
     };
     window.addEventListener('resize', resizeHandler);
 
-    // Initial state on mobile
+    // Initial state: collapse on mobile / tablets (<= 1024px)
     if (isMobile()) {
       toolbar.classList.add('collapsed');
       rightToolbar.classList.add('collapsed');
@@ -2233,6 +2291,7 @@ export default function WhiteboardPage() {
       toggleSidebarBtn.removeEventListener('click', toggleSidebarHandler);
       toggleRightSidebarBtn.removeEventListener('click', toggleRightSidebarHandler);
       window.removeEventListener('resize', resizeHandler);
+      canvas.removeEventListener('pointerdown', canvasClickHandler);
       if (backdropEl) {
         backdropEl.removeEventListener('click', closeAllDrawers);
         if (backdropEl.parentNode) backdropEl.parentNode.removeChild(backdropEl);
@@ -2293,6 +2352,17 @@ export default function WhiteboardPage() {
       <button id="toggle-right-sidebar-btn" className="sidebar-toggle right-toggle no-print">▶</button>
 
       <div id="toolbar" className="sidebar left-sidebar no-print">
+        {/* Top Header with Close Button */}
+        <div className="flex items-center justify-between w-full pb-2 mb-1 border-b border-white/20">
+          <span className="font-black text-xs text-white">✏️ টুলস মেনু</span>
+          <button
+            id="close-left-sidebar-btn"
+            type="button"
+            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-md text-xs font-black shadow flex items-center gap-1 cursor-pointer transition-transform"
+          >
+            ✕ বন্ধ করুন
+          </button>
+        </div>
         <label>প্রধান টুলস:</label>
         <div className="tool-group">
           <button type="button" className="tool-btn active" data-tool="pen">✏️ কলম</button>
@@ -2330,6 +2400,17 @@ export default function WhiteboardPage() {
       </div>
 
       <div id="right-toolbar" className="sidebar right-sidebar no-print">
+        {/* Top Header with Close Button */}
+        <div className="flex items-center justify-between w-full pb-2 mb-1 border-b border-white/20">
+          <span className="font-black text-xs text-white">⚙️ অপশন মেনু</span>
+          <button
+            id="close-right-sidebar-btn"
+            type="button"
+            className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-md text-xs font-black shadow flex items-center gap-1 cursor-pointer transition-transform"
+          >
+            ✕ বন্ধ করুন
+          </button>
+        </div>
         <label>ব্যাকগ্রাউন্ড:</label>
         <div className="bg-btn-group">
           <button type="button" className="bg-btn active" data-bg="blank">⬜ খালি</button>
