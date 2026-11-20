@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { useFirestore, useDoc, useUser } from '@/firebase';
+import { doc, getDoc, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Printer, ArrowLeft, Scissors, LayoutGrid, FileText, CheckCircle2, RefreshCw, Camera, Key, ChevronDown, ChevronUp } from 'lucide-react';
+import { Printer, ArrowLeft, Scissors, LayoutGrid, FileText, CheckCircle2, RefreshCw, Camera, Key, ChevronDown, ChevronUp, BarChart2, Save, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OmrScannerDialog } from '@/components/OmrScannerDialog';
 
@@ -259,6 +259,7 @@ function OmrSheetContent() {
   const isPrintAuto = searchParams.get('print') === 'true';
 
   const db = useFirestore();
+  const { user } = useUser();
   const [examMeta, setExamMeta] = useState<any>(null);
   
   // Custom Controls State
@@ -274,6 +275,9 @@ function OmrSheetContent() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [masterAnswerKey, setMasterAnswerKey] = useState<Record<number, string>>({});
   const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
+  const [savedAnswerKeys, setSavedAnswerKeys] = useState<any[]>([]);
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [loadKeyId, setLoadKeyId] = useState('');
 
   const softwareDocRef = React.useMemo(() => db ? doc(db, 'config', 'software') : null, [db]);
   const { data: softwareConfig } = useDoc(softwareDocRef);
@@ -312,6 +316,54 @@ function OmrSheetContent() {
       }, 500);
     }
   }, [isPrintAuto]);
+
+  // Load saved answer keys from Firestore
+  useEffect(() => {
+    async function loadSavedKeys() {
+      if (!db) return;
+      try {
+        const q = query(collection(db, 'omr_answer_keys'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        setSavedAnswerKeys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.error('উত্তরমালা লোড করতে সমস্যা:', e);
+      }
+    }
+    loadSavedKeys();
+  }, [db]);
+
+  const handleSaveAnswerKey = async () => {
+    if (!db) return;
+    if (!examTitle.trim()) {
+      alert('পরীক্ষার শিরোনাম দিন।');
+      return;
+    }
+    if (Object.keys(masterAnswerKey).length === 0) {
+      alert('অন্তত একটি উত্তর সেট করুন।');
+      return;
+    }
+    setIsSavingKey(true);
+    try {
+      await addDoc(collection(db, 'omr_answer_keys'), {
+        examTitle: examTitle.trim(),
+        examSubtitle: examSubtitle.trim(),
+        questionCount,
+        answerKey: masterAnswerKey,
+        createdAt: serverTimestamp(),
+        userId: user?.uid || 'anonymous',
+      });
+      // Reload
+      const q = query(collection(db, 'omr_answer_keys'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      setSavedAnswerKeys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      alert('উত্তরমালা সংরক্ষণ করা হয়েছে! ✅');
+    } catch (e) {
+      console.error(e);
+      alert('সংরক্ষণে সমস্যা হয়েছে।');
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-200 py-4 sm:py-6 px-2 font-kalpurush print:bg-white print:p-0">
@@ -398,6 +450,15 @@ function OmrSheetContent() {
             >
               <Camera className="w-4 h-4" /> মোবাইলে স্ক্যান
             </Button>
+
+            {/* Results Button */}
+            <Button
+              onClick={() => router.push('/omr-results')}
+              variant="outline"
+              className="border-emerald-400 text-emerald-700 hover:bg-emerald-50 font-black gap-2 h-9 px-4 no-print"
+            >
+              <BarChart2 className="w-4 h-4" /> ফলাফল দেখুন
+            </Button>
           </div>
         </div>
 
@@ -405,21 +466,52 @@ function OmrSheetContent() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t text-xs">
           <div>
             <label className="text-[10px] font-black text-slate-500 uppercase">পরীক্ষার শিরোনাম:</label>
-            <Input
-              value={examTitle}
-              onChange={(e) => setExamTitle(e.target.value)}
-              placeholder="এস এস সি পরীক্ষা- ২০২৭"
-              className="h-8 text-xs font-bold mt-0.5"
-            />
+            <div className="relative mt-0.5">
+              <input
+                list="examTitleList"
+                value={examTitle}
+                onChange={(e) => setExamTitle(e.target.value)}
+                placeholder="এস এস সি পরীক্ষা- ২০২৭"
+                className="h-8 text-xs font-bold w-full border rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <datalist id="examTitleList">
+                {[...new Set(savedAnswerKeys.map((k: any) => k.examTitle).filter(Boolean))].map((t: any) => (
+                  <option key={String(t)} value={String(t)} />
+                ))}
+                <option value="এস এস সি পরীক্ষা- ২০২৭" />
+                <option value="জে এস সি পরীক্ষা- ২০২৭" />
+                <option value="অর্ধ-বার্ষিক পরীক্ষা- ২০২৬" />
+                <option value="বার্ষিক পরীক্ষা- ২০২৬" />
+                <option value="মডেল টেস্ট ২০২৭" />
+              </datalist>
+            </div>
           </div>
           <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase">উপ-শিরোনাম / বিষয়:</label>
-            <Input
-              value={examSubtitle}
-              onChange={(e) => setExamSubtitle(e.target.value)}
-              placeholder="মডেল টেস্ট / গণিত"
-              className="h-8 text-xs font-bold mt-0.5"
-            />
+            <label className="text-[10px] font-black text-slate-500 uppercase">উপ-শিরোনাম / বিষয়:</label>
+            <div className="relative mt-0.5">
+              <input
+                list="examSubtitleList"
+                value={examSubtitle}
+                onChange={(e) => setExamSubtitle(e.target.value)}
+                placeholder="মডেল টেস্ট / গণিত"
+                className="h-8 text-xs font-bold w-full border rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <datalist id="examSubtitleList">
+                {[...new Set(savedAnswerKeys
+                  .filter((k: any) => !examTitle || k.examTitle === examTitle)
+                  .map((k: any) => k.examSubtitle).filter(Boolean))].map((t: any) => (
+                  <option key={String(t)} value={String(t)} />
+                ))}
+                <option value="বাংলা প্রথম পত্র" />
+                <option value="বাংলা দ্বিতীয় পত্র" />
+                <option value="ইংরেজি প্রথম পত্র" />
+                <option value="ইংরেজি দ্বিতীয় পত্র" />
+                <option value="গণিত" />
+                <option value="বিজ্ঞান" />
+                <option value="সাধারণ বিজ্ঞান" />
+                <option value="মডেল টেস্ট" />
+              </datalist>
+            </div>
           </div>
           <div>
             <label className="text-[10px] font-black text-slate-500 uppercase">পূর্ণমান:</label>
@@ -488,7 +580,7 @@ function OmrSheetContent() {
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-3 items-center">
                 <button
                   type="button"
                   onClick={() => setMasterAnswerKey({})}
@@ -499,6 +591,44 @@ function OmrSheetContent() {
                 <span className="text-xs text-slate-500 flex items-center">
                   মোট {Object.keys(masterAnswerKey).length}টি উত্তর সেট করা হয়েছে
                 </span>
+                <div className="ml-auto flex items-center gap-2">
+                  {savedAnswerKeys.length > 0 && (
+                    <select
+                      value={loadKeyId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setLoadKeyId(id);
+                        if (!id) return;
+                        const found = savedAnswerKeys.find(k => k.id === id);
+                        if (found && found.answerKey) {
+                          const loaded: Record<number, string> = {};
+                          Object.entries(found.answerKey).forEach(([k, v]) => {
+                            loaded[Number(k)] = v as string;
+                          });
+                          setMasterAnswerKey(loaded);
+                          if (found.questionCount) setQuestionCount(found.questionCount);
+                        }
+                      }}
+                      className="h-8 text-xs font-bold border rounded-md px-2 bg-white max-w-[200px]"
+                    >
+                      <option value="">— সেভ করা উত্তরমালা লোড করুন —</option>
+                      {savedAnswerKeys.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.examTitle} / {k.examSubtitle}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveAnswerKey}
+                    disabled={isSavingKey}
+                    className="text-xs text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 border border-emerald-300 hover:border-emerald-500 rounded px-3 py-1 transition-colors bg-emerald-50 disabled:opacity-50"
+                  >
+                    {isSavingKey ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    উত্তরমালা সেভ করুন
+                  </button>
+                </div>
               </div>
             </div>
           )}

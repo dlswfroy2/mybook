@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { 
   Camera, 
@@ -37,7 +37,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { scanAndEvaluateOmr, ScanOmrOutput } from '@/ai/flows/scan-omr-flow';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
@@ -83,6 +83,10 @@ export function OmrScannerDialog({
     return initial;
   });
 
+  // Saved answer keys from Firestore
+  const [savedAnswerKeys, setSavedAnswerKeys] = useState<any[]>([]);
+  const [loadedKeyId, setLoadedKeyId] = useState('');
+
   // Scanned evaluation result
   const [result, setResult] = useState<ScanOmrOutput | null>(null);
   const [editableStudentName, setEditableStudentName] = useState('');
@@ -90,6 +94,21 @@ export function OmrScannerDialog({
   const [isSaving, setIsSaving] = useState(false);
 
   const bubbleOptions = ['ক', 'খ', 'গ', 'ঘ'];
+
+  // Load saved answer keys
+  useEffect(() => {
+    async function loadKeys() {
+      if (!db) return;
+      try {
+        const q = query(collection(db, 'omr_answer_keys'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        setSavedAnswerKeys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.error('উত্তরমালা লোড করতে সমস্যা:', e);
+      }
+    }
+    if (open) loadKeys();
+  }, [db, open]);
 
   // Handle image selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,13 +336,39 @@ export function OmrScannerDialog({
             {/* Tab 2: Answer Key Setup */}
             {activeTab === 'answerKey' && (
               <div className="space-y-3 bg-white p-4 rounded-2xl border">
-                <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex flex-wrap items-center justify-between border-b pb-2 gap-2">
                   <div>
                     <h4 className="font-black text-sm text-slate-800">মাস্টার উত্তরমালা (সঠিক উত্তর)</h4>
                     <p className="text-[11px] text-slate-500 font-bold">প্রতিটি প্রশ্নের সঠিক উত্তরের বৃত্তে ক্লিক করে সিলেক্ট করুন।</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-black text-slate-600">ভুল উত্তরের নেগেটিভ মার্ক:</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {savedAnswerKeys.length > 0 && (
+                      <select
+                        value={loadedKeyId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setLoadedKeyId(id);
+                          if (!id) return;
+                          const found = savedAnswerKeys.find(k => k.id === id);
+                          if (found && found.answerKey) {
+                            const loaded: Record<number, string> = {};
+                            Object.entries(found.answerKey).forEach(([k, v]) => {
+                              loaded[Number(k)] = v as string;
+                            });
+                            setAnswerKey(prev => ({ ...prev, ...loaded }));
+                          }
+                        }}
+                        className="h-8 text-xs font-bold border rounded-md px-2 bg-indigo-50 max-w-[200px]"
+                      >
+                        <option value="">📂 সেভ করা উত্তরমালা লোড করুন</option>
+                        {savedAnswerKeys.map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.examTitle} / {k.examSubtitle}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <label className="text-[11px] font-black text-slate-600">নেগেটিভ মার্ক:</label>
                     <select
                       value={negativeMark}
                       onChange={(e) => setNegativeMark(parseFloat(e.target.value))}
