@@ -53,7 +53,7 @@ function cleanMarkdownSymbols(text: string): string {
 }
 
 import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
-import { getSubjectCategory } from './generate-practice-questions';
+import { getSubjectCategory } from '@/lib/subject-utils';
 
 /**
  * Executes an AI generation request with a strict timeout to prevent slow/hanging API models.

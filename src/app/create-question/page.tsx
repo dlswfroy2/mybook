@@ -51,7 +51,8 @@ import { collection, setDoc, doc, getDoc, serverTimestamp } from 'firebase/fires
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
-import { generatePracticeQuestions, getSubjectCategory } from '@/ai/flows/generate-practice-questions';
+import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
+import { getSubjectCategory } from '@/lib/subject-utils';
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
