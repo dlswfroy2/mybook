@@ -53,6 +53,7 @@ function cleanMarkdownSymbols(text: string): string {
 }
 
 import { createAiClient, getAvailableApiKeys } from '@/ai/genkit';
+import { getSubjectCategory } from './generate-practice-questions';
 
 /**
  * Executes an AI generation request with a strict timeout to prevent slow/hanging API models.
@@ -282,11 +283,33 @@ export async function expandLectureContent(
   const styleDesc = typeDescriptions[input.type || 'bullet_points'] || 'সংক্ষিপ্ত ও সাজানো পয়েন্ট';
   const diffDesc = difficultyInstructions[input.difficulty || 'medium'] || difficultyInstructions.medium;
 
+  const category = getSubjectCategory(input.subject || '');
+
   let questionsRequirement = '';
   if (input.questionCounts) {
     const list: string[] = [];
     if (input.questionCounts.creative && input.questionCounts.creative > 0) {
-      list.push(`• সৃজনশীল প্রশ্ন (CQ): ${input.questionCounts.creative}টি
+      if (category === 'math') {
+        list.push(`• গণিত সৃজনশীল প্রশ্ন (CQ): ${input.questionCounts.creative}টি
+  - নম্বরিং ও ফরম্যাট নিয়ম (বাধ্যতামূলক): সরাসরি ধারাবাহিক নম্বর ১। ২। দিয়ে শুরু করবে।
+  - গণিতে ঠিক ৩টি উপ-প্রশ্ন থাকবে: ক, খ এবং গ (কোনো অবস্থাতেই ঘ থাকবে না! গণিতে উপ-প্রশ্ন ৩টি: ক, খ, গ):
+    ১। [বীজগাণিতিক সমীকরণ / জ্যামিতিক উদ্দীপক / তথ্য]
+    ক. [জ্ঞানমূলক বা সংক্ষিপ্ত মান নির্ণয় - ২ নম্বর]
+    খ. [প্রয়োগমূলক প্রমাণ বা সমাধান - ৪ নম্বর]
+    গ. [উচ্চতর দক্ষতামূলক প্রমাণ বা সমাধান - ৪ নম্বর]
+    (মোট মান: ২ + ৪ + ৪ = ১০)`);
+      } else if (category === 'english_1st') {
+        list.push(`• English 1st Paper Reading Test (Passage & Questions): ${input.questionCounts.creative} items
+  - Format: Rich Seen Passage (150-250 words) followed by:
+    1. Multiple Choice Questions (MCQ) [1 x 5 = 5]
+    2. Answering Questions (a to e) [2 x 5 = 10]
+    3. Fill in the blanks with suitable words [1 x 5 = 5]
+  - 100% in English.`);
+      } else if (category === 'english_2nd') {
+        list.push(`• English 2nd Paper Grammar & Composition: ${input.questionCounts.creative} items
+  - Format: Board standard Grammar items (e.g., Right forms of verbs, Transformation of sentences, Narration, Tag questions) and Composition items. 100% in English.`);
+      } else {
+        list.push(`• সৃজনশীল প্রশ্ন (CQ): ${input.questionCounts.creative}টি
   - নম্বরিং ও ফরম্যাট নিয়ম (বাধ্যতামূলক): "সৃজনশীল প্রশ্ন ১" বা "উদ্দীপক:" এভাবে আলাদা কোনো হেডিং দিবে না! সরাসরি ধারাবাহিক নম্বর দিয়ে শুরু করবে এবং ক, খ, গ, ঘ প্রতিটি উপ-প্রশ্ন অবশ্যই আলাদা আলাদা নতুন লাইনে সাজাবে (এক লাইনে পাশাপাশি নয়):
     ১। [এখানে বাস্তবধর্মী উদ্দীপক / তথ্য / সমীকরণ সরাসরি শুরু হবে]
     ক. [জ্ঞানমূলক প্রশ্ন - ১ নম্বর]
@@ -299,34 +322,39 @@ export async function expandLectureContent(
     খ. [অনুধাবনমূলক প্রশ্ন - ২ নম্বর]
     গ. [প্রয়োগমূলক প্রশ্ন - ৩ নম্বর]
     ঘ. [উচ্চতর দক্ষতামূলক প্রশ্ন - ৪ নম্বর]`);
+      }
     }
     if (input.questionCounts.short && input.questionCounts.short > 0) {
-      list.push(`• সংক্ষিপ্ত প্রশ্ন: ${input.questionCounts.short}টি
-  - নম্বরিং ও ফরম্যাট নিয়ম: সরাসরি ১। ২। ৩। এভাবে ধারাবাহিক নম্বরে প্রশ্ন ও যথাযথ উত্তর দিবে:
-    ১। [প্রশ্ন বাক্য]?
-    উত্তর: [সংক্ষিপ্ত ও যথাযথ উত্তর]
-    ২। [প্রশ্ন বাক্য]?
-    উত্তর: [সংক্ষিপ্ত ও যথাযথ উত্তর]`);
+      if (category === 'english_1st' || category === 'english_2nd') {
+        list.push(`• Short Questions / Grammar Items: ${input.questionCounts.short} items
+  - Format: Numbered items 1. 2. strictly in English without solutions.`);
+      } else {
+        list.push(`• সংক্ষিপ্ত প্রশ্ন: ${input.questionCounts.short}টি
+  - নম্বরিং ও ফরম্যাট নিয়ম: সরাসরি ১। ২। ৩। এভাবে ধারাবাহিক নম্বরে প্রশ্ন দিবে (কোনো উত্তর লিখবে না!):
+    ১। [প্রশ্ন বাক্য]? [২]
+    ২। [প্রশ্ন বাক্য]? [২]`);
+      }
     }
     if (input.questionCounts.mcq && input.questionCounts.mcq > 0) {
-      list.push(`• বহুনির্বাচনী প্রশ্ন (MCQ): ${input.questionCounts.mcq}টি
-  - নম্বরিং ও অপশন বিন্যাস নিয়ম (অত্যন্ত গুরুত্বপূর্ণ): সরাসরি ১। ২। ৩। নম্বরে প্রশ্ন লিখবে। প্রতিটি প্রশ্নের ৪টি অপশন ক), খ), গ), ঘ) অবশ্যই এক লাইনে রো (Row / অনুভূমিক / পাশাপাশি) আকারে সাজানো থাকবে, কলাম আকারে খাড়াখাড়ি সাজানো যাবে না!
+      if (category === 'english_1st' || category === 'english_2nd') {
+        list.push(`• Multiple Choice Questions (MCQ): ${input.questionCounts.mcq} items
+  - Format: 1. 2. 3. with options (a), (b), (c), (d) arranged horizontally in one row. In English.`);
+      } else {
+        list.push(`• বহুনির্বাচনী প্রশ্ন (MCQ): ${input.questionCounts.mcq}টি
+  - নম্বরিং ও অপশন বিন্যাস নিয়ম (অত্যন্ত গুরুত্বপূর্ণ): সরাসরি ১। ২। ৩। নম্বরে প্রশ্ন লিখবে। প্রতিটি প্রশ্নের ৪টি অপশন ক) খ) গ) ঘ) অবশ্যই এক লাইনে রো (Row / অনুভূমিক / পাশাপাশি) আকারে সাজানো থাকবে, কলাম আকারে খাড়াখাড়ি সাজানো যাবে না!
   - উদাহরণ ফরম্যাট:
     ১। [প্রশ্ন বাক্য]?
     ক) [অপশন ১]      খ) [অপশন ২]      গ) [অপশন ৩]      ঘ) [অপশন ৪]
-    (কঠোর সতর্কতা: কোনো অবস্থাতেই সঠিক উত্তর বা কোনো উত্তরমালা প্রদান করবে না! শুধুমাত্র প্রশ্ন ও ৪টি অপশন থাকবে)
-
-    ২। [প্রশ্ন বাক্য]?
-    ক) [অপশন ১]      খ) [অপশন ২]      গ) [অপশন ৩]      ঘ) [অপশন ৪]
-    সঠিক উত্তর: খ`);
+    (কঠোর সতর্কতা: কোনো অবস্থাতেই সঠিক উত্তর বা কোনো উত্তরমালা প্রদান করবে না! শুধুমাত্র প্রশ্ন ও ৪টি অপশন থাকবে)`);
+      }
     }
     if (input.questionCounts.knowledge && input.questionCounts.knowledge > 0) {
       list.push(`• জ্ঞান ও অনুধাবনমূলক প্রশ্ন: ${input.questionCounts.knowledge}টি
-  - সরাসরি ১। ২। ৩। ধারাবাহিক নম্বরে প্রশ্ন ও উত্তর সাজাবে।`);
+  - সরাসরি ১। ২। ৩। ধারাবাহিক নম্বরে প্রশ্ন সাজাবে।`);
     }
     if (input.questionCounts.fillInBlanks && input.questionCounts.fillInBlanks > 0) {
       list.push(`• শূন্যস্থান পূরণ: ${input.questionCounts.fillInBlanks}টি
-  - সরাসরি ১। ২। ৩। ধারাবাহিক নম্বরে বাক্যের নির্দিষ্ট স্থানে শূন্যস্থান ও নিচে উত্তর সাজাবে।`);
+  - সরাসরি ১। ২। ৩। ধারাবাহিক নম্বরে বাক্যের নির্দিষ্ট স্থানে শূন্যস্থান সাজাবে।`);
     }
     if (list.length > 0) {
       questionsRequirement = `\nতৈরি করতে হবে নিচের নির্দিষ্ট ধরনের প্রশ্নসমূহ:\n${list.join('\n')}\n`;
@@ -337,7 +365,94 @@ export async function expandLectureContent(
 
   let prompt = '';
   if (isQuestionsMode) {
-    prompt = `তুমি বাংলাদেশের জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB)-এর একজন অভিজ্ঞ মাস্টার ট্রেইনার ও সেরা প্রশ্ন প্রণেতা।
+    if (category === 'english_1st') {
+      prompt = `You are an expert Question Setter and Chief Examiner for Bangladesh National Curriculum and Textbook Board (NCTB) for English First Paper (Classes 6-10 / SSC).
+Institution: "Top Grade Tutorials"
+Class: Class ${input.className || '9-10'}
+Subject: English 1st Paper
+${input.chapter ? `Unit / Chapter: ${input.chapter}` : ''}
+${input.topicPrompt ? `Topic / Focus: "${input.topicPrompt}"` : ''}
+
+${diffDesc}
+
+${questionsRequirement}
+Total Items: ${input.totalQuestions || 'As required'}
+
+STRICT NCTB BOARD GUIDELINES:
+1. 100% IN STANDARD ENGLISH. Absolutely no Bengali text or scripts!
+2. Generate authentic NCTB Board Question pattern:
+   - Seen Passage (150-250 words) from the textbook unit.
+   - 1. MCQ (a to e/g) with options (i), (ii), (iii), (iv)
+   - 2. Open-ended comprehension questions (a to e) [2 x 5 = 10]
+   - 3. Fill in the blanks with clues/without clues based on text [1 x 5 = 5]
+   - Unseen Passage, Information transfer, Summary, Matching, Rearrange, Guided writing as appropriate.
+3. ABSOLUTE PROHIBITION: DO NOT PROVIDE ANY ANSWERS, SOLUTIONS, OR ANSWER KEYS. ONLY the question paper text.
+4. Clean formatting, no markdown symbols like *, **, #, etc. Ready for test paper print.`;
+    } else if (category === 'english_2nd') {
+      prompt = `You are an expert Question Setter and Chief Examiner for Bangladesh National Curriculum and Textbook Board (NCTB) for English Second Paper (Grammar & Composition - Classes 6-10 / SSC).
+Institution: "Top Grade Tutorials"
+Class: Class ${input.className || '9-10'}
+Subject: English 2nd Paper (Grammar & Composition)
+${input.chapter ? `Topic / Chapter: ${input.chapter}` : ''}
+${input.topicPrompt ? `Focus Instructions: "${input.topicPrompt}"` : ''}
+
+${diffDesc}
+
+${questionsRequirement}
+Total Items: ${input.totalQuestions || 'As required'}
+
+STRICT NCTB BOARD GUIDELINES:
+1. 100% IN PROPER ENGLISH. Absolutely no Bengali text!
+2. Authentic NCTB Board Exam Grammar items:
+   - Gap filling with clues (box) [0.5 x 10 = 5]
+   - Gap filling without clues (prepositions, articles) [0.5 x 10 = 5]
+   - Substitution Table [1 x 5 = 5]
+   - Right forms of verbs [0.5 x 10 = 5 or 10 marks]
+   - Narration / Speech change (Direct to Indirect) [5 marks]
+   - Transformation of sentences (Voice, Degree, Complex, Compound, Simple) [1 x 10 = 10]
+   - Completing sentences (Conditionals, phrases) [1 x 5 = 5]
+   - Suffix and Prefix [0.5 x 10 = 5]
+   - Tag questions [1 x 5 = 5]
+   - Sentence connectors [1 x 5 = 5]
+   - Punctuation and Capitalisation [5 marks]
+   - Composition: CV with cover letter, Application, Paragraph, or Composition.
+3. ABSOLUTE PROHIBITION: DO NOT PROVIDE ANY ANSWERS, SOLUTIONS, OR ANSWER KEYS. ONLY the question items.
+4. Clean formatting, no markdown asterisks (*, **), ready to print.`;
+    } else if (category === 'math') {
+      prompt = `তুমি বাংলাদেশের জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB)-এর গণিত বিষয়ের একজন সিনিয়র প্রশ্নপ্রণেতা ও প্রধান পরীক্ষক।
+প্রতিষ্ঠান: "টপ গ্রেড টিউটোরিয়ালস"
+শ্রেণি: ${input.className ? input.className + ' শ্রেণি' : 'বিদ্যালয় শ্রেণি'}
+বিষয়: ${input.subject || 'গণিত'}
+${input.chapter ? `অধ্যায়: ${input.chapter}` : ''}
+${input.topicPrompt ? `টপিক বা বিশেষ নির্দেশনা: "${input.topicPrompt}"` : ''}
+
+${diffDesc}
+
+${questionsRequirement}
+মোট প্রশ্ন সংখ্যা: ${input.totalQuestions || 'প্রয়োজন অনুযায়ী'}টি
+
+কঠোর ও অলঙ্ঘনীয় NCTB গণিত প্রশ্ন প্রণয়ন নিয়মাবলী:
+১. গণিত সৃজনশীল প্রশ্ন (CQ) কাঠামো (বাধ্যতামূলক):
+   - উদ্দীপক: বীজগাণিতিক রাশি, জ্যামিতিক চিত্র/উপপাদ্যের শর্ত, ত্রিকোণমিতি বা পরিসংখ্যানের বাস্তবভিত্তিক তথ্য।
+   - উপ-প্রশ্ন হবে ঠিক ৩টি: ক, খ এবং গ (কোনো অবস্থাতেই ঘ বা ৪টি উপ-প্রশ্ন হবে না! গণিতে ৩টি উপ-প্রশ্ন ক, খ, গ থাকে)।
+   - মান বণ্টন হবে কঠোরভাবে:
+     * ক. [জ্ঞানমূলক / সংক্ষিপ্ত সমাধান - ২ নম্বর]
+     * খ. [প্রয়োগমূলক প্রমাণ বা সমাধান - ৪ নম্বর]
+     * গ. [উচ্চতর দক্ষতামূলক বিকল্প সমাধান বা দ্বিতীয় প্রমাণ - ৪ নম্বর]
+     * মোট মান: [২ + ৪ + ৪ = ১০]
+   - উদাহরণ ফরম্যাট:
+     ১। $x^2 - 3x + 1 = 0$ একটি বীজগাণিতিক সমীকরণ।
+     ক. $x + \\frac{1}{x}$ এর মান নির্ণয় কর। [২]
+     খ. প্রমাণ কর যে, $x^3 + \\frac{1}{x^3} = 18$। [৪]
+     গ. উদ্দীপকের সাহায্য নিয়ে প্রমাণ কর যে, $x^5 - \\frac{1}{x^5} = 123\\sqrt{5}$। [৪]
+২. বহুনির্বাচনী (MCQ) প্রশ্নের ফরম্যাট:
+   - সরাসরি ১। ২। নম্বরে প্রশ্ন লিখবে। অপশনগুলো ক) খ) গ) ঘ) অবশ্যই এক লাইনে রো (Row) আকারে সাজাবে।
+   - বহুপদী সমাপ্তিসূচক (i, ii, iii) সমন্বিত প্রশ্ন অন্তর্ভুক্ত করবে।
+৩. গাণিতিক চিহ্নের ক্ষেত্রে KaTeX সামঞ্জস্যপূর্ণ ফরম্যাট ব্যবহার করবে ($x^2$, $\\frac{a}{b}$, $\\sqrt{x}$)।
+৪. কঠোর নিষেধাজ্ঞা: কোনো অবস্থাতেই সঠিক উত্তর বা সমাধানমালা লেখা যাবে না! শুধুমাত্র প্রশ্ন থাকবে।
+৫. কোনো অপ্রয়োজনীয় মার্কডাউন চিহ্ন (*, **, #) ব্যবহার করবে না।`;
+    } else {
+      prompt = `তুমি বাংলাদেশের জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB)-এর একজন অভিজ্ঞ মাস্টার ট্রেইনার ও সেরা প্রশ্ন প্রণেতা।
 প্রতিষ্ঠান: "টপ গ্রেড টিউটোরিয়ালস"
 শ্রেণি: ${input.className ? input.className + ' শ্রেণি' : 'বিদ্যালয় শ্রেণি'}
 বিষয়: ${input.subject || 'সাধারণ বিষয়'}
@@ -369,6 +484,7 @@ ${questionsRequirement}
 ৬. ভাষা হবে প্রাঞ্জল, নির্ভুল প্রমিত বাংলা। কোনো অপ্রয়োজনীয় ভূমিকা বা সম্ভাষণ রাখবে না, সরাসরি পাঠ্য প্রশ্নাবলী শুরু করবে যাতে এটি লেকচার শিট বা প্রশ্নপত্রে প্রিন্ট করার উপযোগী হয়।
 ৭. কোনো অপ্রয়োজনীয় মার্কডাউন চিহ্ন যেমন *, **, #, ## ইত্যাদি ব্যবহার করবে না। সম্পূর্ণ লেখাটি সরাসরি পরিষ্কার বাংলা টেক্সট ও প্যারাগ্রাফ আকারে সাজাবে।
 ৮. গাণিতিক বা বৈজ্ঞানিক সমীকরণের ক্ষেত্রে KaTeX সামঞ্জস্যপূর্ণ ফরম্যাট ব্যবহার করবে যেমন $x^2 + y^2 = r^2$, $\\frac{a}{b}$, $\\sqrt{x}$।`;
+    }
   } else {
     prompt = `তুমি বাংলাদেশের জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB)-এর একজন অভিজ্ঞ মাস্টার ট্রেইনার ও সেরা শিক্ষক।
 নিচের বিষয়ের ওপর ভিত্তি করে শিক্ষার্থীদের জন্য পাঠ্যবই স্ট্যান্ডার্ড পূর্ণাঙ্গ লেকচার শিট তৈরি করো।

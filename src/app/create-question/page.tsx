@@ -51,7 +51,7 @@ import { collection, setDoc, doc, getDoc, serverTimestamp } from 'firebase/fires
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
-import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
+import { generatePracticeQuestions, getSubjectCategory } from '@/ai/flows/generate-practice-questions';
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
@@ -1396,10 +1396,47 @@ function CreateQuestionContent() {
                 <Select value={aiType} onValueChange={(v: any) => setAiType(v)}>
                   <SelectTrigger className="h-9 font-bold text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="creative">সৃজনশীল প্রশ্ন (উদ্দীপক + ক, খ, গ, ঘ)</SelectItem>
-                    <SelectItem value="mcq">বহুনির্বাচনি (MCQ + ৪টি অপশন)</SelectItem>
-                    <SelectItem value="short">সংক্ষিপ্ত ও জ্ঞানমূলক প্রশ্ন</SelectItem>
-                    <SelectItem value="mixed">মিশ্রিত প্রশ্ন (সৃজনশীল ও MCQ)</SelectItem>
+                    {(() => {
+                      const cat = getSubjectCategory(meta.subject || '');
+                      if (cat === 'english_1st') {
+                        return (
+                          <>
+                            <SelectItem value="creative">Seen Passage Reading Test (MCQ + Q&A + Gap Filling)</SelectItem>
+                            <SelectItem value="short">Guided Writing (Paragraph / Story / Letter / Dialogue)</SelectItem>
+                            <SelectItem value="mcq">Multiple Choice Questions (MCQ)</SelectItem>
+                            <SelectItem value="mixed">Full Board Model Set (Seen + Unseen + Writing)</SelectItem>
+                          </>
+                        );
+                      }
+                      if (cat === 'english_2nd') {
+                        return (
+                          <>
+                            <SelectItem value="creative">Composition (CV / Application / Paragraph / Report)</SelectItem>
+                            <SelectItem value="short">Grammar Items (Right Forms, Narration, Transformation, Tags)</SelectItem>
+                            <SelectItem value="mcq">MCQ / Short Grammar Test</SelectItem>
+                            <SelectItem value="mixed">Full Board Model Set (Grammar 1-11 + Composition)</SelectItem>
+                          </>
+                        );
+                      }
+                      if (cat === 'math') {
+                        return (
+                          <>
+                            <SelectItem value="creative">গণিত সৃজনশীল প্রশ্ন (উদ্দীপক + ক [২], খ [৪], গ [৪] = ১০)</SelectItem>
+                            <SelectItem value="mcq">গণিত বহুনির্বাচনি (MCQ ও বহুপদী সমাপ্তিসূচক)</SelectItem>
+                            <SelectItem value="short">সংক্ষিপ্ত প্রশ্ন ও মান নির্ণয়</SelectItem>
+                            <SelectItem value="mixed">মিশ্রিত প্রশ্ন (সৃজনশীল ও MCQ)</SelectItem>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          <SelectItem value="creative">সৃজনশীল প্রশ্ন (উদ্দীপক + ক, খ, গ, ঘ)</SelectItem>
+                          <SelectItem value="mcq">বহুনির্বাচনি (MCQ + ৪টি অপশন)</SelectItem>
+                          <SelectItem value="short">সংক্ষিপ্ত ও জ্ঞানমূলক প্রশ্ন</SelectItem>
+                          <SelectItem value="mixed">মিশ্রিত প্রশ্ন (সৃজনশীল ও MCQ)</SelectItem>
+                        </>
+                      );
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
@@ -1595,7 +1632,15 @@ function CreateQuestionContent() {
                         checked={aiQuestionTypes.creative}
                         onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, creative: !!c }))}
                       />
-                      <span className="text-xs font-black text-slate-800">📝 সৃজনশীল প্রশ্ন (CQ)</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {(() => {
+                          const cat = getSubjectCategory(aiAssistantSubject || '');
+                          if (cat === 'math') return '📝 গণিত সৃজনশীল (ক-২, খ-৪, গ-৪ = ১০)';
+                          if (cat === 'english_1st') return '📝 Reading Test (Seen/Unseen Passage)';
+                          if (cat === 'english_2nd') return '📝 Composition (CV, Application, Para)';
+                          return '📝 সৃজনশীল প্রশ্ন (CQ)';
+                        })()}
+                      </span>
                     </label>
                     {aiQuestionTypes.creative && (
                       <div className="flex items-center gap-1">
@@ -1614,7 +1659,14 @@ function CreateQuestionContent() {
                         checked={aiQuestionTypes.short}
                         onCheckedChange={(c) => setAiQuestionTypes(prev => ({ ...prev, short: !!c }))}
                       />
-                      <span className="text-xs font-black text-slate-800">✍️ সংক্ষিপ্ত প্রশ্নাবলী</span>
+                      <span className="text-xs font-black text-slate-800">
+                        {(() => {
+                          const cat = getSubjectCategory(aiAssistantSubject || '');
+                          if (cat === 'english_1st') return '✍️ Guided Writing Items';
+                          if (cat === 'english_2nd') return '✍️ Grammar Items (1-11)';
+                          return '✍️ সংক্ষিপ্ত প্রশ্নাবলী';
+                        })()}
+                      </span>
                     </label>
                     {aiQuestionTypes.short && (
                       <div className="flex items-center gap-1">

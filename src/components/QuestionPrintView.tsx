@@ -42,6 +42,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { WordToolbar } from '@/components/WordToolbar';
+import { FloatingSelectionToolbar } from '@/components/FloatingSelectionToolbar';
 import { CLASSES } from '@/lib/constants';
 import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
 
@@ -2588,6 +2589,51 @@ export function QuestionPrintView({
     repaginateDocument({ newFontSize: size });
   };
 
+  // ✅ Word-style Smart Font Size: If text is selected, change ONLY the selected text/line/letter;
+  // If no text selected, change global page font size!
+  const handleSmartFontSizeChange = (sizeVal: number | string) => {
+    const pt = parseFloat(String(sizeVal));
+    if (isNaN(pt) || pt < 6 || pt > 72) return;
+
+    // 1. Try applying to user-selected text / letter / word / line
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && sel.toString().trim()) {
+      const range = sel.getRangeAt(0);
+      let container: Node | null = range.commonAncestorContainer;
+      let isInContentArea = false;
+      while (container) {
+        if (container.nodeType === Node.ELEMENT_NODE && (container as HTMLElement).classList?.contains('content-area')) {
+          isInContentArea = true;
+          break;
+        }
+        container = container.parentNode;
+      }
+
+      if (isInContentArea) {
+        try {
+          const span = document.createElement('span');
+          span.style.fontSize = `${pt}pt`;
+          const frag = range.extractContents();
+          span.appendChild(frag);
+          range.insertNode(span);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          span.closest('.content-area')?.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        } catch (e) {
+          console.warn('Smart font size error:', e);
+        }
+      }
+    }
+
+    // 2. Fallback: if no text selected, change global font size
+    handleGlobalFontSizeChange(String(pt));
+  };
+
   const handleAddNextPage = (initialContent = "") => {
     setPaginatedPages(prev => [...prev, initialContent]);
     const nextIdx = paginatedPages.length;
@@ -2739,13 +2785,14 @@ export function QuestionPrintView({
 
         <div className="flex items-center gap-2">
           {/* Font Size +/- */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5" title="ফন্ট সাইজ পরিবর্তন করুন">
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5" title="ফন্ট সাইজ পরিবর্তন করুন (সিলেক্ট করা অংশে বা পুরো পেজে)">
             <button
               type="button"
+              onMouseDown={e => e.preventDefault()}
               onClick={() => {
                 const newSize = Math.max(6, (parseFloat(fontSizeDraft) || globalFontSize) - 0.5);
                 setFontSizeDraft(String(newSize));
-                handleGlobalFontSizeChange(String(newSize));
+                handleSmartFontSizeChange(newSize);
               }}
               className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
               title="ফন্ট ছোট করুন"
@@ -2755,10 +2802,10 @@ export function QuestionPrintView({
               min={6} max={72} step={0.5}
               value={fontSizeDraft || globalFontSize}
               onChange={e => setFontSizeDraft(e.target.value)}
-              onBlur={e => { if (e.target.value) handleGlobalFontSizeChange(e.target.value); }}
+              onBlur={e => { if (e.target.value) handleSmartFontSizeChange(e.target.value); }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                  handleGlobalFontSizeChange((e.target as HTMLInputElement).value);
+                  handleSmartFontSizeChange((e.target as HTMLInputElement).value);
                 }
               }}
               className="w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
@@ -2767,10 +2814,11 @@ export function QuestionPrintView({
             <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
             <button
               type="button"
+              onMouseDown={e => e.preventDefault()}
               onClick={() => {
                 const newSize = Math.min(72, (parseFloat(fontSizeDraft) || globalFontSize) + 0.5);
                 setFontSizeDraft(String(newSize));
-                handleGlobalFontSizeChange(String(newSize));
+                handleSmartFontSizeChange(newSize);
               }}
               className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
               title="ফন্ট বড় করুন"
