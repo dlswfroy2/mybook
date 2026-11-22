@@ -1294,7 +1294,7 @@ function StudentListContent() {
                                         }
                                     `}</style>
                                     {['6', '8', '9'].includes(activeTab) ? (
-                                        <div className="esif-container printable-area bg-white p-8 border-[4px] border-black rounded-[32px] shadow-2xl overflow-x-auto min-w-fit print:p-0 print:border-none print:shadow-none print:min-w-full">
+                                        <div className="esif-container printable-area bg-white p-3 sm:p-8 border-2 sm:border-[4px] border-black rounded-2xl sm:rounded-[32px] shadow-2xl overflow-x-auto w-full max-w-full print:p-0 print:border-none print:shadow-none print:min-w-full">
                                             <div className="w-full mx-auto bg-white p-4">
                                                 <header className="text-center mb-6">
                                                     <h1 className="text-4xl font-black mb-1 uppercase">{schoolInfo.nameEn || "BIRGANJ POURO HIGH SCHOOL"}</h1>

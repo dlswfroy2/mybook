@@ -646,7 +646,7 @@ function OmrSheetContent() {
       />
 
       {/* ── Main Printable Sheet Area ── */}
-      <div className="flex justify-center overflow-x-auto pb-8 print:p-0 print:m-0 print:overflow-visible">
+      <div className="flex justify-start sm:justify-center overflow-x-auto w-full max-w-full pb-8 print:p-0 print:m-0 print:overflow-visible">
         {layoutMode === 'landscape_2up' ? (
           /* ═════════════════════════════════════════════════════════════════
              LANDSCAPE 2-IN-1 VIEW: Exact match of user Word document image

@@ -184,13 +184,37 @@ const IDCardGeneratorPage = () => {
 
             {/* Printable Area */}
             <div className="hidden print:block printable-area bg-white">
+                <style jsx global>{`
+                    @media print {
+                        @page {
+                            size: A4 portrait;
+                            margin: 0 !important;
+                        }
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            background: white !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        .printable-page {
+                            page-break-after: always !important;
+                            break-after: page !important;
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                            height: 297mm !important;
+                            max-height: 297mm !important;
+                            overflow: hidden !important;
+                        }
+                    }
+                `}</style>
                 {mode === 'single' && previewStudent && (
                     <div className="flex justify-center items-center h-screen">
                         <StudentIDCard student={previewStudent} schoolInfo={schoolInfo} isPrint />
                     </div>
                 )}
                 {mode === 'bulk' && bulkStudentsGrouped.map((group, pageIdx) => (
-                    <div key={pageIdx} className="w-[210mm] h-[297mm] p-[15mm] grid grid-cols-2 grid-rows-3 gap-[10mm] box-border justify-items-center content-center" style={{ pageBreakAfter: 'always' }}>
+                    <div key={pageIdx} className="printable-page w-[210mm] px-[8mm] py-[5mm] grid grid-cols-2 grid-rows-3 gap-x-[8mm] gap-y-[3mm] box-border justify-items-center content-center">
                         {group.map(student => (
                             <div key={student.id} className="flex items-center justify-center">
                                 <StudentIDCard student={student} schoolInfo={schoolInfo} isPrint />

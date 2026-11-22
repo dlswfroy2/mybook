@@ -1187,7 +1187,7 @@ function CreateQuestionContent() {
                       ওয়ার্ড ভিউ ↗
                     </Button>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-4 md:p-8 flex justify-center overflow-x-auto">
+                  <CardContent className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto w-full max-w-full">
                     {/* Visual A4 Paper Preview */}
                     <div className="w-full max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm">
                       {/* Institutional Header */}

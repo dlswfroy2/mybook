@@ -680,14 +680,14 @@ const MonthlyAttendanceGrid = ({
                                         </TableHead>
                                     );
                                 })}
-                                <TableHead className="w-20 text-center font-black border-l-2 border-black bg-slate-200 sticky right-0 z-[60] text-black shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">মোট উপস্থিত</TableHead>
+                                <TableHead className="w-16 sm:w-20 text-center font-black border-l-2 border-black bg-slate-200 sm:sticky sm:right-0 z-[60] text-black text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">মোট উপস্থিত</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {students.map((student, sIdx) => (
                                 <TableRow key={student.id} className="h-8 hover:bg-slate-50 transition-colors">
-                                    <TableCell className="text-center font-black border-r-2 border-black bg-white sticky left-0 z-30">{toBengaliNumber(student.roll)}</TableCell>
-                                    <TableCell className="font-black border-r-2 border-black bg-white sticky left-14 z-30 whitespace-nowrap px-3 text-[11px] text-slate-800">{student.studentNameBn}</TableCell>
+                                    <TableCell className="text-center font-black border-r-2 border-black bg-white sticky left-0 z-30 w-11 sm:w-14 text-xs sm:text-sm">{toBengaliNumber(student.roll)}</TableCell>
+                                    <TableCell className="font-black border-r-2 border-black bg-white sticky left-11 sm:left-14 z-30 whitespace-nowrap px-1.5 sm:px-3 text-[10px] sm:text-[11px] text-slate-800 w-[110px] max-w-[110px] sm:w-auto sm:max-w-none overflow-hidden text-ellipsis">{student.studentNameBn}</TableCell>
                                     {daysInMonth.map(day => {
                                         const d = getDate(day);
                                         const isSelected = d === activeDay;
@@ -744,7 +744,7 @@ const MonthlyAttendanceGrid = ({
                                             </TableCell>
                                         );
                                     })}
-                                    <TableCell className="text-center font-black border-l-2 border-black bg-white sticky right-0 z-30 text-blue-700 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
+                                    <TableCell className="text-center font-black border-l-2 border-black bg-white sm:sticky sm:right-0 z-30 text-blue-700 text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
                                         {toBengaliNumber(getStudentTotalPresent(student.id))}
                                     </TableCell>
                                 </TableRow>
@@ -760,7 +760,7 @@ const MonthlyAttendanceGrid = ({
                                         {toBengaliNumber(getDayTotalPresent(day))}
                                     </TableCell>
                                 ))}
-                                <TableCell className="sticky right-0 z-50 border-l-2 border-black bg-slate-200 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"></TableCell>
+                                <TableCell className="sm:sticky sm:right-0 z-50 border-l-2 border-black bg-slate-200 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"></TableCell>
                             </TableRow>
                         </TableFooter>
                     </table>
@@ -1326,7 +1326,7 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                         <Table className="min-w-[1000px] border-separate border-spacing-0 border-collapse print:min-w-full print:w-full">
                             <TableHeader className="sticky top-0 z-30 print:bg-white print:static">
                                 <TableRow className="h-16 print:h-7">
-                                    <TableHead className="text-center font-black border-r border-b w-48 bg-muted z-40 sticky left-0 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:bg-slate-100 print:shadow-none print:border-black text-[14px] print:text-[11px] print:w-[22%]">তারিখ ও বার</TableHead>
+                                    <TableHead className="text-center font-black border-r border-b w-32 sm:w-48 bg-muted z-40 sticky left-0 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:bg-slate-100 print:shadow-none print:border-black text-[11px] sm:text-[14px] print:text-[11px] print:w-[22%]">তারিখ ও বার</TableHead>
                                     {classes.map(cls => (
                                         <TableHead key={cls} className="text-center font-black border-r border-b text-[14px] leading-tight print:border-black print:text-[11px] print:w-[9%] print:bg-slate-100">{classNamesMap[cls]}</TableHead>
                                     ))}
@@ -1350,7 +1350,7 @@ const MonthlySummaryBoard = ({ allStudents }: { allStudents: Student[] }) => {
                                             isOff ? "bg-red-100 hover:bg-red-200 print:bg-slate-100" : "hover:bg-slate-50"
                                         )}>
                                             <TableCell className={cn(
-                                                "text-center font-black border-r whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:shadow-none print:border-black text-[14px] print:text-[10.5px] print:p-0.5 group/row",
+                                                "text-center font-black border-r whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_0px_rgba(0,0,0,0.1)] print:static print:shadow-none print:border-black text-[11px] sm:text-[14px] print:text-[10.5px] print:p-0.5 group/row w-32 sm:w-48",
                                                 isOff ? "text-red-700 bg-red-200 print:bg-slate-100 print:text-rose-700" : "text-slate-600 bg-white"
                                             )}>
                                                 <div className="flex items-center justify-between gap-2 px-2 print:px-1">

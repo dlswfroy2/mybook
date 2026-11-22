@@ -356,7 +356,7 @@ function MarksheetContent() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     <div className="flex items-center gap-2 flex-1 sm:flex-initial bg-slate-50 p-1.5 rounded-xl border border-slate-200">
                         <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setWatermarkOpacity(prev => Math.max(0, parseFloat((prev - 0.05).toFixed(2))))}>
@@ -369,7 +369,7 @@ function MarksheetContent() {
                         </div>
                     </div>
                     <Select value={currentExamName} onValueChange={setCurrentExamName}>
-                        <SelectTrigger className="h-10 w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
+                        <SelectTrigger className="h-9 sm:h-10 flex-1 sm:w-[180px] bg-slate-50 border-slate-200 text-xs font-black text-slate-800">
                             <SelectValue placeholder="Select Examination" />
                         </SelectTrigger>
                         <SelectContent className="font-kalpurush">
@@ -380,21 +380,23 @@ function MarksheetContent() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button onClick={() => window.print()} className="shadow-md font-black rounded-xl bg-primary text-white">
+                    <Button onClick={() => window.print()} className="shadow-md font-black rounded-xl bg-primary text-white h-9 sm:h-10 text-xs sm:text-sm px-3 sm:px-4">
                         <Printer className="mr-2 h-4 w-4" />
-                        Print (A4)
+                        Print
                     </Button>
                 </div>
             </div>
             
-            <div className="printable-area w-full max-w-[210mm] bg-white relative flex flex-col box-border shadow-2xl print:shadow-none print:p-0">
-                <MarksheetTemplate 
-                    result={processedResult} 
-                    schoolInfo={schoolInfo} 
-                    examName={currentExamName} 
-                    academicYear={academicYear}
-                    watermarkOpacity={watermarkOpacity}
-                />
+            <div className="w-full max-w-full overflow-x-auto pb-6">
+                <div className="printable-area w-full min-w-[750px] sm:min-w-0 max-w-[210mm] bg-white relative flex flex-col box-border shadow-2xl print:shadow-none print:p-0 mx-auto">
+                    <MarksheetTemplate 
+                        result={processedResult} 
+                        schoolInfo={schoolInfo} 
+                        examName={currentExamName} 
+                        academicYear={academicYear}
+                        watermarkOpacity={watermarkOpacity}
+                    />
+                </div>
             </div>
         </div>
     );
