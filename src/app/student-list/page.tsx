@@ -259,13 +259,25 @@ function TopTableScrollbar({
         };
     }, [targetRef, updateWidth]);
 
+    // Quick scroll by offset on button click
+    const handleScrollBy = (amount: number) => {
+        const table = targetRef.current;
+        if (table) {
+            table.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+        const top = topScrollRef.current;
+        if (top) {
+            top.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    };
+
     return (
         <div className="bg-slate-100/90 border-2 border-slate-300 rounded-xl p-2 mb-2 no-print shadow-sm flex items-center gap-2">
             <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => targetRef.current?.scrollBy({ left: -350, behavior: 'smooth' })}
+                onClick={() => handleScrollBy(-350)}
                 className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
                 title="টেবিল বামে সরান"
             >
@@ -286,7 +298,7 @@ function TopTableScrollbar({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => targetRef.current?.scrollBy({ left: 350, behavior: 'smooth' })}
+                onClick={() => handleScrollBy(350)}
                 className="h-8 px-3 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs flex items-center gap-1 shrink-0 border-slate-300 shadow-sm select-none"
                 title="টেবিল ডানে সরান"
             >
@@ -933,8 +945,8 @@ function StudentListContent() {
                                             <div className="px-1 no-print">
                                                 <TopTableScrollbar targetRef={tableContainerRef} minScrollWidth={1200} />
                                             </div>
-                                            <div ref={tableContainerRef} className="table-container shadow-xl border-2 border-black !overflow-auto permanent-scroll">
-                                                <Table className="min-w-max border-separate border-spacing-0 border-t-2 border-black">
+                                            <div ref={tableContainerRef} className="table-container shadow-xl border-2 border-black overflow-x-auto touch-pan-x permanent-scroll w-full max-w-full">
+                                                <table className="min-w-max border-separate border-spacing-0 border-t-2 border-black w-full">
                                                     <TableHeader className="sticky top-0 z-40 bg-muted/95 backdrop-blur-sm shadow-sm border-b-2 border-black">
                                                         <TableRow className="h-14">
                                                             <TableHead className="font-black text-center w-12 sm:w-16 sticky left-0 z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">রোল</TableHead>
@@ -1178,7 +1190,7 @@ function StudentListContent() {
                                                             </TableRow>
                                                         ))}
                                                     </TableBody>
-                                                </Table>
+                                                </table>
                                             </div>
                                         </div>
                                     )}
@@ -1301,7 +1313,7 @@ function StudentListContent() {
                                                     <p className="text-sm font-bold border-b-2 border-black inline-block px-4 pb-0.5 uppercase tracking-widest">ESIF STUDENT REGISTRATION FORM</p>
                                                     <h2 className="text-xl font-black mt-2">Class {classRomanMap[activeTab]} Registration - {selectedYear}</h2>
                                                 </header>
-                                                <Table className="border-collapse border-2 border-black w-full min-w-[800px] print:min-w-full print:w-full">
+                                                <table className="border-collapse border-2 border-black w-full min-w-[800px] print:min-w-full print:w-full">
                                                     <TableHeader>
                                                         <TableRow className="bg-slate-50 border-b-2 border-black h-12">
                                                             <TableHead className="border-r-2 border-black text-center font-black p-1 w-12 text-black text-[12px]">SL NO</TableHead>
@@ -1323,7 +1335,7 @@ function StudentListContent() {
                                                             ))
                                                         )}
                                                     </TableBody>
-                                                </Table>
+                                                </table>
                                             </div>
                                         </div>
                                     ) : (

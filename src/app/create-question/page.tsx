@@ -43,7 +43,9 @@ import {
   LayoutTemplate,
   Sparkles,
   ListChecks,
-  Code2
+  Code2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useDoc } from '@/firebase';
@@ -161,6 +163,7 @@ function CreateQuestionContent() {
   // Document Content for Live Visual Editor & Print
   const [documentContent, setDocumentContent] = useState<string>('');
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  const paperContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync questions to document content when questions change
   const syncQuestionsToContent = useCallback((qList: Question[], qbList: Question[] = []) => {
@@ -1174,22 +1177,50 @@ function CreateQuestionContent() {
               {/* Tab 1: Live Visual Paper Editor */}
               <TabsContent value="editor" className="mt-0 space-y-4">
                 <Card className="shadow-lg border-2 border-slate-200 bg-slate-100/50">
-                  <CardHeader className="py-2.5 px-3 sm:px-4 bg-white border-b flex flex-row items-center justify-between">
+                  <CardHeader className="py-2 px-3 sm:px-4 bg-white border-b flex flex-row items-center justify-between gap-2">
                     <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 truncate">
                       📄 লাইভ প্রিন্ট-স্টাইল লেআউট
                     </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleGoToPrint}
-                      className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
-                    >
-                      ওয়ার্ড ভিউ ↗
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Mobile Canvas Scroll Buttons */}
+                      <div className="flex sm:hidden items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-300">
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => paperContainerRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}
+                          className="h-6 px-1.5 text-[10px] font-black text-slate-800 hover:bg-white"
+                          title="ক্যানভাস বামে সরান"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5 text-blue-600 mr-0.5" /> বামে
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                          onClick={() => paperContainerRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}
+                          className="h-6 px-1.5 text-[10px] font-black text-slate-800 hover:bg-white"
+                          title="ক্যানভাস ডানে সরান"
+                        >
+                          ডানে <ChevronRight className="w-3.5 h-3.5 text-blue-600 ml-0.5" />
+                        </Button>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleGoToPrint}
+                        className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
+                      >
+                        ওয়ার্ড ভিউ ↗
+                      </Button>
+                    </div>
                   </CardHeader>
-                  <CardContent className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto w-full max-w-full">
+                  <CardContent 
+                    ref={paperContainerRef}
+                    className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto touch-pan-x w-full max-w-full permanent-scroll"
+                  >
                     {/* Visual A4 Paper Preview */}
-                    <div className="w-full max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm">
+                    <div className="w-[720px] min-w-[720px] sm:w-full sm:min-w-0 max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-4 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm shrink-0">
                       {/* Institutional Header */}
                       <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
                         <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
