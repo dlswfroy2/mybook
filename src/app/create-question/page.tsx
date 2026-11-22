@@ -164,6 +164,7 @@ function CreateQuestionContent() {
 
   // Document Content for Live Visual Editor & Print
   const [documentContent, setDocumentContent] = useState<string>('');
+  const [mobileFitMode, setMobileFitMode] = useState(false);
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const paperContainerRef = useRef<HTMLDivElement>(null);
 
@@ -881,7 +882,7 @@ function CreateQuestionContent() {
   }, [isEnglish]);
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
+    <div className="max-w-[1400px] mx-auto space-y-8 pb-36 sm:pb-16 font-kalpurush">
       <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
@@ -1204,9 +1205,22 @@ function CreateQuestionContent() {
                     <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 truncate">
                       📄 লাইভ প্রিন্ট-স্টাইল লেআউট
                     </span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Mobile Canvas Scroll Buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                      {/* Mobile Canvas Controls */}
                       <div className="flex sm:hidden items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-300">
+                        <Button
+                          size="sm"
+                          type="button"
+                          variant={mobileFitMode ? "default" : "outline"}
+                          onClick={() => setMobileFitMode(!mobileFitMode)}
+                          className={cn(
+                            "h-6 px-1.5 text-[10px] font-black",
+                            mobileFitMode ? "bg-indigo-600 text-white" : "text-slate-800 bg-white"
+                          )}
+                          title="মোবাইলে পুরো পেজ ফিট করুন"
+                        >
+                          {mobileFitMode ? "📄 A4" : "📱 ফিট"}
+                        </Button>
                         <Button
                           size="sm"
                           type="button"
@@ -1240,10 +1254,15 @@ function CreateQuestionContent() {
                   </CardHeader>
                   <CardContent 
                     ref={paperContainerRef}
-                    className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto touch-pan-x w-full max-w-full permanent-scroll"
+                    className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto w-full max-w-full permanent-scroll"
                   >
                     {/* Visual A4 Paper Preview */}
-                    <div className="w-[720px] min-w-[720px] sm:w-full sm:min-w-0 max-w-[8.27in] bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-4 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm shrink-0">
+                    <div className={cn(
+                      "bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm shrink-0 transition-all",
+                      mobileFitMode 
+                        ? "w-full min-w-0 max-w-full" 
+                        : "w-[720px] min-w-[720px] sm:w-full sm:min-w-0 max-w-[8.27in]"
+                    )}>
                       {/* Institutional Header */}
                       <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
                         <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
@@ -1445,6 +1464,62 @@ function CreateQuestionContent() {
                 />
               </TabsContent>
             </Tabs>
+
+            {/* Floating Mobile Canvas Navigation Bar (Always reachable on mobile) */}
+            {activeMainTab === 'editor' && (
+              <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 sm:hidden flex items-center gap-1 bg-slate-900/90 text-white px-2.5 py-1 rounded-full shadow-2xl backdrop-blur-md border border-slate-700 select-none">
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => paperContainerRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+                  className="h-7 w-7 p-0 text-white hover:bg-white/20 rounded-full"
+                  title="বামে সরান"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => window.scrollBy({ top: -300, behavior: 'smooth' })}
+                  className="h-7 px-1.5 text-[10px] font-black text-amber-300 hover:bg-white/20 rounded-full"
+                  title="উপরে সরান"
+                >
+                  ▲ উপরে
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setMobileFitMode(!mobileFitMode)}
+                  className="h-7 px-2 text-[10px] font-black bg-indigo-600 text-white hover:bg-indigo-700 rounded-full"
+                  title="স্ক্রিন ফিট টগল"
+                >
+                  {mobileFitMode ? "📄 A4" : "📱 ফিট"}
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => window.scrollBy({ top: 300, behavior: 'smooth' })}
+                  className="h-7 px-1.5 text-[10px] font-black text-amber-300 hover:bg-white/20 rounded-full"
+                  title="নিচে সরান"
+                >
+                  ▼ নিচে
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => paperContainerRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+                  className="h-7 w-7 p-0 text-white hover:bg-white/20 rounded-full"
+                  title="ডানে সরান"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
 
             {/* Bottom Actions */}
             <div className="flex items-center gap-4 pt-4 border-t">
