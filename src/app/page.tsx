@@ -1717,17 +1717,17 @@ export default function Home() {
     <div className="space-y-8 animate-fade-in font-kalpurush">
       <NoticeTicker />
 
-      <div className="flex flex-wrap gap-4 items-center justify-center sm:justify-start">
-          <Link href="/add-student">
-              <Button className="h-12 px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[6px] border-green-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                  <UserPlus className="h-5 w-5" /> কুইক ভর্তি
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2.5 sm:gap-4 items-center w-full">
+          <Link href="/add-student" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto h-11 sm:h-12 px-2.5 sm:px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[5px] sm:border-b-[6px] border-green-800 shadow-lg font-black text-xs sm:text-base gap-1.5 sm:gap-2 transition-all active:translate-y-1 text-white flex items-center justify-center">
+                  <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" /> কুইক ভর্তি
               </Button>
           </Link>
 
           <Dialog open={isQuickPaymentOpen} onOpenChange={setIsQuickPaymentOpen}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-red-600 hover:bg-red-700 border-b-[6px] border-red-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                      <Banknote className="h-5 w-5" /> কুইক পেমেন্ট
+                  <Button className="w-full sm:w-auto h-11 sm:h-12 px-2.5 sm:px-6 rounded-2xl bg-red-600 hover:bg-red-700 border-b-[5px] sm:border-b-[6px] border-red-800 shadow-lg font-black text-xs sm:text-base gap-1.5 sm:gap-2 transition-all active:translate-y-1 text-white flex items-center justify-center">
+                      <Banknote className="h-4 w-4 sm:h-5 sm:w-5" /> কুইক পেমেন্ট
                   </Button>
               </DialogTrigger>
               <DialogContent className="font-kalpurush sm:max-w-md">
@@ -1765,8 +1765,8 @@ export default function Home() {
 
           <Dialog open={isQuickAttendanceOpen} onOpenChange={(o) => { setIsQuickAttendanceOpen(o); if(!o) setIsConfirmingQuickAttendance(false); }}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[6px] border-green-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                      <UserCheck className="h-5 w-5" /> কুইক হাজিরা
+                  <Button className="w-full sm:w-auto h-11 sm:h-12 px-2.5 sm:px-6 rounded-2xl bg-green-600 hover:bg-green-700 border-b-[5px] sm:border-b-[6px] border-green-800 shadow-lg font-black text-xs sm:text-base gap-1.5 sm:gap-2 transition-all active:translate-y-1 text-white flex items-center justify-center">
+                      <UserCheck className="h-4 w-4 sm:h-5 sm:w-5" /> কুইক হাজিরা
                   </Button>
               </DialogTrigger>
               <DialogContent className={cn("font-kalpurush sm:max-w-md transition-all duration-300", isConfirmingQuickAttendance && "border-rose-500 ring-4 ring-rose-100")}>
@@ -1814,8 +1814,8 @@ export default function Home() {
 
           <Dialog open={isQuickUploadOpen} onOpenChange={(o) => { setIsQuickUploadOpen(o); if(!o) setIsConfirmingReplace(false); }}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[6px] border-orange-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                      <FileUp className="h-5 w-5" /> কুইক আপলোড
+                  <Button className="w-full sm:w-auto h-11 sm:h-12 px-2.5 sm:px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 border-b-[5px] sm:border-b-[6px] border-orange-800 shadow-lg font-black text-xs sm:text-base gap-1.5 sm:gap-2 transition-all active:translate-y-1 text-white flex items-center justify-center">
+                      <FileUp className="h-4 w-4 sm:h-5 sm:w-5" /> কুইক আপলোড
                   </Button>
               </DialogTrigger>
               <DialogContent className={cn("font-kalpurush sm:max-w-md", isConfirmingReplace && "border-rose-500 ring-4 ring-rose-100")} onKeyDown={handleKeyDownInUpload}>
@@ -1921,8 +1921,8 @@ export default function Home() {
 
           <Dialog open={isAiPortalOpen} onOpenChange={setIsAiPortalOpen}>
               <DialogTrigger asChild>
-                  <Button className="h-12 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 border-b-[6px] border-indigo-800 shadow-lg font-black gap-2 transition-all active:translate-y-1 text-white">
-                      <Sparkles className="h-5 w-5" /> এআই অ্যাসিস্ট্যান্ট
+                  <Button className="col-span-2 sm:col-span-1 w-full sm:w-auto h-11 sm:h-12 px-2.5 sm:px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 border-b-[5px] sm:border-b-[6px] border-indigo-800 shadow-lg font-black text-xs sm:text-base gap-1.5 sm:gap-2 transition-all active:translate-y-1 text-white flex items-center justify-center">
+                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" /> এআই অ্যাসিস্ট্যান্ট
                   </Button>
               </DialogTrigger>
               <DialogContent className="font-kalpurush sm:max-w-2xl max-h-[95vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl">

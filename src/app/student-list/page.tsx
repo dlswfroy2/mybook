@@ -729,9 +729,9 @@ function StudentListContent() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
-      <main className="flex-1 p-4 md:p-10 pb-40">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
-            <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+      <main className="flex-1 p-1 sm:p-4 md:p-10 pb-40">
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-4 sm:gap-8">
+            <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-1.5 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20">
                 <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">শিক্ষার্থী মডিউল</h2>
                 <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
                     {sidebarItems.map(item => (
@@ -739,7 +739,7 @@ function StudentListContent() {
                             key={item.id}
                             onClick={() => setActiveSection(item.id)}
                             className={cn(
-                                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2",
+                                "flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2 text-xs sm:text-sm",
                                 activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
                             )}
                         >
@@ -754,7 +754,7 @@ function StudentListContent() {
             </aside>
 
             <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-                <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                <div className="p-2 sm:p-6 lg:p-8 flex-1">
                     <div className="mb-6 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg">
@@ -815,7 +815,7 @@ function StudentListContent() {
                     </div>
 
                     {activeSection === 'list' && (
-                        <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-primary/10 no-print">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6 p-2 sm:p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-primary/10 no-print">
                             <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)} className="h-9 px-3 rounded-lg border-2 bg-white text-xs font-bold text-blue-700 outline-none notranslate" translate="no">
                                 <option value="all">{isEn ? `Students (${classStats.gender.all})` : `ছাত্র-ছাত্রী (${toBengaliNumber(classStats.gender.all)})`}</option>
                                 <option value="male">{isEn ? `Male (${classStats.gender.male})` : `ছাত্র (${toBengaliNumber(classStats.gender.male)})`}</option>
@@ -835,12 +835,12 @@ function StudentListContent() {
                                 <option value="commerce">{isEn ? `Business Studies (${classStats.group.commerce})` : `ব্যবসায় শিক্ষা (${toBengaliNumber(classStats.group.commerce)})`}</option>
                             </select>
                             
-                            <div className="ml-auto flex items-center gap-2">
+                            <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center justify-between sm:justify-end gap-2">
                                 {canDeleteStudent && getStudentsByClass(activeTab).length > 0 && (
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 font-black border-rose-200 text-rose-600 hover:bg-rose-50" disabled={isDeletingAll}>
-                                                {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+                                            <Button variant="outline" size="sm" className="h-9 font-black border-rose-200 text-rose-600 hover:bg-rose-50 text-xs flex-1 sm:flex-none justify-center" disabled={isDeletingAll}>
+                                                {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1" />}
                                                 সব ডিলিট করুন
                                             </Button>
                                         </AlertDialogTrigger>
@@ -858,18 +858,18 @@ function StudentListContent() {
                                     </AlertDialog>
                                 )}
                                 {hasPermission('manage:students') && (
-                                    <Link href="/add-student"><Button size="sm" className="h-9 font-black shadow-md"><Plus className="mr-1.5 h-4 w-4" /> নতুন শিক্ষার্থী</Button></Link>
+                                    <Link href="/add-student" className="flex-1 sm:flex-none"><Button size="sm" className="w-full sm:w-auto h-9 font-black shadow-md text-xs justify-center"><Plus className="mr-1.5 h-4 w-4" /> নতুন শিক্ষার্থী</Button></Link>
                                 )}
                             </div>
                         </div>
                     )}
 
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
-                        <TabsList className="grid w-full grid-cols-5 h-12 bg-slate-100 p-1 rounded-2xl mb-8">
+                        <TabsList className="flex overflow-x-auto sm:grid sm:grid-cols-5 h-11 sm:h-12 bg-slate-100 p-1 rounded-2xl mb-6 scrollbar-none">
                             {classes.map((c) => (
-                                <TabsTrigger key={c} value={c} className="font-black text-xs sm:text-sm rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md notranslate" translate="no">
-                                    {isEn ? `Class ${c}` : `${classNamesMap[c]} শ্রেণি`} 
-                                    <Badge variant="secondary" className="ml-2 h-5 bg-primary/10 text-primary border-none hidden sm:inline-flex notranslate" translate="no">
+                                <TabsTrigger key={c} value={c} className="font-black text-xs sm:text-sm rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md shrink-0 whitespace-nowrap px-3 sm:px-2 notranslate" translate="no">
+                                    {isEn ? `Class ${c}` : <>{classNamesMap[c]} <span className="hidden sm:inline">শ্রেণি</span></>} 
+                                    <Badge variant="secondary" className="ml-1 sm:ml-2 h-4 sm:h-5 text-[10px] sm:text-xs bg-primary/10 text-primary border-none inline-flex notranslate" translate="no">
                                         {isEn ? allStudents.filter(s => s.academicYear === selectedYear && s.className === c).length : toBengaliNumber(allStudents.filter(s => s.academicYear === selectedYear && s.className === c).length)}
                                     </Badge>
                                 </TabsTrigger>
@@ -937,11 +937,11 @@ function StudentListContent() {
                                                 <Table className="min-w-max border-separate border-spacing-0 border-t-2 border-black">
                                                     <TableHeader className="sticky top-0 z-40 bg-muted/95 backdrop-blur-sm shadow-sm border-b-2 border-black">
                                                         <TableRow className="h-14">
-                                                            <TableHead className="font-black text-center w-16 sticky left-0 z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black">রোল</TableHead>
-                                                            <TableHead className="font-black text-center w-20 border-r-2 border-b-2 border-black text-black">ছবি</TableHead>
-                                                            <TableHead className="font-black min-w-[220px] sticky left-[64px] z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black">শিক্ষার্থীর নাম (বাংলা ও ইংরেজি)</TableHead>
-                                                            <TableHead className="font-black min-w-[200px] border-r-2 border-b-2 border-black text-black">পিতা ও মাতার নাম</TableHead>
-                                                            <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">মোবাইল</TableHead>
+                                                            <TableHead className="font-black text-center w-12 sm:w-16 sticky left-0 z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">রোল</TableHead>
+                                                            <TableHead className="font-black text-center w-14 sm:w-20 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">ছবি</TableHead>
+                                                            <TableHead className="font-black w-[130px] min-w-[130px] sm:w-auto sm:min-w-[220px] sticky left-[48px] sm:left-[64px] z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">শিক্ষার্থীর নাম</TableHead>
+                                                            <TableHead className="font-black min-w-[180px] sm:min-w-[200px] border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">পিতা ও মাতার নাম</TableHead>
+                                                            <TableHead className="font-black w-28 sm:w-32 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">মোবাইল</TableHead>
                                                             {isBulkEdit && (
                                                                 <>
                                                                     <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">জন্ম তারিখ</TableHead>
@@ -955,7 +955,7 @@ function StudentListContent() {
                                                                     <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">ইউনিয়ন</TableHead>
                                                                 </>
                                                             )}
-                                                            <TableHead className="text-center w-16 sticky right-0 z-50 bg-muted border-l-2 border-b-2 border-black">
+                                                            <TableHead className="text-center w-14 sm:w-16 sm:sticky sm:right-0 z-50 bg-muted border-l-2 border-b-2 border-black">
                                                                 <Link href="/add-student">
                                                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary text-white hover:bg-primary/90" title="নতুন শিক্ষার্থী যোগ করুন">
                                                                         <Plus className="h-5 w-5" />
@@ -967,18 +967,18 @@ function StudentListContent() {
                                                     <TableBody>
                                                         {getStudentsByClass(activeTab).map((student) => (
                                                             <TableRow key={student.id} id={`student-row-${student.id}`} className={cn("transition-colors h-16 group", student.id === targetStudentId && "bg-yellow-50", editedData[student.id] && "bg-amber-50")}>
-                                                                <TableCell className="font-black text-center text-lg border-r-2 border-b-2 border-black sticky left-0 z-30 bg-white group-hover:bg-slate-50">
+                                                                <TableCell className="font-black text-center text-sm sm:text-lg border-r-2 border-b-2 border-black sticky left-0 z-30 bg-white group-hover:bg-slate-50 w-12 sm:w-16">
                                                                     {isBulkEdit ? (
                                                                         <Input 
                                                                             type="number"
                                                                             value={editedData[student.id]?.roll ?? student.roll} 
                                                                             onChange={e => handleBulkInputChange(student.id, 'roll', parseInt(e.target.value) || 0)}
-                                                                            className="h-8 w-16 font-black text-center border-2 border-primary/20"
+                                                                            className="h-8 w-14 sm:w-16 font-black text-center border-2 border-primary/20"
                                                                         />
                                                                     ) : toBengaliNumber(student.roll)}
                                                                 </TableCell>
-                                                                <TableCell className="text-center border-r-2 border-b-2 border-black p-1">
-                                                                    <div className="relative h-11 w-11 mx-auto rounded-lg overflow-hidden border-2 border-slate-100 group/img">
+                                                                <TableCell className="text-center border-r-2 border-b-2 border-black p-1 w-14 sm:w-20">
+                                                                    <div className="relative h-10 w-10 sm:h-11 sm:w-11 mx-auto rounded-lg overflow-hidden border-2 border-slate-100 group/img">
                                                                         <Avatar className="h-full w-full rounded-none">
                                                                             <AvatarImage src={sanitizePhotoUrl(editedData[student.id]?.photoUrl || student.photoUrl, student.gender) || getStudentPlaceholderImage(student.gender)} className="object-cover" />
                                                                             <AvatarFallback className="font-black text-xs">S</AvatarFallback>
@@ -996,7 +996,7 @@ function StudentListContent() {
                                                                         )}
                                                                     </div>
                                                                 </TableCell>
-                                                                <TableCell className="border-r-2 border-b-2 border-black sticky left-[64px] z-30 bg-white group-hover:bg-slate-50 px-3">
+                                                                <TableCell className="border-r-2 border-b-2 border-black sticky left-[48px] sm:left-[64px] z-30 bg-white group-hover:bg-slate-50 px-2 sm:px-3 w-[130px] max-w-[130px] sm:w-auto sm:max-w-none">
                                                                     {isBulkEdit ? (
                                                                         <div className="space-y-1">
                                                                             <Input 
@@ -1143,7 +1143,7 @@ function StudentListContent() {
                                                                     </>
                                                                 )}
 
-                                                                <TableCell className="text-right pr-6 sticky right-0 z-30 bg-white/95 border-l-2 border-b-2 border-black group-hover:bg-slate-50">
+                                                                <TableCell className="text-right pr-2 sm:pr-6 sm:sticky sm:right-0 z-30 bg-white/95 border-l-2 border-b-2 border-black group-hover:bg-slate-50">
                                                                     <div className="flex justify-end gap-1.5">
                                                                         {isBulkEdit ? (
                                                                             <Button 

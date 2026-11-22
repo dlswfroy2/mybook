@@ -307,32 +307,32 @@ function AccountsDashboardTab({ transactions, isLoading, onActionClick }: { tran
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
                 <Card className="border-2 border-emerald-500/20 bg-emerald-50/30 shadow-md relative overflow-hidden group hover:scale-[1.02] transition-all">
                     <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                        <Banknote className="h-24 w-24 text-emerald-900" />
+                        <Banknote className="h-16 w-16 sm:h-24 sm:w-24 text-emerald-900" />
                     </div>
-                    <CardHeader className="pb-2 relative z-10">
-                        <CardTitle className="text-xs font-black uppercase text-emerald-700">আজকের মোট আদায়</CardTitle>
+                    <CardHeader className="p-2.5 sm:p-6 pb-1 sm:pb-2 relative z-10">
+                        <CardTitle className="text-[10px] sm:text-xs font-black uppercase text-emerald-700">আজকের মোট আদায়</CardTitle>
                     </CardHeader>
-                    <CardContent className="relative z-10">
-                        <div className="text-3xl font-black text-emerald-950">{stats.todayIncome.toLocaleString('bn-BD')} ৳</div>
-                        <p className="text-[10px] font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" /> রিয়েল-টাইম ডাটা
+                    <CardContent className="p-2.5 sm:p-6 pt-0 sm:pt-0 relative z-10">
+                        <div className="text-lg sm:text-3xl font-black text-emerald-950">{stats.todayIncome.toLocaleString('bn-BD')} ৳</div>
+                        <p className="text-[9px] sm:text-[10px] font-bold text-emerald-600 mt-0.5 sm:mt-1 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" /> রিয়েল-টাইম
                         </p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-2 border-primary/20 bg-primary/5 shadow-md relative overflow-hidden group hover:scale-[1.02] transition-all">
                     <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                        <Wallet className="h-24 w-24 text-primary" />
+                        <Wallet className="h-16 w-16 sm:h-24 sm:w-24 text-primary" />
                     </div>
-                    <CardHeader className="pb-2 relative z-10">
-                        <CardTitle className="text-xs font-black uppercase text-primary">এই মাসের মোট আয়</CardTitle>
+                    <CardHeader className="p-2.5 sm:p-6 pb-1 sm:pb-2 relative z-10">
+                        <CardTitle className="text-[10px] sm:text-xs font-black uppercase text-primary">এই মাসের মোট আয়</CardTitle>
                     </CardHeader>
-                    <CardContent className="relative z-10">
-                        <div className="text-3xl font-black text-slate-900">{stats.monthlyIncome.toLocaleString('bn-BD')} ৳</div>
-                        <p className="text-[10px] font-bold text-muted-foreground mt-1">{BENGALI_MONTHS[new Date().getMonth()]} মাস</p>
+                    <CardContent className="p-2.5 sm:p-6 pt-0 sm:pt-0 relative z-10">
+                        <div className="text-lg sm:text-3xl font-black text-slate-900">{stats.monthlyIncome.toLocaleString('bn-BD')} ৳</div>
+                        <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground mt-0.5 sm:mt-1">{BENGALI_MONTHS[new Date().getMonth()]} মাস</p>
                     </CardContent>
                 </Card>
 
@@ -1776,11 +1776,11 @@ export default function AccountsPage() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
       
-      <main className={cn("flex-1 p-4 md:p-6 lg:p-10 gap-8 pb-[250px]", (activePrintReport || activeSection === 'print' || !!printingCollection) && "no-print")}>
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
-            <aside className="w-full md:w-60 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start"><h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">হিসাব শাখা</h2><div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 scrollbar-none">{sidebarItems.map(item => (<button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2", activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30")}> <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}> <item.icon className="h-4 w-4" /> </div> <span className="text-sm font-black">{item.label}</span> {activeSection === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}</button>))}</div></aside>
+      <main className={cn("flex-1 p-1 sm:p-4 md:p-6 lg:p-10 gap-4 sm:gap-8 pb-[250px]", (activePrintReport || activeSection === 'print' || !!printingCollection) && "no-print")}>
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-4 sm:gap-8">
+            <aside className="w-full md:w-60 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-1.5 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20"><h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">হিসাব শাখা</h2><div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 sm:gap-1.5 scrollbar-none">{sidebarItems.map(item => (<button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2 text-xs sm:text-sm", activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30")}> <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}> <item.icon className="h-4 w-4" /> </div> <span className="text-xs sm:text-sm font-black">{item.label}</span> {activeSection === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}</button>))}</div></aside>
             <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-              <div className="p-4 sm:p-6 lg:p-8 flex-1">{isLoadingStudents && allStudents.length === 0 ? <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div> : (<><div className="mb-6 border-b pb-4 flex justify-between items-center no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p></div><Link href="/fee-due-report"><Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 shadow-md"><CreditCard className="h-4 w-4 mr-1.5" /> কেন্দ্রীয় ফি বকেয়া ও আদায় রিপোর্ট</Button></Link></div>{activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}{activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}{activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}{activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}{activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} onPrintReceipt={handleReceiptPrint} />}{activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}{activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}{activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}{activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}{activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}{activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}{activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}</>)}</div>
+              <div className="p-2 sm:p-6 lg:p-8 flex-1">{isLoadingStudents && allStudents.length === 0 ? <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div> : (<><div className="mb-6 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p></div><Link href="/fee-due-report"><Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 shadow-md"><CreditCard className="h-4 w-4 mr-1.5" /> কেন্দ্রীয় ফি বকেয়া ও আদায় রিপোর্ট</Button></Link></div>{activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}{activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}{activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}{activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}{activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} onPrintReceipt={handleReceiptPrint} />}{activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}{activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}{activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}{activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}{activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}{activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}{activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}</>)}</div>
             </div>
         </div>
       </main>

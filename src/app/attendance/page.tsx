@@ -508,12 +508,12 @@ const MonthlyAttendanceGrid = ({
                 </div>
             )}
             
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-primary/5 p-4 rounded-xl border-2 border-primary/10 gap-4 no-print">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg"><CalendarCheck className="h-5 w-5 text-primary" /></div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-primary/5 p-2.5 sm:p-4 rounded-xl border-2 border-primary/10 gap-3 sm:gap-4 no-print">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                    <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg"><CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /></div>
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                            <h3 className="font-black text-lg text-slate-800">মাসিক হাজিরা রেজিস্টার</h3>
+                            <h3 className="font-black text-base sm:text-lg text-slate-800">মাসিক হাজিরা রেজিস্টার</h3>
                             {isAdmin && (
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -539,14 +539,14 @@ const MonthlyAttendanceGrid = ({
                         <p className="text-xs font-bold text-muted-foreground">{BENGALI_MONTHS[viewDate.getMonth()]} {toBengaliNumber(selectedYear)}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                     {activeDay && (
-                        <p className="text-xs font-black text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                        <p className="text-[11px] sm:text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
                             আজকের কলাম: {toBengaliNumber(activeDay)} তারিখ
                         </p>
                     )}
-                    <Button onClick={handleSave} disabled={isSaving || !selectedDate || isOffDay(selectedDate, holidays)} className="font-black shadow-lg">
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    <Button onClick={handleSave} disabled={isSaving || !selectedDate || isOffDay(selectedDate, holidays)} className="font-black shadow-lg h-9 sm:h-10 text-xs sm:text-sm">
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
                         হাজিরা সেভ করুন
                     </Button>
                 </div>
@@ -2139,10 +2139,10 @@ export default function AttendancePage() {
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush print:bg-white print:min-h-0 print:p-0 print:m-0">
             
-            <main className="flex-1 p-4 md:p-10 pb-40 print:p-0 print:m-0 print:pb-0">
-                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8 print:block print:max-w-none print:p-0 print:m-0">
+            <main className="flex-1 p-1 sm:p-4 md:p-10 pb-40 print:p-0 print:m-0 print:pb-0">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-4 sm:gap-8 print:block print:max-w-none print:p-0 print:m-0">
                     {/* Sidebar Navigation */}
-                    <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+                    <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-1.5 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20">
                         <div className="mb-6 px-4 hidden md:block">
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">হাজিরা ব্যবস্থাপনা</h2>
                             <Badge className={cn(
@@ -2158,7 +2158,7 @@ export default function AttendancePage() {
                                     key={item.id}
                                     onClick={() => setActiveSection(item.id)}
                                     className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2",
+                                        "flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit border-2 text-xs sm:text-sm",
                                         activeSection === item.id 
                                             ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" 
                                             : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
@@ -2176,7 +2176,7 @@ export default function AttendancePage() {
 
                     {/* Content Area */}
                     <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4 print:block print:min-h-0 print:border-none print:shadow-none print:rounded-none print:overflow-visible print:p-0 print:m-0">
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1 print:p-0 print:m-0">
+                        <div className="p-2 sm:p-6 lg:p-8 flex-1 print:p-0 print:m-0">
                             {!isOnline && (
                                 <div className="mb-6 p-4 bg-rose-50 border-2 border-dashed border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700 animate-pulse no-print">
                                     <WifiOff className="h-6 w-6" />

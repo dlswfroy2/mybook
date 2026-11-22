@@ -400,7 +400,7 @@ export default function AcademicCalendarPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12 font-kalpurush">
+    <div className="space-y-4 sm:space-y-6 pb-12 font-kalpurush overflow-hidden max-w-full">
       {/* Top Banner & Title */}
       <div className="bg-gradient-to-r from-primary via-indigo-700 to-primary text-white px-3 py-1.5 rounded-xl shadow-md border border-white/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 backdrop-blur-3xl transform skew-x-12 pointer-events-none" />
@@ -531,21 +531,21 @@ export default function AcademicCalendarPage() {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="grid" className="space-y-6">
-        <TabsList className="bg-white dark:bg-card border-2 border-slate-200 dark:border-border p-1.5 rounded-2xl shadow-sm gap-2">
-          <TabsTrigger value="grid" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
+      <Tabs defaultValue="grid" className="space-y-4 sm:space-y-6">
+        <TabsList className="bg-white dark:bg-card border-2 border-slate-200 dark:border-border p-1.5 rounded-2xl shadow-sm gap-1.5 sm:gap-2 flex w-full max-w-full overflow-x-auto scrollbar-none justify-start">
+          <TabsTrigger value="grid" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl shrink-0 whitespace-nowrap">
             <CalendarIcon className="w-4 h-4 mr-1.5" />
             ১২ মাসের ক্যালেন্ডার
           </TabsTrigger>
-          <TabsTrigger value="holidays" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
+          <TabsTrigger value="holidays" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl shrink-0 whitespace-nowrap">
             <FileText className="w-4 h-4 mr-1.5" />
             মাধ্যমিক ছুটির তালিকা ({toBengaliNumber(consolidatedHolidayList.length)})
           </TabsTrigger>
-          <TabsTrigger value="exams" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
+          <TabsTrigger value="exams" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl shrink-0 whitespace-nowrap">
             <GraduationCap className="w-4 h-4 mr-1.5 text-yellow-500" />
             পরীক্ষা ও মূল্যায়ন সময়সূচি
           </TabsTrigger>
-          <TabsTrigger value="reminders" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl">
+          <TabsTrigger value="reminders" className="font-black text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white rounded-xl shrink-0 whitespace-nowrap">
             <BellRing className="w-4 h-4 mr-1.5" />
             প্রতিষ্ঠান ও বেতন রিমাইন্ডার
           </TabsTrigger>
@@ -554,7 +554,7 @@ export default function AcademicCalendarPage() {
         {/* 12-Month Grid View */}
         <TabsContent value="grid" className="space-y-6">
           {/* Month Quick Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-2 scrollbar-none max-w-full">
             {BANGLA_MONTHS.map((monthName, idx) => (
               <Button
                 key={monthName}
@@ -572,8 +572,8 @@ export default function AcademicCalendarPage() {
           </div>
 
           {/* Single Focused Month Big Card */}
-          <Card className="border-2 border-slate-200 dark:border-border shadow-md rounded-[24px] overflow-hidden">
-            <CardHeader className="bg-slate-50 dark:bg-card/50 border-b p-4 flex flex-row items-center justify-between">
+          <Card className="border-2 border-slate-200 dark:border-border shadow-md rounded-[20px] sm:rounded-[24px] overflow-hidden">
+            <CardHeader className="bg-slate-50 dark:bg-card/50 border-b p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -583,7 +583,7 @@ export default function AcademicCalendarPage() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <CardTitle className="text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
+                <CardTitle className="text-base sm:text-lg md:text-xl font-black text-slate-800 dark:text-slate-100">
                   {BANGLA_MONTHS[selectedMonth]} {toBengaliNumber(currentYearNum)}
                 </CardTitle>
                 <Button
@@ -596,7 +596,7 @@ export default function AcademicCalendarPage() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full bg-rose-500 inline-block" /> মাধ্যমিক ছুটি
                 </span>
@@ -608,21 +608,21 @@ export default function AcademicCalendarPage() {
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="p-4 md:p-6">
+            <CardContent className="p-1 sm:p-4 md:p-6 overflow-hidden">
               {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-2 mb-2 text-center font-black text-xs text-muted-foreground">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center font-black text-[10px] sm:text-xs text-muted-foreground">
                 {WEEKDAYS.map((wd, i) => (
-                  <div key={wd} className={cn("py-2 rounded-xl", (i === 0 || i === 6) ? "text-rose-500 bg-rose-50 dark:bg-rose-950/30 font-black" : "")}>
+                  <div key={wd} className={cn("py-1.5 sm:py-2 rounded-lg sm:rounded-xl", (i === 0 || i === 6) ? "text-rose-500 bg-rose-50 dark:bg-rose-950/30 font-black" : "")}>
                     {wd}
                   </div>
                 ))}
               </div>
 
               {/* Day Cells */}
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {generateMonthDays(selectedMonth).map((d, idx) => {
                   if (!d.isCurrentMonth) {
-                    return <div key={`empty-${idx}`} className="h-20 md:h-24 rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-200/50" />;
+                    return <div key={`empty-${idx}`} className="h-16 sm:h-20 md:h-24 rounded-xl sm:rounded-2xl bg-slate-50/50 dark:bg-slate-900/20 border border-dashed border-slate-200/50" />;
                   }
 
                   const hasHoliday = !!d.holiday;
@@ -632,7 +632,7 @@ export default function AcademicCalendarPage() {
                     <div
                       key={d.dateStr}
                       className={cn(
-                        "h-20 md:h-24 p-2 rounded-2xl border transition-all flex flex-col justify-between relative group",
+                        "min-w-0 h-16 sm:h-20 md:h-24 p-1 sm:p-2 rounded-xl sm:rounded-2xl border transition-all flex flex-col justify-between relative group overflow-hidden",
                         d.isWeekend ? "bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-900/40" : "bg-white dark:bg-card border-slate-200 dark:border-border",
                         hasHoliday && "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300",
                         isExam && "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300"
@@ -640,7 +640,7 @@ export default function AcademicCalendarPage() {
                     >
                       <div className="flex items-center justify-between">
                         <span className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-black",
+                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black shrink-0",
                           d.isWeekend ? "text-rose-600 bg-rose-100 dark:bg-rose-900/50" : "text-slate-800 dark:text-slate-200",
                           hasHoliday && "bg-rose-600 text-white",
                           isExam && "bg-emerald-600 text-white"
@@ -648,23 +648,23 @@ export default function AcademicCalendarPage() {
                           {toBengaliNumber(d.dayNum)}
                         </span>
                         {d.isWeekend && !hasHoliday && !isExam && (
-                          <span className="text-[10px] text-rose-500 font-bold hidden sm:inline">সাপ্তাহিক ছুটি</span>
+                          <span className="text-[9px] sm:text-[10px] text-rose-500 font-bold hidden sm:inline">সাপ্তাহিক ছুটি</span>
                         )}
                         {isExam && (
-                          <span className="text-[10px] text-emerald-600 font-bold hidden sm:inline">পরীক্ষা</span>
+                          <span className="text-[9px] sm:text-[10px] text-emerald-600 font-bold hidden sm:inline">পরীক্ষা</span>
                         )}
                       </div>
 
                       {hasHoliday && (
-                        <div className="mt-1">
-                          <p className="text-[10px] leading-tight font-black line-clamp-2 p-1 rounded-lg bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                        <div className="mt-0.5 sm:mt-1">
+                          <p className="text-[8px] sm:text-[10px] leading-tight font-black line-clamp-1 sm:line-clamp-2 p-0.5 sm:p-1 rounded bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100 break-words">
                             {d.holiday!.description}
                           </p>
                         </div>
                       )}
                       {isExam && (
-                        <div className="mt-1">
-                          <p className="text-[10px] leading-tight font-black line-clamp-2 p-1 rounded-lg bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100">
+                        <div className="mt-0.5 sm:mt-1">
+                          <p className="text-[8px] sm:text-[10px] leading-tight font-black line-clamp-1 sm:line-clamp-2 p-0.5 sm:p-1 rounded bg-emerald-100 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100">
                             পরীক্ষা চলছে
                           </p>
                         </div>

@@ -1,4 +1,4 @@
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -11,6 +11,12 @@ import { AcademicYearProvider } from '@/context/AcademicYearContext';
 import { GlobalAiAssistant } from '@/components/GlobalAiAssistant';
 import { GlobalCommandPalette } from '@/components/GlobalCommandPalette';
 import { PwaRegister } from '@/components/PwaRegister';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export const metadata: Metadata = {
   title: 'টপ গ্রেড টিউটোরিয়ালস',
@@ -52,7 +58,7 @@ export default function RootLayout({
             <SchoolInfoProvider>
               <AcademicYearProvider>
                 <Navbar />
-                <main className="flex-1 pt-20 pb-6 container mx-auto px-4">
+                <main className="flex-1 pt-16 sm:pt-20 pb-6 container mx-auto px-1 sm:px-4 max-w-7xl">
                   {children}
                 </main>
                 <Footer />

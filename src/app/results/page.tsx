@@ -323,7 +323,7 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4 items-end p-2.5 sm:p-4 border rounded-lg bg-white/50 shadow-sm">
                 <div className="space-y-2">
                     <Label>পরীক্ষা</Label>
                     <Select value={examName} onValueChange={setExamName}>
@@ -645,7 +645,7 @@ const SubjectReportTab = ({ allStudents, onPrintRequested }: { allStudents: Stud
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end p-4 border rounded-lg bg-white/50 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-2.5 sm:gap-4 items-end p-2.5 sm:p-4 border rounded-lg bg-white/50 shadow-sm">
                 <div className="space-y-2">
                     <Label className="text-xs font-bold">পরীক্ষা</Label>
                     <Select value={examName} onValueChange={setExamName}>
@@ -777,8 +777,8 @@ function GroupResultTable({
                 <table className="min-w-max border-separate border-spacing-0 w-full">
                     <thead className="z-30">
                         <tr>
-                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-0 top-0 z-30 w-[60px] text-[12px] p-1 h-[64px] box-border">রোল</th>
-                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-[60px] top-0 z-30 min-w-[200px] text-[12px] p-1 h-[64px] box-border">শিক্ষার্থীর নাম</th>
+                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-0 top-0 z-30 w-[45px] sm:w-[60px] text-[11px] sm:text-[12px] p-0.5 sm:p-1 h-[64px] box-border">রোল</th>
+                            <th rowSpan={2} className="text-center font-black bg-white border-r-2 border-b-2 border-black sticky left-[45px] sm:left-[60px] top-0 z-30 w-[110px] min-w-[110px] sm:w-auto sm:min-w-[200px] text-[11px] sm:text-[12px] p-0.5 sm:p-1 h-[64px] box-border">শিক্ষার্থীর নাম</th>
                             {subs.map((s, idx) => (
                                 <th 
                                     key={s.name} 
@@ -791,11 +791,11 @@ function GroupResultTable({
                                     {s.name}
                                 </th>
                             ))}
-                            <th rowSpan={2} className="text-center font-black border-l-2 border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[280px] z-30 w-[70px] h-[64px] box-border">মোট</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-[210px] z-30 w-[70px] h-[64px] box-border">GPA</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[140px] bg-[#fff1f2] z-30 w-[70px] h-[64px] box-border">গ্রেড</th>
-                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky top-0 right-[70px] bg-[#fff1f2] z-30 w-[70px] h-[64px] box-border">মেধা</th>
-                            <th rowSpan={2} className="text-center font-black border-b-2 border-black text-[14px] bg-[#fff1f2] p-1 sticky top-0 right-0 z-30 w-[70px] h-[64px] box-border">প্রিন্ট</th>
+                            <th rowSpan={2} className="text-center font-black border-l-2 border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] bg-[#fff1f2] p-0.5 sm:p-1 md:sticky md:top-0 md:right-[280px] z-30 w-[55px] sm:w-[70px] h-[64px] box-border">মোট</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] bg-[#fff1f2] p-0.5 sm:p-1 md:sticky md:top-0 md:right-[210px] z-30 w-[55px] sm:w-[70px] h-[64px] box-border">GPA</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 md:sticky md:top-0 md:right-[140px] bg-[#fff1f2] z-30 w-[55px] sm:w-[70px] h-[64px] box-border">গ্রেড</th>
+                            <th rowSpan={2} className="text-center font-black border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 md:sticky md:top-0 md:right-[70px] bg-[#fff1f2] z-30 w-[55px] sm:w-[70px] h-[64px] box-border">মেধা</th>
+                            <th rowSpan={2} className="text-center font-black border-b-2 border-black text-[12px] sm:text-[14px] bg-[#fff1f2] p-0.5 sm:p-1 md:sticky md:top-0 md:right-0 z-30 w-[55px] sm:w-[70px] h-[64px] box-border">প্রিন্ট</th>
                         </tr>
                         <tr className="h-[32px]">
                             {subs.map((s, idx) => {
@@ -821,8 +821,8 @@ function GroupResultTable({
                     <tbody>
                         {results.map(res => (
                             <tr key={res.student.id} className="h-10 hover:bg-slate-50 transition-colors">
-                                <td className="text-center font-black sticky left-0 z-20 bg-white border-r-2 border-b-2 border-black text-[13px] p-0.5 w-[60px] h-10 box-border">{toBengaliNumber(res.student.roll)}</td>
-                                <td className="font-bold sticky left-[60px] z-20 bg-white border-r-2 border-b-2 border-black text-[13px] p-0.5 px-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] h-10 box-border">{res.student.studentNameBn}</td>
+                                <td className="text-center font-black sticky left-0 z-20 bg-white border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 w-[45px] sm:w-[60px] h-10 box-border">{toBengaliNumber(res.student.roll)}</td>
+                                <td className="font-bold sticky left-[45px] sm:left-[60px] z-20 bg-white border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 px-1.5 sm:px-3 whitespace-nowrap overflow-hidden text-ellipsis w-[110px] max-w-[110px] sm:w-auto sm:max-w-[200px] h-10 box-border">{res.student.studentNameBn}</td>
                                 {subs.map((s, idx) => {
                                     const sr = res.subjectResults.get(s.name);
                                     const isEng = s.name.includes('ইংরেজি');
@@ -842,11 +842,11 @@ function GroupResultTable({
                                         </React.Fragment>
                                     )
                                 })}
-                                <td className="text-center font-black text-primary border-l-2 border-r-2 border-b-2 border-black text-[14px] p-0.5 sticky right-[280px] bg-[#fff1f2] z-20 w-[70px] h-10 box-border">{toBengaliNumber(res.totalMarks)}</td>
-                                <td className="text-center font-black border-r-2 border-b-2 border-black text-[14px] p-0.5 sticky right-[210px] bg-[#fff1f2] z-20 w-[70px] h-10 box-border">{toBengaliNumber(res.gpa.toFixed(2))}</td>
-                                <td className={cn("text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky right-[140px] bg-[#fff1f2] z-20 w-[70px] h-10 box-border", !res.isPass && "text-rose-700")}>{res.isPass ? res.finalGrade : `F${toBengaliNumber(res.failedSubjectsCount)}`}</td>
-                                <td className={cn("text-center font-black border-r-2 border-b-2 border-black text-[13px] p-0.5 sticky right-[70px] bg-[#fff1f2] z-20 w-[70px] h-10 box-border", !res.isPass && "text-rose-500 italic text-[11px]")}>{res.isPass ? (toBengaliNumber(res.meritPosition || '-')) : 'ফেল'}</td>
-                                <td className="text-center p-0.5 border-b-2 border-black sticky right-0 bg-[#fff1f2] z-20 w-[70px] h-10 box-border">
+                                <td className="text-center font-black text-primary border-l-2 border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] p-0.5 md:sticky md:right-[280px] bg-[#fff1f2] z-20 w-[55px] sm:w-[70px] h-10 box-border">{toBengaliNumber(res.totalMarks)}</td>
+                                <td className="text-center font-black border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] p-0.5 md:sticky md:right-[210px] bg-[#fff1f2] z-20 w-[55px] sm:w-[70px] h-10 box-border">{toBengaliNumber(res.gpa.toFixed(2))}</td>
+                                <td className={cn("text-center font-black border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 md:sticky md:right-[140px] bg-[#fff1f2] z-20 w-[55px] sm:w-[70px] h-10 box-border", !res.isPass && "text-rose-700")}>{res.isPass ? res.finalGrade : `F${toBengaliNumber(res.failedSubjectsCount)}`}</td>
+                                <td className={cn("text-center font-black border-r-2 border-b-2 border-black text-[11px] sm:text-[13px] p-0.5 md:sticky md:right-[70px] bg-[#fff1f2] z-20 w-[55px] sm:w-[70px] h-10 box-border", !res.isPass && "text-rose-500 italic text-[11px]")}>{res.isPass ? (toBengaliNumber(res.meritPosition || '-')) : 'ফেল'}</td>
+                                <td className="text-center p-0.5 border-b-2 border-black md:sticky md:right-0 bg-[#fff1f2] z-20 w-[55px] sm:w-[70px] h-10 box-border">
                                     <Link href={`/marksheet/${res.student.id}?academicYear=${selectedYear}&examName=${examName}`} target="_blank">
                                         <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white shadow-sm border border-slate-200"><Printer className="h-4 w-4 text-primary" /></Button>
                                     </Link>
@@ -1227,7 +1227,7 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                         <Button onClick={handleDownloadBulkSample} disabled={!className || !examName} variant="outline" className="flex-1 text-[9px] h-7 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50"><Download className="h-3 w-3 mr-1" /> নমুনা ডাউনলোড</Button>
                         <Button onClick={() => bulkUploadRef.current?.click()} disabled={isBulkUploading || !className || !examName} className="flex-1 text-[9px] h-7 font-black bg-indigo-600 hover:bg-indigo-700 shadow-md">
                             {isBulkUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <FileUp className="h-3 w-3 mr-1" />}
-                            Excel আপলোড (সব বিষয়)
+                            Excel আপলোড <span className="hidden sm:inline">(সব বিষয়)</span>
                         </Button>
                         <input type="file" ref={bulkUploadRef} className="hidden" accept=".xlsx, .xls" onChange={handleBulkUpload} />
                     </div>
@@ -1970,28 +1970,28 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <Card className="max-w-lg mx-auto border-2 shadow-xl rounded-3xl overflow-hidden">
-                <CardHeader className="bg-primary text-white p-6"><CardTitle className="text-xl flex items-center gap-2"><Search className="h-6 w-6" /> ফলাফল অনুসন্ধান</CardTitle></CardHeader>
-                <CardContent className="p-6">
+            <Card className="max-w-lg mx-auto border-2 shadow-xl rounded-2xl sm:rounded-3xl overflow-hidden">
+                <CardHeader className="bg-primary text-white p-3.5 sm:p-6"><CardTitle className="text-lg sm:text-xl flex items-center gap-2"><Search className="h-5 w-5 sm:h-6 sm:w-6" /> ফলাফল অনুসন্ধান</CardTitle></CardHeader>
+                <CardContent className="p-3.5 sm:p-6">
                     <form onSubmit={handleSearch} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2"><Label className="font-bold">রোল</Label><Input value={searchRoll} onChange={e => setSearchRoll(e.target.value)} placeholder="উদা: ১" required className="h-11 font-black text-lg" /></div>
+                        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+                            <div className="space-y-2"><Label className="font-bold text-xs sm:text-sm">রোল</Label><Input value={searchRoll} onChange={e => setSearchRoll(e.target.value)} placeholder="উদা: ১" required className="h-10 sm:h-11 font-black text-base sm:text-lg" /></div>
                             <div className="space-y-2">
-                                <Label className="font-bold">শ্রেণি</Label>
+                                <Label className="font-bold text-xs sm:text-sm">শ্রেণি</Label>
                                 <Select value={searchClass} onValueChange={(v) => setSearchClass(v)}>
-                                    <SelectTrigger className="h-11 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-10 sm:h-11 border-2 font-bold text-xs sm:text-base"><SelectValue /></SelectTrigger>
                                     <SelectContent>{Object.entries(classNamesMap).map(([v, l]) => <SelectItem key={v} value={v}>{l} শ্রেণি</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="font-bold">পরীক্ষা</Label>
+                            <Label className="font-bold text-xs sm:text-sm">পরীক্ষা</Label>
                             <Select value={searchExam} onValueChange={setSearchExam}>
-                                <SelectTrigger className="h-11 border-2 font-black text-lg"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
+                                <SelectTrigger className="h-10 sm:h-11 border-2 font-black text-xs sm:text-base"><SelectValue placeholder="পরীক্ষা নির্বাচন করুন" /></SelectTrigger>
                                 <SelectContent>{exams.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
-                        <Button type="submit" disabled={isSearching} className="w-full h-12 text-lg font-black">{isSearching ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : 'খুঁজুন'}</Button>
+                        <Button type="submit" disabled={isSearching} className="w-full h-11 sm:h-12 text-base sm:text-lg font-black">{isSearching ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : 'খুঁজুন'}</Button>
                     </form>
                 </CardContent>
             </Card>
@@ -2357,18 +2357,18 @@ export default function ResultsPage() {
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
-                        <main className="flex-1 p-4 md:p-8 no-print pb-40">
-                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
-                    <aside className="w-full md:w-64 shrink-0 space-y-1 bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+                        <main className="flex-1 p-1 sm:p-4 md:p-8 no-print pb-40">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-4 sm:gap-8">
+                    <aside className="w-full md:w-64 shrink-0 space-y-1 bg-white md:bg-transparent p-1.5 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20">
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">ফলাফল ব্যবস্থাপনা</h2>
                         <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
                             {sidebarItems.map(item => (
-                                <button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit", activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50")}><div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}><item.icon className="h-4 w-4" /></div><span className="text-sm font-black">{item.label}</span>{activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}</button>
+                                <button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit text-xs sm:text-sm", activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50")}><div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}><item.icon className="h-4 w-4" /></div><span className="text-xs sm:text-sm font-black">{item.label}</span>{activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}</button>
                             ))}
                         </div>
                     </aside>
                     <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-                        <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                        <div className="p-2 sm:p-6 lg:p-8 flex-1">
                             <div className="mb-6 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest">{schoolInfo.name}</p></div></div>
                             {isLoading ? (<div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>) : (
                                 <div className="animate-in fade-in duration-500">
