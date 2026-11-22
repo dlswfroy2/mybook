@@ -2,6 +2,9 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  compress: true,
+  poweredByHeader: false,
+  reactStrictMode: false,
   /* config options here */
   experimental: {
     serverActions: {
@@ -112,7 +115,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/:path*(webmanifest|json|ico|png|jpg|jpeg|svg)',
+        source: '/:path*(webmanifest|manifest.json)',
         headers: [
           {
             key: 'Cache-Control',
@@ -125,6 +128,15 @@ const nextConfig: NextConfig = {
           {
             key: 'Expires',
             value: '0',
+          },
+        ],
+      },
+      {
+        source: '/:path*(ico|png|jpg|jpeg|svg|webp|woff2|woff)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
           },
         ],
       },
