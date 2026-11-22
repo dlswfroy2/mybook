@@ -955,7 +955,7 @@ function StudentListContent() {
                                                                     <TableHead className="font-black w-32 border-r-2 border-b-2 border-black text-black">ইউনিয়ন</TableHead>
                                                                 </>
                                                             )}
-                                                            <TableHead className="text-center w-14 sm:w-16 sm:sticky sm:right-0 z-50 bg-muted border-l-2 border-b-2 border-black">
+                                                            <TableHead className="text-center w-14 sm:w-16 xl:sticky xl:right-0 z-50 bg-muted border-l-2 border-b-2 border-black">
                                                                 <Link href="/add-student">
                                                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary text-white hover:bg-primary/90" title="নতুন শিক্ষার্থী যোগ করুন">
                                                                         <Plus className="h-5 w-5" />
@@ -1143,7 +1143,7 @@ function StudentListContent() {
                                                                     </>
                                                                 )}
 
-                                                                <TableCell className="text-right pr-2 sm:pr-6 sm:sticky sm:right-0 z-30 bg-white/95 border-l-2 border-b-2 border-black group-hover:bg-slate-50">
+                                                                <TableCell className="text-right pr-2 sm:pr-6 xl:sticky xl:right-0 z-30 bg-white/95 border-l-2 border-b-2 border-black group-hover:bg-slate-50">
                                                                     <div className="flex justify-end gap-1.5">
                                                                         {isBulkEdit ? (
                                                                             <Button 

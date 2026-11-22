@@ -680,7 +680,7 @@ const MonthlyAttendanceGrid = ({
                                         </TableHead>
                                     );
                                 })}
-                                <TableHead className="w-16 sm:w-20 text-center font-black border-l-2 border-black bg-slate-200 sm:sticky sm:right-0 z-[60] text-black text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">মোট উপস্থিত</TableHead>
+                                <TableHead className="w-16 sm:w-20 text-center font-black border-l-2 border-black bg-slate-200 xl:sticky xl:right-0 z-[60] text-black text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">মোট উপস্থিত</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -744,7 +744,7 @@ const MonthlyAttendanceGrid = ({
                                             </TableCell>
                                         );
                                     })}
-                                    <TableCell className="text-center font-black border-l-2 border-black bg-white sm:sticky sm:right-0 z-30 text-blue-700 text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
+                                    <TableCell className="text-center font-black border-l-2 border-black bg-white xl:sticky xl:right-0 z-30 text-blue-700 text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
                                         {toBengaliNumber(getStudentTotalPresent(student.id))}
                                     </TableCell>
                                 </TableRow>
@@ -760,7 +760,7 @@ const MonthlyAttendanceGrid = ({
                                         {toBengaliNumber(getDayTotalPresent(day))}
                                     </TableCell>
                                 ))}
-                                <TableCell className="sm:sticky sm:right-0 z-50 border-l-2 border-black bg-slate-200 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"></TableCell>
+                                <TableCell className="xl:sticky xl:right-0 z-50 border-l-2 border-black bg-slate-200 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"></TableCell>
                             </TableRow>
                         </TableFooter>
                     </table>

@@ -202,7 +202,7 @@ function NavbarContent() {
         </SheetContent>
       </Sheet>
 
-      <Link href="/" className="flex items-center gap-3 group">
+      <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink min-w-0">
         <div className="hidden sm:flex bg-white p-1 rounded-xl text-primary group-hover:scale-105 transition-transform items-center justify-center shadow-lg shrink-0">
           {appLogoUrl ? (
             <img src={appLogoUrl} alt="Logo" className="w-10 h-10 object-contain" />
@@ -210,23 +210,23 @@ function NavbarContent() {
             <BookOpenText className="w-10 h-10" />
           )}
         </div>
-        <div className="flex flex-col">
-          <h1 className="text-[18px] xs:text-[22px] md:text-[35px] font-black font-headline tracking-tighter drop-shadow-[0_6px_6px_rgba(0,0,0,1)] leading-tight text-white uppercase scale-y-110 origin-left truncate max-w-[150px] xs:max-w-[220px] sm:max-w-none">
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-[15px] sm:text-[22px] md:text-[35px] font-black font-headline tracking-tighter drop-shadow-[0_4px_4px_rgba(0,0,0,1)] leading-tight text-white uppercase whitespace-nowrap">
             {appName}
           </h1>
-          <p className="text-[10px] md:text-xs font-black text-yellow-400 italic leading-none mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+          <p className="text-[9px] md:text-xs font-bold text-yellow-400 italic leading-none mt-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] whitespace-nowrap">
             Smart learning, Bright Future.
           </p>
         </div>
       </Link>
       
-      <div className="ml-auto flex items-center gap-2 md:gap-3">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
         {/* Academic Year Selector */}
-        <div className="flex items-center gap-1.5 bg-black/25 hover:bg-black/35 border border-white/20 rounded-xl px-2.5 py-1 text-white shadow-inner">
-          <Calendar className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+        <div className="flex items-center gap-1 bg-black/25 hover:bg-black/35 border border-white/20 rounded-xl px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-white shadow-inner">
+          <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-yellow-400 shrink-0" />
           <span className="text-xs font-black hidden sm:inline">শিক্ষাবর্ষ:</span>
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-7 w-[80px] bg-transparent border-0 text-white font-black text-xs focus:ring-0 px-1 py-0 shadow-none cursor-pointer">
+            <SelectTrigger className="h-6 sm:h-7 w-[58px] sm:w-[80px] bg-transparent border-0 text-white font-black text-[11px] sm:text-xs focus:ring-0 px-0.5 sm:px-1 py-0 shadow-none cursor-pointer">
               <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
             </SelectTrigger>
             <SelectContent className="font-kalpurush font-bold bg-white text-slate-900 shadow-xl border border-slate-200">
@@ -246,7 +246,7 @@ function NavbarContent() {
           user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-white/30 hover:border-white/60 transition-colors p-0 overflow-hidden">
+                <Button variant="ghost" className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full border-2 border-white/30 hover:border-white/60 transition-colors p-0 overflow-hidden">
                   <Avatar className="h-full w-full">
                     <AvatarImage src={userPhoto} alt={userName} />
                     <AvatarFallback className="bg-secondary text-primary font-black">

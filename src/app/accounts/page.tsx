@@ -1135,25 +1135,25 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={potentialTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={potentialTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-auto permanent-scroll">
+                    <div ref={potentialTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-x-auto touch-pan-x permanent-scroll w-full max-w-full">
                         <table className="border-separate border-spacing-0 w-full min-w-[1300px] caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 bg-slate-100">
-                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] text-center w-11 sm:w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
-                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] w-[110px] sm:min-w-[100px] text-black sticky left-11 sm:left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
+                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] text-center w-10 sm:w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
+                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] w-[100px] max-w-[100px] sm:w-[150px] sm:max-w-none text-black sticky left-10 sm:left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">ভর্তি ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">সেশন ফি</TableHead>
                                     {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r-2 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">পরীক্ষা ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">অন্যান্য</TableHead>
-                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 sm:sticky sm:right-0 z-40 uppercase">মোট পাওনা</TableHead>
+                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 xl:sticky xl:right-0 z-40 uppercase">মোট পাওনা</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {potentialPreviewData.map((row, i) => (
                                     <TableRow key={i} className="h-10 hover:bg-slate-50 transition-colors">
-                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[11px] sm:text-[13px] sticky left-0 z-20 bg-white w-11 sm:w-14">{toBengaliNumber(row.roll)}</TableCell>
-                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] truncate sticky left-11 sm:left-14 z-20 bg-white px-1.5 sm:px-3 w-[110px] max-w-[110px] sm:w-auto sm:max-w-none">{row.name}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[11px] sm:text-[13px] sticky left-0 z-20 bg-white w-10 sm:w-14">{toBengaliNumber(row.roll)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] truncate sticky left-10 sm:left-14 z-20 bg-white px-1.5 sm:px-3 w-[100px] max-w-[100px] sm:w-[150px] sm:max-w-none overflow-hidden text-ellipsis">{row.name}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
                                         {Array(12).fill(row.tuition).map((val, j) => (
@@ -1161,19 +1161,19 @@ function IncomeComparisonTab({ allStudents, selectedYear, onPrintPotentialReport
                                         ))}
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
-                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sm:sticky sm:right-0 z-20 border-l-2 border-b-2 border-black">{toBengaliNumber(row.total)}</TableCell>
+                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 xl:sticky xl:right-0 z-20 border-l-2 border-b-2 border-black">{toBengaliNumber(row.total)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                             <TableFooter className="sticky bottom-0 z-30">
                                 <TableRow className="h-12 border-t-[3px] border-black bg-slate-200 font-black">
-                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট সম্ভাব্য পাওনা:</TableCell>
+                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট সম্ভাব্য পাওনা:</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.admission)}</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.session)}</TableCell>
                                     {potentialGrandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.exam)}</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(potentialGrandTotals.other)}</TableCell>
-                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sm:sticky sm:right-0 z-50 border-l-2 border-b-2 border-black leading-none">{toBengaliNumber(potentialGrandTotals.total)} ৳</TableCell>
+                                    <TableCell className="text-right pr-6 text-[18px] sm:text-[22px] bg-blue-950 text-white xl:sticky xl:right-0 z-50 border-l-2 border-b-2 border-black leading-none">{toBengaliNumber(potentialGrandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </table>
@@ -1284,35 +1284,35 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
             </div>
 
             <Card className="border-[4px] border-black rounded-[32px] overflow-hidden shadow-2xl bg-white">
-                <CardHeader className="bg-primary/5 border-b-[3px] border-black no-print p-6">
-                    <CardTitle className="text-xl font-black flex justify-between items-center uppercase tracking-tight">
+                <CardHeader className="bg-primary/5 border-b-[3px] border-black no-print p-3 sm:p-6">
+                    <CardTitle className="text-base sm:text-xl font-black flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 uppercase tracking-tight">
                         <span>শ্রেণিভিত্তিক বার্ষিক আদায় বিবরণী - {toBengaliNumber(selectedYear)} ({classNamesMap[selectedClass]})</span>
-                        <Badge variant="outline" className="font-black border-primary text-primary px-6 h-8 bg-white shadow-sm">মোট শিক্ষার্থী: {toBengaliNumber(reportData.length)} জন</Badge>
+                        <Badge variant="outline" className="font-black border-primary text-primary px-3 sm:px-6 h-7 sm:h-8 bg-white shadow-sm shrink-0 text-xs sm:text-sm">মোট শিক্ষার্থী: {toBengaliNumber(reportData.length)} জন</Badge>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="p-4 pb-0 no-print">
                         <TopTableScrollbar targetRef={classwiseTableRef} minScrollWidth={1300} />
                     </div>
-                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-auto permanent-scroll">
+                    <div ref={classwiseTableRef} className="table-container !max-h-[500px] border-2 border-black !rounded-none overflow-x-auto touch-pan-x permanent-scroll w-full max-w-full">
                         <table className="border-separate border-spacing-0 w-full min-w-[1300px] caption-bottom text-sm">
                             <TableHeader className="bg-slate-100 sticky top-0 z-30 shadow-sm">
                                 <TableRow className="h-12 bg-slate-100">
-                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] text-center w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
-                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[13px] min-w-[100px] text-black sticky left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
+                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] text-center w-10 sm:w-14 text-black sticky left-0 z-40 bg-slate-100 uppercase">রোল</TableHead>
+                                    <TableHead className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] w-[100px] max-w-[100px] sm:w-[150px] sm:max-w-none text-black sticky left-10 sm:left-14 z-40 bg-slate-100 uppercase">শিক্ষার্থীর নাম</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">ভর্তি ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">সেশন ফি</TableHead>
                                     {BENGALI_MONTHS.map(m => <TableHead key={m} className="border-r-2 border-b-2 border-black font-black text-[11px] text-center text-black px-1 uppercase">{m}</TableHead>)}
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">পরীক্ষা ফি</TableHead>
                                     <TableHead className="border-r-2 border-b-2 border-black font-black text-[12px] text-center text-black uppercase">অন্যান্য</TableHead>
-                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 sm:sticky sm:right-0 z-40 uppercase">মোট আদায়</TableHead>
+                                    <TableHead className="border-b-2 border-black font-black text-[13px] text-right pr-6 text-white bg-blue-900 xl:sticky xl:right-0 z-40 uppercase">মোট আদায়</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {reportData.map((row, i) => (
                                     <TableRow key={i} className="h-10 hover:bg-slate-50 transition-colors">
-                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[13px] sticky left-0 z-20 bg-white">{toBengaliNumber(row.roll)}</TableCell>
-                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[13px] truncate sticky left-14 z-20 bg-white px-3">{row.name}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black text-center font-black text-[11px] sm:text-[13px] sticky left-0 z-20 bg-white w-10 sm:w-14">{toBengaliNumber(row.roll)}</TableCell>
+                                        <TableCell className="border-r-2 border-b-2 border-black font-black text-[11px] sm:text-[13px] truncate sticky left-10 sm:left-14 z-20 bg-white px-1.5 sm:px-3 w-[100px] max-w-[100px] sm:w-[150px] sm:max-w-none overflow-hidden text-ellipsis">{row.name}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.admission > 0 ? toBengaliNumber(row.admission) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.session > 0 ? toBengaliNumber(row.session) : '-'}</TableCell>
                                         {row.months.map((val: number, j: number) => (
@@ -1320,19 +1320,19 @@ function ClasswiseAnnualReportTab({ allStudents, selectedYear, onPrint }: { allS
                                         ))}
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.exam > 0 ? toBengaliNumber(row.exam) : '-'}</TableCell>
                                         <TableCell className="border-r-2 border-b-2 border-black text-center text-[12px] font-bold text-slate-800">{row.other > 0 ? toBengaliNumber(row.other) : '-'}</TableCell>
-                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 sm:sticky sm:right-0 z-20 border-l-2 border-b-2 border-black text-xs sm:text-base">{toBengaliNumber(row.total)}</TableCell>
+                                        <TableCell className="text-right pr-6 font-black text-[16px] bg-blue-50 text-blue-900 xl:sticky xl:right-0 z-20 border-l-2 border-b-2 border-black text-xs sm:text-base">{toBengaliNumber(row.total)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                             <TableFooter className="sticky bottom-0 z-30">
                                 <TableRow className="h-12 border-t-[3px] border-black bg-slate-200 font-black">
-                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট আদায়:</TableCell>
+                                    <TableCell colSpan={2} className="text-right pr-4 border-r-2 border-b-2 border-black text-[12px] sm:text-[14px] sticky left-0 z-50 bg-slate-200 uppercase tracking-tighter">সর্বমোট আদায়:</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.admission)}</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.session)}</TableCell>
                                     {grandTotals.months.map((val: number, j: number) => <TableCell key={j} className="border-r-2 border-b-2 border-black text-center text-[12px]">{toBengaliNumber(Math.round(val))}</TableCell>)}
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.exam)}</TableCell>
                                     <TableCell className="border-r-2 border-b-2 border-black text-center text-[13px]">{toBengaliNumber(grandTotals.other)}</TableCell>
-                                    <TableCell className="text-right pr-6 text-[22px] bg-blue-950 text-white sm:sticky sm:right-0 z-50 border-l-2 border-b-2 border-black leading-none text-base sm:text-[22px]">{toBengaliNumber(grandTotals.total)} ৳</TableCell>
+                                    <TableCell className="text-right pr-6 text-[18px] sm:text-[22px] bg-blue-950 text-white xl:sticky xl:right-0 z-50 border-l-2 border-b-2 border-black leading-none text-base sm:text-[22px]">{toBengaliNumber(grandTotals.total)} ৳</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </table>
