@@ -1223,11 +1223,11 @@ const ResultSheetTab = ({ allStudents, onPrint }: { allStudents: Student[], onPr
                         <Button onClick={handleDownloadExcel} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-emerald-600 text-emerald-700 hover:bg-emerald-50 h-9 font-black text-xs"><FileSpreadsheet className="h-3 w-3 mr-1" /> Excel</Button>
                         <Button onClick={() => onPrint({ results: groupedData, classResults, className, groupFilter, examName })} disabled={processedResults.length === 0} variant="outline" className="flex-1 border-primary text-primary hover:bg-primary/5 h-9 font-black text-xs"><Printer className="h-3 w-3 mr-1" /> প্রিন্ট</Button>
                     </div>
-                    <div className="flex gap-2">
-                        <Button onClick={handleDownloadBulkSample} disabled={!className || !examName} variant="outline" className="flex-1 text-[9px] h-7 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50"><Download className="h-3 w-3 mr-1" /> নমুনা ডাউনলোড</Button>
-                        <Button onClick={() => bulkUploadRef.current?.click()} disabled={isBulkUploading || !className || !examName} className="flex-1 text-[9px] h-7 font-black bg-indigo-600 hover:bg-indigo-700 shadow-md">
-                            {isBulkUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <FileUp className="h-3 w-3 mr-1" />}
-                            Excel আপলোড <span className="hidden sm:inline">(সব বিষয়)</span>
+                    <div className="flex gap-1.5 sm:gap-2">
+                        <Button onClick={handleDownloadBulkSample} disabled={!className || !examName} variant="outline" className="flex-1 text-[9px] sm:text-xs h-7 sm:h-8 px-1 sm:px-2 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 truncate"><Download className="h-3 w-3 mr-1 shrink-0" /><span className="truncate">নমুনা ডাউনলোড</span></Button>
+                        <Button onClick={() => bulkUploadRef.current?.click()} disabled={isBulkUploading || !className || !examName} className="flex-1 text-[9px] sm:text-xs h-7 sm:h-8 px-1 sm:px-2 font-black bg-indigo-600 hover:bg-indigo-700 shadow-md truncate">
+                            {isBulkUploading ? <Loader2 className="h-3 w-3 animate-spin mr-1 shrink-0" /> : <FileUp className="h-3 w-3 mr-1 shrink-0" />}
+                            <span className="truncate">Excel আপলোড</span> <span className="hidden sm:inline ml-1">(সব বিষয়)</span>
                         </Button>
                         <input type="file" ref={bulkUploadRef} className="hidden" accept=".xlsx, .xls" onChange={handleBulkUpload} />
                     </div>
