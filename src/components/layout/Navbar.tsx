@@ -161,8 +161,33 @@ function NavbarContent() {
               </SheetTitle>
             </div>
           </SheetHeader>
+
+          {/* Academic Year Selector inside Sidebar Menu */}
+          <div className="p-2.5 mx-2.5 my-2 rounded-xl bg-gradient-to-r from-white/10 to-white/5 border border-white/15 flex items-center justify-between shadow-lg shrink-0">
+            <div className="flex items-center gap-2 text-white">
+              <div className="p-1.5 rounded-lg bg-yellow-400/20 text-yellow-400 border border-yellow-400/30">
+                <Calendar className="w-4 h-4 shrink-0" />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[11px] font-black text-white/95">শিক্ষাবর্ষ / সেশন</span>
+                <span className="text-[8.5px] font-bold text-white/60">সেশন পরিবর্তন করুন</span>
+              </div>
+            </div>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="h-8 w-[92px] bg-black/50 border border-white/20 text-yellow-300 font-black text-xs focus:ring-0 px-2 py-0 shadow-inner cursor-pointer rounded-lg">
+                <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="font-kalpurush font-bold bg-white text-slate-900 shadow-2xl border-2 border-slate-200 z-[140]">
+                {availableYears.map(yr => (
+                  <SelectItem key={yr} value={yr} className="font-bold text-xs">
+                    {toBengaliNumber(yr)} শিক্ষাবর্ষ
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           
-          <div className="flex-1 overflow-y-auto py-2 px-2.5 space-y-1.5 bg-[#0f172a] scrollbar-thin scrollbar-thumb-white/20">
+          <div className="flex-1 overflow-y-auto py-1 px-2.5 space-y-1.5 bg-[#0f172a] scrollbar-thin scrollbar-thumb-white/20">
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               return (
@@ -221,12 +246,12 @@ function NavbarContent() {
       </Link>
       
       <div className="ml-auto flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
-        {/* Academic Year Selector */}
-        <div className="flex items-center gap-1 bg-black/25 hover:bg-black/35 border border-white/20 rounded-xl px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-white shadow-inner">
-          <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-yellow-400 shrink-0" />
-          <span className="text-xs font-black hidden sm:inline">শিক্ষাবর্ষ:</span>
+        {/* Academic Year Selector - Visible on Desktop, inside sidebar menu on mobile */}
+        <div className="hidden sm:flex items-center gap-1.5 bg-black/25 hover:bg-black/35 border border-white/20 rounded-xl px-2.5 py-1 text-white shadow-inner">
+          <Calendar className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+          <span className="text-xs font-black">শিক্ষাবর্ষ:</span>
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-6 sm:h-7 w-[58px] sm:w-[80px] bg-transparent border-0 text-white font-black text-[11px] sm:text-xs focus:ring-0 px-0.5 sm:px-1 py-0 shadow-none cursor-pointer">
+            <SelectTrigger className="h-7 w-[80px] bg-transparent border-0 text-white font-black text-xs focus:ring-0 px-1 py-0 shadow-none cursor-pointer">
               <SelectValue>{toBengaliNumber(selectedYear)}</SelectValue>
             </SelectTrigger>
             <SelectContent className="font-kalpurush font-bold bg-white text-slate-900 shadow-xl border border-slate-200">

@@ -498,22 +498,23 @@ export function GlobalAiAssistant() {
   return (
     <>
       {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6 z-50 no-print flex flex-col items-end gap-2">
+      <div className="fixed bottom-16 right-3 sm:bottom-6 sm:right-6 z-50 no-print flex flex-col items-end gap-2">
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
-            className="group relative flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 text-white px-4 py-3 rounded-full shadow-2xl hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all duration-300 border-2 border-white/20"
+            className="group relative flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto sm:gap-2.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 text-white rounded-full sm:px-4 sm:py-3 shadow-2xl hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all duration-300 border-2 border-white/20 shrink-0"
             title="AI সহকারী ওপেন করুন"
+            aria-label="AI সহকারী"
           >
-            <div className="relative">
-              <Bot className="h-6 w-6 text-white group-hover:rotate-12 transition-transform duration-300" />
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+            <div className="relative flex items-center justify-center">
+              <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white group-hover:rotate-12 transition-transform duration-300" />
+              <span className="absolute -top-1 -right-1 flex h-2 w-2 sm:h-2.5 sm:w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-500"></span>
               </span>
             </div>
-            <span className="font-kalpurush font-black text-sm tracking-wide pr-1">AI সহকারী</span>
-            <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
+            <span className="hidden sm:inline font-kalpurush font-black text-sm tracking-wide pr-1">AI সহকারী</span>
+            <Sparkles className="hidden sm:inline h-4 w-4 text-amber-300 animate-pulse" />
           </button>
         )}
 
