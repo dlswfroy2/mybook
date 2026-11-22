@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import 'katex/dist/katex.min.css';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,14 +18,12 @@ import {
   Building2, 
   Calendar, 
   BookOpen, 
-  HelpCircle, 
   FileText,
-  AlertCircle,
-  Layers,
-  ListOrdered
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateBoardQuestions, GenerateBoardQuestionsOutput } from '@/ai/flows/generate-board-questions';
+import { formatMathToHtml } from '@/lib/math-formatter';
 
 const toBengaliNumber = (num: number | string) => {
   const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -72,11 +71,11 @@ const YEARS = [
 ];
 
 const COMMON_SUBJECTS = [
+  'গণিত',
+  'উচ্চতর গণিত',
   'পদার্থবিজ্ঞান',
   'রসায়ন',
   'জীববিজ্ঞান',
-  'উচ্চতর গণিত',
-  'গণিত',
   'বাংলা ১ম পত্র',
   'বাংলা ২য় পত্র',
   'English 1st Paper',
@@ -110,7 +109,7 @@ export function BoardQuestionSection({
   const [examName, setExamName] = useState(defaultClassId ? `${defaultClassId} শ্রেণি` : 'এসএসসি (SSC)');
   const [board, setBoard] = useState('দিনাজপুর বোর্ড');
   const [year, setYear] = useState('২০২৪');
-  const [subject, setSubject] = useState(defaultSubject || 'পদার্থবিজ্ঞান');
+  const [subject, setSubject] = useState(defaultSubject || 'গণিত');
   const [chapter, setChapter] = useState('');
   const [type, setType] = useState<'mcq' | 'creative' | 'short' | 'english' | 'all'>('creative');
 
@@ -165,14 +164,19 @@ export function BoardQuestionSection({
 
   const handleInsert = () => {
     if (!result || !onInsertQuestions) return;
-    onInsertQuestions(result.questions, result.formattedText);
+    // Format question content through formatMathToHtml so KaTeX and clean symbols are preserved
+    const formattedQuestions = result.questions.map(q => ({
+      ...q,
+      content: formatMathToHtml(q.content)
+    }));
+    onInsertQuestions(formattedQuestions, result.formattedText);
     toast({
       title: 'প্রশ্নপত্রে যুক্ত করা হয়েছে! ✍️',
       description: `মোট ${toBengaliNumber(result.questions.length)}টি প্রশ্ন সফলভাবে আপনার প্রশ্নপত্রে যুক্ত হয়েছে।`,
     });
   };
 
-  // Helper to render text with bold and formatting
+  // Render preview lines with KaTeX and math formatting
   const renderFormattedPreview = (txt: string) => {
     const lines = txt.split('\n');
     return lines.map((line, idx) => {
@@ -181,35 +185,38 @@ export function BoardQuestionSection({
         return <div key={idx} className="h-2" />;
       }
 
-      // Check if horizontal rule
       if (trimmed === '---' || trimmed === '***') {
         return <hr key={idx} className="my-3 border-amber-200" />;
       }
 
-      // Check if header line or major question heading
-      const isHeading = trimmed.startsWith('###') || trimmed.startsWith('**প্রশ্ন') || trimmed.match(/^(?:\*\*)?[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\*]/);
+      const isDivisionHeader = trimmed.match(/^(?:###\s*)?(?:ক|খ|গ|ঘ)-বিভাগ/);
+      const isQuestionHeading = trimmed.match(/^(?:###\s*)?(?:\*\*)?(?:প্রশ্ন\s*)?[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\*]/);
 
-      // Clean bold syntax for inline span
-      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      const htmlContent = formatMathToHtml(line);
 
       return (
-        <p
+        <div
           key={idx}
           className={`leading-relaxed text-slate-800 ${
-            isHeading ? 'font-bold text-amber-950 mt-2 text-[13px]' : 'text-xs'
-          } ${trimmed.startsWith('(ক)') || trimmed.startsWith('(খ)') || trimmed.startsWith('(গ)') || trimmed.startsWith('(ঘ)') || trimmed.startsWith('ক.') || trimmed.startsWith('খ.') || trimmed.startsWith('গ.') || trimmed.startsWith('ঘ.') ? 'pl-3' : ''}`}
-        >
-          {parts.map((p, pIdx) => {
-            if (p.startsWith('**') && p.endsWith('**')) {
-              return (
-                <strong key={pIdx} className="font-black text-slate-900">
-                  {p.slice(2, -2)}
-                </strong>
-              );
-            }
-            return <span key={pIdx}>{p}</span>;
-          })}
-        </p>
+            isDivisionHeader 
+              ? 'font-black text-amber-950 mt-4 text-sm bg-amber-100/70 p-1.5 rounded border border-amber-300' 
+              : isQuestionHeading 
+              ? 'font-bold text-slate-900 mt-2.5 text-[13px]' 
+              : 'text-xs'
+          } ${
+            trimmed.startsWith('(ক)') ||
+            trimmed.startsWith('(খ)') ||
+            trimmed.startsWith('(গ)') ||
+            trimmed.startsWith('(ঘ)') ||
+            trimmed.startsWith('ক.') ||
+            trimmed.startsWith('খ.') ||
+            trimmed.startsWith('গ.') ||
+            trimmed.startsWith('ঘ.')
+              ? 'pl-4 my-1 text-slate-900 font-medium'
+              : ''
+          }`}
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
       );
     });
   };
@@ -230,7 +237,7 @@ export function BoardQuestionSection({
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs text-amber-800/80 font-bold mt-0.5">
-                বোর্ডে আসা সম্পূর্ণ প্রশ্নপত্র (সকল সৃজনশীল ও MCQ) — কোনো অনুমান বা অন্য বোর্ডের প্রশ্ন নয়
+                বোর্ডে আসা সম্পূর্ণ প্রশ্নপত্র (অফিশিয়াল বিভাগ ও নম্বর বণ্টনসহ) — কোনো অনুমান নয়
               </CardDescription>
             </div>
           </div>
@@ -242,14 +249,13 @@ export function BoardQuestionSection({
         <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5 font-bold">
           <div className="flex items-center gap-1.5 text-amber-800 font-black">
             <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>কঠোর শর্তাবলী ও প্রম্পট নিয়ম:</span>
+            <span>অফিশিয়াল বোর্ড প্রশ্ন কাঠামো ও নিয়মাবলী:</span>
           </div>
           <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11.5px] font-medium text-amber-900">
+            <li><strong>গণিত:</strong> ৪টি বিভাগ (ক-বীজগণিত, খ-জ্যামিতি, গ-ত্রিকোণমিতি ও পরিমিতি, ঘ-পরিসংখ্যান) অনুযায়ী সম্পূর্ণ ১১টি সৃজনশীল প্রশ্ন।</li>
+            <li><strong>বিজ্ঞান (পদার্থ/রসায়ন/জীববিজ্ঞান):</strong> ৮টি সৃজনশীল প্রশ্ন (যেকোনো ৫টির উত্তর দিতে হয়)।</li>
+            <li><strong>চিহ্ন ও প্রতীক:</strong> সমীকরণ, বর্গমূল, পাওয়ার, সেট ও বিজ্ঞান সংকেত সরাসরি KaTeX দিয়ে নির্ভুল ও সুন্দরভাবে রেন্ডার হবে।</li>
             <li>বোর্ডের নাম ও সাল শুধুমাত্র উপরের মূল হেডারে থাকবে; প্রশ্নের ভেতরের কোনো লাইনে বারবার লেখা থাকবে না।</li>
-            <li>ঐ পরীক্ষায় আসা সম্পূর্ণ প্রশ্নপত্র তৈরি হবে (বিজ্ঞানে ৮টি CQ / ২৫টি MCQ; অন্যান্য বিষয়ে ১১টি CQ / ৩০টি MCQ)।</li>
-            <li>MCQ-এর ৪টি অপশন এক লাইনে পাশাপাশি থাকবে এবং সঠিক উত্তর শেষে উত্তরমালায় থাকবে।</li>
-            <li>গণিত ও বিজ্ঞানের সংকেত বা এককসমূহ পরিষ্কার ফরমেটে (যেমন: ৪.২ cm, ১ mm, ১৫০ g, ৭৮০০ kg/m³, ১৬ ms⁻¹) প্রদর্শিত হবে।</li>
-            <li><strong>কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেওয়া হবে, অনুমান করে লেখা হবে না।</strong></li>
           </ul>
         </div>
 
@@ -332,7 +338,7 @@ export function BoardQuestionSection({
             <Input 
               value={chapter}
               onChange={(e) => setChapter(e.target.value)}
-              placeholder="যেমন: বল ও গতির সমীকরণ, ১ম অধ্যায়, ইত্যাদি..."
+              placeholder="যেমন: বীজগণিত, জ্যামিতি, ১ম অধ্যায়, ইত্যাদি..."
               className="h-9 text-xs font-bold bg-slate-50 border-amber-200"
             />
           </div>
@@ -346,7 +352,7 @@ export function BoardQuestionSection({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="creative" className="text-xs font-bold">
-                  📝 সম্পূর্ণ সৃজনশীল প্রশ্নপত্র (CQ - সকল উদ্দীপক + ক, খ, গ, ঘ)
+                  📝 সম্পূর্ণ সৃজনশীল প্রশ্নপত্র (CQ - সকল বিভাগ ও প্রশ্ন)
                 </SelectItem>
                 <SelectItem value="mcq" className="text-xs font-bold">
                   🎯 সম্পূর্ণ বহুনির্বাচনী প্রশ্নপত্র (MCQ - সকল প্রশ্ন, অপশন পাশাপাশি ও উত্তরমালা)
@@ -422,8 +428,8 @@ export function BoardQuestionSection({
               </div>
             </div>
 
-            {/* Formatted Text Preview with rendered styles */}
-            <div className="p-4 sm:p-5 bg-slate-50/90 border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto custom-scrollbar font-kalpurush space-y-1">
+            {/* Formatted Text Preview with rendered KaTeX & math styles */}
+            <div className="p-4 sm:p-5 bg-white border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto custom-scrollbar font-kalpurush space-y-1.5 shadow-inner">
               {renderFormattedPreview(result.formattedText)}
             </div>
           </div>
