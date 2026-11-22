@@ -28,6 +28,45 @@ export interface GenerateBoardQuestionsOutput {
   year: string;
   subject: string;
   examName: string;
+  answerKey?: string;
+}
+
+/**
+ * Clean up LaTeX, math syntax, and redundant board labels
+ */
+function cleanMathAndLatex(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/\\text\s*\{([^}]+)\}/g, '$1')
+    .replace(/\\circ/g, '°')
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\pm/g, '±')
+    .replace(/\\degree/g, '°')
+    .replace(/\\Omega/g, 'Ω')
+    .replace(/\\mu/g, 'μ')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\,/g, ' ')
+    .replace(/\\;/g, ' ')
+    .replace(/\\quad/g, ' ')
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+    .replace(/\^\{?(-?\d+)\}?/g, (_, p1) => {
+      const superMap: Record<string, string> = {
+        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+        '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+        '-': '⁻'
+      };
+      return p1.split('').map((c: string) => superMap[c] || c).join('');
+    })
+    .replace(/\$([^\$\n]+)\$/g, '$1')
+    .replace(/\$/g, '')
+    // Remove repeated board names from individual question lines e.g. [দিনাজপুর বোর্ড-২০২৪]
+    .replace(/\[\s*[^\]\n]*(?:বোর্ড|Board)[^\]\n]*\]/gi, '')
+    .trim();
 }
 
 export async function generateBoardQuestions(
@@ -35,42 +74,51 @@ export async function generateBoardQuestions(
 ): Promise<GenerateBoardQuestionsOutput> {
   const { examName, board, year, subject, chapter, type } = input;
 
-  let targetPrompt = '';
+  const typeLabel =
+    type === 'mcq'
+      ? 'বহুনির্বাচনী প্রশ্ন (MCQ)'
+      : type === 'creative'
+      ? 'সৃজনশীল প্রশ্ন (CQ)'
+      : type === 'english'
+      ? 'English Question Paper'
+      : 'সংক্ষিপ্ত প্রশ্ন';
 
+  let typeSpecificInstruction = '';
   if (type === 'mcq') {
-    targetPrompt = `শুধু ${board}-এর ${subject}${chapter ? ` ও ${chapter}` : ''} থেকে আসা বহুনির্বাচনী (MCQ) প্রশ্নগুলো দাও। অন্য কোনো বোর্ডের প্রশ্ন মিশাবে না। প্রতিটি প্রশ্নের চারটি অপশন এক লাইনে পাশাপাশি রাখো এবং সব প্রশ্নের সঠিক উত্তর শেষে আলাদা করে উত্তরমালায় দাও। কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।`;
+    typeSpecificInstruction = `
+- এটি বহুনির্বাচনী (MCQ) পরীক্ষা। এই বিষয়ের বোর্ড পরীক্ষায় যতগুলো MCQ এসেছিল (সাধারণত বিজ্ঞান/আইসিটি বিষয়ে ২৫টি, অন্যান্য বিষয়ে ৩০টি), তার সম্পূর্ণ সবকটি প্রশ্ন ক্রমানুসারে (১ থেকে ২৫ বা ৩০ পর্যন্ত) প্রদান করুন।
+- প্রতিটি প্রশ্নের চারটি অপশন এক লাইনে পাশাপাশি রাখুন: (ক) ... (খ) ... (গ) ... (ঘ) ...
+- সবকটি প্রশ্নের শেষে আলাদা করে একবারে 'উত্তরমালা' দিন (যেমন: উত্তরমালা: ১. ক, ২. খ...)।
+`;
   } else if (type === 'creative') {
-    targetPrompt = `শুধু ${board}-এর ${year ? `${year} সালের ` : ''}${chapter ? `${chapter} অধ্যায়-এর ` : ''}${examName ? `${examName} পরীক্ষার ` : ''}${subject} বিষয়ের সৃজনশীল (ক, খ, গ, ঘ) প্রশ্নগুলো দাও। কোনো অনুমানভিত্তিক বা অন্য বোর্ডের প্রশ্ন যুক্ত করবে না। প্রশ্নের শেষে কোন সালে ও কোন বোর্ডে এসেছে তা উল্লেখ করো (যেমন: [${board}-${year}])। কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।`;
-  } else if (type === 'short') {
-    targetPrompt = `শুধু ${board}-এর ${year ? `${year} সালের ` : ''}${chapter ? `${chapter} অধ্যায়-এর ` : ''}${examName ? `${examName} পরীক্ষার ` : ''}${subject} বিষয়ের সংক্ষিপ্ত প্রশ্নগুলো দাও। কোনো অনুমানভিত্তিক বা অন্য বোর্ডের প্রশ্ন যুক্ত করবে না। প্রশ্নের শেষে কোন সালে ও কোন বোর্ডে এসেছে তা উল্লেখ করো (যেমন: [${board}-${year}])। কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।`;
+    typeSpecificInstruction = `
+- এটি সৃজনশীল (CQ) পরীক্ষা। এই বিষয়ের বোর্ড পরীক্ষায় যতগুলো সৃজনশীল প্রশ্ন এসেছিল (বিজ্ঞান বিভাগে ৮টি, অন্যান্য বিষয়ে ১১টি), তার সম্পূর্ণ সবকটি সৃজনশীল প্রশ্ন ক্রমানুসারে (১ থেকে ৮ বা ১১ পর্যন্ত) সম্পূর্ণ উদ্দীপক ও ক, খ, গ, ঘ সহ ক্রমানুসারে প্রদান করুন। কোনো প্রশ্ন বাদ দেবেন না।
+`;
   } else if (type === 'english') {
-    targetPrompt = `শুধু ${board}-এর ${examName ? `${examName} পরীক্ষার ` : ''}${subject} বিষয়ের ${year}-এর প্রশ্নগুলো দাও। অন্য কোনো বোর্ডের প্রশ্ন দেবে না। শুধু যে প্রশ্নগুলো নিশ্চিতভাবে এই বোর্ডে এসেছে, সেগুলোই তালিকা আকারে দাও। কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।`;
+    typeSpecificInstruction = `
+- এটি ইংরেজি বিষয়ের পরীক্ষা। বোর্ড পরীক্ষায় আসা সম্পূর্ণ প্রশ্নপত্রের সকল আইটেম (Part A: Reading Test এবং Part B: Writing Test অথবা Grammar এবং Composition) ক্রমানুসারে প্রদান করুন।
+- NCTB-এর পূর্ণাঙ্গ অফিসিয়াল ধারায় প্রস্তুত করুন।
+`;
   } else {
-    // General / all
-    targetPrompt = `শুধু ${board}-এর ${examName ? `${examName} পরীক্ষার ` : ''}${subject} বিষয়ের ${year}-এর প্রশ্নগুলো দাও। অন্য কোনো বোর্ডের প্রশ্ন দেবে না। শুধু যে প্রশ্নগুলো নিশ্চিতভাবে এই বোর্ডে এসেছে, সেগুলোই তালিকা আকারে দাও। কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।`;
+    typeSpecificInstruction = `
+- এই বিষয়ের বোর্ড পরীক্ষায় আসা সম্পূর্ণ প্রশ্নপত্রের সকল প্রশ্ন ক্রমানুসারে প্রদান করুন।
+`;
   }
 
-  const systemInstructions = `
-আপনি বাংলাদেশ জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB) এবং সকল শিক্ষা বোর্ডের প্রশ্ন বিশ্লেষক ও শিক্ষক বিশেষজ্ঞ।
-আপনাকে দেওয়া ব্যবহারকারীর সুনির্দিষ্ট শর্তাবলী ১০০% মানতে হবে:
+  const prompt = `
+আপনি বাংলাদেশ জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB) এবং সকল শিক্ষা বোর্ডের প্রশ্ন বিশেষজ্ঞ।
+আপনাকে শুধু ${board}-এর ${examName ? `${examName} পরীক্ষার ` : ''}${year} সালের ${subject} বিষয়ের সম্পূর্ণ বোর্ড প্রশ্নপত্রটি দিতে হবে। ${chapter ? `(অধ্যায়/বিষয়বস্তু: ${chapter})` : ''}
 
-ব্যবহারকারীর নির্দিষ্ট প্রম্পট:
-"${targetPrompt}"
-
-কঠোর শর্তাবলী ও রূপরেখা:
-১. শুধুমাত্র ${board}-এর ${year} সালের নিশ্চিত প্রশ্ন অন্তর্ভুক্ত করবেন। অন্য কোনো বোর্ডের প্রশ্ন কিছুতেই মেশাবেন না।
-২. নিশ্চিত না হলে অনুমান করতে মানা: কোনো প্রশ্নের বোর্ড বা সাল সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবে, অনুমান করে লিখবে না।
-৩. বহুনির্বাচনী (MCQ) হলে:
-   - প্রতিটি প্রশ্নের চারটি অপশন এক লাইনে পাশাপাশি সাজাবেন: (ক) ... (খ) ... (গ) ... (ঘ) ...
-   - সব প্রশ্নের সঠিক উত্তর শেষে আলাদা করে 'উত্তরমালা' অংশে একবারে দেবেন।
-৪. সৃজনশীল (CQ) হলে:
-   - উদ্দীপক এরপর ক, খ, গ, ঘ আকারে থাকবে।
-   - প্রতিটি প্রশ্নের শেষে [${board}-${year}] উল্লেখ থাকবে।
-৫. ইংরেজি বিষয়ের জন্য:
-   - NCTB অফিসিয়াল ইংরেজি পরীক্ষার প্রশ্নপত্রের ধারায় ইংরেজিতে প্রশ্ন উপস্থাপন করবেন।
-   - শেষে বোর্ড ও সাল নির্দেশ থাকবে।
-
-সরাসরি প্রস্তুতকৃত প্রশ্নমালা এবং শেষে প্রয়োজনীয় ক্ষেত্রে উত্তরমালা লিখুন। কোনো অপ্রয়োজনীয় ভূমিকা বা অতিরিক্ত কথা লিখবেন না।
+কঠোর শর্তাবলী ও বিন্যাস নির্দেশিকা (১০০% অনুসরণীয়):
+১. হেডারের বিন্যাস:
+   শুধুমাত্র প্রশ্নপত্রের শুরুতে হেডারে একবার স্পষ্টভাবে পরীক্ষার পরিচয় লিখুন:
+   ${examName ? `${examName} পরীক্ষা ` : ''}${year} • ${board}
+   বিষয়: ${subject} (${typeLabel})
+   [সম্পূর্ণ বোর্ড প্রশ্নপত্র]
+২. প্রশ্নের ভেতরের প্রতিটি লাইনে (যেমন ক, খ, গ, ঘ বা উদ্দীপকের শেষে) বোর্ডের নাম ও সাল কখনোই লিখবেন না। শুধুমাত্র উপরের হেডারে থাকবে।
+${typeSpecificInstruction}
+৩. কোনো অপ্রয়োজনীয় ল্যাটেক্স বা কাঁচা কোড (যেমন: $1\\text{ mm}$, $4.2\\text{ cm}$, $7800\\text{ kg/m}^3$, $16\\text{ ms}^{-1}$) লিখবেন না। সরাসরি সাধারণ বাংলা বা ইংরেজি সংকেত লিখুন (যেমন: ৪.২ cm, ১ mm, ১৫০ g, ৭৮০০ kg/m³, ১৬ ms⁻¹)।
+৪. জিরো-অনুমান (Zero Hallucination): কোনো অবস্থাতেই কাল্পনিক বা অনুমাননির্ভর প্রশ্ন তৈরি করবেন না। শুধুমাত্র নিশ্চিতভাবে ${board}-এর ${year} সালে এই পরীক্ষায় আসা প্রশ্নগুলোই অন্তর্ভুক্ত করবেন। কোনো প্রশ্ন সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেবেন, অনুমান করে লিখবেন না।
 `;
 
   const availableKeys = getAvailableApiKeys();
@@ -82,7 +130,8 @@ export async function generateBoardQuestions(
         const client = createAiClient(key, model);
         const resp = await client.generate({
           model,
-          prompt: `${systemInstructions}\n\n${targetPrompt}`,
+          prompt,
+          config: { maxOutputTokens: 8192 },
         });
         rawText = resp.text?.trim() || '';
         if (rawText) break;
@@ -95,20 +144,23 @@ export async function generateBoardQuestions(
     throw new Error('বোর্ড প্রশ্ন তৈরি করা সম্ভব হয়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন।');
   }
 
-  // Parse questions from rawText to array of items
-  const questions: BoardQuestionItem[] = [];
-  
-  if (type === 'mcq') {
-    // Split into questions and answer key
-    const parts = rawText.split(/(?:উত্তরমালা|সঠিক উত্তরমালা|উত্তরসমূহ|Answer Key)[:\n]/i);
-    const questionsBlock = parts[0];
-    const answerKey = parts.length > 1 ? parts[1].trim() : '';
+  // Clean raw LaTeX & math artifacts
+  const cleanedText = cleanMathAndLatex(rawText);
 
-    // Split by question numbers (e.g. ১., ২. or 1., 2.)
-    const qMatches = questionsBlock.split(/(?=\n[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)])/);
+  // Parse questions from cleanedText into distinct array of items
+  const questions: BoardQuestionItem[] = [];
+  let answerKey = '';
+
+  if (type === 'mcq') {
+    const parts = cleanedText.split(/(?:উত্তরমালা|সঠিক উত্তরমালা|উত্তরসমূহ|Answer Key)[:\n]/i);
+    const questionsBlock = parts[0];
+    answerKey = parts.length > 1 ? parts[1].trim() : '';
+
+    const qMatches = questionsBlock.split(/(?=\n\s*[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)])/);
     for (const qm of qMatches) {
       const trimmed = qm.trim();
-      if (trimmed) {
+      // Skip top header if it doesn't start with a number
+      if (trimmed && trimmed.match(/^[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)]/)) {
         questions.push({
           id: Math.random().toString(36).substring(2, 9),
           type: 'mcq',
@@ -117,7 +169,7 @@ export async function generateBoardQuestions(
       }
     }
 
-    if (answerKey && questions.length > 0) {
+    if (answerKey) {
       questions.push({
         id: Math.random().toString(36).substring(2, 9),
         type: 'short',
@@ -125,11 +177,16 @@ export async function generateBoardQuestions(
       });
     }
   } else if (type === 'creative') {
-    const qMatches = rawText.split(/(?=\n[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)]\s*(?:উদ্দীপক|নিচের|পড়ে))/);
-    if (qMatches.length > 1) {
-      for (const qm of qMatches) {
-        const trimmed = qm.trim();
-        if (trimmed) {
+    // Split by horizontal lines or question numbered headings
+    const blocks = cleanedText.split(/\n\s*---\s*\n/);
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i].trim();
+      if (!block) continue;
+      // If it has multiple sub-numbered questions
+      const sub = block.split(/(?=\n\s*(?:###\s*)?(?:\*\*)?(?:প্রশ্ন\s*)?[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\*])/);
+      for (const s of sub) {
+        const trimmed = s.trim();
+        if (trimmed && trimmed.match(/(?:^|\n)\s*(?:###\s*)?(?:\*\*)?(?:প্রশ্ন\s*)?[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\*]/)) {
           questions.push({
             id: Math.random().toString(36).substring(2, 9),
             type: 'creative',
@@ -137,20 +194,15 @@ export async function generateBoardQuestions(
           });
         }
       }
-    } else {
-      questions.push({
-        id: Math.random().toString(36).substring(2, 9),
-        type: 'creative',
-        content: rawText,
-      });
     }
   } else {
-    // General or short
-    const qMatches = rawText.split(/(?=\n[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)])/);
-    if (qMatches.length > 1) {
-      for (const qm of qMatches) {
-        const trimmed = qm.trim();
-        if (trimmed) {
+    // English or short
+    const blocks = cleanedText.split(/\n\s*---\s*\n/);
+    for (const block of blocks) {
+      const trimmed = block.trim();
+      if (trimmed) {
+        // If block starts with question or item
+        if (trimmed.match(/^(?:###\s*)?(?:\*\*)?(?:Item|Question|Part|[১-৯১২৩৪৫৬৭৮৯০0-9]+)[.\*]/i)) {
           questions.push({
             id: Math.random().toString(36).substring(2, 9),
             type: type === 'short' ? 'short' : 'creative',
@@ -158,30 +210,39 @@ export async function generateBoardQuestions(
           });
         }
       }
-    } else {
-      questions.push({
-        id: Math.random().toString(36).substring(2, 9),
-        type: 'short',
-        content: rawText,
-      });
     }
   }
 
-  // If questions empty, wrap full text
+  // Fallback: If array is empty, wrap whole text or split by lines
+  if (questions.length === 0) {
+    const fallbackMatches = cleanedText.split(/(?=\n\s*(?:[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\)]|প্রশ্ন\s*[১-৯১২৩৪৫৬৭৮৯০0-9]+))/);
+    for (const fm of fallbackMatches) {
+      const trimmed = fm.trim();
+      if (trimmed) {
+        questions.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: type === 'mcq' ? 'mcq' : (type === 'creative' ? 'creative' : 'short'),
+          content: trimmed,
+        });
+      }
+    }
+  }
+
   if (questions.length === 0) {
     questions.push({
       id: Math.random().toString(36).substring(2, 9),
       type: type === 'mcq' ? 'mcq' : (type === 'creative' ? 'creative' : 'short'),
-      content: rawText,
+      content: cleanedText,
     });
   }
 
   return {
-    formattedText: rawText,
+    formattedText: cleanedText,
     questions,
     board,
     year,
     subject,
     examName,
+    answerKey,
   };
 }

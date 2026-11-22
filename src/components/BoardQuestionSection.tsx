@@ -19,10 +19,17 @@ import {
   BookOpen, 
   HelpCircle, 
   FileText,
-  AlertCircle
+  AlertCircle,
+  Layers,
+  ListOrdered
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateBoardQuestions, GenerateBoardQuestionsOutput } from '@/ai/flows/generate-board-questions';
+
+const toBengaliNumber = (num: number | string) => {
+  const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return String(num).replace(/[0-9]/g, d => bnDigits[parseInt(d, 10)]);
+};
 
 const BOARDS = [
   'দিনাজপুর বোর্ড',
@@ -65,15 +72,15 @@ const YEARS = [
 ];
 
 const COMMON_SUBJECTS = [
-  'বাংলা ১ম পত্র',
-  'বাংলা ২য় পত্র',
-  'English 1st Paper',
-  'English 2nd Paper',
-  'গণিত',
   'পদার্থবিজ্ঞান',
   'রসায়ন',
   'জীববিজ্ঞান',
   'উচ্চতর গণিত',
+  'গণিত',
+  'বাংলা ১ম পত্র',
+  'বাংলা ২য় পত্র',
+  'English 1st Paper',
+  'English 2nd Paper',
   'সাধারণ বিজ্ঞান',
   'বাংলাদেশ ও বিশ্বপরিচয়',
   'ইসলাম ও নৈতিক শিক্ষা',
@@ -105,7 +112,7 @@ export function BoardQuestionSection({
   const [year, setYear] = useState('২০২৪');
   const [subject, setSubject] = useState(defaultSubject || 'পদার্থবিজ্ঞান');
   const [chapter, setChapter] = useState('');
-  const [type, setType] = useState<'mcq' | 'creative' | 'short' | 'english' | 'all'>('mcq');
+  const [type, setType] = useState<'mcq' | 'creative' | 'short' | 'english' | 'all'>('creative');
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerateBoardQuestionsOutput | null>(null);
@@ -134,8 +141,8 @@ export function BoardQuestionSection({
 
       setResult(data);
       toast({
-        title: 'বোর্ড প্রশ্ন প্রস্তুত! 🏛️',
-        description: `${board}-এর ${subject} (${year}) বিষয়ের প্রশ্ন প্রস্তুত করা হয়েছে।`,
+        title: 'সম্পূর্ণ বোর্ড প্রশ্ন প্রস্তুত! 🏛️',
+        description: `${board}-এর ${subject} (${year}) বিষয়ের সম্পূর্ণ প্রশ্ন প্রস্তুত করা হয়েছে।`,
       });
     } catch (err: any) {
       toast({
@@ -152,7 +159,7 @@ export function BoardQuestionSection({
     if (!result?.formattedText) return;
     navigator.clipboard.writeText(result.formattedText);
     setCopied(true);
-    toast({ title: 'কপি হয়েছে!', description: 'প্রশ্নমালা ক্লিপবোর্ডে কপি করা হয়েছে।' });
+    toast({ title: 'কপি হয়েছে!', description: 'সম্পূর্ণ প্রশ্নমালা ক্লিপবোর্ডে কপি করা হয়েছে।' });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -161,7 +168,49 @@ export function BoardQuestionSection({
     onInsertQuestions(result.questions, result.formattedText);
     toast({
       title: 'প্রশ্নপত্রে যুক্ত করা হয়েছে! ✍️',
-      description: 'বোর্ড প্রশ্ন সফলভাবে আপনার প্রশ্নপত্রে যুক্ত হয়েছে।',
+      description: `মোট ${toBengaliNumber(result.questions.length)}টি প্রশ্ন সফলভাবে আপনার প্রশ্নপত্রে যুক্ত হয়েছে।`,
+    });
+  };
+
+  // Helper to render text with bold and formatting
+  const renderFormattedPreview = (txt: string) => {
+    const lines = txt.split('\n');
+    return lines.map((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return <div key={idx} className="h-2" />;
+      }
+
+      // Check if horizontal rule
+      if (trimmed === '---' || trimmed === '***') {
+        return <hr key={idx} className="my-3 border-amber-200" />;
+      }
+
+      // Check if header line or major question heading
+      const isHeading = trimmed.startsWith('###') || trimmed.startsWith('**প্রশ্ন') || trimmed.match(/^(?:\*\*)?[১-৯১২৩৪৫৬৭৮৯০0-9]+[.\*]/);
+
+      // Clean bold syntax for inline span
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+
+      return (
+        <p
+          key={idx}
+          className={`leading-relaxed text-slate-800 ${
+            isHeading ? 'font-bold text-amber-950 mt-2 text-[13px]' : 'text-xs'
+          } ${trimmed.startsWith('(ক)') || trimmed.startsWith('(খ)') || trimmed.startsWith('(গ)') || trimmed.startsWith('(ঘ)') || trimmed.startsWith('ক.') || trimmed.startsWith('খ.') || trimmed.startsWith('গ.') || trimmed.startsWith('ঘ.') ? 'pl-3' : ''}`}
+        >
+          {parts.map((p, pIdx) => {
+            if (p.startsWith('**') && p.endsWith('**')) {
+              return (
+                <strong key={pIdx} className="font-black text-slate-900">
+                  {p.slice(2, -2)}
+                </strong>
+              );
+            }
+            return <span key={pIdx}>{p}</span>;
+          })}
+        </p>
+      );
     });
   };
 
@@ -181,7 +230,7 @@ export function BoardQuestionSection({
                 </Badge>
               </CardTitle>
               <CardDescription className="text-xs text-amber-800/80 font-bold mt-0.5">
-                শুধু নিশ্চিত ও যাচাইকৃত বোর্ড প্রশ্ন — কোনো অনুমান বা অন্য বোর্ডের প্রশ্ন নয়
+                বোর্ডে আসা সম্পূর্ণ প্রশ্নপত্র (সকল সৃজনশীল ও MCQ) — কোনো অনুমান বা অন্য বোর্ডের প্রশ্ন নয়
               </CardDescription>
             </div>
           </div>
@@ -190,15 +239,16 @@ export function BoardQuestionSection({
 
       <CardContent className="p-4 sm:p-6 space-y-5">
         {/* Rules Disclaimer Alert Box */}
-        <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1 font-bold">
+        <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5 font-bold">
           <div className="flex items-center gap-1.5 text-amber-800 font-black">
             <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
             <span>কঠোর শর্তাবলী ও প্রম্পট নিয়ম:</span>
           </div>
           <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11.5px] font-medium text-amber-900">
-            <li>শুধু নির্বাচিত বোর্ডের নির্দিষ্ট সালের প্রশ্ন আসবে, অন্য কোনো বোর্ডের প্রশ্ন আসবে না।</li>
+            <li>বোর্ডের নাম ও সাল শুধুমাত্র উপরের মূল হেডারে থাকবে; প্রশ্নের ভেতরের কোনো লাইনে বারবার লেখা থাকবে না।</li>
+            <li>ঐ পরীক্ষায় আসা সম্পূর্ণ প্রশ্নপত্র তৈরি হবে (বিজ্ঞানে ৮টি CQ / ২৫টি MCQ; অন্যান্য বিষয়ে ১১টি CQ / ৩০টি MCQ)।</li>
             <li>MCQ-এর ৪টি অপশন এক লাইনে পাশাপাশি থাকবে এবং সঠিক উত্তর শেষে উত্তরমালায় থাকবে।</li>
-            <li>CQ-এর উদ্দীপক ও ক, খ, গ, ঘ শেষে কোন সাল ও বোর্ডের তা উল্লেখ থাকবে।</li>
+            <li>গণিত ও বিজ্ঞানের সংকেত বা এককসমূহ পরিষ্কার ফরমেটে (যেমন: ৪.২ cm, ১ mm, ১৫০ g, ৭৮০০ kg/m³, ১৬ ms⁻¹) প্রদর্শিত হবে।</li>
             <li><strong>কোনো প্রশ্নের বোর্ড সম্পর্কে নিশ্চিত না হলে সেটি বাদ দেওয়া হবে, অনুমান করে লেখা হবে না।</strong></li>
           </ul>
         </div>
@@ -278,7 +328,7 @@ export function BoardQuestionSection({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
           {/* Chapter / Topic (Optional) */}
           <div className="space-y-1">
-            <label className="text-xs font-black text-slate-700">অধ্যায় / বিষয়বস্তু (ঐচ্ছিক)</label>
+            <label className="text-xs font-black text-slate-700">অধ্যায় / বিষয়বস্তু (ঐচ্ছিক - সম্পূর্ণ বই হলে খালি রাখুন)</label>
             <Input 
               value={chapter}
               onChange={(e) => setChapter(e.target.value)}
@@ -295,17 +345,17 @@ export function BoardQuestionSection({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="mcq" className="text-xs font-bold">
-                  🎯 বহুনির্বাচনী প্রশ্ন (MCQ - ৪টি অপশন পাশাপাশি ও উত্তরমালা)
-                </SelectItem>
                 <SelectItem value="creative" className="text-xs font-bold">
-                  📝 সৃজনশীল প্রশ্ন (CQ - উদ্দীপক + ক, খ, গ, ঘ ও সাল/বোর্ড উল্লেখ)
+                  📝 সম্পূর্ণ সৃজনশীল প্রশ্নপত্র (CQ - সকল উদ্দীপক + ক, খ, গ, ঘ)
                 </SelectItem>
-                <SelectItem value="short" className="text-xs font-bold">
-                  ✏️ সংক্ষিপ্ত প্রশ্ন (Short Questions ও সাল/বোর্ড উল্লেখ)
+                <SelectItem value="mcq" className="text-xs font-bold">
+                  🎯 সম্পূর্ণ বহুনির্বাচনী প্রশ্নপত্র (MCQ - সকল প্রশ্ন, অপশন পাশাপাশি ও উত্তরমালা)
                 </SelectItem>
                 <SelectItem value="english" className="text-xs font-bold">
-                  🌐 ইংরেজি প্রশ্নমালা (English Board Exam Items)
+                  🌐 সম্পূর্ণ ইংরেজি প্রশ্নপত্র (English 1st/2nd Board Items)
+                </SelectItem>
+                <SelectItem value="short" className="text-xs font-bold">
+                  ✏️ সংক্ষিপ্ত প্রশ্নমালা (Short Questions)
                 </SelectItem>
                 <SelectItem value="all" className="text-xs font-bold">
                   📚 পূর্ণাঙ্গ বোর্ড প্রশ্নমালা / তালিকা
@@ -320,17 +370,17 @@ export function BoardQuestionSection({
           <Button
             onClick={handleGenerate}
             disabled={loading}
-            className="w-full sm:w-auto min-w-[200px] h-10 font-black text-xs bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-md gap-2"
+            className="w-full sm:w-auto min-w-[220px] h-10 font-black text-xs bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800 text-white shadow-md gap-2"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>বোর্ড প্রশ্ন প্রস্তুত হচ্ছে...</span>
+                <span>সম্পূর্ণ বোর্ড প্রশ্ন তৈরি হচ্ছে (অপেক্ষা করুন)...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 text-amber-200 animate-spin" />
-                <span>বোর্ড প্রশ্ন তৈরি করুন</span>
+                <span>সম্পূর্ণ বোর্ড প্রশ্ন তৈরি করুন</span>
               </>
             )}
           </Button>
@@ -339,14 +389,14 @@ export function BoardQuestionSection({
         {/* Results Area */}
         {result && (
           <div className="mt-6 pt-5 border-t border-amber-200 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gradient-to-r from-amber-50 to-orange-50 p-3 rounded-lg border border-amber-200">
+              <div className="flex items-center gap-2 flex-wrap">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span className="font-black text-xs text-amber-950">
                   {result.board} • {result.subject} ({result.year})
                 </span>
                 <Badge variant="outline" className="bg-white text-emerald-800 border-emerald-300 text-[10px] font-bold">
-                  {result.questions.length} টি প্রশ্ন পাওয়া গেছে
+                  {toBengaliNumber(result.questions.length)} টি প্রশ্ন পাওয়া গেছে
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
@@ -357,7 +407,7 @@ export function BoardQuestionSection({
                   className="h-8 gap-1.5 text-xs font-bold border-amber-300 hover:bg-amber-100 text-amber-900"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'কপি হয়েছে' : 'কপি করুন'}</span>
+                  <span>{copied ? 'কপি হয়েছে' : 'সম্পূর্ণ কপি করুন'}</span>
                 </Button>
                 {onInsertQuestions && (
                   <Button
@@ -372,11 +422,9 @@ export function BoardQuestionSection({
               </div>
             </div>
 
-            {/* Formatted Text Preview */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl max-h-[450px] overflow-y-auto custom-scrollbar font-kalpurush">
-              <pre className="whitespace-pre-wrap font-sans text-xs text-slate-800 leading-relaxed font-normal">
-                {result.formattedText}
-              </pre>
+            {/* Formatted Text Preview with rendered styles */}
+            <div className="p-4 sm:p-5 bg-slate-50/90 border border-slate-200 rounded-xl max-h-[500px] overflow-y-auto custom-scrollbar font-kalpurush space-y-1">
+              {renderFormattedPreview(result.formattedText)}
             </div>
           </div>
         )}
