@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import 'katex/dist/katex.min.css';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -18,8 +17,7 @@ import {
   Building2, 
   Calendar, 
   BookOpen, 
-  FileText,
-  AlertCircle
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateBoardQuestions, GenerateBoardQuestionsOutput } from '@/ai/flows/generate-board-questions';
@@ -110,7 +108,6 @@ export function BoardQuestionSection({
   const [board, setBoard] = useState('দিনাজপুর বোর্ড');
   const [year, setYear] = useState('২০২৪');
   const [subject, setSubject] = useState(defaultSubject || 'গণিত');
-  const [chapter, setChapter] = useState('');
   const [type, setType] = useState<'mcq' | 'creative' | 'short' | 'english' | 'all'>('creative');
 
   const [loading, setLoading] = useState(false);
@@ -134,7 +131,6 @@ export function BoardQuestionSection({
         board,
         year,
         subject,
-        chapter: chapter.trim() || undefined,
         type,
       });
 
@@ -244,21 +240,7 @@ export function BoardQuestionSection({
         </div>
       </CardHeader>
 
-      <CardContent className="p-4 sm:p-6 space-y-5">
-        {/* Rules Disclaimer Alert Box */}
-        <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5 font-bold">
-          <div className="flex items-center gap-1.5 text-amber-800 font-black">
-            <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>অফিশিয়াল বোর্ড প্রশ্ন কাঠামো ও নিয়মাবলী:</span>
-          </div>
-          <ul className="list-disc list-inside space-y-0.5 pl-1 text-[11.5px] font-medium text-amber-900">
-            <li><strong>গণিত:</strong> ৪টি বিভাগ (ক-বীজগণিত, খ-জ্যামিতি, গ-ত্রিকোণমিতি ও পরিমিতি, ঘ-পরিসংখ্যান) অনুযায়ী সম্পূর্ণ ১১টি সৃজনশীল প্রশ্ন।</li>
-            <li><strong>বিজ্ঞান (পদার্থ/রসায়ন/জীববিজ্ঞান):</strong> ৮টি সৃজনশীল প্রশ্ন (যেকোনো ৫টির উত্তর দিতে হয়)।</li>
-            <li><strong>চিহ্ন ও প্রতীক:</strong> সমীকরণ, বর্গমূল, পাওয়ার, সেট ও বিজ্ঞান সংকেত সরাসরি KaTeX দিয়ে নির্ভুল ও সুন্দরভাবে রেন্ডার হবে।</li>
-            <li>বোর্ডের নাম ও সাল শুধুমাত্র উপরের মূল হেডারে থাকবে; প্রশ্নের ভেতরের কোনো লাইনে বারবার লেখা থাকবে না।</li>
-          </ul>
-        </div>
-
+      <CardContent className="p-4 sm:p-6 space-y-4">
         {/* Form Controls Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Exam Name */}
@@ -330,45 +312,31 @@ export function BoardQuestionSection({
           </div>
         </div>
 
-        {/* Row 2: Chapter & Question Type */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-          {/* Chapter / Topic (Optional) */}
-          <div className="space-y-1">
-            <label className="text-xs font-black text-slate-700">অধ্যায় / বিষয়বস্তু (ঐচ্ছিক - সম্পূর্ণ বই হলে খালি রাখুন)</label>
-            <Input 
-              value={chapter}
-              onChange={(e) => setChapter(e.target.value)}
-              placeholder="যেমন: বীজগণিত, জ্যামিতি, ১ম অধ্যায়, ইত্যাদি..."
-              className="h-9 text-xs font-bold bg-slate-50 border-amber-200"
-            />
-          </div>
-
-          {/* Question Type */}
-          <div className="space-y-1">
-            <label className="text-xs font-black text-slate-700">প্রশ্নের ধরণ</label>
-            <Select value={type} onValueChange={(v: any) => setType(v)}>
-              <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-amber-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="creative" className="text-xs font-bold">
-                  📝 সম্পূর্ণ সৃজনশীল প্রশ্নপত্র (CQ - সকল বিভাগ ও প্রশ্ন)
-                </SelectItem>
-                <SelectItem value="mcq" className="text-xs font-bold">
-                  🎯 সম্পূর্ণ বহুনির্বাচনী প্রশ্নপত্র (MCQ - সকল প্রশ্ন, অপশন পাশাপাশি ও উত্তরমালা)
-                </SelectItem>
-                <SelectItem value="english" className="text-xs font-bold">
-                  🌐 সম্পূর্ণ ইংরেজি প্রশ্নপত্র (English 1st/2nd Board Items)
-                </SelectItem>
-                <SelectItem value="short" className="text-xs font-bold">
-                  ✏️ সংক্ষিপ্ত প্রশ্নমালা (Short Questions)
-                </SelectItem>
-                <SelectItem value="all" className="text-xs font-bold">
-                  📚 পূর্ণাঙ্গ বোর্ড প্রশ্নমালা / তালিকা
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Row 2: Question Type */}
+        <div className="space-y-1 pt-1">
+          <label className="text-xs font-black text-slate-700">প্রশ্নের ধরণ</label>
+          <Select value={type} onValueChange={(v: any) => setType(v)}>
+            <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-amber-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="creative" className="text-xs font-bold">
+                📝 সম্পূর্ণ সৃজনশীল প্রশ্নপত্র (CQ - সকল বিভাগ ও প্রশ্ন)
+              </SelectItem>
+              <SelectItem value="mcq" className="text-xs font-bold">
+                🎯 সম্পূর্ণ বহুনির্বাচনী প্রশ্নপত্র (MCQ - সকল প্রশ্ন, অপশন পাশাপাশি ও উত্তরমালা)
+              </SelectItem>
+              <SelectItem value="english" className="text-xs font-bold">
+                🌐 সম্পূর্ণ ইংরেজি প্রশ্নপত্র (English 1st/2nd Board Items)
+              </SelectItem>
+              <SelectItem value="short" className="text-xs font-bold">
+                ✏️ সংক্ষিপ্ত প্রশ্নমালা (Short Questions)
+              </SelectItem>
+              <SelectItem value="all" className="text-xs font-bold">
+                📚 পূর্ণাঙ্গ বোর্ড প্রশ্নমালা / তালিকা
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Generate Button */}

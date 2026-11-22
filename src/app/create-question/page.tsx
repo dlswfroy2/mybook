@@ -928,31 +928,14 @@ function CreateQuestionContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
-                {/* 1. AI Quick Full Generator */}
-                <Button
-                  type="button"
-                  onClick={() => setAiModalOpen(true)}
-                  className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs h-10 shadow-md"
-                >
-                  <BrainCircuit className="w-4 h-4 mr-2 text-amber-300 animate-pulse" /> AI দিয়ে প্রশ্নপত্র তৈরি করুন
-                </Button>
-
-                {/* 2. AI Multi-type Assistant */}
-                <Button
-                  type="button"
-                  onClick={handleOpenAiAssistant}
-                  className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 hover:from-emerald-700 hover:to-indigo-800 text-white font-black text-xs h-10 shadow-md"
-                >
-                  <Sparkles className="w-4 h-4 mr-2 text-amber-300 animate-spin" /> AI সহকারী (মান ও ধরণ নিয়ন্ত্রণ)
-                </Button>
-
-                {/* 3. Board Question Bank & AI Section */}
+                {/* Unified AI Question Bank & Assistant */}
                 <Button
                   type="button"
                   onClick={() => setActiveMainTab('board')}
-                  className="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800 text-white font-black text-xs h-10 shadow-md"
+                  className="w-full bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-700 hover:from-amber-700 hover:to-indigo-800 text-white font-black text-xs h-11 shadow-md gap-2"
                 >
-                  <Award className="w-4 h-4 mr-2 text-yellow-200" /> 🏛️ বোর্ড প্রশ্ন ব্যাংক (AI)
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+                  <span>🏛️ AI বোর্ড প্রশ্ন ব্যাংক ও সহকারী</span>
                 </Button>
 
                 {/* 3. Ready-made Template Dialog */}
@@ -1169,21 +1152,12 @@ function CreateQuestionContent() {
                   </Button>
                   <Button
                     type="button"
-                    onClick={handleOpenAiAssistant}
-                    size="sm"
-                    className="h-8 gap-1 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs text-xs px-2 sm:px-3"
-                    title="মান ও টপিক অনুযায়ী AI দিয়ে প্রশ্ন তৈরি করুন"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> <span>AI সহকারী</span>
-                  </Button>
-                  <Button
-                    type="button"
                     onClick={() => setActiveMainTab('board')}
                     size="sm"
-                    className="h-8 gap-1 font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-xs text-xs px-2 sm:px-3"
-                    title="বোর্ড, সাল ও বিষয় অনুযায়ী এআই দিয়ে প্রশ্ন তৈরি করুন"
+                    className="h-8 gap-1 font-bold bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-600 hover:from-amber-700 hover:to-indigo-700 text-white shadow-xs text-xs px-2 sm:px-3"
+                    title="বোর্ড ও এআই দিয়ে সম্পূর্ণ প্রশ্ন তৈরি করুন"
                   >
-                    <Award className="w-3.5 h-3.5 text-yellow-200" /> <span>বোর্ড প্রশ্ন</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> <span>AI বোর্ড প্রশ্ন</span>
                   </Button>
                   <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
                   <Button 

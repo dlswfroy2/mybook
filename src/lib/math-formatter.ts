@@ -98,6 +98,7 @@ export function formatMathToHtml(text: string): string {
     .replace(/\\theta/g, 'θ')
     .replace(/\\pi/g, 'π')
     .replace(/\\rho/g, 'ρ')
+    .replace(/\\text\{([^}]+)\}/g, '$1')
     .replace(/\\omega/g, 'ω')
     .replace(/\\alpha/g, 'α')
     .replace(/\\beta/g, 'β')
