@@ -265,10 +265,6 @@ function TopTableScrollbar({
         if (table) {
             table.scrollBy({ left: amount, behavior: 'smooth' });
         }
-        const top = topScrollRef.current;
-        if (top) {
-            top.scrollBy({ left: amount, behavior: 'smooth' });
-        }
     };
 
     return (
@@ -345,6 +341,32 @@ function StudentListContent() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth mobile touch-pan gesture tracking
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const scrollStartX = useRef(0);
+
+  const handleTableTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && tableContainerRef.current) {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      scrollStartX.current = tableContainerRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && tableContainerRef.current) {
+      const diffX = e.touches[0].clientX - touchStartX.current;
+      const diffY = e.touches[0].clientY - touchStartY.current;
+
+      // When dragging horizontally, scroll the table smoothly left/right
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        tableContainerRef.current.scrollLeft = scrollStartX.current - diffX;
+      }
+      // When dragging vertically, let default page scroll proceed naturally
+    }
+  };
 
   const bnToEn = (str: string) => str.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)].toString());
 
@@ -778,7 +800,7 @@ function StudentListContent() {
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-col md:flex-row md:items-center gap-2">
                             {activeSection === 'list' && (
                                 <>
                                     <div className="relative w-full md:w-64">
@@ -791,26 +813,28 @@ function StudentListContent() {
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                         />
                                     </div>
-                                    <div className="flex bg-muted p-1 rounded-xl">
-                                        <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('table'); setIsBulkEdit(false); }}><List className="h-4 w-4" /></Button>
-                                        <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('grid'); setIsBulkEdit(false); }}><LayoutGrid className="h-4 w-4" /></Button>
+                                    <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+                                        <div className="flex bg-muted p-1 rounded-xl shrink-0">
+                                            <Button variant={viewMode === 'table' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('table'); setIsBulkEdit(false); }}><List className="h-4 w-4" /></Button>
+                                            <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-2 shadow-none" onClick={() => { setViewMode('grid'); setIsBulkEdit(false); }}><LayoutGrid className="h-4 w-4" /></Button>
+                                        </div>
+                                        {viewMode === 'table' && canEditStudent && (
+                                            <Button 
+                                                variant={isBulkEdit ? "default" : "outline"} 
+                                                size="sm" 
+                                                className={cn("flex-1 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 justify-center text-xs sm:text-sm", isBulkEdit ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-200 text-amber-700")}
+                                                onClick={() => { setIsBulkEdit(!isBulkEdit); if(isBulkEdit) setEditedData({}); }}
+                                            >
+                                                {isBulkEdit ? <XCircle className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <FilePen className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+                                                {isBulkEdit ? 'এডিট বন্ধ' : 'একসাথে এডিট'}
+                                            </Button>
+                                        )}
+                                        {hasPermission('upload:students') && (
+                                            <Button variant="outline" className="flex-1 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 border-primary text-primary justify-center text-xs sm:text-sm" onClick={() => setIsUploadOpen(true)}>
+                                                <FileUp className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Excel আপলোড
+                                            </Button>
+                                        )}
                                     </div>
-                                    {viewMode === 'table' && canEditStudent && (
-                                        <Button 
-                                            variant={isBulkEdit ? "default" : "outline"} 
-                                            size="sm" 
-                                            className={cn("h-10 px-4 font-black border-2", isBulkEdit ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-200 text-amber-700")}
-                                            onClick={() => { setIsBulkEdit(!isBulkEdit); if(isBulkEdit) setEditedData({}); }}
-                                        >
-                                            {isBulkEdit ? <XCircle className="mr-1.5 h-4 w-4" /> : <FilePen className="mr-1.5 h-4 w-4" />}
-                                            {isBulkEdit ? 'এডিট বন্ধ করুন' : 'একসাথে এডিট'}
-                                        </Button>
-                                    )}
-                                    {hasPermission('upload:students') && (
-                                        <Button variant="outline" className="font-black border-2 border-primary text-primary" onClick={() => setIsUploadOpen(true)}>
-                                            <FileUp className="mr-2 h-4 w-4" /> Excel আপলোড
-                                        </Button>
-                                    )}
                                 </>
                             )}
                             {activeSection === 'print' && (
@@ -827,31 +851,35 @@ function StudentListContent() {
                     </div>
 
                     {activeSection === 'list' && (
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6 p-2 sm:p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-primary/10 no-print">
-                            <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)} className="h-9 px-3 rounded-lg border-2 bg-white text-xs font-bold text-blue-700 outline-none notranslate" translate="no">
-                                <option value="all">{isEn ? `Students (${classStats.gender.all})` : `ছাত্র-ছাত্রী (${toBengaliNumber(classStats.gender.all)})`}</option>
-                                <option value="male">{isEn ? `Male (${classStats.gender.male})` : `ছাত্র (${toBengaliNumber(classStats.gender.male)})`}</option>
-                                <option value="female">{isEn ? `Female (${classStats.gender.female})` : `ছাত্রী (${toBengaliNumber(classStats.gender.female)})`}</option>
-                            </select>
-                            <select value={filterReligion} onChange={(e) => setFilterReligion(e.target.value)} className="h-9 px-3 rounded-lg border-2 bg-white text-xs font-bold text-primary outline-none notranslate" translate="no">
-                                <option value="all">{isEn ? `All Religions (${classStats.religion.all})` : `সকল ধর্ম (${toBengaliNumber(classStats.religion.all)})`}</option>
-                                <option value="islam">{isEn ? `Islam (${classStats.religion.islam})` : `ইসলাম (${toBengaliNumber(classStats.religion.islam)})`}</option>
-                                <option value="hindu">{isEn ? `Hindu (${classStats.religion.hinduism})` : `হিন্দু (${toBengaliNumber(classStats.religion.hinduism)})`}</option>
-                                <option value="christian">{isEn ? `Christian (${classStats.religion.christianity})` : `খ্রিস্টান (${toBengaliNumber(classStats.religion.christianity)})`}</option>
-                                <option value="other">{isEn ? `Other (${classStats.religion.other})` : `অন্যান্য (${toBengaliNumber(classStats.religion.other)})`}</option>
-                            </select>
-                            <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="h-9 px-3 rounded-lg border-2 bg-white text-xs font-bold text-emerald-700 outline-none notranslate" translate="no">
-                                <option value="all">{isEn ? `All Groups (${classStats.group.all})` : `সকল বিভাগ (${toBengaliNumber(classStats.group.all)})`}</option>
-                                <option value="science">{isEn ? `Science (${classStats.group.science})` : `বিজ্ঞান (${toBengaliNumber(classStats.group.science)})`}</option>
-                                <option value="arts">{isEn ? `Humanities (${classStats.group.arts})` : `মানবিক (${toBengaliNumber(classStats.group.arts)})`}</option>
-                                <option value="commerce">{isEn ? `Business Studies (${classStats.group.commerce})` : `ব্যবসায় শিক্ষা (${toBengaliNumber(classStats.group.commerce)})`}</option>
-                            </select>
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 mb-6 p-2.5 sm:p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-primary/10 no-print">
+                            {/* Filter Dropdowns: 3 columns on mobile, auto on sm+ */}
+                            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3 w-full sm:w-auto">
+                                <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)} className="h-9 px-1.5 sm:px-3 rounded-lg border-2 bg-white text-[11px] sm:text-xs font-bold text-blue-700 outline-none w-full sm:w-auto truncate notranslate" translate="no">
+                                    <option value="all">{isEn ? `Students (${classStats.gender.all})` : `ছাত্র-ছাত্রী (${toBengaliNumber(classStats.gender.all)})`}</option>
+                                    <option value="male">{isEn ? `Male (${classStats.gender.male})` : `ছাত্র (${toBengaliNumber(classStats.gender.male)})`}</option>
+                                    <option value="female">{isEn ? `Female (${classStats.gender.female})` : `ছাত্রী (${toBengaliNumber(classStats.gender.female)})`}</option>
+                                </select>
+                                <select value={filterReligion} onChange={(e) => setFilterReligion(e.target.value)} className="h-9 px-1.5 sm:px-3 rounded-lg border-2 bg-white text-[11px] sm:text-xs font-bold text-primary outline-none w-full sm:w-auto truncate notranslate" translate="no">
+                                    <option value="all">{isEn ? `All Religions (${classStats.religion.all})` : `সকল ধর্ম (${toBengaliNumber(classStats.religion.all)})`}</option>
+                                    <option value="islam">{isEn ? `Islam (${classStats.religion.islam})` : `ইসলাম (${toBengaliNumber(classStats.religion.islam)})`}</option>
+                                    <option value="hindu">{isEn ? `Hindu (${classStats.religion.hinduism})` : `হিন্দু (${toBengaliNumber(classStats.religion.hinduism)})`}</option>
+                                    <option value="christian">{isEn ? `Christian (${classStats.religion.christianity})` : `খ্রিস্টান (${toBengaliNumber(classStats.religion.christianity)})`}</option>
+                                    <option value="other">{isEn ? `Other (${classStats.religion.other})` : `অন্যান্য (${toBengaliNumber(classStats.religion.other)})`}</option>
+                                </select>
+                                <select value={filterGroup} onChange={(e) => setFilterGroup(e.target.value)} className="h-9 px-1.5 sm:px-3 rounded-lg border-2 bg-white text-[11px] sm:text-xs font-bold text-emerald-700 outline-none w-full sm:w-auto truncate notranslate" translate="no">
+                                    <option value="all">{isEn ? `All Groups (${classStats.group.all})` : `সকল বিভাগ (${toBengaliNumber(classStats.group.all)})`}</option>
+                                    <option value="science">{isEn ? `Science (${classStats.group.science})` : `বিজ্ঞান (${toBengaliNumber(classStats.group.science)})`}</option>
+                                    <option value="arts">{isEn ? `Humanities (${classStats.group.arts})` : `মানবিক (${toBengaliNumber(classStats.group.arts)})`}</option>
+                                    <option value="commerce">{isEn ? `Business Studies (${classStats.group.commerce})` : `ব্যবসায় শিক্ষা (${toBengaliNumber(classStats.group.commerce)})`}</option>
+                                </select>
+                            </div>
                             
-                            <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center justify-between sm:justify-end gap-2">
+                            {/* Action Buttons: 2 columns on mobile, right-aligned on sm+ */}
+                            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:ml-auto">
                                 {canDeleteStudent && getStudentsByClass(activeTab).length > 0 && (
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 font-black border-rose-200 text-rose-600 hover:bg-rose-50 text-xs flex-1 sm:flex-none justify-center" disabled={isDeletingAll}>
+                                            <Button variant="outline" size="sm" className="h-9 font-black border-rose-200 text-rose-600 hover:bg-rose-50 text-xs w-full sm:w-auto justify-center" disabled={isDeletingAll}>
                                                 {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1" />}
                                                 সব ডিলিট করুন
                                             </Button>
@@ -870,7 +898,7 @@ function StudentListContent() {
                                     </AlertDialog>
                                 )}
                                 {hasPermission('manage:students') && (
-                                    <Link href="/add-student" className="flex-1 sm:flex-none"><Button size="sm" className="w-full sm:w-auto h-9 font-black shadow-md text-xs justify-center"><Plus className="mr-1.5 h-4 w-4" /> নতুন শিক্ষার্থী</Button></Link>
+                                    <Link href="/add-student" className="w-full sm:w-auto"><Button size="sm" className="w-full sm:w-auto h-9 font-black shadow-md text-xs justify-center"><Plus className="mr-1.5 h-4 w-4" /> নতুন শিক্ষার্থী</Button></Link>
                                 )}
                             </div>
                         </div>
@@ -945,13 +973,22 @@ function StudentListContent() {
                                             <div className="px-1 no-print">
                                                 <TopTableScrollbar targetRef={tableContainerRef} minScrollWidth={1200} />
                                             </div>
-                                            <div ref={tableContainerRef} className="table-container shadow-xl border-2 border-black overflow-x-auto touch-pan-x permanent-scroll w-full max-w-full">
+                                            <div 
+                                                ref={tableContainerRef} 
+                                                onTouchStart={handleTableTouchStart}
+                                                onTouchMove={handleTableTouchMove}
+                                                className="table-container shadow-xl border-2 border-black overflow-x-auto permanent-scroll w-full max-w-full"
+                                                style={{
+                                                    WebkitOverflowScrolling: 'touch',
+                                                    touchAction: 'pan-x pan-y',
+                                                }}
+                                            >
                                                 <table className="min-w-max border-separate border-spacing-0 border-t-2 border-black w-full">
                                                     <TableHeader className="sticky top-0 z-40 bg-muted/95 backdrop-blur-sm shadow-sm border-b-2 border-black">
                                                         <TableRow className="h-14">
                                                             <TableHead className="font-black text-center w-12 sm:w-16 sticky left-0 z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">রোল</TableHead>
                                                             <TableHead className="font-black text-center w-14 sm:w-20 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">ছবি</TableHead>
-                                                            <TableHead className="font-black w-[130px] min-w-[130px] sm:w-auto sm:min-w-[220px] sticky left-[48px] sm:left-[64px] z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">শিক্ষার্থীর নাম</TableHead>
+                                                            <TableHead className="font-black w-[130px] min-w-[130px] sm:w-auto sm:min-w-[220px] static sm:sticky sm:left-[64px] z-10 sm:z-50 bg-muted/95 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">শিক্ষার্থীর নাম</TableHead>
                                                             <TableHead className="font-black min-w-[180px] sm:min-w-[200px] border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">পিতা ও মাতার নাম</TableHead>
                                                             <TableHead className="font-black w-28 sm:w-32 border-r-2 border-b-2 border-black text-black text-xs sm:text-sm">মোবাইল</TableHead>
                                                             {isBulkEdit && (
@@ -1008,7 +1045,7 @@ function StudentListContent() {
                                                                         )}
                                                                     </div>
                                                                 </TableCell>
-                                                                <TableCell className="border-r-2 border-b-2 border-black sticky left-[48px] sm:left-[64px] z-30 bg-white group-hover:bg-slate-50 px-2 sm:px-3 w-[130px] max-w-[130px] sm:w-auto sm:max-w-none">
+                                                                <TableCell className="border-r-2 border-b-2 border-black static sm:sticky sm:left-[64px] z-0 sm:z-30 bg-white group-hover:bg-slate-50 px-2 sm:px-3 w-[130px] max-w-[130px] sm:w-auto sm:max-w-none">
                                                                     {isBulkEdit ? (
                                                                         <div className="space-y-1">
                                                                             <Input 
