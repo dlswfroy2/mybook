@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Student } from '@/lib/student-data';
+import { Student, studentFromDoc } from '@/lib/student-data';
 import { 
     getAttendanceFromStorage, 
     DailyAttendance, 
@@ -369,6 +369,7 @@ const MonthlyAttendanceGrid = ({
         try {
             const attendanceData: StudentAttendance[] = students.map(student => ({
                 studentId: student.id,
+                roll: Number(student.roll),
                 status: currentStatusMap.get(student.id) || 'absent'
             }));
 
@@ -456,7 +457,7 @@ const MonthlyAttendanceGrid = ({
     };
 
     // Presence calculations
-    const getStudentTotalPresent = useCallback((studentId: string) => {
+    const getStudentTotalPresent = useCallback((studentId: string, sIdx?: number, roll?: number) => {
         let count = 0;
         daysInMonth.forEach(day => {
             const d = getDate(day);
@@ -466,7 +467,9 @@ const MonthlyAttendanceGrid = ({
             } else {
                 const ds = format(day, 'yyyy-MM-dd');
                 const record = monthRecords.find(r => r.date === ds);
-                const att = record?.attendance.find(a => a.studentId === studentId);
+                const att = record?.attendance.find(a => a.studentId === studentId)
+                    || (roll !== undefined ? record?.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(roll)) : undefined)
+                    || (sIdx !== undefined ? record?.attendance[sIdx] : undefined);
                 if (att?.status === 'present') count++;
             }
         });
@@ -724,7 +727,9 @@ const MonthlyAttendanceGrid = ({
                                         
                                         if (isSelected) {
                                             const existingRecord = monthRecords.find(r => r.date === recordDateStr);
-                                            const existingAtt = existingRecord?.attendance.find(a => a.studentId === student.id);
+                                            const existingAtt = existingRecord?.attendance.find(a => a.studentId === student.id)
+                                                || existingRecord?.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(student.roll))
+                                                || existingRecord?.attendance[sIdx];
                                             const status = currentStatusMap.get(student.id) || existingAtt?.status;
                                             return (
                                                 <TableCell key={d} className="p-0 border-r border-black/20 bg-blue-50/50">
@@ -759,7 +764,9 @@ const MonthlyAttendanceGrid = ({
                                         }
 
                                         const record = monthRecords.find(r => r.date === recordDateStr);
-                                        const att = record?.attendance.find(a => a.studentId === student.id);
+                                        const att = record?.attendance.find(a => a.studentId === student.id)
+                                            || record?.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(student.roll))
+                                            || record?.attendance[sIdx];
                                         
                                         return (
                                             <TableCell key={d} className={cn(
@@ -773,7 +780,7 @@ const MonthlyAttendanceGrid = ({
                                         );
                                     })}
                                     <TableCell className="text-center font-black border-l-2 border-black bg-white xl:sticky xl:right-0 z-30 text-blue-700 text-xs sm:text-sm shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
-                                        {toBengaliNumber(getStudentTotalPresent(student.id))}
+                                        {toBengaliNumber(getStudentTotalPresent(student.id, sIdx, student.roll))}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -1016,6 +1023,7 @@ const QuickRollAttendanceTab = ({ allStudents, date, onDateChange }: { allStuden
 
             const attendanceData: StudentAttendance[] = classStudents.map(student => ({
                 studentId: student.id,
+                roll: Number(student.roll),
                 status: (student.roll !== undefined && inputRolls.includes(student.roll)) ? 'present' : 'absent'
             }));
 
@@ -1649,10 +1657,12 @@ const AbsentStudentListTab = ({ allStudents }: { allStudents: Student[] }) => {
 
             const studentsInClass = allStudents.filter(s => s.academicYear === selectedYear && s.className === selectedClass);
             
-            const results = studentsInClass.map(student => {
+            const results = studentsInClass.map((student, sIdx) => {
                 let count = 0;
                 records.forEach(r => {
-                    const att = r.attendance.find(a => a.studentId === student.id);
+                    const att = r.attendance.find(a => a.studentId === student.id)
+                        || r.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(student.roll))
+                        || r.attendance[sIdx];
                     if (att?.status === 'absent') count++;
                 });
                 return { student, count };
@@ -1752,13 +1762,14 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
     const fetchAlerts = useCallback(async () => {
         if (!db || !selectedClass) return;
         setIsLoading(true);
-        const data = await getConsecutiveAbsences(db, selectedClass, selectedYear);
+        const classStudents = allStudents.filter(s => s.academicYear === selectedYear && s.className === selectedClass);
+        const data = await getConsecutiveAbsences(db, selectedClass, selectedYear, classStudents);
         
         const sortedData = data.sort((a, b) => {
-            const studentA = allStudents.find(s => s.id === a.studentId);
-            const studentB = allStudents.find(s => s.id === b.studentId);
-            const rollA = Number(studentA?.roll) || 0;
-            const rollB = Number(studentB?.roll) || 0;
+            const studentA = a.student || allStudents.find(s => s.id === a.studentId);
+            const studentB = b.student || allStudents.find(s => s.id === b.studentId);
+            const rollA = Number(studentA?.roll) || a.roll || 0;
+            const rollB = Number(studentB?.roll) || b.roll || 0;
             return rollA - rollB;
         });
 
@@ -1815,13 +1826,13 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                                 </TableHeader>
                                 <TableBody>
                                     {alerts.map((alert, idx) => {
-                                        const student = allStudents.find(s => s.id === alert.studentId);
+                                        const student = alert.student || allStudents.find(s => s.id === alert.studentId);
                                         return (
-                                            <TableRow key={alert.studentId} className="h-14 hover:bg-rose-50/50">
+                                            <TableRow key={alert.studentId || idx} className="h-14 hover:bg-rose-50/50">
                                                 <TableCell className="text-center font-bold">{toBengaliNumber(idx + 1)}</TableCell>
-                                                <TableCell className="text-center font-black text-lg">{toBengaliNumber(student?.roll || '-')}</TableCell>
+                                                <TableCell className="text-center font-black text-lg">{toBengaliNumber(student?.roll ?? alert.roll ?? '-')}</TableCell>
                                                 <TableCell>
-                                                    <p className="font-black text-slate-800">{student?.studentNameBn}</p>
+                                                    <p className="font-black text-slate-800">{student?.studentNameBn || '-'}</p>
                                                     <p className="text-[10px] font-bold text-muted-foreground">{student?.guardianMobile || '-'}</p>
                                                 </TableCell>
                                                 <TableCell className="text-center">
@@ -1869,12 +1880,14 @@ const ReportSheet = ({ classId, students, startDate, endDate }: { classId: strin
                     return attDate >= start && attDate <= end;
                 });
                 
-                const studentReports = students.map(student => {
+                const studentReports = students.map((student, sIdx) => {
                     let presentDays = 0;
                     let absentDays = 0;
 
                     allAttendance.forEach(dailyRecord => {
-                        const studentAttendance = dailyRecord.attendance.find(a => a.studentId === student.id);
+                        const studentAttendance = dailyRecord.attendance.find(a => a.studentId === student.id)
+                            || dailyRecord.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(student.roll))
+                            || dailyRecord.attendance[sIdx];
                         if (studentAttendance) {
                             if (studentAttendance.status === 'present') presentDays++;
                             else absentDays++;
@@ -2118,7 +2131,7 @@ export default function AttendancePage() {
         const studentsQuery = query(collection(db, "students"), orderBy("roll"));
 
         const unsubscribe = onSnapshot(studentsQuery, (querySnapshot) => {
-            const studentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), dob: doc.data().dob?.toDate(), })) as Student[];
+            const studentsData = querySnapshot.docs.map(studentFromDoc);
             setAllStudents(studentsData);
             setIsLoading(false);
         }, (error: FirestoreError) => {

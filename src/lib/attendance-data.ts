@@ -14,12 +14,14 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import type { Student } from '@/lib/student-data';
 
 export type AttendanceStatus = 'present' | 'absent';
 
 export interface StudentAttendance {
   studentId: string;
   status: AttendanceStatus;
+  roll?: number;
 }
 
 export interface DailyAttendance {
@@ -172,9 +174,16 @@ export interface StudentConsecutiveAbsence {
     studentId: string;
     absentDays: number;
     lastAbsentDate: string;
+    roll?: number;
+    student?: Student;
 }
 
-export const getConsecutiveAbsences = async (db: Firestore, className: string, academicYear: string): Promise<StudentConsecutiveAbsence[]> => {
+export const getConsecutiveAbsences = async (
+    db: Firestore, 
+    className: string, 
+    academicYear: string,
+    classStudents?: Student[]
+): Promise<StudentConsecutiveAbsence[]> => {
     const q = query(
         collection(db, ATTENDANCE_COLLECTION),
         where("academicYear", "==", academicYear),
@@ -187,6 +196,37 @@ export const getConsecutiveAbsences = async (db: Firestore, className: string, a
         if (allRecords.length === 0) return [];
 
         const sortedRecords = allRecords.sort((a, b) => b.date.localeCompare(a.date));
+
+        // If active students of the class are provided, calculate consecutive absences directly for them
+        if (classStudents && classStudents.length > 0) {
+            const sortedStudents = [...classStudents].sort((a, b) => Number(a.roll) - Number(b.roll));
+            const results: StudentConsecutiveAbsence[] = [];
+
+            sortedStudents.forEach((student, sIdx) => {
+                let consecutive = 0;
+                for (const record of sortedRecords) {
+                    const att = record.attendance.find(a => a.studentId === student.id)
+                        || record.attendance.find(a => (a as any).roll !== undefined && Number((a as any).roll) === Number(student.roll))
+                        || record.attendance[sIdx];
+                    if (att) {
+                        if (att.status === 'absent') consecutive++;
+                        else if (att.status === 'present') break;
+                    } else break;
+                }
+                if (consecutive >= 3) {
+                    results.push({
+                        studentId: student.id,
+                        absentDays: consecutive,
+                        lastAbsentDate: sortedRecords[0].date,
+                        roll: Number(student.roll),
+                        student: student,
+                    });
+                }
+            });
+
+            return results;
+        }
+
         const studentAbsenceMap = new Map<string, number>();
         const studentLastDateMap = new Map<string, string>();
         
