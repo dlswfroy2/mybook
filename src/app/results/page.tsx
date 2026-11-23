@@ -2011,8 +2011,30 @@ const ResultSearchTab = ({ allStudents }: { allStudents: Student[] }) => {
                             <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">গ্রেড</p><p className={cn("text-xl font-black", searchResult.isPass ? "text-emerald-600" : "text-rose-600")}>{searchResult.isPass ? searchResult.finalGrade : 'F'}</p></div>
                             <div className="p-3 bg-slate-50 border rounded-xl text-center"><p className="text-[10px] font-black uppercase text-muted-foreground">মেধাক্রম</p><p className="text-xl font-black text-amber-600">{searchResult.isPass ? toBengaliNumber(searchResult.meritPosition || '-') : '-'}</p></div>
                         </div>
-                        <div className="table-container max-h-[300px] border-2"><Table><TableHeader className="bg-muted/50 sticky top-0 z-10"><TableRow><TableHead className="font-black">বিষয়</TableHead><TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead><TableHead className="text-center font-black">গ্রেড</TableHead><TableHead className="text-right font-black">পয়েন্ট</TableHead></TableRow></TableHeader><TableBody>{Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (<TableRow key={name} className="h-10"><TableCell className="font-bold text-xs">{name}</TableCell><TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell><TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell><TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell></TableRow>))}</TableBody></Table></div></CardContent>
-                    <CardFooter className="bg-slate-50 p-4 border-t flex justify-end gap-3">
+                        <div className="w-full overflow-x-auto border-2 rounded-xl shadow-sm">
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="font-black">বিষয়</TableHead>
+                                        <TableHead className="text-center font-black">প্রাপ্ত নম্বর</TableHead>
+                                        <TableHead className="text-center font-black">গ্রেড</TableHead>
+                                        <TableHead className="text-right font-black">পয়েন্ট</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from(searchResult.subjectResults.entries()).map(([name, res]) => (
+                                        <TableRow key={name} className="h-10 hover:bg-slate-50/80">
+                                            <TableCell className="font-bold text-xs">{name}</TableCell>
+                                            <TableCell className="text-center font-black text-blue-900">{toBengaliNumber(res.marks)}</TableCell>
+                                            <TableCell className={cn("text-center font-black", res.isPass ? "text-slate-700" : "text-rose-600")}>{res.grade}</TableCell>
+                                            <TableCell className="text-right font-bold text-xs">{toBengaliNumber(res.point.toFixed(2))}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="bg-slate-50 p-4 border-t flex flex-wrap justify-end gap-3">
                         <Button variant="outline" className="font-black" onClick={() => setSearchResult(null)}>অন্য ফলাফল খুঁজুন</Button>
                         <Link href={`/marksheet/${searchResult.student.id}?academicYear=${selectedYear}&examName=${encodeURIComponent(searchExam)}`} target="_blank">
                             <Button className="font-black shadow-lg"><Printer className="mr-2 h-4 w-4" /> মার্কশিট প্রিন্ট করুন</Button>
