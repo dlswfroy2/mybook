@@ -342,29 +342,30 @@ function StudentListContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Smooth mobile touch-pan gesture tracking
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const scrollStartX = useRef(0);
-
-  const handleTableTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1 && tableContainerRef.current) {
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
-      scrollStartX.current = tableContainerRef.current.scrollLeft;
+  // Universal smooth mobile touch-pan gesture tracking for any table container
+  const handleGenericTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const target = e.currentTarget;
+      target.dataset.touchStartX = String(e.touches[0].clientX);
+      target.dataset.touchStartY = String(e.touches[0].clientY);
+      target.dataset.scrollStartX = String(target.scrollLeft);
     }
   };
 
-  const handleTableTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 1 && tableContainerRef.current) {
-      const diffX = e.touches[0].clientX - touchStartX.current;
-      const diffY = e.touches[0].clientY - touchStartY.current;
+  const handleGenericTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const target = e.currentTarget;
+      const startX = parseFloat(target.dataset.touchStartX || '0');
+      const startY = parseFloat(target.dataset.touchStartY || '0');
+      const scrollStartX = parseFloat(target.dataset.scrollStartX || '0');
 
-      // When dragging horizontally, scroll the table smoothly left/right
+      const diffX = e.touches[0].clientX - startX;
+      const diffY = e.touches[0].clientY - startY;
+
+      // When dragging horizontally, scroll the container smoothly
       if (Math.abs(diffX) > Math.abs(diffY)) {
-        tableContainerRef.current.scrollLeft = scrollStartX.current - diffX;
+        target.scrollLeft = scrollStartX - diffX;
       }
-      // When dragging vertically, let default page scroll proceed naturally
     }
   };
 
@@ -979,8 +980,8 @@ function StudentListContent() {
                                             </div>
                                             <div 
                                                 ref={tableContainerRef} 
-                                                onTouchStart={handleTableTouchStart}
-                                                onTouchMove={handleTableTouchMove}
+                                                onTouchStart={handleGenericTouchStart}
+                                                onTouchMove={handleGenericTouchMove}
                                                 className="table-container shadow-xl border-2 border-black overflow-x-auto permanent-scroll w-full max-w-full"
                                                 style={{
                                                     WebkitOverflowScrolling: 'touch',
@@ -1277,8 +1278,16 @@ function StudentListContent() {
                                         <div className="mt-2 inline-block border border-black px-6 py-0.5 rounded-full font-black text-sm uppercase">শিক্ষার্থী বিস্তারিত তালিকা - {toBengaliNumber(selectedYear)}</div>
                                         <p className="text-sm font-black mt-1">শ্রেণি: {classNamesMap[activeTab]} শ্রেণি</p>
                                     </header>
-                                    <div className="w-full">
-                                        <table className="w-full border-collapse border-[1.5px] border-black text-[9px]">
+                                    <div 
+                                        onTouchStart={handleGenericTouchStart}
+                                        onTouchMove={handleGenericTouchMove}
+                                        className="w-full overflow-x-auto permanent-scroll pb-2 print:overflow-visible print:pb-0"
+                                        style={{
+                                            WebkitOverflowScrolling: 'touch',
+                                            touchAction: 'pan-x pan-y',
+                                        }}
+                                    >
+                                        <table className="w-full min-w-[750px] print:min-w-full print:w-full border-collapse border-[1.5px] border-black text-[9px]">
                                             <thead>
                                                 <tr className="bg-slate-100 h-10 border-b-2 border-black">
                                                     <th className="border-r border-black p-0.5 w-[5%] text-center">ছবি</th>
