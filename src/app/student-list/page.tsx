@@ -822,16 +822,20 @@ function StudentListContent() {
                                             <Button 
                                                 variant={isBulkEdit ? "default" : "outline"} 
                                                 size="sm" 
-                                                className={cn("flex-1 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 justify-center text-xs sm:text-sm", isBulkEdit ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-200 text-amber-700")}
+                                                className={cn("flex-1 min-w-0 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 justify-center text-xs sm:text-sm", isBulkEdit ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-200 text-amber-700")}
                                                 onClick={() => { setIsBulkEdit(!isBulkEdit); if(isBulkEdit) setEditedData({}); }}
                                             >
-                                                {isBulkEdit ? <XCircle className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <FilePen className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-                                                {isBulkEdit ? 'এডিট বন্ধ' : 'একসাথে এডিট'}
+                                                {isBulkEdit ? <XCircle className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> : <FilePen className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />}
+                                                <span className="truncate">{isBulkEdit ? 'এডিট বন্ধ' : 'একসাথে এডিট'}</span>
                                             </Button>
                                         )}
                                         {hasPermission('upload:students') && (
-                                            <Button variant="outline" className="flex-1 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 border-primary text-primary justify-center text-xs sm:text-sm" onClick={() => setIsUploadOpen(true)}>
-                                                <FileUp className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Excel আপলোড
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-auto shrink-0 md:flex-initial h-10 px-2 sm:px-4 font-black border-2 border-primary text-primary justify-center text-[11px] sm:text-sm" 
+                                                onClick={() => setIsUploadOpen(true)}
+                                            >
+                                                <FileUp className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> <span className="truncate">Excel আপলোড</span>
                                             </Button>
                                         )}
                                     </div>
