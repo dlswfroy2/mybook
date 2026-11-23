@@ -1766,10 +1766,8 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
         const data = await getConsecutiveAbsences(db, selectedClass, selectedYear, classStudents);
         
         const sortedData = data.sort((a, b) => {
-            const studentA = a.student || allStudents.find(s => s.id === a.studentId);
-            const studentB = b.student || allStudents.find(s => s.id === b.studentId);
-            const rollA = Number(studentA?.roll) || a.roll || 0;
-            const rollB = Number(studentB?.roll) || b.roll || 0;
+            const rollA = Number(a.student?.roll) || a.roll || 0;
+            const rollB = Number(b.student?.roll) || b.roll || 0;
             return rollA - rollB;
         });
 
@@ -1801,7 +1799,7 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                             <CardTitle className="text-red-900 flex items-center gap-2">
                                 <Plus className="h-5 w-5" /> অনুপস্থিতি সতর্কবার্তা (Absence Alerts)
                             </CardTitle>
-                            <CardDescription>টানা ৩ দিন বা তার বেশি অনুপস্থিত শিক্ষার্থীদের তালিকা</CardDescription>
+                            <CardDescription>সর্বশেষ উপস্থিতি অনুযায়ী সকল শিক্ষার্থীর অনুপস্থিতির হিসাব (আসলে ০ দিন, না আসলে টানা অনুপস্থিত দিন)</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -1812,7 +1810,7 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                             <span>বিশ্লেষণ করা হচ্ছে...</span>
                         </div>
                     ) : alerts.length === 0 ? (
-                        <div className="p-20 text-center text-emerald-600 font-black text-lg italic">টানা অনুপস্থিত কোনো শিক্ষার্থী পাওয়া যায়নি।</div>
+                        <div className="p-20 text-center text-muted-foreground font-black text-lg italic">এই শ্রেণিতে কোনো শিক্ষার্থী পাওয়া যায়নি।</div>
                     ) : (
                         <div className="table-container">
                             <Table>
@@ -1828,7 +1826,7 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                                     {alerts.map((alert, idx) => {
                                         const student = alert.student || allStudents.find(s => s.id === alert.studentId);
                                         return (
-                                            <TableRow key={alert.studentId || idx} className="h-14 hover:bg-rose-50/50">
+                                            <TableRow key={alert.studentId || idx} className={cn("h-14 transition-colors", alert.absentDays >= 3 ? "hover:bg-rose-50/50" : "hover:bg-slate-50")}>
                                                 <TableCell className="text-center font-bold">{toBengaliNumber(idx + 1)}</TableCell>
                                                 <TableCell className="text-center font-black text-lg">{toBengaliNumber(student?.roll ?? alert.roll ?? '-')}</TableCell>
                                                 <TableCell>
@@ -1836,7 +1834,13 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                                                     <p className="text-[10px] font-bold text-muted-foreground">{student?.guardianMobile || '-'}</p>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <Badge variant="destructive" className="font-black text-sm px-4 h-7">{toBengaliNumber(alert.absentDays)} দিন</Badge>
+                                                    {alert.absentDays === 0 ? (
+                                                        <Badge variant="outline" className="font-black text-xs px-3 h-7 bg-emerald-50 text-emerald-700 border-emerald-300">০ দিন (উপস্থিত)</Badge>
+                                                    ) : alert.absentDays < 3 ? (
+                                                        <Badge variant="secondary" className="font-black text-xs px-3 h-7 bg-amber-50 text-amber-700 border border-amber-300">{toBengaliNumber(alert.absentDays)} দিন</Badge>
+                                                    ) : (
+                                                        <Badge variant="destructive" className="font-black text-sm px-4 h-7">{toBengaliNumber(alert.absentDays)} দিন</Badge>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         );

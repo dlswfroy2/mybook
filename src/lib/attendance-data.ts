@@ -213,18 +213,17 @@ export const getConsecutiveAbsences = async (
                         else if (att.status === 'present') break;
                     } else break;
                 }
-                if (consecutive >= 3) {
-                    results.push({
-                        studentId: student.id,
-                        absentDays: consecutive,
-                        lastAbsentDate: sortedRecords[0].date,
-                        roll: Number(student.roll),
-                        student: student,
-                    });
-                }
+                
+                results.push({
+                    studentId: student.id,
+                    absentDays: consecutive,
+                    lastAbsentDate: sortedRecords[0]?.date || '',
+                    roll: Number(student.roll),
+                    student: student,
+                });
             });
 
-            return results;
+            return results.sort((a, b) => (Number(a.roll) || 0) - (Number(b.roll) || 0));
         }
 
         const studentAbsenceMap = new Map<string, number>();
