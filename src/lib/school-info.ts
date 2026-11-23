@@ -24,7 +24,7 @@ export const defaultSchoolInfo: SchoolInfo = {
     code: '',
     address: '',
     logoUrl: '',
-    phone: '০১৭১৭৫৭৬৩৩০'
+    phone: '০১৭৪০০৮৪১৫৪, ০১৫১৬৩২১৭২৫'
 };
 
 const SCHOOL_INFO_DOC_PATH = 'school/info';

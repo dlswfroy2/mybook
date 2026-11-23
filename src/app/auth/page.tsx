@@ -896,13 +896,18 @@ export default function AuthPage() {
                   </div>
                </CardContent>
             </Card>
-            <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all">
+            <Card className="bg-white/95 backdrop-blur-md border border-rose-200 shadow-xl rounded-2xl md:rounded-3xl group hover:-translate-y-1 transition-all overflow-hidden">
                <CardContent className="p-4 md:p-6 flex flex-col gap-3">
                   <div className="bg-rose-50 w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors">
                      <Trophy className="w-5 h-5 md:w-6 md:h-6" />
                   </div>
-                  <div>
-                    <p className="text-2xl md:text-3xl font-black text-rose-600 uppercase tracking-wider mt-0.5">এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}</p>
+                  <div className="min-w-0">
+                    <p className="text-2xl md:text-3xl font-black text-slate-800">
+                      {toBengaliNumber(stats.passRate > 0 ? stats.passRate.toFixed(1) : '১০০')}%
+                    </p>
+                    <p className="text-[10px] md:text-xs font-black text-rose-600 uppercase tracking-wider mt-0.5 truncate" title={`এস এস সি পরীক্ষা-${toBengaliNumber(stats.sscYear)}`}>
+                      এস এস সি পরীক্ষা-{toBengaliNumber(stats.sscYear)}
+                    </p>
                   </div>
                </CardContent>
             </Card>
@@ -1114,7 +1119,11 @@ export default function AuthPage() {
               <MapPin className="w-3.5 h-3.5 text-[#ef4444]" /> {schoolInfo?.address || 'বাংলাদেশ'}
             </div>
             <div className="flex items-center gap-2">
-              <Phone className="w-3.5 h-3.5 text-[#22c55e]" /> {toBengaliNumber(schoolInfo?.phone || '')}
+              <Phone className="w-3.5 h-3.5 text-[#22c55e]" /> {
+                schoolInfo?.phone && !schoolInfo.phone.includes('01717576') && !schoolInfo.phone.includes('০১৭১৭৫৭৬')
+                  ? toBengaliNumber(schoolInfo.phone)
+                  : '০১৭৪০০৮৪১৫৪, ০১৫১৬৩২১৭২৫'
+              }
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-blue-500/60">

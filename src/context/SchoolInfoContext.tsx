@@ -37,6 +37,9 @@ export function SchoolInfoProvider({ children }: { children: ReactNode }) {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && (parsed.name || parsed.logoUrl)) {
+            if (!parsed.phone || parsed.phone.includes('01717576') || parsed.phone.includes('০১৭১৭৫৭৬')) {
+              parsed.phone = '০১৭৪০০৮৪১৫৪, ০১৫১৬৩২১৭২৫';
+            }
             setSchoolInfo(prev => ({ ...prev, ...parsed }));
             setIsLoading(false);
           }
@@ -51,6 +54,9 @@ export function SchoolInfoProvider({ children }: { children: ReactNode }) {
             // Only update if there is actual meaningful data so we never overwrite with blanks
             if (data && (data.name || data.logoUrl || data.address || data.eiin)) {
               const fullInfo = { ...defaultSchoolInfo, ...data } as SchoolInfo;
+              if (!fullInfo.phone || fullInfo.phone.includes('01717576') || fullInfo.phone.includes('০১৭১৭৫৭৬')) {
+                fullInfo.phone = '০১৭৪০০৮৪১৫৪, ০১৫১৬৩২১৭২৫';
+              }
               setSchoolInfo(fullInfo);
               if (typeof window !== 'undefined') {
                 try { localStorage.setItem('cached_school_info', JSON.stringify(fullInfo)); } catch (e) {}
@@ -67,6 +73,9 @@ export function SchoolInfoProvider({ children }: { children: ReactNode }) {
             if (cached) {
               const parsed = JSON.parse(cached);
               if (parsed && (parsed.name || parsed.logoUrl)) {
+                if (!parsed.phone || parsed.phone.includes('01717576') || parsed.phone.includes('০১৭১৭৫৭৬')) {
+                  parsed.phone = '০১৭৪০০৮৪১৫৪, ০১৫১৬৩২১৭২৫';
+                }
                 setSchoolInfo(prev => ({ ...prev, ...parsed }));
               }
             }
