@@ -331,6 +331,31 @@ const MonthlyAttendanceGrid = ({
         }
     };
 
+    // Touch scroll handlers for mobile
+    const handleGenericTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (e.touches.length === 1) {
+            const target = e.currentTarget;
+            target.dataset.touchStartX = String(e.touches[0].clientX);
+            target.dataset.touchStartY = String(e.touches[0].clientY);
+            target.dataset.scrollStartX = String(target.scrollLeft);
+            target.dataset.scrollStartY = String(target.scrollTop);
+        }
+    };
+
+    const handleGenericTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (e.touches.length === 1) {
+            const target = e.currentTarget;
+            const startX = parseFloat(target.dataset.touchStartX || '0');
+            const startY = parseFloat(target.dataset.touchStartY || '0');
+            const scrollStartX = parseFloat(target.dataset.scrollStartX || '0');
+            const scrollStartY = parseFloat(target.dataset.scrollStartY || '0');
+            const diffX = e.touches[0].clientX - startX;
+            const diffY = e.touches[0].clientY - startY;
+            target.scrollLeft = scrollStartX - diffX;
+            target.scrollTop = scrollStartY - diffY;
+        }
+    };
+
     const handleSave = async () => {
         if (!db || !user || isSaving || !selectedDate) return;
         
@@ -608,13 +633,16 @@ const MonthlyAttendanceGrid = ({
                 <div 
                     ref={tableContainerRef}
                     onScroll={() => handleScrollSync('table')}
+                    onTouchStart={handleGenericTouchStart}
+                    onTouchMove={handleGenericTouchMove}
                     className="table-container attendance-table !max-h-[600px] border rounded-lg overflow-auto relative permanent-scroll"
+                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
                 >
                     <table className="w-full caption-bottom text-sm border-separate border-spacing-0 min-w-max">
                         <TableHeader className="sticky top-0 z-40">
                             <TableRow className="border-t-2 border-b-2 border-black bg-slate-100 h-20">
                                 <TableHead className="w-14 text-center font-black border-r-2 border-black bg-slate-200 sticky left-0 z-[60] text-black">রোল</TableHead>
-                                <TableHead className="min-w-[180px] font-black border-r-2 border-black bg-slate-200 sticky left-14 z-[60] text-black">শিক্ষার্থীর নাম</TableHead>
+                                <TableHead className="min-w-[180px] font-black border-r-2 border-black bg-slate-200 sm:sticky sm:left-14 sm:z-[60] text-black">শিক্ষার্থীর নাম</TableHead>
                                 {daysInMonth.map(day => {
                                     const d = getDate(day);
                                     const isSelected = d === activeDay;
@@ -687,7 +715,7 @@ const MonthlyAttendanceGrid = ({
                             {students.map((student, sIdx) => (
                                 <TableRow key={student.id} className="h-8 hover:bg-slate-50 transition-colors">
                                     <TableCell className="text-center font-black border-r-2 border-black bg-white sticky left-0 z-30 w-11 sm:w-14 text-xs sm:text-sm">{toBengaliNumber(student.roll)}</TableCell>
-                                    <TableCell className="font-black border-r-2 border-black bg-white sticky left-11 sm:left-14 z-30 whitespace-nowrap px-1.5 sm:px-3 text-[10px] sm:text-[11px] text-slate-800 w-[110px] max-w-[110px] sm:w-auto sm:max-w-none overflow-hidden text-ellipsis">{student.studentNameBn}</TableCell>
+                                    <TableCell className="font-black border-r-2 border-black bg-white sm:sticky sm:left-14 sm:z-30 whitespace-nowrap px-1.5 sm:px-3 text-[10px] sm:text-[11px] text-slate-800 w-[110px] max-w-[110px] sm:w-auto sm:max-w-none overflow-hidden text-ellipsis">{student.studentNameBn}</TableCell>
                                     {daysInMonth.map(day => {
                                         const d = getDate(day);
                                         const isSelected = d === activeDay;
