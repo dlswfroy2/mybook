@@ -124,6 +124,31 @@ export const deleteDailyAttendance = async (db: Firestore, date: string, classNa
   }
 };
 
+export const clearClassAttendance = async (db: Firestore, className: string, academicYear: string) => {
+  try {
+    const q = query(
+      collection(db, ATTENDANCE_COLLECTION),
+      where("className", "==", className),
+      where("academicYear", "==", academicYear)
+    );
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(db);
+      snapshot.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (serverError: any) {
+    if (serverError.code === 'permission-denied') {
+      const permissionError = new FirestorePermissionError({
+        path: ATTENDANCE_COLLECTION,
+        operation: 'delete',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
+    }
+    throw serverError;
+  }
+};
+
 export const getAttendanceForDate = async (db: Firestore, date: string, academicYear: string): Promise<DailyAttendance[]> => {
     const q = query(
         collection(db, ATTENDANCE_COLLECTION),

@@ -13,7 +13,8 @@ import {
     AttendanceStatus, 
     getConsecutiveAbsences, 
     StudentConsecutiveAbsence,
-    deleteDailyAttendance
+    deleteDailyAttendance,
+    clearClassAttendance
 } from '@/lib/attendance-data';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAcademicYear } from '@/context/AcademicYearContext';
@@ -1758,6 +1759,9 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
     const [selectedClass, setSelectedClass] = useState('6');
     const [alerts, setAlerts] = useState<StudentConsecutiveAbsence[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [totalAttendanceDays, setTotalAttendanceDays] = useState(0);
+    const [lastAttendanceDate, setLastAttendanceDate] = useState<string>('');
+    const [isClearing, setIsClearing] = useState(false);
 
     const fetchAlerts = useCallback(async () => {
         if (!db || !selectedClass) return;
@@ -1772,10 +1776,38 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
         });
 
         setAlerts(sortedData);
+        setLastAttendanceDate(sortedData[0]?.lastAbsentDate || '');
+
+        try {
+            const q = query(
+                collection(db, 'attendance'),
+                where("academicYear", "==", selectedYear),
+                where("className", "==", selectedClass)
+            );
+            const snap = await getDocs(q);
+            setTotalAttendanceDays(snap.size);
+        } catch (e) {
+            setTotalAttendanceDays(0);
+        }
+
         setIsLoading(false);
     }, [db, selectedClass, selectedYear, allStudents]);
 
     useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
+
+    const handleClearClassRecords = async () => {
+        if (!db || !selectedClass) return;
+        setIsClearing(true);
+        try {
+            await clearClassAttendance(db, selectedClass, selectedYear);
+            toast({ title: "সফলভাবে মুছে ফেলা হয়েছে", description: `${classNamesMap[selectedClass]}-এর সকল সংরক্ষিত পুরনো হাজিরা রেকর্ড মুছে দেওয়া হয়েছে।` });
+            await fetchAlerts();
+        } catch (e) {
+            toast({ variant: "destructive", title: "মুছতে সমস্যা হয়েছে" });
+        } finally {
+            setIsClearing(false);
+        }
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -1794,13 +1826,44 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
 
             <Card className="border-2 border-red-100 shadow-lg overflow-hidden">
                 <CardHeader className="bg-red-50/50 border-b">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div>
                             <CardTitle className="text-red-900 flex items-center gap-2">
                                 <Plus className="h-5 w-5" /> অনুপস্থিতি সতর্কবার্তা (Absence Alerts)
                             </CardTitle>
-                            <CardDescription>সর্বশেষ উপস্থিতি অনুযায়ী সকল শিক্ষার্থীর অনুপস্থিতির হিসাব (আসলে ০ দিন, না আসলে টানা অনুপস্থিত দিন)</CardDescription>
+                            <CardDescription className="mt-1">
+                                {totalAttendanceDays > 0 ? (
+                                    <span>
+                                        সর্বশেষ সংরক্ষিত হাজিরা: <strong className="text-slate-800">{lastAttendanceDate ? format(new Date(lastAttendanceDate), 'd MMMM yyyy', { locale: bn }) : '-'}</strong> (মোট {toBengaliNumber(totalAttendanceDays)} দিনের সংরক্ষিত রেকর্ড অনুযায়ী)
+                                    </span>
+                                ) : (
+                                    <span>এই শ্রেণিতে এখনও কোনো হাজিরা নেওয়া হয়নি</span>
+                                )}
+                            </CardDescription>
                         </div>
+                        {totalAttendanceDays > 0 && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs font-black text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 shrink-0">
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> পুরনো হাজিরা রেকর্ড মুছুন
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="font-kalpurush">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-rose-700">সংরক্ষিত হাজিরা রেকর্ড মুছবেন?</AlertDialogTitle>
+                                        <AlertDialogDescription className="font-bold">
+                                            {classNamesMap[selectedClass]}-এর মোট {toBengaliNumber(totalAttendanceDays)} দিনের সকল সংরক্ষিত হাজিরা রেকর্ড মুছে যাবে। আপনি কি নিশ্চিত?
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleClearClassRecords} disabled={isClearing} className="bg-destructive font-black">
+                                            {isClearing ? 'মুছে ফেলা হচ্ছে...' : 'হ্যাঁ, সব মুছুন'}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1808,6 +1871,12 @@ const AbsenceAlertsTab = ({ allStudents }: { allStudents: Student[] }) => {
                         <div className="p-20 text-center italic flex flex-col items-center gap-2">
                             <Loader2 className="h-6 w-6 animate-spin" />
                             <span>বিশ্লেষণ করা হচ্ছে...</span>
+                        </div>
+                    ) : totalAttendanceDays === 0 ? (
+                        <div className="p-20 text-center text-muted-foreground font-black text-base flex flex-col items-center gap-2">
+                            <Info className="h-8 w-8 text-blue-500" />
+                            <span>এই শ্রেণিতে এখনও কোনো দিনের হাজিরা নেওয়া বা সংরক্ষণ করা হয়নি।</span>
+                            <span className="text-xs font-normal opacity-80">হাজিরা রেজিস্টার থেকে নতুন হাজিরা সংরক্ষণ করলে এখানে স্বয়ংক্রিয়ভাবে অনুপস্থিতি হিসাব প্রদর্শিত হবে।</span>
                         </div>
                     ) : alerts.length === 0 ? (
                         <div className="p-20 text-center text-muted-foreground font-black text-lg italic">এই শ্রেণিতে কোনো শিক্ষার্থী পাওয়া যায়নি।</div>
