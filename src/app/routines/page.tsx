@@ -2316,6 +2316,11 @@ export default function RoutinesPage() {
     const [originalRoutineData, setOriginalRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
+    const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
+    const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>('day');
+    const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>('main');
+    const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
+    const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
 
     const activeColumns = useMemo(() => {
         if (routineScope === 'standalone' && standaloneRoutine) {
@@ -2325,11 +2330,6 @@ export default function RoutinesPage() {
         }
         return columns;
     }, [routineScope, standaloneRoutine, columns]);
-    const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
-    const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>('day');
-    const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>('main');
-    const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
-    const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
