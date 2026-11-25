@@ -1101,52 +1101,110 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                 </DialogContent>
             </Dialog>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {isLoading ? <div className="col-span-full text-center py-20 italic">তথ্য লোড হচ্ছে...</div> : 
-                 allocations.map((record, rIdx) => {
-                    const scopedAllocs = record.allocations.filter(a => (a.scope || 'main') === allocationScope);
-                    return (
-                    <Card key={`${record.teacherName || 'teacher'}-${rIdx}`} className="border-2 border-black/5 hover:border-primary/20 transition-all shadow-sm rounded-2xl overflow-hidden bg-white">
-                        <CardHeader className="bg-muted/30 p-4 border-b">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                                        <AvatarFallback className="bg-primary text-white font-black">{getTeacherDisplayName(record.teacherName).charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <CardTitle className="text-base font-black text-slate-800 notranslate" translate="no">{getTeacherDisplayName(record.teacherName)}</CardTitle>
-                                </div>
-                                <Badge variant="outline" className={cn("text-[10px] font-black", allocationScope === 'standalone' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-indigo-50 text-indigo-700 border-indigo-200")}>
-                                    {allocationScope === 'standalone' ? 'স্বতন্ত্র' : 'মেইন'}
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                            <div className="space-y-2">
-                                {scopedAllocs.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground italic text-center py-4">এই বিভাগে কোনো বিষয় বণ্টন করা হয়নি</p>
-                                ) : (
-                                    scopedAllocs.map((a, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border group">
-                                            <div className="flex flex-col">
-                                                <span className="text-[11px] font-black text-blue-900 leading-none">{a.subjectName}</span>
-                                                <span className="text-[9px] font-bold text-muted-foreground mt-1 notranslate" translate="no">{isEn ? `Class ${a.className}` : `${classNamesMap[a.className]} শ্রেণি`}</span>
-                                            </div>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-6 w-6 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => handleRemoveAllocation(record.teacherName, a.className, a.subjectName, allocationScope)}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    );
-                 })}
+            <div className="w-full">
+                {isLoading ? (
+                    <div className="text-center py-20 italic">তথ্য লোড হচ্ছে...</div>
+                ) : (
+                    <div className="overflow-x-auto border-2 border-black rounded-2xl bg-white shadow-xl">
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr className="bg-indigo-600 text-white border-b-2 border-black text-sm">
+                                    <th className="p-3.5 border-r-2 border-black text-center font-black w-16">ক্রমিক</th>
+                                    <th className="p-3.5 border-r-2 border-black text-left font-black w-60">শিক্ষকের নাম</th>
+                                    <th className="p-3.5 border-r-2 border-black text-left font-black">বণ্টনকৃত বিষয়সমূহ</th>
+                                    <th className="p-3.5 border-r-2 border-black text-center font-black w-24">মোট বিষয়</th>
+                                    <th className="p-3.5 text-center font-black w-28">অ্যাকশন</th>
+                                </tr>
+                            </thead>
+                            <TableBody>
+                                {allocations.map((record, rIdx) => {
+                                    const scopedAllocs = record.allocations.filter(a => (a.scope || 'main') === allocationScope);
+                                    return (
+                                        <TableRow
+                                            key={`${record.teacherName || 'teacher'}-${rIdx}`}
+                                            className={cn(
+                                                "border-b border-slate-300 hover:bg-indigo-50/40 transition-colors",
+                                                rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/60"
+                                            )}
+                                        >
+                                            <TableCell className="p-3 border-r-2 border-slate-300 text-center font-black text-xs">
+                                                {toBengaliNumber(rIdx + 1)}
+                                            </TableCell>
+                                            <TableCell className="p-3 border-r-2 border-slate-300 align-middle">
+                                                <div className="flex items-center gap-2.5">
+                                                    <Avatar className="h-8 w-8 border border-indigo-200 shrink-0">
+                                                        <AvatarFallback className="bg-indigo-100 text-indigo-900 font-black text-xs">
+                                                            {getTeacherDisplayName(record.teacherName).charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <span className="font-black text-sm text-slate-900 notranslate block" translate="no">
+                                                            {getTeacherDisplayName(record.teacherName)}
+                                                        </span>
+                                                        <Badge variant="outline" className={cn("text-[9px] py-0 px-1.5 font-bold", allocationScope === 'standalone' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-indigo-50 text-indigo-700 border-indigo-200")}>
+                                                            {allocationScope === 'standalone' ? 'স্বতন্ত্র' : 'মেইন'}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="p-3 border-r-2 border-slate-300 align-middle">
+                                                {scopedAllocs.length === 0 ? (
+                                                    <span className="text-xs text-muted-foreground italic font-medium">কোনো বিষয় বণ্টন করা হয়নি</span>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {scopedAllocs.map((a, idx) => (
+                                                            <span
+                                                                key={idx}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-950 group"
+                                                            >
+                                                                <span className="font-black text-blue-900">{a.subjectName}</span>
+                                                                <span className="text-[10px] text-slate-500 font-medium">
+                                                                    ({classNamesMap[a.className]} শ্রেণি)
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    title="মুছে ফেলুন"
+                                                                    onClick={() => handleRemoveAllocation(record.teacherName, a.className, a.subjectName, allocationScope)}
+                                                                    className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="p-3 border-r-2 border-slate-300 text-center align-middle font-black text-sm">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className={cn(
+                                                        "font-black text-xs px-2.5 py-0.5",
+                                                        scopedAllocs.length > 0 ? "bg-indigo-100 text-indigo-900" : "bg-slate-100 text-slate-500"
+                                                    )}
+                                                >
+                                                    {toBengaliNumber(scopedAllocs.length)}টি
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="p-3 text-center align-middle">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setSelectedTeacher(record.teacherName);
+                                                        openSubjectPopup();
+                                                    }}
+                                                    className="h-8 px-2.5 text-xs font-bold border-indigo-300 hover:bg-indigo-50 text-indigo-800"
+                                                >
+                                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-indigo-600" /> বিষয় বণ্টন
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );
