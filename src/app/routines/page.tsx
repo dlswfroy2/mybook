@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION } from '@/lib/routine-data';
+import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns } from '@/lib/routine-data';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { subjectNameNormalization as baseSubjectNameNormalization, getSubjects } from '@/lib/subjects';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
@@ -137,7 +138,7 @@ const parseSubjectTeacher = (cell: string): { subject: string, teacher: string |
     return { subject, teacher };
 };
 
-const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) => {
+const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>, columns: RoutineColumnConfig[] = DEFAULT_ROUTINE_COLUMNS) => {
     const analysis = useMemo(() => {
         const colorPalette = [
             '#FDEDEC', '#F5EEF8', '#EAF2F8', '#D6EAF8',
@@ -166,7 +167,8 @@ const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) =
 
         const days = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
         const classes = Object.keys(routine);
-        const periodsCount = 6;
+        const periodColumns = columns.filter(c => c.type === 'period');
+        const periodsCount = Math.max(periodColumns.length, 1);
 
         classes.forEach(cls => {
             days.forEach(day => {
@@ -200,11 +202,11 @@ const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) =
                     'বৃহস্পতিবার': { classes: [], before: 0, after: 0 } 
                 },
                 fullSchedule: {
-                    'রবিবার': Array(6).fill(''),
-                    'সোমবার': Array(6).fill(''),
-                    'মঙ্গলবার': Array(6).fill(''),
-                    'বুধবার': Array(6).fill(''),
-                    'বৃহস্পতিবার': Array(6).fill('')
+                    'রবিবার': Array(periodsCount).fill(''),
+                    'সোমবার': Array(periodsCount).fill(''),
+                    'মঙ্গলবার': Array(periodsCount).fill(''),
+                    'বুধবার': Array(periodsCount).fill(''),
+                    'বৃহস্পতিবার': Array(periodsCount).fill('')
                 }
             };
         });
@@ -214,10 +216,19 @@ const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) =
         sortedTeachers.forEach((teacher, index) => {
             teacherColorMap.set(teacher, colorPalette[index % colorPalette.length]);
         });
+
+        // Calculate break position
+        const breakIndexInColumns = columns.findIndex(c => c.type === 'break');
+        let periodBeforeBreak = -1;
+        let periodAfterBreak = -1;
+        if (breakIndexInColumns !== -1) {
+            periodBeforeBreak = columns.slice(0, breakIndexInColumns).filter(c => c.type === 'period').length - 1;
+            periodAfterBreak = periodBeforeBreak + 1;
+        }
         
         days.forEach(day => {
-            const teachersAt3rd = new Map<string, string[]>(); // Before break (index 2)
-            const teachersAt4th = new Map<string, string[]>(); // After break (index 3)
+            const teachersBeforeBreak = new Map<string, string[]>();
+            const teachersAfterBreak = new Map<string, string[]>();
 
             for (let periodIdx = 0; periodIdx < periodsCount; periodIdx++) {
                 const periodTeachers = new Map<string, string>();
@@ -242,12 +253,12 @@ const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) =
                                     periodTeachers.set(trimmedTeacher, cls);
                                 }
 
-                                if (periodIdx === 2) { 
-                                    if (!teachersAt3rd.has(trimmedTeacher)) teachersAt3rd.set(trimmedTeacher, []);
-                                    teachersAt3rd.get(trimmedTeacher)!.push(cls);
-                                } else if (periodIdx === 3) { 
-                                    if (!teachersAt4th.has(trimmedTeacher)) teachersAt4th.set(trimmedTeacher, []);
-                                    teachersAt4th.get(trimmedTeacher)!.push(cls);
+                                if (periodBeforeBreak >= 0 && periodIdx === periodBeforeBreak) { 
+                                    if (!teachersBeforeBreak.has(trimmedTeacher)) teachersBeforeBreak.set(trimmedTeacher, []);
+                                    teachersBeforeBreak.get(trimmedTeacher)!.push(cls);
+                                } else if (periodAfterBreak >= 0 && periodIdx === periodAfterBreak) { 
+                                    if (!teachersAfterBreak.has(trimmedTeacher)) teachersAfterBreak.set(trimmedTeacher, []);
+                                    teachersAfterBreak.get(trimmedTeacher)!.push(cls);
                                 }
                             })
                         }
@@ -255,13 +266,15 @@ const useRoutineAnalysis = (routine: Record<string, Record<string, string[]>>) =
                 });
             }
 
-            teachersAt3rd.forEach((classesBefore, teacher) => {
-                if (teachersAt4th.has(teacher)) {
-                    const classesAfter = teachersAt4th.get(teacher)!;
-                    classesBefore.forEach(cls => breakClashes.add(`${cls}-${day}-2`));
-                    classesAfter.forEach(cls => breakClashes.add(`${cls}-${day}-3`));
-                }
-            });
+            if (periodBeforeBreak >= 0 && periodAfterBreak >= 0) {
+                teachersBeforeBreak.forEach((classesBefore, teacher) => {
+                    if (teachersAfterBreak.has(teacher)) {
+                        const classesAfter = teachersAfterBreak.get(teacher)!;
+                        classesBefore.forEach(cls => breakClashes.add(`${cls}-${day}-${periodBeforeBreak}`));
+                        classesAfter.forEach(cls => breakClashes.add(`${cls}-${day}-${periodAfterBreak}`));
+                    }
+                });
+            }
         });
 
         classes.forEach(cls => {
@@ -1132,41 +1145,141 @@ const RoutineStatistics = ({ stats }: { stats: any }) => {
     );
 };
 
-const CombinedRoutineTable = ({ routineData, conflicts, isEditMode, onCellChange, teacherColorMap, isMounted }: { routineData: Record<string, Record<string, string[]>>, conflicts: any, isEditMode: boolean, onCellChange: (cls: string, day: string, periodIdx: number, value: string) => void, teacherColorMap: Map<string, string>, isMounted: boolean }) => {
+const CombinedRoutineTable = ({ 
+    routineData, 
+    conflicts, 
+    isEditMode, 
+    onCellChange, 
+    teacherColorMap, 
+    isMounted,
+    columns = DEFAULT_ROUTINE_COLUMNS,
+    onAddColumn,
+    onDeleteColumn,
+    onEditColumn
+}: { 
+    routineData: Record<string, Record<string, string[]>>, 
+    conflicts: any, 
+    isEditMode: boolean, 
+    onCellChange: (cls: string, day: string, periodIdx: number, value: string) => void, 
+    teacherColorMap: Map<string, string>, 
+    isMounted: boolean,
+    columns?: RoutineColumnConfig[],
+    onAddColumn?: (insertAfterIndex: number) => void,
+    onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void,
+    onEditColumn?: (col: RoutineColumnConfig, index: number) => void
+}) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const days = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
     const classes = ['6', '7', '8', '9', '10'];
-    const periods = [ 
-        { name: "১ম", time: "১০:৩০ - ১১:২০" }, 
-        { name: "২য়", time: "১১:২০ - ১২:১০" }, 
-        { name: "৩য়", time: "১২:১০ - ০১:০০" }
-    ];
-    const postBreakPeriods = [ 
-        { name: "৪র্থ", time: "০২:০০ - ০২:৪০" }, 
-        { name: "৫ম", time: "০২:৪০ - ৩:২০" }, 
-        { name: "৬ষ্ঠ", time: "০৩:২০ - ০৪:০০" } 
-    ];
+
+    let periodCounter = 0;
+    const columnsWithPeriodIdx = (columns || DEFAULT_ROUTINE_COLUMNS).map(col => {
+        if (col.type === 'period') {
+            const pIdx = periodCounter++;
+            return { ...col, periodIdx: pIdx };
+        }
+        return { ...col, periodIdx: -1 };
+    });
 
     return (
         <div className="overflow-x-auto w-full border-2 border-green-600 rounded-lg shadow-inner bg-white">
            <Table className="border-collapse w-full min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
                 <TableHeader>
-                   <TableRow className="bg-muted/50 h-14 print:h-8">
-                       <TableHead className="border-r font-bold align-middle text-center w-[100px] print:w-[60px] border-green-600 text-black">বার</TableHead>
-                       <TableHead className="border-r font-bold align-middle text-center w-[80px] print:w-[40px] border-green-600 text-black">শ্রেণি</TableHead>
-                       {periods.map(p => (
-                           <TableHead key={p.name} className="border-r text-center font-bold min-w-[110px] print:min-w-[70px] border-green-600 text-black">
-                               {p.name}<br/>
-                               <span className="font-normal text-[10px] text-muted-foreground print:hidden">{p.time}</span>
+                   <TableRow className="bg-muted/50 h-16 print:h-8">
+                       <TableHead className="border-r font-bold align-middle text-center w-[90px] print:w-[60px] border-green-600 text-black">
+                           বার
+                       </TableHead>
+                       <TableHead className="border-r font-bold align-middle text-center w-[85px] print:w-[40px] border-green-600 text-black p-1">
+                           <div className="flex flex-col items-center justify-between min-h-[58px] print:min-h-0">
+                               <span className="text-sm font-black text-slate-800 mt-1">শ্রেণি</span>
+                               {onAddColumn && (
+                                   <div className="mt-1 no-print pt-1 border-t border-slate-200/60 w-full flex justify-center">
+                                       <button
+                                           type="button"
+                                           onClick={() => onAddColumn(-1)}
+                                           className="h-5 px-1.5 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded flex items-center gap-0.5 border border-emerald-200 shadow-xs cursor-pointer"
+                                           title="১ম পিরিয়ডের আগে নতুন কলাম যোগ করুন"
+                                       >
+                                           <Plus className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                           <span>+ কলাম</span>
+                                       </button>
+                                   </div>
+                                )}
+                           </div>
+                       </TableHead>
+                       {columnsWithPeriodIdx.map((col, index) => {
+                           const isBreak = col.type === 'break';
+                           return (
+                               <TableHead 
+                                   key={col.id} 
+                                   className={cn(
+                                       "border-r text-center font-bold p-1 border-green-600",
+                                       isBreak ? "bg-amber-50 text-amber-900 min-w-[80px] print:w-[30px] print:text-[7px]" : "min-w-[115px] print:min-w-[70px] text-black"
+                                   )}
+                               >
+                                   <div className="flex flex-col items-center justify-between min-h-[58px] print:min-h-0">
+                                       <div className="w-full">
+                                           <span className={cn("text-sm font-black leading-tight block", isBreak ? "text-amber-900" : "text-slate-800")}>
+                                               {col.name}
+                                           </span>
+                                           {col.time && (
+                                               <span className={cn("font-medium text-[10px] print:hidden block mt-0.5", isBreak ? "text-amber-700/80" : "text-muted-foreground")}>
+                                                   {col.time}
+                                               </span>
+                                           )}
+                                       </div>
+                                       {(onAddColumn || onDeleteColumn || onEditColumn) && (
+                                           <div className="flex items-center justify-center gap-1 mt-1 no-print pt-1 border-t border-slate-200/60 w-full">
+                                               {onAddColumn && (
+                                                   <button
+                                                       type="button"
+                                                       onClick={() => onAddColumn(index)}
+                                                       className="h-5 px-1.5 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded flex items-center gap-0.5 border border-emerald-200 shadow-xs cursor-pointer"
+                                                       title="ডানে নতুন কলাম যোগ করুন"
+                                                   >
+                                                       <Plus className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                                       <span>যোগ</span>
+                                                   </button>
+                                               )}
+                                               {onEditColumn && (
+                                                   <button
+                                                       type="button"
+                                                       onClick={() => onEditColumn(col, index)}
+                                                       className="h-5 w-5 flex items-center justify-center bg-slate-50 hover:bg-slate-200 text-slate-600 rounded border border-slate-200 shadow-xs cursor-pointer"
+                                                       title="নাম ও সময় পরিবর্তন"
+                                                   >
+                                                       <FilePen className="w-2.5 h-2.5" />
+                                                   </button>
+                                               )}
+                                               {onDeleteColumn && (
+                                                   <button
+                                                       type="button"
+                                                       onClick={() => onDeleteColumn(col, index)}
+                                                       className="h-5 w-5 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded border border-rose-200 shadow-xs cursor-pointer"
+                                                       title="এই কলামটি মুছে ফেলুন"
+                                                   >
+                                                       <Trash2 className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                   </button>
+                                               )}
+                                           </div>
+                                       )}
+                                   </div>
+                               </TableHead>
+                           );
+                       })}
+                       {onAddColumn && (
+                           <TableHead className="w-20 border-r text-center font-bold border-green-600 align-middle no-print p-1 bg-emerald-50/40">
+                               <button
+                                   type="button"
+                                   onClick={() => onAddColumn(columns.length - 1)}
+                                   className="h-6 px-2 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded flex items-center gap-1 transition-colors shadow-xs mx-auto whitespace-nowrap cursor-pointer"
+                                   title="শেষে নতুন কলাম যোগ করুন"
+                               >
+                                   <Plus className="w-3 h-3 stroke-[3]" />
+                                   <span>+ কলাম</span>
+                               </button>
                            </TableHead>
-                       ))}
-                       <TableHead className="border-r text-center font-bold bg-amber-50 text-amber-900 w-[50px] print:w-[30px] print:text-[7px] border-green-600">বিরতি</TableHead>
-                       {postBreakPeriods.map(p => (
-                           <TableHead key={p.name} className="border-r text-center font-bold min-w-[110px] print:min-w-[70px] border-green-600 text-black">
-                               {p.name}<br/>
-                               <span className="font-normal text-[10px] text-muted-foreground print:hidden">{p.time}</span>
-                           </TableHead>
-                       ))}
+                       )}
                    </TableRow>
                </TableHeader>
                <TableBody>
@@ -1186,20 +1299,41 @@ const CombinedRoutineTable = ({ routineData, conflicts, isEditMode, onCellChange
                                     </TableCell>
                                )}
                                <TableCell className="font-bold border-r text-center bg-gray-50/50 print:bg-white text-xs print:text-[8px] border-green-600 notranslate" translate="no">{isEn ? `Class ${cls}` : classNamesMap[cls]}</TableCell>
-                               {[...Array(3)].map((_, periodIdx) => {
+                               {columnsWithPeriodIdx.map((col) => {
+                                   if (col.type === 'break') {
+                                       if (classIndex === 0) {
+                                           return (
+                                               <TableCell 
+                                                   key={col.id}
+                                                   className="border-r text-center bg-amber-50/30 font-black text-[11px] print:text-[8px] align-middle text-amber-800 border-green-600" 
+                                                   rowSpan={classes.length}
+                                               >
+                                                   <div className="[writing-mode:vertical-lr] rotate-180 py-4 print:py-1 tracking-widest uppercase">
+                                                       {col.time || col.name || 'টিফিন'}
+                                                   </div>
+                                               </TableCell>
+                                           );
+                                       }
+                                       return null;
+                                   }
+                                   const periodIdx = col.periodIdx;
                                    const cellContent = (routineData[cls]?.[day] || [])[periodIdx] || '';
-                                   return <EditableCell key={`${day}-${cls}-${periodIdx}`} content={cellContent} isEditMode={isEditMode} onCellChange={(value) => onCellChange(cls, day, periodIdx, value)} conflictKey={`${cls}-${day}-${periodIdx}`} conflicts={conflicts} teacherColorMap={teacherColorMap} isMounted={isMounted} />;
+                                   return (
+                                       <EditableCell 
+                                           key={`${day}-${cls}-${col.id}-${periodIdx}`} 
+                                           content={cellContent} 
+                                           isEditMode={isEditMode} 
+                                           onCellChange={(value) => onCellChange(cls, day, periodIdx, value)} 
+                                           conflictKey={`${cls}-${day}-${periodIdx}`} 
+                                           conflicts={conflicts} 
+                                           teacherColorMap={teacherColorMap} 
+                                           isMounted={isMounted} 
+                                       />
+                                   );
                                })}
-                               {classIndex === 0 && (
-                                    <TableCell className="border-r text-center bg-amber-50/30 font-black text-[11px] print:text-[8px] align-middle text-amber-800 border-green-600" rowSpan={classes.length}>
-                                        <div className="[writing-mode:vertical-lr] rotate-180 py-4 print:py-1 tracking-widest uppercase">টিফিন</div>
-                                    </TableCell>
+                               {onAddColumn && (
+                                   <TableCell className="border-r text-center align-middle no-print bg-slate-50/30 p-0 border-green-600" />
                                )}
-                               {[...Array(3)].map((_, i) => {
-                                   const periodIdx = i + 3;
-                                   const cellContent = (routineData[cls]?.[day] || [])[periodIdx] || '';
-                                   return <EditableCell key={`${day}-${cls}-${periodIdx}`} content={cellContent} isEditMode={isEditMode} onCellChange={(value) => onCellChange(cls, day, periodIdx, value)} conflictKey={`${cls}-${day}-${periodIdx}`} conflicts={conflicts} teacherColorMap={teacherColorMap} isMounted={isMounted} />;
-                               })}
                            </TableRow>
                        ))
                    ))}
@@ -1303,9 +1437,29 @@ export default function RoutinesPage() {
     const { toast } = useToast();
     const [originalRoutineData, setOriginalRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
+    const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
+
+    // Dialog state for adding column
+    const [addColumnDialogOpen, setAddColumnDialogOpen] = useState(false);
+    const [targetInsertIndex, setTargetInsertIndex] = useState<number>(-1);
+    const [newColType, setNewColType] = useState<'period' | 'break'>('period');
+    const [newColName, setNewColName] = useState('');
+    const [newColTime, setNewColTime] = useState('');
+
+    // Dialog state for editing column
+    const [editColumnDialogOpen, setEditColumnDialogOpen] = useState(false);
+    const [editingCol, setEditingCol] = useState<RoutineColumnConfig | null>(null);
+    const [editingColIndex, setEditingColIndex] = useState<number>(-1);
+    const [editColName, setEditColName] = useState('');
+    const [editColTime, setEditColTime] = useState('');
+
+    // Dialog state for deleting column
+    const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
+    const [deletingCol, setDeletingCol] = useState<RoutineColumnConfig | null>(null);
+    const [deletingColIndex, setDeletingColIndex] = useState<number>(-1);
 
     const [targetYear, setTargetYear] = useState('');
     const { schoolInfo } = useSchoolInfo();
@@ -1321,22 +1475,25 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
-            getStaff(db)
+            getStaff(db),
+            getRoutineColumns(db, selectedYear)
         ]);
         setAllStaff(staffData);
+        setColumns(colsFromDb);
         
+        const numPeriods = colsFromDb.filter(c => c.type === 'period').length || 6;
         const transformedData: Record<string, Record<string, string[]>> = {};
         routinesFromDb.forEach(r => {
             if (!transformedData[r.className]) {
                 transformedData[r.className] = {};
             }
-            const periods = r.periods || [];
-            while (periods.length < 6) {
+            const periods = [...(r.periods || [])];
+            while (periods.length < numPeriods) {
                 periods.push('');
             }
-            transformedData[r.className][r.day] = periods.slice(0, 6);
+            transformedData[r.className][r.day] = periods.slice(0, numPeriods);
         });
         setRoutineData(transformedData);
         setOriginalRoutineData(transformedData);
@@ -1354,7 +1511,7 @@ export default function RoutinesPage() {
         }
     }, [isClient]);
 
-    const { conflicts, stats, teacherColorMap } = useRoutineAnalysis(routineData);
+    const { conflicts, stats, teacherColorMap } = useRoutineAnalysis(routineData, columns);
     
     // Allow managers and admins to see conflicts
     const displayConflicts = (isAdmin || canManageRoutines) ? conflicts : {
@@ -1368,39 +1525,158 @@ export default function RoutinesPage() {
     const handleCellChange = (className: string, day: string, periodIndex: number, value: string) => {
         setRoutineData(prevData => {
             const newData = JSON.parse(JSON.stringify(prevData));
+            const numPeriods = columns.filter(c => c.type === 'period').length || 6;
             if (!newData[className]) newData[className] = {};
-            if (!newData[className][day]) newData[className][day] = Array(6).fill('');
+            if (!newData[className][day]) newData[className][day] = Array(numPeriods).fill('');
             newData[className][day][periodIndex] = value;
             return newData;
         });
     };
 
-    const handleSaveChanges = () => {
+    const openAddColumn = (insertAfterIndex: number) => {
+        setTargetInsertIndex(insertAfterIndex);
+        setNewColType('period');
+        
+        const currentPeriodCount = columns.filter(c => c.type === 'period').length;
+        const ordinals = ['১ম', '২য়', '৩য়', '৪র্থ', '৫ম', '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম', '১১তম', '১২তম'];
+        const suggestedName = ordinals[currentPeriodCount] || `${toBengaliNumber(currentPeriodCount + 1)}ম`;
+        
+        const times = [
+            '১০:০০ - ১১:২০',
+            '১১:২০ - ১২:১০',
+            '১২:১০ - ০১:০০',
+            '০২:০০ - ০২:৪০',
+            '০২:৪০ - ৩:২০',
+            '০৩:২০ - ০৪:০০',
+            '০৪:০০ - ০৪:৪০',
+            '০৪:৪০ - ০৫:২০'
+        ];
+        const suggestedTime = times[currentPeriodCount] || '';
+        
+        setNewColName(suggestedName);
+        setNewColTime(suggestedTime);
+        setAddColumnDialogOpen(true);
+    };
+
+    const submitAddColumn = () => {
+        if (!newColName.trim()) {
+            toast({ variant: 'destructive', title: 'অনুগ্রহ করে কলামের নাম লিখুন।' });
+            return;
+        }
+        const targetIndex = targetInsertIndex + 1; // if -1, insert at 0
+        const newCol: RoutineColumnConfig = {
+            id: `col_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            name: newColName.trim(),
+            time: newColTime.trim(),
+            type: newColType
+        };
+
+        if (newColType === 'period') {
+            const newPeriodIdx = columns.slice(0, targetIndex).filter(c => c.type === 'period').length;
+            setRoutineData(prevData => {
+                const nextData = JSON.parse(JSON.stringify(prevData));
+                Object.keys(nextData).forEach(cls => {
+                    Object.keys(nextData[cls]).forEach(day => {
+                        if (Array.isArray(nextData[cls][day])) {
+                            nextData[cls][day].splice(newPeriodIdx, 0, '');
+                        }
+                    });
+                });
+                return nextData;
+            });
+        }
+
+        const nextCols = [...columns];
+        nextCols.splice(targetIndex, 0, newCol);
+        setColumns(nextCols);
+        setIsEditMode(true);
+        setAddColumnDialogOpen(false);
+        toast({ title: `"${newCol.name}" কলাম যোগ করা হয়েছে। পরিবর্তন সেভ করতে 'সেভ করুন' বাটনে ক্লিক করুন।` });
+    };
+
+    const openEditColumn = (col: RoutineColumnConfig, index: number) => {
+        setEditingCol(col);
+        setEditingColIndex(index);
+        setEditColName(col.name);
+        setEditColTime(col.time || '');
+        setEditColumnDialogOpen(true);
+    };
+
+    const submitEditColumn = () => {
+        if (!editColName.trim() || editingColIndex < 0) return;
+        const nextCols = [...columns];
+        nextCols[editingColIndex] = {
+            ...nextCols[editingColIndex],
+            name: editColName.trim(),
+            time: editColTime.trim()
+        };
+        setColumns(nextCols);
+        setIsEditMode(true);
+        setEditColumnDialogOpen(false);
+        toast({ title: 'কলামের নাম ও সময় আপডেট করা হয়েছে।' });
+    };
+
+    const openDeleteColumn = (col: RoutineColumnConfig, index: number) => {
+        setDeletingCol(col);
+        setDeletingColIndex(index);
+        setDeleteColumnDialogOpen(true);
+    };
+
+    const confirmDeleteColumn = () => {
+        if (!deletingCol || deletingColIndex < 0) return;
+        
+        if (deletingCol.type === 'period') {
+            const periodIdx = columns.slice(0, deletingColIndex).filter(c => c.type === 'period').length;
+            setRoutineData(prevData => {
+                const nextData = JSON.parse(JSON.stringify(prevData));
+                Object.keys(nextData).forEach(cls => {
+                    Object.keys(nextData[cls]).forEach(day => {
+                        if (Array.isArray(nextData[cls][day])) {
+                            nextData[cls][day].splice(periodIdx, 1);
+                        }
+                    });
+                });
+                return nextData;
+            });
+        }
+
+        const nextCols = columns.filter((_, idx) => idx !== deletingColIndex);
+        setColumns(nextCols);
+        setIsEditMode(true);
+        setDeleteColumnDialogOpen(false);
+        toast({ title: `"${deletingCol.name}" কলামটি মুছে ফেলা হয়েছে।` });
+    };
+
+    const handleSaveChanges = async () => {
         if (!db) return;
         if (!canManageRoutines) {
             toast({ variant: 'destructive', title: 'দুঃখিত, আপনার এটি করার অনুমতি নেই।' });
             return;
         }
         
-        const routinesToSave: ClassRoutine[] = [];
-        Object.keys(routineData).forEach(className => {
-            Object.keys(routineData[className]).forEach(day => {
-                routinesToSave.push({
-                    academicYear: selectedYear,
-                    className,
-                    day,
-                    periods: routineData[className][day]
+        try {
+            await saveRoutineColumns(db, selectedYear, columns);
+
+            const routinesToSave: ClassRoutine[] = [];
+            Object.keys(routineData).forEach(className => {
+                Object.keys(routineData[className]).forEach(day => {
+                    routinesToSave.push({
+                        academicYear: selectedYear,
+                        className,
+                        day,
+                        periods: routineData[className][day]
+                    });
                 });
             });
-        });
 
-        saveRoutinesBatch(db, routinesToSave).then(() => {
-            toast({ title: 'রুটিন সেভ হয়েছে' });
+            await saveRoutinesBatch(db, routinesToSave);
+            toast({ title: 'রুটিন ও কলাম সফলভাবে সেভ হয়েছে' });
             setIsEditMode(false);
             setOriginalRoutineData(routineData);
-        }).catch(() => {
+        } catch (e) {
+            console.error(e);
             toast({ variant: 'destructive', title: 'সেভ করা যায়নি' });
-        });
+        }
     };
 
     const handleCopyRoutine = async () => {
@@ -1411,6 +1687,7 @@ export default function RoutinesPage() {
 
         setIsLoading(true);
         try {
+            await saveRoutineColumns(db, targetYear, columns);
             const batch = writeBatch(db);
             const currentRoutines = await getFullRoutine(db, selectedYear);
             
@@ -1437,13 +1714,14 @@ export default function RoutinesPage() {
         
         setIsLoading(true);
         try {
+            const numPeriods = columns.filter(c => c.type === 'period').length || 6;
             const batch = writeBatch(db);
             const currentRoutines = await getFullRoutine(db, selectedYear);
             
             currentRoutines.forEach(r => {
                 const docId = `${selectedYear}_${r.className}_${r.day}`;
                 const docRef = doc(db, ROUTINE_COLLECTION, docId);
-                batch.update(docRef, { periods: Array(6).fill('') });
+                batch.update(docRef, { periods: Array(numPeriods).fill('') });
             });
 
             await batch.commit();
@@ -1543,7 +1821,11 @@ export default function RoutinesPage() {
                                                 isEditMode={isEditMode} 
                                                 onCellChange={handleCellChange} 
                                                 teacherColorMap={teacherColorMap} 
-                                                isMounted={isMounted} 
+                                                isMounted={isMounted}
+                                                columns={columns}
+                                                onAddColumn={openAddColumn}
+                                                onDeleteColumn={openDeleteColumn}
+                                                onEditColumn={openEditColumn}
                                             />
                                         </div>
                                     )}
@@ -1580,6 +1862,167 @@ export default function RoutinesPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Dialog: নতুন কলাম যোগ */}
+                <Dialog open={addColumnDialogOpen} onOpenChange={setAddColumnDialogOpen}>
+                    <DialogContent className="sm:max-w-md font-kalpurush">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-emerald-600 stroke-[3]" />
+                                নতুন কলাম যোগ করুন
+                            </DialogTitle>
+                            <DialogDescription className="text-xs font-bold text-muted-foreground">
+                                {targetInsertIndex === -1 ? 'টেবিলের শুরুতে (১ম পিরিয়ডের আগে) যোগ হবে' : `‘${columns[targetInsertIndex]?.name}’ কলামের ঠিক ডানে নতুন কলাম যোগ হবে`}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">কলামের ধরণ:</Label>
+                                <div className="grid grid-cols-2 gap-2 mt-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setNewColType('period');
+                                            const currentPeriodCount = columns.filter(c => c.type === 'period').length;
+                                            const ordinals = ['১ম', '২য়', '৩য়', '৪র্থ', '৫ম', '৬ষ্ঠ', '৭ম', '৮ম', '৯ম', '১০ম', '১১তম', '১২তম'];
+                                            setNewColName(ordinals[currentPeriodCount] || `${toBengaliNumber(currentPeriodCount + 1)}ম`);
+                                        }}
+                                        className={cn(
+                                            "py-2 px-3 rounded-lg border-2 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer",
+                                            newColType === 'period' ? "border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <CalendarClock className="w-4 h-4 text-emerald-600" />
+                                        পিরিয়ড (ক্লাস)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setNewColType('break');
+                                            setNewColName('বিরতি');
+                                            setNewColTime('টিফিন');
+                                        }}
+                                        className={cn(
+                                            "py-2 px-3 rounded-lg border-2 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer",
+                                            newColType === 'break' ? "border-amber-600 bg-amber-50 text-amber-800 shadow-sm" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <span className="text-base">☕</span>
+                                        বিরতি (টিফিন)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">কলামের নাম:</Label>
+                                <Input
+                                    value={newColName}
+                                    onChange={(e) => setNewColName(e.target.value)}
+                                    placeholder="যেমন: ৬ষ্ঠ, ৭ম, বিশেষ ক্লাস..."
+                                    className="font-bold text-sm mt-1"
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">
+                                    {newColType === 'period' ? 'পিরিয়ডের সময় (ঐচ্ছিক):' : 'বিরতির শিরোনাম বা সময় (ঐচ্ছিক):'}
+                                </Label>
+                                <Input
+                                    value={newColTime}
+                                    onChange={(e) => setNewColTime(e.target.value)}
+                                    placeholder="যেমন: ০৩:২০ - ০৪:০০"
+                                    className="font-bold text-sm mt-1"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={() => setAddColumnDialogOpen(false)} className="font-bold">
+                                বাতিল
+                            </Button>
+                            <Button onClick={submitAddColumn} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md">
+                                <Plus className="w-4 h-4 mr-1 stroke-[3]" />
+                                কলাম যোগ করুন
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Dialog: কলামের নাম ও সময় সম্পাদনা */}
+                <Dialog open={editColumnDialogOpen} onOpenChange={setEditColumnDialogOpen}>
+                    <DialogContent className="sm:max-w-md font-kalpurush">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <FilePen className="w-5 h-5 text-primary" />
+                                কলামের নাম ও সময় সম্পাদনা
+                            </DialogTitle>
+                            <DialogDescription className="text-xs font-bold text-muted-foreground">
+                                এই কলামের শিরোনাম ও সময় পরিবর্তন করুন
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">কলামের নাম:</Label>
+                                <Input
+                                    value={editColName}
+                                    onChange={(e) => setEditColName(e.target.value)}
+                                    placeholder="কলামের নাম"
+                                    className="font-bold text-sm mt-1"
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">সময়:</Label>
+                                <Input
+                                    value={editColTime}
+                                    onChange={(e) => setEditColTime(e.target.value)}
+                                    placeholder="যেমন: ১০:০০ - ১১:২০"
+                                    className="font-bold text-sm mt-1"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={() => setEditColumnDialogOpen(false)} className="font-bold">
+                                বাতিল
+                            </Button>
+                            <Button onClick={submitEditColumn} className="bg-primary text-white font-black shadow-md">
+                                আপডেট করুন
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* AlertDialog: কলাম ডিলিট নিশ্চিতকরণ */}
+                <AlertDialog open={deleteColumnDialogOpen} onOpenChange={setDeleteColumnDialogOpen}>
+                    <AlertDialogContent className="font-kalpurush">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-xl font-black text-rose-600 flex items-center gap-2">
+                                <Trash2 className="w-5 h-5 stroke-[2.5]" />
+                                কলামটি কি মুছে ফেলতে চান?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-sm font-bold text-slate-700 mt-2">
+                                আপনি কি নিশ্চিত যে <span className="text-black font-black underline">"{deletingCol?.name}"</span> কলামটি মুছে ফেলতে চান?
+                                {deletingCol?.type === 'period' && (
+                                    <span className="block text-rose-600 font-bold mt-1">
+                                        সতর্কতা: এই পিরিয়ডের অন্তর্ভুক্ত সকল শ্রেণির ক্লাস তথ্য মুছে যাবে।
+                                    </span>
+                                )}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+                            <AlertDialogAction 
+                                onClick={confirmDeleteColumn}
+                                className="bg-rose-600 hover:bg-rose-700 text-white font-black shadow-md"
+                            >
+                                হ্যাঁ, মুছে ফেলুন
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </main>
 
             <div className="printable-area routine-print-container text-black bg-white hidden print:flex p-10 flex-col font-kalpurush">
@@ -1598,7 +2041,8 @@ export default function RoutinesPage() {
                         isEditMode={false} 
                         onCellChange={() => {}} 
                         teacherColorMap={teacherColorMap} 
-                        isMounted={isMounted} 
+                        isMounted={isMounted}
+                        columns={columns}
                     />
                 </div>
                 <footer className="mt-12 flex justify-between border-t-2 border-black pt-4">

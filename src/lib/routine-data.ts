@@ -2,6 +2,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   query,
@@ -13,12 +14,65 @@ import {
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
+export interface RoutineColumnConfig {
+  id: string;
+  type: 'period' | 'break';
+  name: string;
+  time?: string;
+}
+
+export const DEFAULT_ROUTINE_COLUMNS: RoutineColumnConfig[] = [
+  { id: 'p1', type: 'period', name: '১ম', time: '১০:০০ - ১১:২০' },
+  { id: 'p2', type: 'period', name: '২য়', time: '১১:২০ - ১২:১০' },
+  { id: 'p3', type: 'period', name: '৩য়', time: '১২:১০ - ০১:০০' },
+  { id: 'break', type: 'break', name: 'বিরতি', time: 'টিফিন' },
+  { id: 'p4', type: 'period', name: '৪র্থ', time: '০২:০০ - ০২:৪০' },
+  { id: 'p5', type: 'period', name: '৫ম', time: '০২:৪০ - ৩:২০' },
+  { id: 'p6', type: 'period', name: '৬ষ্ঠ', time: '০৩:২০ - ০৪:০০' },
+];
+
+export const getRoutineColumns = async (db: Firestore, academicYear: string): Promise<RoutineColumnConfig[]> => {
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(`routine_columns_${academicYear}`);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+  }
+  if (!db) return DEFAULT_ROUTINE_COLUMNS;
+  try {
+    const docRef = doc(db, ROUTINE_COLLECTION, `columns_${academicYear}`);
+    const snap = await getDoc(docRef);
+    if (snap.exists() && snap.data().columns) {
+      const cols = snap.data().columns as RoutineColumnConfig[];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`routine_columns_${academicYear}`, JSON.stringify(cols));
+      }
+      return cols;
+    }
+  } catch (e) {
+    console.error('Error fetching routine columns:', e);
+  }
+  return DEFAULT_ROUTINE_COLUMNS;
+};
+
+export const saveRoutineColumns = async (db: Firestore, academicYear: string, columns: RoutineColumnConfig[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(`routine_columns_${academicYear}`, JSON.stringify(columns));
+  }
+  if (!db) return;
+  const docRef = doc(db, ROUTINE_COLLECTION, `columns_${academicYear}`);
+  await setDoc(docRef, { academicYear, columns, updatedAt: new Date().toISOString() }, { merge: true });
+};
+
 export interface ClassRoutine {
   id?: string;
   academicYear: string;
   className: string;
   day: string; // রবিবার, সোমবার, etc.
-  periods: string[]; // Array of 7 strings like "Subject - Teacher"
+  periods: string[]; // Array of strings like "Subject - Teacher"
 }
 
 export const ROUTINE_COLLECTION = 'classRoutines';
