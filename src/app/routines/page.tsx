@@ -2316,6 +2316,15 @@ export default function RoutinesPage() {
     const [originalRoutineData, setOriginalRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
+
+    const activeColumns = useMemo(() => {
+        if (routineScope === 'standalone' && standaloneRoutine) {
+            return standaloneRoutine.columns && standaloneRoutine.columns.length > 0
+                ? standaloneRoutine.columns
+                : DEFAULT_ROUTINE_COLUMNS;
+        }
+        return columns;
+    }, [routineScope, standaloneRoutine, columns]);
     const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
     const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>('day');
     const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>('main');
@@ -2481,7 +2490,30 @@ export default function RoutinesPage() {
         };
 
         if (newColType === 'period') {
-            const newPeriodIdx = columns.slice(0, targetIndex).filter(c => c.type === 'period').length;
+            const newPeriodIdx = activeColumns.slice(0, targetIndex).filter(c => c.type === 'period').length;
+            if (routineScope === 'standalone' && standaloneRoutine) {
+                setStandaloneRoutine(prev => {
+                    if (!prev) return prev;
+                    const nextDayData: Record<string, string[]> = {};
+                    Object.entries(prev.dayData || {}).forEach(([day, arr]) => {
+                        const copy = Array.isArray(arr) ? [...arr] : [];
+                        copy.splice(newPeriodIdx, 0, '');
+                        nextDayData[day] = copy;
+                    });
+                    const nextDateRows = (prev.dateRows || []).map(r => {
+                        const copy = Array.isArray(r.periods) ? [...r.periods] : [];
+                        copy.splice(newPeriodIdx, 0, '');
+                        return { ...r, periods: copy };
+                    });
+                    const nextCols = [...(prev.columns && prev.columns.length > 0 ? prev.columns : DEFAULT_ROUTINE_COLUMNS)];
+                    nextCols.splice(targetIndex, 0, newCol);
+                    return { ...prev, columns: nextCols, dayData: nextDayData, dateRows: nextDateRows };
+                });
+                setIsEditMode(true);
+                setAddColumnDialogOpen(false);
+                toast({ title: `"${newCol.name}" কলাম স্বতন্ত্র রুটিনে যোগ করা হয়েছে। পরিবর্তন সেভ করতে 'সেভ করুন' বাটনে ক্লিক করুন।` });
+                return;
+            }
             setRoutineData(prevData => {
                 const nextData = JSON.parse(JSON.stringify(prevData));
                 Object.keys(nextData).forEach(cls => {
@@ -2493,6 +2525,28 @@ export default function RoutinesPage() {
                 });
                 return nextData;
             });
+            setDateRoutineRows(prevRows =>
+                prevRows.map(r => {
+                    const nextClasses: Record<string, string[]> = {};
+                    Object.entries(r.classes || {}).forEach(([cls, arr]) => {
+                        const copy = Array.isArray(arr) ? [...arr] : [];
+                        copy.splice(newPeriodIdx, 0, '');
+                        nextClasses[cls] = copy;
+                    });
+                    return { ...r, classes: nextClasses };
+                })
+            );
+        } else if (routineScope === 'standalone' && standaloneRoutine) {
+            setStandaloneRoutine(prev => {
+                if (!prev) return prev;
+                const nextCols = [...(prev.columns && prev.columns.length > 0 ? prev.columns : DEFAULT_ROUTINE_COLUMNS)];
+                nextCols.splice(targetIndex, 0, newCol);
+                return { ...prev, columns: nextCols };
+            });
+            setIsEditMode(true);
+            setAddColumnDialogOpen(false);
+            toast({ title: `"${newCol.name}" কলাম স্বতন্ত্র রুটিনে যোগ করা হয়েছে।` });
+            return;
         }
 
         const nextCols = [...columns];
@@ -2513,6 +2567,22 @@ export default function RoutinesPage() {
 
     const submitEditColumn = () => {
         if (!editColName.trim() || editingColIndex < 0) return;
+        if (routineScope === 'standalone' && standaloneRoutine) {
+            setStandaloneRoutine(prev => {
+                if (!prev) return prev;
+                const nextCols = [...(prev.columns && prev.columns.length > 0 ? prev.columns : DEFAULT_ROUTINE_COLUMNS)];
+                nextCols[editingColIndex] = {
+                    ...nextCols[editingColIndex],
+                    name: editColName.trim(),
+                    time: editColTime.trim()
+                };
+                return { ...prev, columns: nextCols };
+            });
+            setIsEditMode(true);
+            setEditColumnDialogOpen(false);
+            toast({ title: 'স্বতন্ত্র রুটিনের কলামের নাম ও সময় আপডেট করা হয়েছে।' });
+            return;
+        }
         const nextCols = [...columns];
         nextCols[editingColIndex] = {
             ...nextCols[editingColIndex],
@@ -2533,6 +2603,35 @@ export default function RoutinesPage() {
 
     const confirmDeleteColumn = () => {
         if (!deletingCol || deletingColIndex < 0) return;
+
+        if (routineScope === 'standalone' && standaloneRoutine) {
+            const baseCols = standaloneRoutine.columns && standaloneRoutine.columns.length > 0 ? standaloneRoutine.columns : DEFAULT_ROUTINE_COLUMNS;
+            const periodIdx = deletingCol.type === 'period' ? baseCols.slice(0, deletingColIndex).filter(c => c.type === 'period').length : -1;
+            setStandaloneRoutine(prev => {
+                if (!prev) return prev;
+                const nextCols = (prev.columns && prev.columns.length > 0 ? prev.columns : DEFAULT_ROUTINE_COLUMNS).filter((_, idx) => idx !== deletingColIndex);
+                let nextDayData = prev.dayData || {};
+                let nextDateRows = prev.dateRows || [];
+                if (periodIdx >= 0) {
+                    nextDayData = {};
+                    Object.entries(prev.dayData || {}).forEach(([day, arr]) => {
+                        const copy = Array.isArray(arr) ? [...arr] : [];
+                        copy.splice(periodIdx, 1);
+                        nextDayData[day] = copy;
+                    });
+                    nextDateRows = (prev.dateRows || []).map(r => {
+                        const copy = Array.isArray(r.periods) ? [...r.periods] : [];
+                        copy.splice(periodIdx, 1);
+                        return { ...r, periods: copy };
+                    });
+                }
+                return { ...prev, columns: nextCols, dayData: nextDayData, dateRows: nextDateRows };
+            });
+            setIsEditMode(true);
+            setDeleteColumnDialogOpen(false);
+            toast({ title: `"${deletingCol.name}" কলামটি স্বতন্ত্র রুটিন থেকে মুছে ফেলা হয়েছে।` });
+            return;
+        }
         
         if (deletingCol.type === 'period') {
             const periodIdx = columns.slice(0, deletingColIndex).filter(c => c.type === 'period').length;
@@ -2547,6 +2646,17 @@ export default function RoutinesPage() {
                 });
                 return nextData;
             });
+            setDateRoutineRows(prevRows =>
+                prevRows.map(r => {
+                    const nextClasses: Record<string, string[]> = {};
+                    Object.entries(r.classes || {}).forEach(([cls, arr]) => {
+                        const copy = Array.isArray(arr) ? [...arr] : [];
+                        copy.splice(periodIdx, 1);
+                        nextClasses[cls] = copy;
+                    });
+                    return { ...r, classes: nextClasses };
+                })
+            );
         }
 
         const nextCols = columns.filter((_, idx) => idx !== deletingColIndex);
@@ -2564,14 +2674,17 @@ export default function RoutinesPage() {
         }
         
         try {
-            await saveRoutineColumns(db, selectedYear, columns);
-
             if (routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine) {
-                await saveStandaloneRoutine(db, standaloneRoutine);
+                await saveStandaloneRoutine(db, {
+                    ...standaloneRoutine,
+                    columns: activeColumns,
+                });
                 toast({ title: `${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিন আলাদাভাবে সেভ হয়েছে` });
                 setIsEditMode(false);
                 return;
             }
+
+            await saveRoutineColumns(db, selectedYear, columns);
 
             if (routineFormat === 'date') {
                 await saveDateRoutine(db, selectedYear, dateRoutineRows);
@@ -2875,7 +2988,7 @@ export default function RoutinesPage() {
                                                     }
                                                     selectedClass={selectedClassFilter}
                                                     isEditMode={isEditMode}
-                                                    columns={columns}
+                                                    columns={activeColumns}
                                                     teacherColorMap={teacherColorMap}
                                                     isMounted={isMounted}
                                                     allocationsList={allocationsList}
@@ -2894,7 +3007,7 @@ export default function RoutinesPage() {
                                                         }
                                                     }}
                                                     onCellChange={(rowId, cls, periodIdx, value) => {
-                                                        const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                        const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
                                                         if (routineScope === 'standalone') {
                                                             setStandaloneRoutine(prev => {
                                                                 if (!prev) return prev;
@@ -2922,7 +3035,7 @@ export default function RoutinesPage() {
                                                         }
                                                     }}
                                                     onAddRow={() => {
-                                                        const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                        const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
                                                         const newId = `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
                                                         const getNextDateStr = (lastDateStr?: string) => {
                                                             if (!lastDateStr) return format(new Date(), 'yyyy-MM-dd');
@@ -2977,7 +3090,7 @@ export default function RoutinesPage() {
                                                     isEditMode={isEditMode} 
                                                     onCellChange={(cls, day, periodIdx, value) => {
                                                         if (routineScope === 'standalone') {
-                                                            const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                            const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
                                                             setStandaloneRoutine(prev => {
                                                                 if (!prev) return prev;
                                                                 const nextDayData = { ...(prev.dayData || {}) };
@@ -2993,7 +3106,7 @@ export default function RoutinesPage() {
                                                     }} 
                                                     teacherColorMap={teacherColorMap} 
                                                     isMounted={isMounted}
-                                                    columns={columns}
+                                                    columns={activeColumns}
                                                     onAddColumn={openAddColumn}
                                                     onDeleteColumn={openDeleteColumn}
                                                     onEditColumn={openEditColumn}
@@ -3201,9 +3314,9 @@ export default function RoutinesPage() {
 
             {(() => {
                 const MAX_PRINT_COLS = 7;
-                const colPages: RoutineColumn[][] = [];
-                for (let i = 0; i < columns.length; i += MAX_PRINT_COLS) {
-                    colPages.push(columns.slice(i, i + MAX_PRINT_COLS));
+                const colPages: RoutineColumnConfig[][] = [];
+                for (let i = 0; i < activeColumns.length; i += MAX_PRINT_COLS) {
+                    colPages.push(activeColumns.slice(i, i + MAX_PRINT_COLS));
                 }
                 if (colPages.length === 0) colPages.push([]);
 
@@ -3222,7 +3335,7 @@ export default function RoutinesPage() {
                 const activeClasses = selectedClassFilter === 'all' ? ['6', '7', '8', '9', '10'] : [selectedClassFilter];
                 const activeDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার'];
 
-                const estimatePageZoom = (pageCols: RoutineColumn[]) => {
+                const estimatePageZoom = (pageCols: RoutineColumnConfig[]) => {
                     const colCount = Math.max(1, pageCols.length);
                     const approxCharsPerLine = Math.max(12, Math.floor(24 * (7 / colCount)));
                     let totalRowHeight = 36; // table header
@@ -3234,7 +3347,7 @@ export default function RoutinesPage() {
                                 const periods = r.classes?.[cls] || [];
                                 let maxLines = 2;
                                 pageCols.forEach(col => {
-                                    const origIdx = columns.findIndex(c => c.id === col.id);
+                                    const origIdx = activeColumns.findIndex(c => c.id === col.id);
                                     const cell = periods[origIdx] || '';
                                     if (cell) {
                                         const lines = Math.ceil(cell.length / approxCharsPerLine);
@@ -3250,7 +3363,7 @@ export default function RoutinesPage() {
                                 const periods = activeDayData?.[cls]?.[day] || [];
                                 let maxLines = 1;
                                 pageCols.forEach(col => {
-                                    const origIdx = columns.findIndex(c => c.id === col.id);
+                                    const origIdx = activeColumns.findIndex(c => c.id === col.id);
                                     const cell = periods[origIdx] || '';
                                     if (cell) {
                                         const lines = Math.ceil(cell.length / approxCharsPerLine);
@@ -3266,9 +3379,9 @@ export default function RoutinesPage() {
                     return Math.max(0.32, Math.min(0.95, 650 / estHeight));
                 };
 
-                const remapRowPeriods = (periods: string[], pageCols: RoutineColumn[]) =>
+                const remapRowPeriods = (periods: string[], pageCols: RoutineColumnConfig[]) =>
                     pageCols.map(col => {
-                        const origIdx = columns.findIndex(c => c.id === col.id);
+                        const origIdx = activeColumns.findIndex(c => c.id === col.id);
                         return origIdx >= 0 ? (periods[origIdx] || '') : '';
                     });
 

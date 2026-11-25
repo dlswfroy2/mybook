@@ -252,18 +252,33 @@ export interface StandaloneClassRoutine {
     className: string;
     academicYear: string;
     title?: string;
+    columns?: RoutineColumnConfig[];
     dayData: Record<string, string[]>;
     dateRows: StandaloneDateRow[];
 }
 
 export const getStandaloneRoutine = async (db: Firestore, academicYear: string, className: string): Promise<StandaloneClassRoutine> => {
-    const empty: StandaloneClassRoutine = { className, academicYear, title: '', dayData: {}, dateRows: [] };
+    const empty: StandaloneClassRoutine = {
+        className,
+        academicYear,
+        title: '',
+        columns: JSON.parse(JSON.stringify(DEFAULT_ROUTINE_COLUMNS)),
+        dayData: {},
+        dateRows: [],
+    };
     const localKey = `standalone_routine_${academicYear}_${className}`;
     if (!db) {
         if (typeof window !== 'undefined') {
             try {
                 const raw = localStorage.getItem(localKey);
-                if (raw) return { ...empty, ...JSON.parse(raw) };
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    return {
+                        ...empty,
+                        ...parsed,
+                        columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : empty.columns,
+                    };
+                }
             } catch {}
         }
         return empty;
@@ -277,6 +292,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                 className,
                 academicYear,
                 title: d.title || '',
+                columns: Array.isArray(d.columns) && d.columns.length > 0 ? d.columns : empty.columns,
                 dayData: d.dayData || {},
                 dateRows: Array.isArray(d.dateRows) ? d.dateRows : []
             };
