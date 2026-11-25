@@ -20,6 +20,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 export interface SubjectAllocation {
   className: string;
   subjectName: string;
+  scope?: 'main' | 'standalone';
 }
 
 export interface TeacherAllocationRecord {

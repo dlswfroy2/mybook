@@ -770,7 +770,9 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
     
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedClass, setSelectedClass] = useState<string>('6');
-    const [selectedSubject, setSelectedSubject] = useState<string>('');
+    const [allocationScope, setAllocationScope] = useState<'main' | 'standalone'>('main');
+    const [subjectPopupOpen, setSubjectPopupOpen] = useState(false);
+    const [checkedSubjects, setCheckedSubjects] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -811,27 +813,31 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                 seenTeachers.add(staff.nameBn);
 
                 const dbRecord = data.find(r => r.teacherName === staff.nameBn);
-                const allocationMap = new Map<string, string>();
+                const allocationMap = new Map<string, SubjectAllocation>();
                 
                 if (dbRecord) {
                     // Use saved DB allocations as authoritative source so deletions persist
-                    dbRecord.allocations.forEach(a => allocationMap.set(`${a.className}|${a.subjectName}`, a.subjectName));
+                    dbRecord.allocations.forEach(a => {
+                        const sc = a.scope || 'main';
+                        allocationMap.set(`${sc}|${a.className}|${a.subjectName}`, {
+                            className: a.className,
+                            subjectName: a.subjectName,
+                            scope: sc
+                        });
+                    });
                 } else {
                     // Initial seed from Routine (Sync) only when no DB record exists yet
                     Object.keys(scanned).forEach(shortName => {
                         if (staff.nameBn.includes(shortName) || shortName.includes(staff.nameBn)) {
                             scanned[shortName].forEach(item => {
                                 const [cls, sub] = item.split('|');
-                                allocationMap.set(`${cls}|${sub}`, sub);
+                                allocationMap.set(`main|${cls}|${sub}`, { className: cls, subjectName: sub, scope: 'main' });
                             });
                         }
                     });
                 }
 
-                const finalAllocations: SubjectAllocation[] = Array.from(allocationMap.entries()).map(([key, sub]) => ({
-                    className: key.split('|')[0],
-                    subjectName: sub
-                }));
+                const finalAllocations: SubjectAllocation[] = Array.from(allocationMap.values());
 
                 merged.push({
                     teacherName: staff.nameBn,
@@ -846,42 +852,54 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
 
     useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
 
-    // Subjects already allocated to any teacher in the currently selected class
-    const allocatedSubjectsInClass = useMemo(() => {
+    // Subjects already allocated to OTHER teachers in the currently selected class & scope
+    const allocatedToOtherTeachersInClass = useMemo(() => {
         const set = new Set<string>();
         allocations.forEach(rec => {
+            if (rec.teacherName === selectedTeacher) return;
             rec.allocations.forEach(a => {
-                if (a.className === selectedClass) {
+                if (a.className === selectedClass && (a.scope || 'main') === allocationScope) {
                     set.add(a.subjectName);
                 }
             });
         });
         return set;
-    }, [allocations, selectedClass]);
+    }, [allocations, selectedClass, allocationScope, selectedTeacher]);
+
+    const currentTeacherSubjectsInClass = useMemo(() => {
+        const record = allocations.find(r => r.teacherName === selectedTeacher);
+        if (!record) return [];
+        return record.allocations
+            .filter(a => a.className === selectedClass && (a.scope || 'main') === allocationScope)
+            .map(a => a.subjectName);
+    }, [allocations, selectedTeacher, selectedClass, allocationScope]);
 
     const availableSubjectsForClass = useMemo(() => {
-        return getSubjects(selectedClass).filter(s => !allocatedSubjectsInClass.has(s.name));
-    }, [selectedClass, allocatedSubjectsInClass]);
+        return getSubjects(selectedClass).filter(s => !allocatedToOtherTeachersInClass.has(s.name));
+    }, [selectedClass, allocatedToOtherTeachersInClass]);
 
-    useEffect(() => {
-        if (selectedSubject && !availableSubjectsForClass.some(s => s.name === selectedSubject)) {
-            setSelectedSubject('');
-        }
-    }, [availableSubjectsForClass, selectedSubject]);
-
-    const handleAddAllocation = async () => {
-        if (!db || !selectedTeacher || !selectedClass || !selectedSubject) return;
-        
-        const record = allocations.find(r => r.teacherName === selectedTeacher);
-        const nextAllocations = [...(record?.allocations || [])];
-        
-        if (nextAllocations.some(a => a.className === selectedClass && a.subjectName === selectedSubject)) {
-            toast({ variant: 'destructive', title: 'ইতিমধ্যে যুক্ত আছে' });
+    const openSubjectPopup = () => {
+        if (!selectedTeacher) {
+            toast({ variant: 'destructive', title: 'প্রথমে শিক্ষক নির্বাচন করুন' });
             return;
         }
+        setCheckedSubjects(currentTeacherSubjectsInClass);
+        setSubjectPopupOpen(true);
+    };
 
-        nextAllocations.push({ className: selectedClass, subjectName: selectedSubject });
-        
+    const handleSaveSubjectsPopup = async () => {
+        if (!db || !selectedTeacher || !selectedClass) return;
+        const record = allocations.find(r => r.teacherName === selectedTeacher);
+        const preservedAllocations = (record?.allocations || []).filter(
+            a => !(a.className === selectedClass && (a.scope || 'main') === allocationScope)
+        );
+        const newForClassAndScope: SubjectAllocation[] = checkedSubjects.map(sub => ({
+            className: selectedClass,
+            subjectName: sub,
+            scope: allocationScope
+        }));
+        const nextAllocations = [...preservedAllocations, ...newForClassAndScope];
+
         setIsSaving(true);
         try {
             await saveTeacherAllocation(db, {
@@ -889,20 +907,23 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                 academicYear,
                 allocations: nextAllocations
             });
-            toast({ title: 'বণ্টন আপডেট হয়েছে' });
+            toast({ title: `${getTeacherDisplayName(selectedTeacher)}-এর ${toBengaliNumber(checkedSubjects.length)}টি বিষয় সেট করা হয়েছে` });
+            setSubjectPopupOpen(false);
             fetchAllocations();
             onAllocationUpdated?.();
         } catch (e) {}
         setIsSaving(false);
     };
 
-    const handleRemoveAllocation = async (teacherName: string, className: string, subjectName: string) => {
+    const handleRemoveAllocation = async (teacherName: string, className: string, subjectName: string, scope: 'main' | 'standalone') => {
         if (!db || !hasPermission('manage:routines')) return;
         
         const record = allocations.find(r => r.teacherName === teacherName);
         if (!record) return;
 
-        const nextAllocations = record.allocations.filter(a => !(a.className === className && a.subjectName === subjectName));
+        const nextAllocations = record.allocations.filter(
+            a => !(a.className === className && a.subjectName === subjectName && (a.scope || 'main') === scope)
+        );
         
         setIsSaving(true);
         try {
@@ -922,11 +943,37 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
         <div className="space-y-8 animate-in fade-in duration-500">
             <Card className="border-2 shadow-lg rounded-3xl overflow-hidden">
                 <CardHeader className="bg-primary/5 border-b-2 border-primary/10">
-                    <CardTitle className="text-xl font-black flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> নতুন বিষয় বণ্টন</CardTitle>
-                    <CardDescription className="font-bold">শিক্ষকদের জন্য শ্রেণি ও বিষয় নির্বাচন করুন</CardDescription>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <CardTitle className="text-xl font-black flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> নতুন বিষয় বণ্টন</CardTitle>
+                            <CardDescription className="font-bold">মেইন বা স্বতন্ত্র রুটিনের জন্য শিক্ষক, শ্রেণি ও পপআপ থেকে একাধিক বিষয় টিক দিয়ে সেট করুন</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
+                            <button
+                                type="button"
+                                onClick={() => setAllocationScope('main')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer",
+                                    allocationScope === 'main' ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                                )}
+                            >
+                                🔗 মেইন রুটিন
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAllocationScope('standalone')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer",
+                                    allocationScope === 'standalone' ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                                )}
+                            >
+                                📌 স্বতন্ত্র রুটিন
+                            </button>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="space-y-2">
                             <Label className="font-bold">শিক্ষক নির্বাচন</Label>
                             <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
@@ -946,47 +993,139 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label className="font-bold">বিষয়</Label>
-                            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                                <SelectTrigger className="bg-white"><SelectValue placeholder="বিষয়" /></SelectTrigger>
-                                <SelectContent>
-                                    {availableSubjectsForClass.length === 0 ? (
-                                        <div className="py-2 px-3 text-xs text-muted-foreground font-bold text-center">
-                                            এই শ্রেণির সকল বিষয় বরাদ্দ করা হয়েছে
-                                        </div>
-                                    ) : (
-                                        availableSubjectsForClass.map((s, idx) => (
-                                            <SelectItem key={`${s.name}-${idx}`} value={s.name}>{s.name}</SelectItem>
-                                        ))
-                                    )}
-                                </SelectContent>
-                            </Select>
+                            <Label className="font-bold">বিষয়সমূহ (একবারে একাধিক)</Label>
+                            <Button
+                                type="button"
+                                onClick={openSubjectPopup}
+                                disabled={isSaving || !selectedTeacher}
+                                className="w-full font-black h-10 shadow-md bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                {selectedTeacher && currentTeacherSubjectsInClass.length > 0
+                                    ? `বিষয় নির্বাচন (${toBengaliNumber(currentTeacherSubjectsInClass.length)}টি সেট)`
+                                    : 'বিষয় নির্বাচন করুন (পপআপ)'}
+                            </Button>
                         </div>
-                        <Button onClick={handleAddAllocation} disabled={isSaving || !selectedTeacher || !selectedSubject} className="font-black h-10 shadow-md">
-                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />} যুক্ত করুন
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
 
+            <Dialog open={subjectPopupOpen} onOpenChange={setSubjectPopupOpen}>
+                <DialogContent className="max-w-lg font-kalpurush border-2 border-indigo-200">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-900">
+                            <Briefcase className="h-5 w-5 text-indigo-600" />
+                            বিষয় নির্বাচন করুন ({allocationScope === 'standalone' ? 'স্বতন্ত্র রুটিন' : 'মেইন রুটিন'})
+                        </DialogTitle>
+                        <DialogDescription className="font-bold text-xs text-slate-600">
+                            শিক্ষক: <span className="text-indigo-800 font-black">{getTeacherDisplayName(selectedTeacher)}</span> • শ্রেণি: <span className="text-indigo-800 font-black">{classNamesMap[selectedClass]} শ্রেণি</span>
+                            <br />
+                            অন্য শিক্ষকদের বরাদ্দকৃত বিষয়গুলো এখানে দেখানো হয়নি। টিক দিয়ে একসাথে সেট করুন।
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 my-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-600">
+                                মোট {toBengaliNumber(availableSubjectsForClass.length)}টি বিষয় উপলব্ধ • নির্বাচিত: {toBengaliNumber(checkedSubjects.length)}টি
+                            </span>
+                            {availableSubjectsForClass.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (checkedSubjects.length === availableSubjectsForClass.length) {
+                                            setCheckedSubjects([]);
+                                        } else {
+                                            setCheckedSubjects(availableSubjectsForClass.map(s => s.name));
+                                        }
+                                    }}
+                                    className="text-xs font-black text-indigo-600 hover:underline cursor-pointer"
+                                >
+                                    {checkedSubjects.length === availableSubjectsForClass.length ? 'সব বাতিল করুন' : 'সবগুলো টিক দিন'}
+                                </button>
+                            )}
+                        </div>
+
+                        {availableSubjectsForClass.length === 0 ? (
+                            <div className="py-8 text-center text-sm font-bold text-muted-foreground border-2 border-dashed rounded-xl">
+                                এই শ্রেণির সকল বিষয় ইতোমধ্যে অন্য শিক্ষকদের বরাদ্দ করা হয়েছে।
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                                {availableSubjectsForClass.map((s, idx) => {
+                                    const isChecked = checkedSubjects.includes(s.name);
+                                    return (
+                                        <label
+                                            key={`${s.name}-${idx}`}
+                                            className={cn(
+                                                "flex items-center gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all select-none",
+                                                isChecked
+                                                    ? "bg-indigo-50 border-indigo-500 text-indigo-950 shadow-xs"
+                                                    : "bg-white border-slate-200 hover:border-indigo-300 text-slate-700"
+                                            )}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                    setCheckedSubjects(prev =>
+                                                        prev.includes(s.name)
+                                                            ? prev.filter(item => item !== s.name)
+                                                            : [...prev, s.name]
+                                                    );
+                                                }}
+                                                className="h-4 w-4 accent-indigo-600 rounded cursor-pointer shrink-0"
+                                            />
+                                            <span className="text-xs font-black leading-tight">{s.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <Button type="button" variant="outline" onClick={() => setSubjectPopupOpen(false)} className="font-bold">
+                            বাতিল
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleSaveSubjectsPopup}
+                            disabled={isSaving}
+                            className="font-black bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+                            নিশ্চিত ও সেভ করুন ({toBengaliNumber(checkedSubjects.length)}টি)
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {isLoading ? <div className="col-span-full text-center py-20 italic">তথ্য লোড হচ্ছে...</div> : 
-                 allocations.map((record, rIdx) => (
+                 allocations.map((record, rIdx) => {
+                    const scopedAllocs = record.allocations.filter(a => (a.scope || 'main') === allocationScope);
+                    return (
                     <Card key={`${record.teacherName || 'teacher'}-${rIdx}`} className="border-2 border-black/5 hover:border-primary/20 transition-all shadow-sm rounded-2xl overflow-hidden bg-white">
                         <CardHeader className="bg-muted/30 p-4 border-b">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                                    <AvatarFallback className="bg-primary text-white font-black">{getTeacherDisplayName(record.teacherName).charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <CardTitle className="text-base font-black text-slate-800 notranslate" translate="no">{getTeacherDisplayName(record.teacherName)}</CardTitle>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                                        <AvatarFallback className="bg-primary text-white font-black">{getTeacherDisplayName(record.teacherName).charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <CardTitle className="text-base font-black text-slate-800 notranslate" translate="no">{getTeacherDisplayName(record.teacherName)}</CardTitle>
+                                </div>
+                                <Badge variant="outline" className={cn("text-[10px] font-black", allocationScope === 'standalone' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-indigo-50 text-indigo-700 border-indigo-200")}>
+                                    {allocationScope === 'standalone' ? 'স্বতন্ত্র' : 'মেইন'}
+                                </Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="p-4">
                             <div className="space-y-2">
-                                {record.allocations.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground italic text-center py-4">কোনো বিষয় বণ্টন করা হয়নি</p>
+                                {scopedAllocs.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic text-center py-4">এই বিভাগে কোনো বিষয় বণ্টন করা হয়নি</p>
                                 ) : (
-                                    record.allocations.map((a, idx) => (
+                                    scopedAllocs.map((a, idx) => (
                                         <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border group">
                                             <div className="flex flex-col">
                                                 <span className="text-[11px] font-black text-blue-900 leading-none">{a.subjectName}</span>
@@ -996,7 +1135,7 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                                                 variant="ghost" 
                                                 size="icon" 
                                                 className="h-6 w-6 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => handleRemoveAllocation(record.teacherName, a.className, a.subjectName)}
+                                                onClick={() => handleRemoveAllocation(record.teacherName, a.className, a.subjectName, allocationScope)}
                                             >
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
@@ -1006,7 +1145,8 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                             </div>
                         </CardContent>
                     </Card>
-                ))}
+                    );
+                 })}
             </div>
         </div>
     );
@@ -2330,6 +2470,13 @@ export default function RoutinesPage() {
         }
         return columns;
     }, [routineScope, standaloneRoutine, columns]);
+
+    const scopedAllocationsList = useMemo(() => {
+        if (routineScope === 'standalone') {
+            return allocationsList.filter(a => a.scope === 'standalone');
+        }
+        return allocationsList.filter(a => (a.scope || 'main') === 'main');
+    }, [allocationsList, routineScope]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
@@ -2358,7 +2505,7 @@ export default function RoutinesPage() {
     const { user, hasPermission } = useAuth();
     
     const [allStaff, setAllStaff] = useState<Staff[]>([]);
-    const [allocationsList, setAllocationsList] = useState<{ className: string; subjectName: string; teacherName: string }[]>([]);
+    const [allocationsList, setAllocationsList] = useState<{ className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[]>([]);
 
     const canManageRoutines = hasPermission('manage:routines');
     const canViewProxy = hasPermission('view:proxy-classes');
@@ -2379,13 +2526,14 @@ export default function RoutinesPage() {
         setColumns(colsFromDb);
         setDateRoutineRows(dateRowsFromDb);
 
-        const flatAllocations: { className: string; subjectName: string; teacherName: string }[] = [];
+        const flatAllocations: { className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[] = [];
         allocationsFromDb.forEach(rec => {
             rec.allocations?.forEach(a => {
                 flatAllocations.push({
                     className: a.className,
                     subjectName: a.subjectName,
-                    teacherName: rec.teacherName
+                    teacherName: rec.teacherName,
+                    scope: a.scope || 'main'
                 });
             });
         });
@@ -2991,7 +3139,7 @@ export default function RoutinesPage() {
                                                     columns={activeColumns}
                                                     teacherColorMap={teacherColorMap}
                                                     isMounted={isMounted}
-                                                    allocationsList={allocationsList}
+                                                    allocationsList={scopedAllocationsList}
                                                     mainRoutineData={routineData}
                                                     onAddColumn={openAddColumn}
                                                     onDeleteColumn={openDeleteColumn}
@@ -3111,7 +3259,7 @@ export default function RoutinesPage() {
                                                     onDeleteColumn={openDeleteColumn}
                                                     onEditColumn={openEditColumn}
                                                     selectedClass={selectedClassFilter}
-                                                    allocationsList={allocationsList}
+                                                    allocationsList={scopedAllocationsList}
                                                 />
                                             )}
                                         </div>
@@ -3438,7 +3586,7 @@ export default function RoutinesPage() {
                                                     columns={pageCols}
                                                     teacherColorMap={teacherColorMap}
                                                     isMounted={isMounted}
-                                                    allocationsList={allocationsList}
+                                                    allocationsList={scopedAllocationsList}
                                                     mainRoutineData={mappedDayData}
                                                     onDateChange={() => {}}
                                                     onCellChange={() => {}}
@@ -3453,7 +3601,7 @@ export default function RoutinesPage() {
                                                     isMounted={isMounted}
                                                     columns={pageCols}
                                                     selectedClass={selectedClassFilter}
-                                                    allocationsList={allocationsList}
+                                                    allocationsList={scopedAllocationsList}
                                                 />
                                             )}
                                         </div>
