@@ -1231,16 +1231,16 @@ const CombinedRoutineTable = ({
 
     return (
         <div className="w-full">
-            {/* Top scrollbar - synced with table */}
+            {/* Top scrollbar - synced with table, always visible */}
             <div
                 ref={topScrollRef}
                 onScroll={handleTopScroll}
-                className="overflow-x-auto w-full border-x-2 border-t-2 border-green-600 rounded-t-lg bg-slate-100/50 print:hidden"
-                style={{ height: '16px' }}
+                className="overflow-x-scroll w-full border-x-2 border-t-2 border-green-600 rounded-t-lg bg-slate-100/50 print:hidden"
+                style={{ height: '20px', overflowX: 'scroll' }}
             >
-                <div ref={topScrollInnerRef} style={{ height: '1px' }} />
+                <div ref={topScrollInnerRef} style={{ height: '1px', minWidth: '901px' }} />
             </div>
-        <div ref={tableScrollRef} onScroll={handleTableScroll} className="overflow-x-auto w-full border-2 border-green-600 rounded-b-lg shadow-inner bg-white print:rounded-lg print:border-t-2">
+        <div ref={tableScrollRef} onScroll={handleTableScroll} className="overflow-x-scroll w-full border-2 border-green-600 rounded-b-lg shadow-inner bg-white print:rounded-lg print:border-t-2 print:overflow-visible">
            <Table className="border-collapse w-full min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
                 <TableHeader>
                    <TableRow className="bg-muted/50 h-16 print:h-8">
