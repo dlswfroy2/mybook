@@ -1190,7 +1190,7 @@ const CombinedRoutineTable = ({
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
     const topScrollInnerRef = useRef<HTMLDivElement>(null);
-    const isSyncing = useRef(false);
+    const scrollSource = useRef<'top' | 'table' | null>(null);
 
     // Sync top scrollbar inner width with actual table scrollWidth
     useEffect(() => {
@@ -1204,7 +1204,6 @@ const CombinedRoutineTable = ({
         syncWidth();
         const observer = new ResizeObserver(syncWidth);
         observer.observe(tableEl);
-        // Also observe the first child (table) for size changes
         if (tableEl.firstElementChild) {
             observer.observe(tableEl.firstElementChild);
         }
@@ -1212,21 +1211,21 @@ const CombinedRoutineTable = ({
     }, [columns, routineData, selectedClass]);
 
     const handleTopScroll = useCallback(() => {
-        if (isSyncing.current) return;
-        isSyncing.current = true;
+        if (scrollSource.current === 'table') return;
+        scrollSource.current = 'top';
         if (tableScrollRef.current && topScrollRef.current) {
             tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
         }
-        isSyncing.current = false;
+        requestAnimationFrame(() => { scrollSource.current = null; });
     }, []);
 
     const handleTableScroll = useCallback(() => {
-        if (isSyncing.current) return;
-        isSyncing.current = true;
+        if (scrollSource.current === 'top') return;
+        scrollSource.current = 'table';
         if (topScrollRef.current && tableScrollRef.current) {
             topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
         }
-        isSyncing.current = false;
+        requestAnimationFrame(() => { scrollSource.current = null; });
     }, []);
 
     return (
