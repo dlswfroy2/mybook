@@ -36,6 +36,39 @@ import { useAcademicYear } from '@/context/AcademicYearContext';
 import { getFullRoutine, getDateRoutine, getStandaloneRoutine, ClassRoutine, DateRoutineRow, StandaloneClassRoutine } from '@/lib/routine-data';
 import { subjectNameNormalization as baseSubjectNorm } from '@/lib/subjects';
 
+type ChapterStatus = 'planned' | 'running' | 'completed';
+
+type PlanRow = {
+  id: string;
+  existingId?: string;
+  date: string;
+  topic: string;
+  notes: string;
+  lessonTypes: string[];
+  chapterStatus: ChapterStatus;
+  coveredPortion: string;
+};
+
+const CHAPTER_STATUS_META: Record<ChapterStatus, { label: string; badgeClass: string }> = {
+  planned: { label: '📝 পরিকল্পিত', badgeClass: 'bg-slate-100 text-slate-800 border-slate-300' },
+  running: { label: '⏳ চলমান', badgeClass: 'bg-amber-100 text-amber-900 border-amber-400' },
+  completed: { label: '✅ সম্পন্ন', badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400' },
+};
+
+const getLessonTypeOptions = (subject: string): string[] => {
+  if (!subject) return [];
+  if (subject.includes('ইংরেজি প্রথম')) {
+    return ['Passage (Seen/Unseen)', 'Lecture Sheet', 'MCQ & Short Q', 'Summary / Flowchart', 'Writing (Paragraph/Letter)', 'Model Test', 'Home Work'];
+  }
+  if (subject.includes('ইংরেজি দ্বিতীয়') || subject.includes('ইংরেজি')) {
+    return ['Grammar', 'Lecture Sheet', 'Cloze / Gap Filling', 'Paragraph', 'Letter / Application', 'Email / Dialogue', 'Composition / CV', 'Model Test'];
+  }
+  if (subject.includes('বাংলা দ্বিতীয়')) {
+    return ['ব্যাকরণ', 'লেকচার শিট', 'বহুনির্বাচনী (MCQ)', 'অনুচ্ছেদ / সারাংশ', 'পত্র / আবেদনপত্র', 'ভাবসম্প্রসারণ', 'রচনা / প্রতিবেদন', 'শ্রেণি পরীক্ষা'];
+  }
+  return ['মূল পাঠ / বই', 'লেকচার শিট', 'সৃজনশীল (CQ)', 'বহুনির্বাচনী (MCQ)', 'গাণিতিক সমস্যা / অনুশীলনী', 'শ্রেণি পরীক্ষা', 'বাড়ির কাজ'];
+};
+
 const DIARY_SUBJ_NORM: Record<string, string> = {
   ...baseSubjectNorm,
   'শারীরিক': 'শারীরিক শিক্ষা',
@@ -105,8 +138,8 @@ export default function TeacherDiaryPage() {
     notes: ''
   });
 
-  const [planRows, setPlanRows] = useState<{ id: string; existingId?: string; date: string; topic: string; notes: string }[]>([
-    { id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }
+  const [planRows, setPlanRows] = useState<PlanRow[]>([
+    { id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }
   ]);
   const lastLoadedKeyRef = useRef<string>('');
 
@@ -163,6 +196,7 @@ export default function TeacherDiaryPage() {
 
   const subjectsList = useMemo(() => formData.classId ? getSubjectsForClass(formData.classId) : [], [formData.classId]);
   const chaptersList = useMemo(() => (formData.classId && formData.subject) ? getChaptersForSubject(formData.classId, formData.subject) : [], [formData.classId, formData.subject]);
+  const lessonTypeOptions = useMemo(() => getLessonTypeOptions(formData.subject), [formData.subject]);
 
   const existingPlansForSubject = useMemo(() => {
     if (!diaryEntries || !formData.classId || !formData.subject) return [];
@@ -170,6 +204,43 @@ export default function TeacherDiaryPage() {
       .filter(e => e.classId === formData.classId && e.subject === formData.subject)
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   }, [diaryEntries, formData.classId, formData.subject]);
+
+  const chapterProgressMap = useMemo(() => {
+    const map: Record<string, { status: 'pending' | ChapterStatus; coveredTypes: string[]; lastPortion: string; lastDate: string; count: number }> = {};
+    const addRecord = (topic: string, status: ChapterStatus, types: string[], portion: string, date: string) => {
+      if (!topic) return;
+      if (!map[topic]) {
+        map[topic] = { status: 'pending', coveredTypes: [], lastPortion: '', lastDate: '', count: 0 };
+      }
+      const entry = map[topic];
+      entry.count += 1;
+      if (status === 'completed') {
+        entry.status = 'completed';
+      } else if (entry.status !== 'completed') {
+        entry.status = status || 'running';
+      }
+      types.forEach(t => {
+        if (t && !entry.coveredTypes.includes(t)) entry.coveredTypes.push(t);
+      });
+      if (!entry.lastDate || date >= entry.lastDate) {
+        entry.lastDate = date;
+        if (portion) entry.lastPortion = portion;
+      }
+    };
+
+    existingPlansForSubject.forEach(p => {
+      addRecord(p.topic || '', (p.chapterStatus || 'running') as ChapterStatus, Array.isArray(p.lessonTypes) ? p.lessonTypes : [], p.coveredPortion || '', p.date || '');
+    });
+
+    planRows.forEach(r => {
+      if (!r.topic || (!r.notes && !r.coveredPortion && r.lessonTypes.length === 0 && !r.existingId)) return;
+      if (!r.existingId) {
+        addRecord(r.topic, r.chapterStatus, r.lessonTypes, r.coveredPortion, r.date);
+      }
+    });
+
+    return map;
+  }, [existingPlansForSubject, planRows]);
 
   useEffect(() => {
     if (!isAdding) {
@@ -190,10 +261,13 @@ export default function TeacherDiaryPage() {
           date: p.date,
           topic: p.topic || '',
           notes: p.notes || '',
+          lessonTypes: Array.isArray(p.lessonTypes) ? p.lessonTypes : [],
+          chapterStatus: (p.chapterStatus || 'running') as ChapterStatus,
+          coveredPortion: p.coveredPortion || '',
         }))
       );
     } else {
-      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
+      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }]);
     }
   }, [isAdding, editingId, formData.classId, formData.subject, existingPlansForSubject]);
 
@@ -341,7 +415,7 @@ export default function TeacherDiaryPage() {
     const saved = existingPlansForSubject.find(p => p.date === dateStr);
     setPlanRows(prev => {
       if (prev.some(r => r.date === dateStr)) return prev;
-      const emptyIdx = prev.findIndex(r => !r.existingId && !r.topic && !r.notes);
+      const emptyIdx = prev.findIndex(r => !r.existingId && !r.topic && !r.notes && r.lessonTypes.length === 0 && !r.coveredPortion);
       if (emptyIdx !== -1) {
         return prev.map((r, i) =>
           i === emptyIdx
@@ -351,6 +425,9 @@ export default function TeacherDiaryPage() {
                 date: dateStr,
                 topic: saved?.topic || '',
                 notes: saved?.notes || '',
+                lessonTypes: Array.isArray(saved?.lessonTypes) ? saved.lessonTypes : [],
+                chapterStatus: (saved?.chapterStatus || 'running') as ChapterStatus,
+                coveredPortion: saved?.coveredPortion || '',
               }
             : r
         );
@@ -363,6 +440,9 @@ export default function TeacherDiaryPage() {
           date: dateStr,
           topic: saved?.topic || '',
           notes: saved?.notes || '',
+          lessonTypes: Array.isArray(saved?.lessonTypes) ? saved.lessonTypes : [],
+          chapterStatus: (saved?.chapterStatus || 'running') as ChapterStatus,
+          coveredPortion: saved?.coveredPortion || '',
         },
       ];
     });
@@ -407,6 +487,9 @@ export default function TeacherDiaryPage() {
           date: row.date,
           topic: row.topic,
           notes: row.notes,
+          lessonTypes: row.lessonTypes,
+          chapterStatus: row.chapterStatus,
+          coveredPortion: row.coveredPortion,
           userId: user.uid,
           updatedAt: serverTimestamp(),
         });
@@ -422,10 +505,15 @@ export default function TeacherDiaryPage() {
             : diaryEntries?.find(e => e.classId === formData.classId && e.subject === formData.subject && e.date === row.date);
 
           if (existingEntry) {
+            const prevTypes = Array.isArray(existingEntry.lessonTypes) ? existingEntry.lessonTypes : [];
+            const typesChanged = JSON.stringify(prevTypes) !== JSON.stringify(row.lessonTypes);
             const hasChanged =
               (existingEntry.date || '') !== row.date ||
               (existingEntry.topic || '') !== row.topic ||
-              (existingEntry.notes || '') !== row.notes;
+              (existingEntry.notes || '') !== row.notes ||
+              (existingEntry.chapterStatus || 'running') !== row.chapterStatus ||
+              (existingEntry.coveredPortion || '') !== row.coveredPortion ||
+              typesChanged;
             if (hasChanged) {
               updatedCount++;
               ops.push(
@@ -435,12 +523,15 @@ export default function TeacherDiaryPage() {
                   date: row.date,
                   topic: row.topic,
                   notes: row.notes,
+                  lessonTypes: row.lessonTypes,
+                  chapterStatus: row.chapterStatus,
+                  coveredPortion: row.coveredPortion,
                   userId: user.uid,
                   updatedAt: serverTimestamp(),
                 })
               );
             }
-          } else if (row.topic || row.notes || validRows.length === 1) {
+          } else if (row.topic || row.notes || row.coveredPortion || row.lessonTypes.length > 0 || validRows.length === 1) {
             addedCount++;
             ops.push(
               addDoc(collection(db, 'diary'), {
@@ -449,6 +540,9 @@ export default function TeacherDiaryPage() {
                 date: row.date,
                 topic: row.topic,
                 notes: row.notes,
+                lessonTypes: row.lessonTypes,
+                chapterStatus: row.chapterStatus,
+                coveredPortion: row.coveredPortion,
                 userId: user.uid,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -477,7 +571,7 @@ export default function TeacherDiaryPage() {
         topic: '',
         notes: ''
       });
-      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
+      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }]);
       setIsAdding(false);
       setEditingId(null);
     } catch (error) {
@@ -495,7 +589,16 @@ export default function TeacherDiaryPage() {
       topic: entry.topic || '',
       notes: entry.notes || ''
     });
-    setPlanRows([{ id: entry.id, date: entry.date, topic: entry.topic || '', notes: entry.notes || '' }]);
+    setPlanRows([{
+      id: entry.id,
+      existingId: entry.id,
+      date: entry.date,
+      topic: entry.topic || '',
+      notes: entry.notes || '',
+      lessonTypes: Array.isArray(entry.lessonTypes) ? entry.lessonTypes : [],
+      chapterStatus: (entry.chapterStatus || 'running') as ChapterStatus,
+      coveredPortion: entry.coveredPortion || '',
+    }]);
     setEditingId(entry.id);
     setIsAdding(true);
   };
@@ -536,8 +639,9 @@ export default function TeacherDiaryPage() {
             setIsAdding(!isAdding);
             setEditingId(null);
             if (!isAdding) {
+              lastLoadedKeyRef.current = '';
               setFormData({ date: format(new Date(), 'yyyy-MM-dd'), classId: '', subject: '', topic: '', notes: '' });
-              setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
+              setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }]);
             }
           }}
           className={cn("gap-2 font-bold", isAdding ? "bg-muted text-muted-foreground" : "bg-indigo-600 hover:bg-indigo-700")}
@@ -639,6 +743,59 @@ export default function TeacherDiaryPage() {
                 </div>
               )}
 
+              {formData.classId && formData.subject && chaptersList.length > 0 && (() => {
+                const completedCount = chaptersList.filter(ch => chapterProgressMap[ch]?.status === 'completed').length;
+                const runningCount = chaptersList.filter(ch => chapterProgressMap[ch]?.status === 'running' || chapterProgressMap[ch]?.status === 'planned').length;
+                const pendingCount = chaptersList.length - completedCount - runningCount;
+                return (
+                  <div className="p-4 bg-slate-50/90 border-b-2 border-black space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-black text-slate-800">
+                        <BookOpen className="w-4 h-4 text-indigo-600" />
+                        <span>অধ্যায়ভিত্তিক পাঠ অগ্রগতি ({formData.subject}):</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
+                        <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-900 border border-emerald-400">
+                          ✅ সম্পন্ন: {toBengaliNumber(completedCount)}
+                        </Badge>
+                        <Badge className="bg-amber-100 hover:bg-amber-100 text-amber-900 border border-amber-400">
+                          ⏳ চলমান: {toBengaliNumber(runningCount)}
+                        </Badge>
+                        <Badge variant="outline" className="bg-white text-slate-700 border-slate-300">
+                          ○ বাকি: {toBengaliNumber(pendingCount)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                      {chaptersList.map(ch => {
+                        const info = chapterProgressMap[ch];
+                        const status = info?.status || 'pending';
+                        return (
+                          <span
+                            key={ch}
+                            title={info?.lastPortion ? `সর্বশেষ অংশ: ${info.lastPortion}` : undefined}
+                            className={cn(
+                              "inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-bold",
+                              status === 'completed'
+                                ? "bg-emerald-50 text-emerald-900 border-emerald-400"
+                                : status === 'running' || status === 'planned'
+                                  ? "bg-amber-50 text-amber-900 border-amber-400"
+                                  : "bg-white text-slate-500 border-slate-200"
+                            )}
+                          >
+                            <span>{status === 'completed' ? '✅' : status === 'running' || status === 'planned' ? '⏳' : '○'}</span>
+                            <span>{ch}</span>
+                            {info?.lastPortion && (
+                              <span className="text-[10px] opacity-80">({info.lastPortion})</span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="divide-y-2 divide-black">
                 {planRows.map((row, rowIdx) => {
                   const dateRoutineInfo = getRoutineForDate(row.date);
@@ -690,6 +847,9 @@ export default function TeacherDiaryPage() {
                                   date: newDate,
                                   topic: matched.topic || '',
                                   notes: matched.notes || '',
+                                  lessonTypes: Array.isArray(matched.lessonTypes) ? matched.lessonTypes : [],
+                                  chapterStatus: (matched.chapterStatus || 'running') as ChapterStatus,
+                                  coveredPortion: matched.coveredPortion || '',
                                 };
                               }
                               return {
@@ -754,31 +914,116 @@ export default function TeacherDiaryPage() {
                       <div className="md:col-span-3 p-4 bg-white">
                         <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">প্রতিদিনের ক্লাস রেকর্ড / পাঠ পরিকল্পনা</label>
                         <div className="space-y-3">
-                          {chaptersList.length > 0 ? (
-                            <Select
-                              onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
-                              value={row.topic}
-                            >
-                              <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0 mb-2">
-                                <SelectValue placeholder="অধ্যায় / টপিক নির্বাচন করুন" />
-                              </SelectTrigger>
-                              <SelectContent className="border-2 border-black font-kalpurush">
-                                {chaptersList.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input 
-                              value={row.topic} 
-                              onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: e.target.value } : r))} 
-                              placeholder="টপিক বা শিরোনাম লিখুন..." 
-                              className="font-bold h-10 border-2 border-black bg-white mb-2 ring-offset-0 focus:ring-0"
-                            />
-                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div className="sm:col-span-2">
+                              {chaptersList.length > 0 ? (
+                                <Select
+                                  onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
+                                  value={row.topic}
+                                >
+                                  <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0">
+                                    <SelectValue placeholder="অধ্যায় / টপিক নির্বাচন করুন" />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-2 border-black font-kalpurush">
+                                    {chaptersList.map(ch => {
+                                      const prog = chapterProgressMap[ch];
+                                      const tag = prog?.status === 'completed' ? ' [✅ সম্পন্ন]' : prog ? ' [⏳ চলমান]' : ' [○ বাকি]';
+                                      return (
+                                        <SelectItem key={ch} value={ch} className="font-bold">
+                                          {ch}{tag}
+                                        </SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input 
+                                  value={row.topic} 
+                                  onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: e.target.value } : r))} 
+                                  placeholder="টপিক বা শিরোনাম লিখুন..." 
+                                  className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <Select
+                                value={row.chapterStatus}
+                                onValueChange={(v: ChapterStatus) => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, chapterStatus: v } : r))}
+                              >
+                                <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0">
+                                  <SelectValue placeholder="অবস্থা" />
+                                </SelectTrigger>
+                                <SelectContent className="border-2 border-black font-kalpurush">
+                                  <SelectItem value="planned" className="font-bold">📝 পরিকল্পিত</SelectItem>
+                                  <SelectItem value="running" className="font-bold text-amber-800">⏳ চলমান</SelectItem>
+                                  <SelectItem value="completed" className="font-bold text-emerald-800">✅ অধ্যায় সম্পন্ন</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <Input
+                            value={row.coveredPortion}
+                            onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, coveredPortion: e.target.value } : r))}
+                            placeholder="পড়ানো অংশ / টপিক সীমা (যেমন: পৃষ্ঠা ৪২-৪৫, অনুশীলনী ১-৩, Tense-এর নিয়ম)..."
+                            className="font-bold h-9 text-sm border-2 border-slate-300 focus:border-black bg-slate-50/50 ring-offset-0 focus:ring-0"
+                          />
+
+                          {lessonTypeOptions.length > 0 && (() => {
+                            const prevCoveredForTopic = row.topic ? (chapterProgressMap[row.topic]?.coveredTypes || []) : [];
+                            const remainingTypes = lessonTypeOptions.filter(t => !prevCoveredForTopic.includes(t) && !row.lessonTypes.includes(t));
+                            return (
+                              <div className="p-2.5 rounded-xl bg-indigo-50/40 border border-indigo-200 space-y-2">
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <span className="text-[11px] font-black text-indigo-900">
+                                    আজকের পাঠের ধরন (ক্লিক করে সিলেক্ট করুন):
+                                  </span>
+                                  {row.topic && prevCoveredForTopic.length > 0 && (
+                                    <span className="text-[10px] font-bold text-slate-600">
+                                      এই অধ্যায়ে ইতোমধ্যে হয়েছে: <span className="text-emerald-700 font-black">{prevCoveredForTopic.join(', ')}</span>
+                                      {remainingTypes.length > 0 && (
+                                        <> • বাকি: <span className="text-amber-700 font-black">{remainingTypes.slice(0, 3).join(', ')}</span></>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {lessonTypeOptions.map(typeOpt => {
+                                    const isSelected = row.lessonTypes.includes(typeOpt);
+                                    return (
+                                      <button
+                                        key={typeOpt}
+                                        type="button"
+                                        onClick={() => {
+                                          setPlanRows(prev => prev.map(r => {
+                                            if (r.id !== row.id) return r;
+                                            const next = isSelected
+                                              ? r.lessonTypes.filter(t => t !== typeOpt)
+                                              : [...r.lessonTypes, typeOpt];
+                                            return { ...r, lessonTypes: next };
+                                          }));
+                                        }}
+                                        className={cn(
+                                          "px-2.5 py-1 rounded-lg text-[11px] font-black border transition-all cursor-pointer",
+                                          isSelected
+                                            ? "bg-indigo-600 text-white border-indigo-700 shadow-xs"
+                                            : "bg-white text-slate-700 border-slate-300 hover:border-indigo-400 hover:bg-indigo-50"
+                                        )}
+                                      >
+                                        {isSelected ? '✓ ' : '+ '}{typeOpt}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           <Textarea 
                             value={row.notes} 
                             onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, notes: e.target.value } : r))} 
                             placeholder="বিস্তারিত ক্লাস রেকর্ড বা আগামী দিনের পরিকল্পনা এখানে লিখুন..." 
-                            className="min-h-[120px] font-bold text-base leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
+                            className="min-h-[110px] font-bold text-base leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
                           />
                         </div>
                       </div>
@@ -813,6 +1058,9 @@ export default function TeacherDiaryPage() {
                           date: candidate,
                           topic: saved?.topic || '',
                           notes: saved?.notes || '',
+                          lessonTypes: Array.isArray(saved?.lessonTypes) ? saved.lessonTypes : [],
+                          chapterStatus: (saved?.chapterStatus || 'running') as ChapterStatus,
+                          coveredPortion: saved?.coveredPortion || '',
                         },
                       ]);
                     }}
@@ -963,7 +1211,28 @@ export default function TeacherDiaryPage() {
                           </td>
                           <td className="p-4 align-top">
                             <div className="space-y-2">
-                              <h4 className="font-black text-base text-foreground leading-tight">{entry.topic}</h4>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-black text-base text-foreground leading-tight">{entry.topic}</h4>
+                                {entry.chapterStatus && CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus] && (
+                                  <Badge variant="outline" className={cn("text-[10px] font-black", CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus].badgeClass)}>
+                                    {CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus].label}
+                                  </Badge>
+                                )}
+                              </div>
+                              {entry.coveredPortion && (
+                                <p className="text-xs font-black text-indigo-800 bg-indigo-50 border border-indigo-200 inline-block px-2 py-0.5 rounded">
+                                  পড়ানো অংশ: {entry.coveredPortion}
+                                </p>
+                              )}
+                              {Array.isArray(entry.lessonTypes) && entry.lessonTypes.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {entry.lessonTypes.map((lt: string) => (
+                                    <span key={lt} className="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300">
+                                      {lt}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <p className="text-sm font-bold text-muted-foreground whitespace-pre-wrap leading-relaxed">{entry.notes}</p>
                             </div>
                           </td>
