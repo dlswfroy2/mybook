@@ -1664,6 +1664,7 @@ const DateRoutineTable = ({
                         ) : (
                             rows.map((row) => {
                                 const dayName = getDayNameFromDate(row.date);
+                                const isHolidayDay = dayName === 'শুক্রবার' || dayName === 'শনিবার';
                                 // Build routineData view for EditableCell rule evaluation:
                                 // - For current classes: include ALL date rows under r.id so weekly count & same-date checks work
                                 // - For other classes: include this row's other classes + mainRoutineData on that weekday
@@ -1692,22 +1693,27 @@ const DateRoutineTable = ({
                                     <TableRow
                                         key={`${row.id}-${cls}`}
                                         className={cn(
-                                            "h-12 print:h-7 hover:bg-muted/20 transition-colors",
+                                            "h-12 print:h-auto transition-colors",
+                                            isHolidayDay ? "bg-rose-50/70 hover:bg-rose-100/60 print:bg-rose-50" : "hover:bg-muted/20",
                                             classIndex === 0 && "border-t-[3px] border-t-green-600",
                                             classIndex === classes.length - 1 && "border-b-[3px] border-b-green-600"
                                         )}
                                     >
                                         {classIndex === 0 && (
-                                            <TableCell className="font-black border-r align-middle text-center bg-gray-50 print:bg-white text-xs print:text-[9px] border-l-[4px] border-l-green-600/20 border-green-600 p-2" rowSpan={classes.length}>
+                                            <TableCell className={cn("font-black border-r align-middle text-center text-xs print:text-[9px] border-l-[4px] border-l-green-600/20 border-green-600 p-2 print:p-1", isHolidayDay ? "bg-rose-100/70 text-rose-800 print:bg-rose-50" : "bg-gray-50 print:bg-white")} rowSpan={classes.length}>
                                                 {isEditMode ? (
                                                     <div className="flex flex-col items-center gap-1.5">
                                                         <Input
                                                             type="date"
                                                             value={row.date}
                                                             onChange={(e) => onDateChange(row.id, e.target.value)}
-                                                            className="h-8 text-xs font-bold border-slate-300 bg-white px-1.5"
+                                                            className={cn("h-8 text-xs font-bold bg-white px-1.5", isHolidayDay ? "border-rose-400 text-rose-700" : "border-slate-300")}
                                                         />
-                                                        {dayName && <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">{dayName}</Badge>}
+                                                        {dayName && (
+                                                            <Badge variant="outline" className={cn("text-[10px] font-black", isHolidayDay ? "bg-rose-100 text-rose-800 border-rose-400" : "bg-indigo-50 text-indigo-700 border-indigo-200")}>
+                                                                {dayName}{isHolidayDay ? ' • ছুটি' : ''}
+                                                            </Badge>
+                                                        )}
                                                         {onDeleteRow && (
                                                             <button
                                                                 type="button"
@@ -1720,8 +1726,8 @@ const DateRoutineTable = ({
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center gap-0.5">
-                                                        <span className="font-black text-slate-900">{formatDisplayDate(row.date)}</span>
-                                                        {dayName && <span className="text-[10px] font-bold text-primary">({dayName})</span>}
+                                                        <span className={cn("font-black", isHolidayDay ? "text-rose-700" : "text-slate-900")}>{formatDisplayDate(row.date)}</span>
+                                                        {dayName && <span className={cn("text-[10px] font-bold", isHolidayDay ? "text-rose-700" : "text-primary")}>({dayName}{isHolidayDay ? ' - ছুটি' : ''})</span>}
                                                     </div>
                                                 )}
                                             </TableCell>
@@ -2918,14 +2924,29 @@ export default function RoutinesPage() {
                                                     onAddRow={() => {
                                                         const numPeriods = columns.filter(c => c.type === 'period').length || 6;
                                                         const newId = `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-                                                        const todayStr = format(new Date(), 'yyyy-MM-dd');
+                                                        const getNextDateStr = (lastDateStr?: string) => {
+                                                            if (!lastDateStr) return format(new Date(), 'yyyy-MM-dd');
+                                                            const d = new Date(lastDateStr.replace(/-/g, '/'));
+                                                            if (isNaN(d.getTime())) return format(new Date(), 'yyyy-MM-dd');
+                                                            d.setDate(d.getDate() + 1);
+                                                            return format(d, 'yyyy-MM-dd');
+                                                        };
                                                         if (routineScope === 'standalone') {
-                                                            setStandaloneRoutine(prev => prev ? {
-                                                                ...prev,
-                                                                dateRows: [...prev.dateRows, { id: newId, date: todayStr, periods: Array(numPeriods).fill('') }]
-                                                            } : prev);
+                                                            setStandaloneRoutine(prev => {
+                                                                if (!prev) return prev;
+                                                                const lastDate = prev.dateRows[prev.dateRows.length - 1]?.date;
+                                                                const nextDate = getNextDateStr(lastDate);
+                                                                return {
+                                                                    ...prev,
+                                                                    dateRows: [...prev.dateRows, { id: newId, date: nextDate, periods: Array(numPeriods).fill('') }]
+                                                                };
+                                                            });
                                                         } else {
-                                                            setDateRoutineRows(prev => [...prev, { id: newId, date: todayStr, classes: {} }]);
+                                                            setDateRoutineRows(prev => {
+                                                                const lastDate = prev[prev.length - 1]?.date;
+                                                                const nextDate = getNextDateStr(lastDate);
+                                                                return [...prev, { id: newId, date: nextDate, classes: {} }];
+                                                            });
                                                         }
                                                     }}
                                                     onDeleteRow={(rowId) => {
@@ -3211,7 +3232,7 @@ export default function RoutinesPage() {
                         rowsToMeasure.forEach(r => {
                             activeClasses.forEach(cls => {
                                 const periods = r.classes?.[cls] || [];
-                                let maxLines = 1;
+                                let maxLines = 2;
                                 pageCols.forEach(col => {
                                     const origIdx = columns.findIndex(c => c.id === col.id);
                                     const cell = periods[origIdx] || '';
@@ -3220,7 +3241,7 @@ export default function RoutinesPage() {
                                         if (lines > maxLines) maxLines = lines;
                                     }
                                 });
-                                totalRowHeight += 10 + Math.min(4, maxLines) * 10;
+                                totalRowHeight += 10 + Math.min(4, maxLines) * 9.5;
                             });
                         });
                     } else {
@@ -3236,13 +3257,13 @@ export default function RoutinesPage() {
                                         if (lines > maxLines) maxLines = lines;
                                     }
                                 });
-                                totalRowHeight += 10 + Math.min(4, maxLines) * 10;
+                                totalRowHeight += 10 + Math.min(4, maxLines) * 9.5;
                             });
                         });
                     }
 
-                    const estHeight = 100 + totalRowHeight;
-                    return Math.max(0.36, Math.min(0.96, 695 / estHeight));
+                    const estHeight = 115 + totalRowHeight;
+                    return Math.max(0.32, Math.min(0.95, 650 / estHeight));
                 };
 
                 const remapRowPeriods = (periods: string[], pageCols: RoutineColumn[]) =>
@@ -3345,13 +3366,16 @@ export default function RoutinesPage() {
                                     -webkit-print-color-adjust: exact;
                                     print-color-adjust: exact;
                                 }
+                                [role="status"],
+                                [data-sonner-toaster],
+                                .toaster {
+                                    display: none !important;
+                                }
                                 .routine-print-container {
                                     width: 100% !important;
                                 }
                                 .routine-print-page {
                                     width: 100% !important;
-                                    page-break-inside: avoid !important;
-                                    break-inside: avoid !important;
                                 }
                                 .break-after-page {
                                     page-break-after: always !important;
@@ -3363,8 +3387,6 @@ export default function RoutinesPage() {
                                     max-width: 100% !important;
                                     table-layout: fixed !important;
                                     border-collapse: collapse !important;
-                                    page-break-inside: avoid !important;
-                                    break-inside: avoid !important;
                                 }
                                 .routine-print-container tr {
                                     height: auto !important;
@@ -3385,7 +3407,7 @@ export default function RoutinesPage() {
                                 }
                                 .routine-print-container th:first-child,
                                 .routine-print-container td:first-child {
-                                    width: 52px !important;
+                                    width: 78px !important;
                                 }
                                 .routine-print-container th:nth-child(2),
                                 .routine-print-container td:nth-child(2) {
