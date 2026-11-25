@@ -3179,82 +3179,157 @@ export default function RoutinesPage() {
             </main>
 
             {(() => {
-                const classCount = selectedClassFilter === 'all' ? 5 : 1;
-                const rowCount = routineFormat === 'date'
-                    ? (routineScope === 'standalone' && standaloneRoutine
-                        ? (standaloneRoutine.dateRows?.length || 1)
-                        : (dateRoutineRows?.length || 1)) * classCount
-                    : 5 * classCount;
-                const colCount = Math.max(1, columns.length);
-                const estHeight = 105 + 34 + rowCount * 24;
-                const estWidth = 120 + colCount * 95;
-                const printZoom = Math.max(0.42, Math.min(0.96, 700 / estHeight, 1050 / estWidth));
+                const MAX_PRINT_COLS = 7;
+                const colPages: RoutineColumn[][] = [];
+                for (let i = 0; i < columns.length; i += MAX_PRINT_COLS) {
+                    colPages.push(columns.slice(i, i + MAX_PRINT_COLS));
+                }
+                if (colPages.length === 0) colPages.push([]);
+
+                const activeDateRows = routineScope === 'standalone' && standaloneRoutine
+                    ? (standaloneRoutine.dateRows || []).map(r => ({
+                        id: r.id,
+                        date: r.date,
+                        classes: { [selectedClassFilter]: r.periods }
+                    }))
+                    : dateRoutineRows;
+
+                const activeDayData = routineScope === 'standalone' && standaloneRoutine
+                    ? { [selectedClassFilter]: standaloneRoutine.dayData || {} }
+                    : routineData;
+
+                const activeClasses = selectedClassFilter === 'all' ? ['6', '7', '8', '9', '10'] : [selectedClassFilter];
+                const activeDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার'];
+
+                const estimatePageZoom = (pageCols: RoutineColumn[]) => {
+                    const colCount = Math.max(1, pageCols.length);
+                    const approxCharsPerLine = Math.max(12, Math.floor(24 * (7 / colCount)));
+                    let totalRowHeight = 36; // table header
+
+                    if (routineFormat === 'date') {
+                        const rowsToMeasure = activeDateRows.length > 0 ? activeDateRows : [{ id: 'empty', date: '', classes: {} }];
+                        rowsToMeasure.forEach(r => {
+                            activeClasses.forEach(cls => {
+                                const periods = r.classes?.[cls] || [];
+                                let maxLines = 1;
+                                pageCols.forEach(col => {
+                                    const origIdx = columns.findIndex(c => c.id === col.id);
+                                    const cell = periods[origIdx] || '';
+                                    if (cell) {
+                                        const lines = Math.ceil(cell.length / approxCharsPerLine);
+                                        if (lines > maxLines) maxLines = lines;
+                                    }
+                                });
+                                totalRowHeight += 10 + Math.min(4, maxLines) * 10;
+                            });
+                        });
+                    } else {
+                        activeDays.forEach(day => {
+                            activeClasses.forEach(cls => {
+                                const periods = activeDayData?.[cls]?.[day] || [];
+                                let maxLines = 1;
+                                pageCols.forEach(col => {
+                                    const origIdx = columns.findIndex(c => c.id === col.id);
+                                    const cell = periods[origIdx] || '';
+                                    if (cell) {
+                                        const lines = Math.ceil(cell.length / approxCharsPerLine);
+                                        if (lines > maxLines) maxLines = lines;
+                                    }
+                                });
+                                totalRowHeight += 10 + Math.min(4, maxLines) * 10;
+                            });
+                        });
+                    }
+
+                    const estHeight = 100 + totalRowHeight;
+                    return Math.max(0.36, Math.min(0.96, 695 / estHeight));
+                };
+
+                const remapRowPeriods = (periods: string[], pageCols: RoutineColumn[]) =>
+                    pageCols.map(col => {
+                        const origIdx = columns.findIndex(c => c.id === col.id);
+                        return origIdx >= 0 ? (periods[origIdx] || '') : '';
+                    });
 
                 return (
                     <>
-                        <div
-                            className="printable-area routine-print-container text-black bg-white hidden print:flex p-0 flex-col font-kalpurush w-full"
-                            style={{ zoom: printZoom } as any}
-                        >
-                            <header className="flex items-center gap-3 border-b-2 border-emerald-800 pb-1.5 mb-2">
-                                {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={42} height={42} className="object-contain" />}
-                                <div className="text-center flex-grow">
-                                    <h1 className="text-lg font-black leading-tight">{schoolInfo.name}</h1>
-                                    <p className="text-[10px] font-bold leading-tight">{schoolInfo.address}</p>
-                                    <h2 className="text-sm font-black mt-0.5 underline">
-                                        {routineScope === 'standalone' && selectedClassFilter !== 'all'
-                                            ? (standaloneRoutine?.title || `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির স্বতন্ত্র রুটিন - ${toBengaliNumber(selectedYear)}`)
-                                            : selectedClassFilter === 'all' 
-                                                ? `সমন্বিত ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}` 
-                                                : `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}`
-                                        }
-                                    </h2>
-                                </div>
-                            </header>
-                            <div className="w-full">
-                                {routineFormat === 'date' ? (
-                                    <DateRoutineTable
-                                        rows={
-                                            routineScope === 'standalone' && standaloneRoutine
-                                                ? standaloneRoutine.dateRows.map(r => ({
-                                                    id: r.id,
-                                                    date: r.date,
-                                                    classes: { [selectedClassFilter]: r.periods }
-                                                }))
-                                                : dateRoutineRows
-                                        }
-                                        selectedClass={selectedClassFilter}
-                                        isEditMode={false}
-                                        columns={columns}
-                                        teacherColorMap={teacherColorMap}
-                                        isMounted={isMounted}
-                                        allocationsList={allocationsList}
-                                        mainRoutineData={routineData}
-                                        onDateChange={() => {}}
-                                        onCellChange={() => {}}
-                                    />
-                                ) : (
-                                    <CombinedRoutineTable 
-                                        routineData={
-                                            routineScope === 'standalone' && standaloneRoutine
-                                                ? { [selectedClassFilter]: standaloneRoutine.dayData || {} }
-                                                : routineData
-                                        } 
-                                        conflicts={displayConflicts} 
-                                        isEditMode={false} 
-                                        onCellChange={() => {}} 
-                                        teacherColorMap={teacherColorMap} 
-                                        isMounted={isMounted}
-                                        columns={columns}
-                                        selectedClass={selectedClassFilter}
-                                        allocationsList={allocationsList}
-                                    />
-                                )}
-                            </div>
-                            <footer className="mt-4 flex justify-between border-t border-black pt-2">
-                                <div className="w-40 border-t border-black text-center font-bold text-[10px] pt-0.5">রুটিন কমিটির স্বাক্ষর</div>
-                                <div className="w-40 border-t border-black text-center font-bold text-[10px] pt-0.5">প্রধান শিক্ষকের স্বাক্ষর</div>
-                            </footer>
+                        <div className="printable-area routine-print-container text-black bg-white hidden print:block p-0 font-kalpurush w-full">
+                            {colPages.map((pageCols, pageIdx) => {
+                                const printZoom = estimatePageZoom(pageCols);
+                                const mappedDateRows = activeDateRows.map(r => ({
+                                    ...r,
+                                    classes: Object.fromEntries(
+                                        Object.entries(r.classes || {}).map(([cls, p]) => [cls, remapRowPeriods(p || [], pageCols)])
+                                    )
+                                }));
+                                const mappedDayData: Record<string, Record<string, string[]>> = {};
+                                Object.entries(activeDayData || {}).forEach(([cls, dayMap]) => {
+                                    mappedDayData[cls] = {};
+                                    Object.entries(dayMap || {}).forEach(([day, p]) => {
+                                        mappedDayData[cls][day] = remapRowPeriods(p || [], pageCols);
+                                    });
+                                });
+
+                                return (
+                                    <div
+                                        key={`print-page-${pageIdx}`}
+                                        className={cn(
+                                            "routine-print-page flex flex-col w-full",
+                                            pageIdx < colPages.length - 1 ? "break-after-page" : ""
+                                        )}
+                                        style={{ zoom: printZoom } as any}
+                                    >
+                                        <header className="flex items-center gap-3 border-b-2 border-emerald-800 pb-1.5 mb-2">
+                                            {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={40} height={40} className="object-contain" />}
+                                            <div className="text-center flex-grow">
+                                                <h1 className="text-lg font-black leading-tight">{schoolInfo.name}</h1>
+                                                <p className="text-[10px] font-bold leading-tight">{schoolInfo.address}</p>
+                                                <h2 className="text-sm font-black mt-0.5 underline">
+                                                    {routineScope === 'standalone' && selectedClassFilter !== 'all'
+                                                        ? (standaloneRoutine?.title || `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির স্বতন্ত্র রুটিন - ${toBengaliNumber(selectedYear)}`)
+                                                        : selectedClassFilter === 'all' 
+                                                            ? `সমন্বিত ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}` 
+                                                            : `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}`
+                                                    }
+                                                    {colPages.length > 1 ? ` (অংশ ${toBengaliNumber(pageIdx + 1)})` : ''}
+                                                </h2>
+                                            </div>
+                                        </header>
+                                        <div className="w-full">
+                                            {routineFormat === 'date' ? (
+                                                <DateRoutineTable
+                                                    rows={mappedDateRows}
+                                                    selectedClass={selectedClassFilter}
+                                                    isEditMode={false}
+                                                    columns={pageCols}
+                                                    teacherColorMap={teacherColorMap}
+                                                    isMounted={isMounted}
+                                                    allocationsList={allocationsList}
+                                                    mainRoutineData={mappedDayData}
+                                                    onDateChange={() => {}}
+                                                    onCellChange={() => {}}
+                                                />
+                                            ) : (
+                                                <CombinedRoutineTable 
+                                                    routineData={mappedDayData} 
+                                                    conflicts={displayConflicts} 
+                                                    isEditMode={false} 
+                                                    onCellChange={() => {}} 
+                                                    teacherColorMap={teacherColorMap} 
+                                                    isMounted={isMounted}
+                                                    columns={pageCols}
+                                                    selectedClass={selectedClassFilter}
+                                                    allocationsList={allocationsList}
+                                                />
+                                            )}
+                                        </div>
+                                        <footer className="mt-3 flex justify-between border-t border-black pt-1.5">
+                                            <div className="w-40 border-t border-black text-center font-bold text-[10px] pt-0.5">রুটিন কমিটির স্বাক্ষর</div>
+                                            <div className="w-40 border-t border-black text-center font-bold text-[10px] pt-0.5">প্রধান শিক্ষকের স্বাক্ষর</div>
+                                        </footer>
+                                    </div>
+                                );
+                            })}
                         </div>
                         <style jsx global>{`
                             @media print {
@@ -3272,13 +3347,21 @@ export default function RoutinesPage() {
                                 }
                                 .routine-print-container {
                                     width: 100% !important;
+                                }
+                                .routine-print-page {
+                                    width: 100% !important;
                                     page-break-inside: avoid !important;
                                     break-inside: avoid !important;
+                                }
+                                .break-after-page {
+                                    page-break-after: always !important;
+                                    break-after: page !important;
                                 }
                                 .routine-print-container table {
                                     width: 100% !important;
                                     min-width: 100% !important;
-                                    table-layout: auto !important;
+                                    max-width: 100% !important;
+                                    table-layout: fixed !important;
                                     border-collapse: collapse !important;
                                     page-break-inside: avoid !important;
                                     break-inside: avoid !important;
@@ -3291,10 +3374,28 @@ export default function RoutinesPage() {
                                 .routine-print-container th,
                                 .routine-print-container td {
                                     border: 1px solid #15803d !important;
-                                    padding: 1px 3px !important;
+                                    padding: 2px 3px !important;
                                     line-height: 1.15 !important;
-                                    font-size: 8px !important;
+                                    font-size: 7.5px !important;
                                     height: auto !important;
+                                    white-space: normal !important;
+                                    word-break: break-word !important;
+                                    overflow-wrap: anywhere !important;
+                                    min-width: 0 !important;
+                                }
+                                .routine-print-container th:first-child,
+                                .routine-print-container td:first-child {
+                                    width: 52px !important;
+                                }
+                                .routine-print-container th:nth-child(2),
+                                .routine-print-container td:nth-child(2) {
+                                    width: 42px !important;
+                                }
+                                .routine-print-container td div,
+                                .routine-print-container th div {
+                                    white-space: normal !important;
+                                    word-break: break-word !important;
+                                    overflow-wrap: anywhere !important;
                                 }
                             }
                         `}</style>
