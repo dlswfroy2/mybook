@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { subjectNameNormalization as baseSubjectNameNormalization, getSubjects } from '@/lib/subjects';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { useSchoolInfo } from '@/context/SchoolInfoContext';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
@@ -1156,7 +1157,8 @@ const CombinedRoutineTable = ({
     onAddColumn,
     onDeleteColumn,
     onEditColumn,
-    selectedClass = 'all'
+    selectedClass = 'all',
+    allocationsList = []
 }: { 
     routineData: Record<string, Record<string, string[]>>, 
     conflicts: any, 
@@ -1168,7 +1170,8 @@ const CombinedRoutineTable = ({
     onAddColumn?: (insertAfterIndex: number) => void,
     onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void,
     onEditColumn?: (col: RoutineColumnConfig, index: number) => void,
-    selectedClass?: string
+    selectedClass?: string,
+    allocationsList?: { className: string; subjectName: string; teacherName: string }[]
 }) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const days = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
@@ -1330,7 +1333,13 @@ const CombinedRoutineTable = ({
                                            conflictKey={`${cls}-${day}-${periodIdx}`} 
                                            conflicts={conflicts} 
                                            teacherColorMap={teacherColorMap} 
-                                           isMounted={isMounted} 
+                                           isMounted={isMounted}
+                                           cls={cls}
+                                           day={day}
+                                           periodIdx={periodIdx}
+                                           routineData={routineData}
+                                           columns={columns}
+                                           allocationsList={allocationsList}
                                        />
                                    );
                                })}
@@ -1346,7 +1355,35 @@ const CombinedRoutineTable = ({
     );
 };
 
-const EditableCell = ({ content, isEditMode, onCellChange, conflictKey, conflicts, teacherColorMap, isMounted }: { content: string, isEditMode: boolean, onCellChange: (value: string) => void, conflictKey: string, conflicts: any, teacherColorMap: Map<string, string>, isMounted: boolean }) => {
+const EditableCell = ({ 
+    content, 
+    isEditMode, 
+    onCellChange, 
+    conflictKey, 
+    conflicts, 
+    teacherColorMap, 
+    isMounted,
+    cls,
+    day,
+    periodIdx,
+    routineData,
+    columns,
+    allocationsList = []
+}: { 
+    content: string, 
+    isEditMode: boolean, 
+    onCellChange: (value: string) => void, 
+    conflictKey: string, 
+    conflicts: any, 
+    teacherColorMap: Map<string, string>, 
+    isMounted: boolean,
+    cls?: string,
+    day?: string,
+    periodIdx?: number,
+    routineData?: Record<string, Record<string, string[]>>,
+    columns?: RoutineColumnConfig[],
+    allocationsList?: { className: string; subjectName: string; teacherName: string }[]
+}) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     
     // Check all types of conflicts
@@ -1383,16 +1420,337 @@ const EditableCell = ({ content, isEditMode, onCellChange, conflictKey, conflict
         return content;
     }, [content, isEn]);
 
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [customText, setCustomText] = useState('');
+
+    useEffect(() => {
+        if (isPopoverOpen) {
+            setCustomText(content || '');
+            setSearchQuery('');
+        }
+    }, [isPopoverOpen, content]);
+
+    // 1. Build list of allocated subject-teacher pairs for this class
+    const optionsForClass = useMemo(() => {
+        if (!cls) return [];
+        const list: { subject: string; teacher: string }[] = [];
+        const seen = new Set<string>();
+
+        // From allocationsList
+        if (allocationsList && allocationsList.length > 0) {
+            allocationsList
+                .filter(a => a.className === cls)
+                .forEach(a => {
+                    const key = `${a.subjectName}|${a.teacherName}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        list.push({ subject: a.subjectName, teacher: a.teacherName });
+                    }
+                });
+        }
+
+        // From default teacherAllocations
+        Object.entries(teacherAllocations).forEach(([tName, subMap]) => {
+            Object.entries(subMap).forEach(([subject, classList]) => {
+                if (classList.includes(cls)) {
+                    const key = `${subject}|${tName}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        list.push({ subject, teacher: tName });
+                    }
+                }
+            });
+        });
+
+        // From routineData
+        if (routineData && routineData[cls]) {
+            Object.values(routineData[cls]).forEach(pList => {
+                pList.forEach(cell => {
+                    const { subject: s, teacher: t } = parseSubjectTeacher(cell);
+                    if (s && t) {
+                        const key = `${s}|${t}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            list.push({ subject: s, teacher: t });
+                        }
+                    }
+                });
+            });
+        }
+
+        // Add class subjects from getSubjects(cls) if not present
+        const classSubjects = getSubjects(cls);
+        classSubjects.forEach(s => {
+            const hasSub = list.some(item => item.subject === s.name || subjectNameNormalization[item.subject] === s.name);
+            if (!hasSub) {
+                list.push({ subject: s.name, teacher: '' });
+            }
+        });
+
+        return list;
+    }, [cls, allocationsList, routineData]);
+
+    // 2. Evaluate rules for each option
+    const evaluatedOptions = useMemo(() => {
+        if (!routineData || !cls || !day || periodIdx === undefined) {
+            return optionsForClass.map(o => ({ ...o, busyInClass: '', isConsecutive: false, isBreakClash: false, subjectRepetitionCount: 0 }));
+        }
+
+        const cols = columns || DEFAULT_ROUTINE_COLUMNS;
+        const breakIndexInCols = cols.findIndex(c => c.type === 'break');
+        let periodBeforeBreak = -1;
+        let periodAfterBreak = -1;
+        if (breakIndexInCols !== -1) {
+            periodBeforeBreak = cols.slice(0, breakIndexInCols).filter(c => c.type === 'period').length - 1;
+            periodAfterBreak = periodBeforeBreak + 1;
+        }
+
+        return optionsForClass.map(opt => {
+            const teacherName = opt.teacher.trim();
+            let busyInClass = '';
+            let isConsecutive = false;
+            let isBreakClash = false;
+            let subjectRepetitionCount = 0;
+
+            if (teacherName) {
+                // Check if teacher is busy in any other class at this day and periodIdx
+                Object.keys(routineData).forEach(otherCls => {
+                    if (otherCls !== cls) {
+                        const otherCell = routineData[otherCls]?.[day]?.[periodIdx] || '';
+                        if (otherCell) {
+                            const { teacher: otherTeacher } = parseSubjectTeacher(otherCell);
+                            if (otherTeacher && otherTeacher.split('/').some(t => {
+                                const tr = t.trim();
+                                return tr === teacherName || tr.includes(teacherName) || teacherName.includes(tr);
+                            })) {
+                                busyInClass = classNamesMap[otherCls] || otherCls;
+                            }
+                        }
+                    }
+                });
+
+                // Consecutive class in this class
+                if (periodIdx > 0) {
+                    const prevCell = routineData[cls]?.[day]?.[periodIdx - 1] || '';
+                    const { teacher: prevTeacher } = parseSubjectTeacher(prevCell);
+                    if (prevTeacher && prevTeacher.split('/').some(t => t.trim() === teacherName)) {
+                        isConsecutive = true;
+                    }
+                }
+                if (periodIdx < (routineData[cls]?.[day]?.length || 0) - 1) {
+                    const nextCell = routineData[cls]?.[day]?.[periodIdx + 1] || '';
+                    const { teacher: nextTeacher } = parseSubjectTeacher(nextCell);
+                    if (nextTeacher && nextTeacher.split('/').some(t => t.trim() === teacherName)) {
+                        isConsecutive = true;
+                    }
+                }
+
+                // Break clash
+                if (periodBeforeBreak >= 0 && periodIdx === periodBeforeBreak) {
+                    const afterBreakCell = routineData[cls]?.[day]?.[periodAfterBreak] || '';
+                    const { teacher: afterTeacher } = parseSubjectTeacher(afterBreakCell);
+                    if (afterTeacher && afterTeacher.split('/').some(t => t.trim() === teacherName)) {
+                        isBreakClash = true;
+                    }
+                } else if (periodAfterBreak >= 0 && periodIdx === periodAfterBreak) {
+                    const beforeBreakCell = routineData[cls]?.[day]?.[periodBeforeBreak] || '';
+                    const { teacher: beforeTeacher } = parseSubjectTeacher(beforeBreakCell);
+                    if (beforeTeacher && beforeTeacher.split('/').some(t => t.trim() === teacherName)) {
+                        isBreakClash = true;
+                    }
+                }
+            }
+
+            // Subject repetition today
+            const dayRoutine = routineData[cls]?.[day] || [];
+            dayRoutine.forEach((cell, idx) => {
+                if (idx !== periodIdx && cell) {
+                    const { subject: s } = parseSubjectTeacher(cell);
+                    if (s === opt.subject || subjectNameNormalization[s] === subjectNameNormalization[opt.subject]) {
+                        subjectRepetitionCount++;
+                    }
+                }
+            });
+
+            return {
+                ...opt,
+                busyInClass,
+                isConsecutive,
+                isBreakClash,
+                subjectRepetitionCount
+            };
+        });
+    }, [optionsForClass, routineData, cls, day, periodIdx, columns]);
+
+    const filteredOptions = useMemo(() => {
+        if (!searchQuery.trim()) return evaluatedOptions;
+        const q = searchQuery.toLowerCase();
+        return evaluatedOptions.filter(o => 
+            o.subject.toLowerCase().includes(q) || 
+            o.teacher.toLowerCase().includes(q)
+        );
+    }, [evaluatedOptions, searchQuery]);
+
     const cellInner = isEditMode ? (
-        <Input
-            value={content}
-            onChange={(e) => onCellChange(e.target.value)}
-            className={cn(
-                "w-full h-full p-1 text-[11px] border-transparent rounded-none focus:ring-0 focus:bg-amber-100 text-center min-h-[40px] bg-transparent", 
-                isConflict && "text-red-700 font-black placeholder:text-red-300"
-            )}
-            placeholder="বিষয় - শিক্ষক"
-        />
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className={cn(
+                        "w-full h-full min-h-[46px] p-1.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all rounded hover:bg-amber-100/70 group/cell border-0 bg-transparent",
+                        !content && "border border-dashed border-slate-300 bg-slate-50/70 hover:bg-slate-100",
+                        isConflict && "bg-red-100/90 text-red-800 font-black ring-2 ring-red-400"
+                    )}
+                    title={content ? `${content} (ক্লিক করে ড্রপডাউন থেকে পরিবর্তন করুন)` : "ক্লিক করে ড্রপডাউন থেকে বিষয় ও শিক্ষক নির্বাচন করুন"}
+                >
+                    {content ? (
+                        <div className="flex flex-col items-center leading-tight">
+                            <span className="text-[11px] font-black text-slate-900">{content.split(' - ')[0]}</span>
+                            <span className="text-[10px] font-bold text-primary mt-0.5">{content.split(' - ')[1] || ''}</span>
+                        </div>
+                    ) : (
+                        <span className="text-[10px] font-bold text-slate-400 group-hover/cell:text-primary flex items-center gap-0.5">
+                            <Plus className="w-3 h-3 text-emerald-600 stroke-[3]" /> নির্বাচন
+                        </span>
+                    )}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent 
+                className="w-80 p-0 font-kalpurush shadow-2xl rounded-2xl border-2 border-primary/20 z-[200] bg-white" 
+                align="center" 
+                side="bottom"
+            >
+                <div className="p-3 bg-muted/40 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                        <LayoutGrid className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-black text-slate-800">
+                            {classNamesMap[cls || ''] || cls} শ্রেণি • {day} • {periodLabels[periodIdx || 0] || `${toBengaliNumber((periodIdx || 0) + 1)}ম`}
+                        </span>
+                    </div>
+                    {content && (
+                        <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => { onCellChange(''); setIsPopoverOpen(false); }}
+                            className="h-6 px-2 text-[10px] text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-bold"
+                        >
+                            <Trash2 className="w-3 h-3 mr-1" /> খালি করুন
+                        </Button>
+                    )}
+                </div>
+
+                <div className="p-2 border-b bg-white">
+                    <Input 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="🔍 বিষয় বা শিক্ষকের নাম খুঁজুন..."
+                        className="h-8 text-xs font-bold bg-slate-50 border-slate-200"
+                    />
+                </div>
+
+                <div className="max-h-60 overflow-y-auto p-1.5 space-y-1 divide-y divide-slate-100">
+                    {filteredOptions.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-muted-foreground font-bold">
+                            কোনো বিষয়/শিক্ষক পাওয়া যায়নি
+                        </div>
+                    ) : (
+                        filteredOptions.map((opt, idx) => {
+                            const isBusy = !!opt.busyInClass;
+                            const isSelected = content === `${opt.subject} - ${opt.teacher}` || content === opt.subject;
+                            return (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                        const val = opt.teacher ? `${opt.subject} - ${opt.teacher}` : opt.subject;
+                                        onCellChange(val);
+                                        setIsPopoverOpen(false);
+                                    }}
+                                    className={cn(
+                                        "w-full text-left p-2 rounded-xl transition-all flex flex-col gap-1 cursor-pointer",
+                                        isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-slate-100/80",
+                                        isBusy && "bg-rose-50/50 border border-rose-200/50"
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-xs font-black text-slate-800">
+                                            {opt.subject}
+                                        </span>
+                                        {opt.teacher && (
+                                            <span className="text-[11px] font-bold text-primary">
+                                                {opt.teacher}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-1 items-center mt-0.5">
+                                        {isBusy ? (
+                                            <span className="text-[9px] font-black text-rose-700 bg-rose-100/90 px-1.5 py-0.5 rounded border border-rose-300">
+                                                ⚠️ ব্যস্ত ({opt.busyInClass} শ্রেণিতে ক্লাস আছে)
+                                            </span>
+                                        ) : opt.teacher ? (
+                                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                ✓ ফ্রি (উপলব্ধ)
+                                            </span>
+                                        ) : null}
+
+                                        {opt.isConsecutive && (
+                                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                                টানা ক্লাস
+                                            </span>
+                                        )}
+
+                                        {opt.isBreakClash && (
+                                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                                টিফিন বিরতি সংঘর্ষ
+                                            </span>
+                                        )}
+
+                                        {opt.subjectRepetitionCount > 0 && (
+                                            <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                                আজ {toBengaliNumber(opt.subjectRepetitionCount)}টি ক্লাস আছে
+                                            </span>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="p-2.5 bg-slate-50 border-t flex items-center gap-1.5">
+                    <Input 
+                        value={customText}
+                        onChange={(e) => setCustomText(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customText.trim()) {
+                                e.preventDefault();
+                                onCellChange(customText.trim());
+                                setIsPopoverOpen(false);
+                            }
+                        }}
+                        placeholder="কাস্টম: বিষয় - শিক্ষক"
+                        className="h-8 text-xs font-bold bg-white"
+                    />
+                    <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                            if (customText.trim()) {
+                                onCellChange(customText.trim());
+                                setIsPopoverOpen(false);
+                            }
+                        }}
+                        disabled={!customText.trim()}
+                        className="h-8 px-2.5 text-xs font-bold shrink-0"
+                    >
+                        সেট
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
     ) : (
         <div className="p-2 print:p-0.5 text-[11px] print:text-[8px] text-center leading-tight break-words font-medium">
             {displayContent || <>&nbsp;</>}
@@ -1470,6 +1828,7 @@ export default function RoutinesPage() {
     const { user, hasPermission } = useAuth();
     
     const [allStaff, setAllStaff] = useState<Staff[]>([]);
+    const [allocationsList, setAllocationsList] = useState<{ className: string; subjectName: string; teacherName: string }[]>([]);
 
     const canManageRoutines = hasPermission('manage:routines');
     const canViewProxy = hasPermission('view:proxy-classes');
@@ -1479,13 +1838,26 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData, colsFromDb] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
             getStaff(db),
-            getRoutineColumns(db, selectedYear)
+            getRoutineColumns(db, selectedYear),
+            getTeacherAllocations(db, selectedYear)
         ]);
         setAllStaff(staffData);
         setColumns(colsFromDb);
+
+        const flatAllocations: { className: string; subjectName: string; teacherName: string }[] = [];
+        allocationsFromDb.forEach(rec => {
+            rec.allocations?.forEach(a => {
+                flatAllocations.push({
+                    className: a.className,
+                    subjectName: a.subjectName,
+                    teacherName: rec.teacherName
+                });
+            });
+        });
+        setAllocationsList(flatAllocations);
         
         const numPeriods = colsFromDb.filter(c => c.type === 'period').length || 6;
         const transformedData: Record<string, Record<string, string[]>> = {};
@@ -1873,6 +2245,7 @@ export default function RoutinesPage() {
                                                 onDeleteColumn={openDeleteColumn}
                                                 onEditColumn={openEditColumn}
                                                 selectedClass={selectedClassFilter}
+                                                allocationsList={allocationsList}
                                             />
                                         </div>
                                     )}
@@ -2096,6 +2469,7 @@ export default function RoutinesPage() {
                         isMounted={isMounted}
                         columns={columns}
                         selectedClass={selectedClassFilter}
+                        allocationsList={allocationsList}
                     />
                 </div>
                 <footer className="mt-12 flex justify-between border-t-2 border-black pt-4">
