@@ -1155,7 +1155,8 @@ const CombinedRoutineTable = ({
     columns = DEFAULT_ROUTINE_COLUMNS,
     onAddColumn,
     onDeleteColumn,
-    onEditColumn
+    onEditColumn,
+    selectedClass = 'all'
 }: { 
     routineData: Record<string, Record<string, string[]>>, 
     conflicts: any, 
@@ -1166,11 +1167,13 @@ const CombinedRoutineTable = ({
     columns?: RoutineColumnConfig[],
     onAddColumn?: (insertAfterIndex: number) => void,
     onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void,
-    onEditColumn?: (col: RoutineColumnConfig, index: number) => void
+    onEditColumn?: (col: RoutineColumnConfig, index: number) => void,
+    selectedClass?: string
 }) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const days = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
-    const classes = ['6', '7', '8', '9', '10'];
+    const allClasses = ['6', '7', '8', '9', '10'];
+    const classes = (selectedClass && selectedClass !== 'all') ? [selectedClass] : allClasses;
 
     let periodCounter = 0;
     const columnsWithPeriodIdx = (columns || DEFAULT_ROUTINE_COLUMNS).map(col => {
@@ -1438,6 +1441,7 @@ export default function RoutinesPage() {
     const [originalRoutineData, setOriginalRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
+    const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
@@ -1815,6 +1819,48 @@ export default function RoutinesPage() {
                                 <div className="animate-in fade-in duration-500">
                                     {activeSection === 'class-routine' && (
                                         <div className="space-y-6">
+                                            {/* Dropdown for Combined vs Individual Class */}
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 p-4 rounded-2xl border border-slate-200 shadow-xs no-print">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2.5 rounded-xl bg-primary text-white shadow-sm">
+                                                        <LayoutGrid className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
+                                                            রুটিন ভিউ / শ্রেণি নির্বাচন:
+                                                        </Label>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <Select value={selectedClassFilter} onValueChange={setSelectedClassFilter}>
+                                                                <SelectTrigger className="w-[250px] h-10 font-black text-sm bg-white border-2 border-primary/40 rounded-xl shadow-xs focus:ring-primary focus:border-primary">
+                                                                    <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
+                                                                </SelectTrigger>
+                                                                <SelectContent className="font-kalpurush">
+                                                                    <SelectItem value="all" className="font-black py-2 text-primary">
+                                                                        📋 সকল শ্রেণি (সমন্বিত রুটিন)
+                                                                    </SelectItem>
+                                                                    {Object.entries(classNamesMap).map(([val, label]) => (
+                                                                        <SelectItem key={val} value={val} className="font-bold py-2">
+                                                                            🏫 {label} শ্রেণি
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/95 px-4 py-2.5 rounded-xl border border-slate-200 shadow-xs">
+                                                    <Info className="w-4 h-4 text-primary shrink-0" />
+                                                    {selectedClassFilter === 'all' ? (
+                                                        <span>সকল শ্রেণির সমন্বিত মাস্টার রুটিন প্রদর্শিত হচ্ছে।</span>
+                                                    ) : (
+                                                        <span>
+                                                            <strong className="text-primary font-black">{classNamesMap[selectedClassFilter]} শ্রেণি</strong>-র পৃথক রুটিন। এখানে তৈরিকৃত বা পরিবর্তিত রুটিন স্বয়ংক্রিয়ভাবে সমন্বিত রুটিনে যুক্ত হয়ে যাবে।
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
                                             <CombinedRoutineTable 
                                                 routineData={routineData} 
                                                 conflicts={displayConflicts} 
@@ -1826,6 +1872,7 @@ export default function RoutinesPage() {
                                                 onAddColumn={openAddColumn}
                                                 onDeleteColumn={openDeleteColumn}
                                                 onEditColumn={openEditColumn}
+                                                selectedClass={selectedClassFilter}
                                             />
                                         </div>
                                     )}
@@ -2031,7 +2078,12 @@ export default function RoutinesPage() {
                     <div className="text-center flex-grow">
                         <h1 className="text-2xl font-black">{schoolInfo.name}</h1>
                         <p className="text-xs font-bold">{schoolInfo.address}</p>
-                        <h2 className="text-lg font-black mt-2 underline">ক্লাস রুটিন - {Number(selectedYear).toLocaleString('bn-BD')}</h2>
+                        <h2 className="text-lg font-black mt-2 underline">
+                            {selectedClassFilter === 'all' 
+                                ? `সমন্বিত ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}` 
+                                : `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}`
+                            }
+                        </h2>
                     </div>
                 </header>
                 <div className="flex-1">
@@ -2043,6 +2095,7 @@ export default function RoutinesPage() {
                         teacherColorMap={teacherColorMap} 
                         isMounted={isMounted}
                         columns={columns}
+                        selectedClass={selectedClassFilter}
                     />
                 </div>
                 <footer className="mt-12 flex justify-between border-t-2 border-black pt-4">
