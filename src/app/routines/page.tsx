@@ -80,6 +80,7 @@ const CLASS_9_10_COMBINED_PAIRS: {
     { subjects: ['রসায়ন', 'ভূগোল ও পরিবেশ'], shortNames: ['রসায়ন', 'ভূগোল'] },
     { subjects: ['পদার্থ', 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা'], shortNames: ['পদার্থ', 'ইতিহাস'] },
     { subjects: ['বাংলাদেশ ও বিশ্ব পরিচয়', 'সাধারণ বিজ্ঞান'], shortNames: ['বা ও বি', 'বিজ্ঞান'] },
+    { subjects: ['কৃষি শিক্ষা', 'উচ্চতর গণিত'], shortNames: ['কৃষি', 'উচ্চতর'] },
 ];
 
 const teacherAllocations: Record<string, Record<string, string[]>> = {
