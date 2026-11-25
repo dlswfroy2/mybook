@@ -1082,12 +1082,12 @@ export default function TeacherDiaryPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-end justify-between bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-200 no-print">
-            <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-end justify-between bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-200 no-print">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 sm:gap-4 items-end w-full sm:w-auto">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-indigo-700 uppercase ml-1">মাস</label>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-32 font-bold border-2 border-black bg-white h-11">
+                  <SelectTrigger className="w-full sm:w-36 font-bold border-2 border-black bg-white h-11">
                     <SelectValue placeholder="মাস" />
                   </SelectTrigger>
                   <SelectContent className="font-kalpurush border-2 border-black">
@@ -1100,13 +1100,13 @@ export default function TeacherDiaryPage() {
                 <Input 
                   value={selectedYear} 
                   onChange={e => setSelectedYear(e.target.value)} 
-                  className="w-24 font-bold border-2 border-black h-11 text-center"
+                  className="w-full sm:w-28 font-bold border-2 border-black bg-white h-11 text-center"
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-indigo-700 uppercase ml-1">শ্রেণি ফিল্টার</label>
                 <Select value={filterClass} onValueChange={v => { setFilterClass(v); setFilterSubject('all'); }}>
-                  <SelectTrigger className="w-32 font-bold border-2 border-black bg-white h-11">
+                  <SelectTrigger className="w-full sm:w-36 font-bold border-2 border-black bg-white h-11">
                     <SelectValue placeholder="সব শ্রেণি" />
                   </SelectTrigger>
                   <SelectContent className="font-kalpurush border-2 border-black">
@@ -1118,7 +1118,7 @@ export default function TeacherDiaryPage() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-indigo-700 uppercase ml-1">বিষয় ফিল্টার</label>
                 <Select value={filterSubject} onValueChange={setFilterSubject}>
-                  <SelectTrigger className="w-40 font-bold border-2 border-black bg-white h-11">
+                  <SelectTrigger className="w-full sm:w-40 font-bold border-2 border-black bg-white h-11">
                     <SelectValue placeholder="সব বিষয়" />
                   </SelectTrigger>
                   <SelectContent className="font-kalpurush border-2 border-black">
@@ -1131,7 +1131,7 @@ export default function TeacherDiaryPage() {
             <Button 
               onClick={() => window.print()}
               variant="outline"
-              className="gap-2 font-black border-2 border-black hover:bg-black hover:text-white transition-all h-11 px-6 shadow-md bg-white"
+              className="w-full sm:w-auto gap-2 font-black border-2 border-black hover:bg-black hover:text-white transition-all h-11 px-6 shadow-md bg-white"
             >
               <Printer className="w-4 h-4" /> প্রিন্ট করুন
             </Button>
@@ -1177,8 +1177,8 @@ export default function TeacherDiaryPage() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-hidden border-2 border-black rounded-xl shadow-xl bg-white">
-                <table className="w-full border-collapse">
+              <div className="w-full overflow-x-auto touch-pan-x border-2 border-black rounded-xl shadow-xl bg-white print:overflow-visible">
+                <table className="w-full min-w-[680px] print:min-w-full border-collapse">
                   <thead>
                     <tr className="bg-indigo-600 text-white border-b-2 border-black">
                       <th className="p-4 border-r-2 border-black text-sm font-black w-24">তারিখ</th>

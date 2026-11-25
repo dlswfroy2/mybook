@@ -2704,25 +2704,25 @@ export default function RoutinesPage() {
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F6F7F9] font-kalpurush">
             
-            <main className="flex-1 p-4 md:p-10 pb-20">
-                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8">
-                    <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 sticky top-20 md:top-28 self-start">
+            <main className="flex-1 p-3 sm:p-4 md:p-10 pb-20 print:hidden">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-6 md:gap-8">
+                    <aside className="w-full md:w-64 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-3 sm:p-4 md:p-0 rounded-2xl md:rounded-none border md:border-0 md:sticky md:top-28 self-start">
                         <h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">রুটিন শাখা</h2>
-                        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 scrollbar-none">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-col gap-2 md:gap-1">
                             {sidebarItems.map(item => (
                                 <button
                                     key={item.id}
                                     onClick={() => setActiveSection(item.id)}
                                     className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold whitespace-nowrap min-w-fit",
-                                        activeSection === item.id ? "bg-white shadow-md text-primary scale-105" : "text-muted-foreground hover:bg-slate-200/50"
+                                        "flex items-center gap-2 md:gap-3 px-2.5 py-2.5 md:px-4 md:py-3 rounded-xl transition-all duration-300 font-bold w-full text-left border md:border-0",
+                                        activeSection === item.id ? "bg-white shadow-md text-primary border-primary/30 md:scale-105" : "bg-slate-50/70 md:bg-transparent text-muted-foreground border-slate-200/70 hover:bg-slate-200/50"
                                     )}
                                 >
                                     <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}>
                                         <item.icon className="h-3.5 w-3.5" />
                                     </div>
-                                    <span className="text-sm font-black">{item.label}</span>
-                                    {activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block" />}
+                                    <span className="text-xs md:text-sm font-black truncate">{item.label}</span>
+                                    {activeSection === item.id && <ChevronRight className="ml-auto h-3.5 w-3.5 hidden md:block shrink-0" />}
                                 </button>
                             ))}
                         </div>
@@ -2735,17 +2735,17 @@ export default function RoutinesPage() {
                                     <h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2>
                                     <p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {Number(selectedYear).toLocaleString('bn-BD')}</p>
                                 </div>
-                                <div className="flex flex-wrap gap-2 no-print">
+                                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full sm:w-auto no-print">
                                     {isEditMode ? (
                                         <>
-                                            <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)} className="font-bold">বাতিল</Button>
-                                            <Button size="sm" onClick={handleSaveChanges} className="font-black shadow-md"><Save className="mr-2 h-4 w-4" /> সেভ করুন</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)} className="font-bold w-full sm:w-auto h-10">বাতিল</Button>
+                                            <Button size="sm" onClick={handleSaveChanges} className="font-black shadow-md w-full sm:w-auto h-10"><Save className="mr-2 h-4 w-4" /> সেভ করুন</Button>
                                         </>
                                     ) : (
                                         <>
-                                            <Button variant="outline" size="sm" onClick={() => window.print()} className="font-bold bg-white"><Printer className="mr-2 h-4 w-4" /> প্রিন্ট</Button>
+                                            <Button variant="outline" size="sm" onClick={() => window.print()} className="font-bold bg-white w-full sm:w-auto h-10"><Printer className="mr-2 h-4 w-4" /> প্রিন্ট</Button>
                                             {canManageRoutines && activeSection === 'class-routine' && (
-                                                <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)} className="font-bold bg-white"><FilePen className="mr-2 h-4 w-4" /> এডিট</Button>
+                                                <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)} className="font-bold bg-white w-full sm:w-auto h-10"><FilePen className="mr-2 h-4 w-4" /> এডিট</Button>
                                             )}
                                         </>
                                     )}
@@ -2760,8 +2760,8 @@ export default function RoutinesPage() {
                                         <div className="space-y-6">
                                             {/* Dropdowns for View, Scope, and Format */}
                                             <div className="flex flex-col gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 p-4 rounded-2xl border border-slate-200 shadow-xs no-print">
-                                                <div className="flex flex-wrap items-end gap-4">
-                                                    <div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-end gap-3 lg:gap-4">
+                                                    <div className="w-full lg:w-auto">
                                                         <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
                                                             রুটিন ভিউ / শ্রেণি নির্বাচন:
                                                         </Label>
@@ -2774,7 +2774,7 @@ export default function RoutinesPage() {
                                                                 }
                                                             }}
                                                         >
-                                                            <SelectTrigger className="w-[220px] h-10 mt-1 font-black text-sm bg-white border-2 border-primary/40 rounded-xl shadow-xs">
+                                                            <SelectTrigger className="w-full lg:w-[230px] h-10 mt-1 font-black text-sm bg-white border-2 border-primary/40 rounded-xl shadow-xs">
                                                                 <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
                                                             </SelectTrigger>
                                                             <SelectContent className="font-kalpurush">
@@ -2792,7 +2792,7 @@ export default function RoutinesPage() {
                                                         </Select>
                                                     </div>
 
-                                                    <div>
+                                                    <div className="w-full lg:w-auto">
                                                         <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
                                                             রুটিনের ধরন:
                                                         </Label>
@@ -2805,7 +2805,7 @@ export default function RoutinesPage() {
                                                                 }
                                                             }}
                                                         >
-                                                            <SelectTrigger className="w-[260px] h-10 mt-1 font-black text-sm bg-white border-2 border-indigo-300 rounded-xl shadow-xs">
+                                                            <SelectTrigger className="w-full lg:w-[250px] h-10 mt-1 font-black text-sm bg-white border-2 border-indigo-300 rounded-xl shadow-xs">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent className="font-kalpurush">
@@ -2819,12 +2819,12 @@ export default function RoutinesPage() {
                                                         </Select>
                                                     </div>
 
-                                                    <div>
+                                                    <div className="w-full sm:col-span-2 lg:col-span-1 lg:w-auto">
                                                         <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
                                                             রুটিন তৈরির পদ্ধতি:
                                                         </Label>
                                                         <Select value={routineFormat} onValueChange={(val: 'day' | 'date') => setRoutineFormat(val)}>
-                                                            <SelectTrigger className="w-[210px] h-10 mt-1 font-black text-sm bg-white border-2 border-emerald-300 rounded-xl shadow-xs">
+                                                            <SelectTrigger className="w-full lg:w-[220px] h-10 mt-1 font-black text-sm bg-white border-2 border-emerald-300 rounded-xl shadow-xs">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent className="font-kalpurush">
@@ -3178,13 +3178,13 @@ export default function RoutinesPage() {
                 </AlertDialog>
             </main>
 
-            <div className="printable-area routine-print-container text-black bg-white hidden print:flex p-10 flex-col font-kalpurush">
-                <header className="flex items-center gap-4 border-b-4 border-emerald-800 pb-2 mb-6">
-                    {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={60} height={60} className="object-contain" />}
+            <div className="printable-area routine-print-container text-black bg-white hidden print:flex p-4 flex-col font-kalpurush w-full">
+                <header className="flex items-center gap-4 border-b-4 border-emerald-800 pb-2 mb-4">
+                    {schoolInfo.logoUrl && <Image src={schoolInfo.logoUrl} alt="Logo" width={54} height={54} className="object-contain" />}
                     <div className="text-center flex-grow">
-                        <h1 className="text-2xl font-black">{schoolInfo.name}</h1>
+                        <h1 className="text-xl font-black">{schoolInfo.name}</h1>
                         <p className="text-xs font-bold">{schoolInfo.address}</p>
-                        <h2 className="text-lg font-black mt-2 underline">
+                        <h2 className="text-base font-black mt-1 underline">
                             {routineScope === 'standalone' && selectedClassFilter !== 'all'
                                 ? (standaloneRoutine?.title || `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির স্বতন্ত্র রুটিন - ${toBengaliNumber(selectedYear)}`)
                                 : selectedClassFilter === 'all' 
@@ -3194,7 +3194,7 @@ export default function RoutinesPage() {
                         </h2>
                     </div>
                 </header>
-                <div className="flex-1">
+                <div className="flex-1 w-full">
                     {routineFormat === 'date' ? (
                         <DateRoutineTable
                             rows={
@@ -3234,11 +3234,34 @@ export default function RoutinesPage() {
                         />
                     )}
                 </div>
-                <footer className="mt-12 flex justify-between border-t-2 border-black pt-4">
+                <footer className="mt-8 flex justify-between border-t-2 border-black pt-3">
                     <div className="w-40 border-t border-black text-center font-bold text-xs pt-1">রুটিন কমিটির স্বাক্ষর</div>
                     <div className="w-40 border-t border-black text-center font-bold text-xs pt-1">প্রধান শিক্ষকের স্বাক্ষর</div>
                 </footer>
             </div>
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        size: landscape;
+                        margin: 8mm;
+                    }
+                    body {
+                        background: white !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .routine-print-container table {
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        table-layout: auto !important;
+                        border-collapse: collapse !important;
+                    }
+                    .routine-print-container th,
+                    .routine-print-container td {
+                        border: 1px solid #15803d !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
