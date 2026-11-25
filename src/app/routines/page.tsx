@@ -1462,6 +1462,7 @@ const DateRoutineTable = ({
     teacherColorMap,
     isMounted,
     allocationsList = [],
+    mainRoutineData,
     onDateChange,
     onCellChange,
     onAddRow,
@@ -1477,6 +1478,7 @@ const DateRoutineTable = ({
     teacherColorMap: Map<string, string>;
     isMounted: boolean;
     allocationsList?: { className: string; subjectName: string; teacherName: string }[];
+    mainRoutineData?: Record<string, Record<string, string[]>>;
     onDateChange: (rowId: string, newDate: string) => void;
     onCellChange: (rowId: string, cls: string, periodIdx: number, value: string) => void;
     onAddRow?: () => void;
@@ -1511,6 +1513,90 @@ const DateRoutineTable = ({
         if (isNaN(d.getTime())) return dateStr;
         return toBengaliNumber(format(d, 'dd-MM-yyyy'));
     };
+
+    // Compute real-time conflicts for all date rows
+    const dateConflicts = useMemo(() => {
+        const teacherClashes = new Set<string>();
+        const consecutiveClassClashes = new Set<string>();
+        const breakClashes = new Set<string>();
+        const subjectRepetitionClashes = new Set<string>();
+        const teacherSubjectMismatchClashes = new Set<string>();
+
+        const cols = columns || DEFAULT_ROUTINE_COLUMNS;
+        const numPeriods = cols.filter(c => c.type === 'period').length || 6;
+        const breakIndexInCols = cols.findIndex(c => c.type === 'break');
+        let periodBeforeBreak = -1;
+        let periodAfterBreak = -1;
+        if (breakIndexInCols !== -1) {
+            periodBeforeBreak = cols.slice(0, breakIndexInCols).filter(c => c.type === 'period').length - 1;
+            periodAfterBreak = periodBeforeBreak + 1;
+        }
+
+        rows.forEach((row) => {
+            const dayName = getDayNameFromDate(row.date);
+            // 1. Teacher clashes per period across classes (and mainRoutineData on same weekday)
+            for (let p = 0; p < numPeriods; p++) {
+                const teacherMap = new Map<string, string[]>();
+                allClasses.forEach(c => {
+                    const cell = (row.classes?.[c]?.[p]) || (dayName && mainRoutineData?.[c]?.[dayName]?.[p]) || '';
+                    if (cell) {
+                        const { teacher } = parseSubjectTeacher(cell);
+                        if (teacher) {
+                            teacher.split('/').forEach(t => {
+                                const tn = t.trim();
+                                if (!tn) return;
+                                const list = teacherMap.get(tn) || [];
+                                list.push(`${c}-${row.id}-${p}`);
+                                teacherMap.set(tn, list);
+                            });
+                        }
+                    }
+                });
+                teacherMap.forEach(keys => {
+                    if (keys.length > 1) keys.forEach(k => teacherClashes.add(k));
+                });
+            }
+
+            // 2. Per-class consecutive, break clash, and subject repetition
+            classes.forEach(c => {
+                const periods = row.classes?.[c] || [];
+                const subjCount = new Map<string, string[]>();
+                for (let p = 0; p < periods.length; p++) {
+                    const cell = periods[p];
+                    if (!cell) continue;
+                    const key = `${c}-${row.id}-${p}`;
+                    const { subject, teacher } = parseSubjectTeacher(cell);
+                    if (subject) {
+                        const norm = subjectNameNormalization[subject] || subject;
+                        const list = subjCount.get(norm) || [];
+                        list.push(key);
+                        subjCount.set(norm, list);
+                    }
+                    if (teacher && p > 0 && periods[p - 1]) {
+                        const prevT = parseSubjectTeacher(periods[p - 1]).teacher;
+                        if (prevT) {
+                            const curList = teacher.split('/').map(x => x.trim());
+                            const prevList = prevT.split('/').map(x => x.trim());
+                            if (curList.some(x => prevList.includes(x))) {
+                                if (periodBeforeBreak >= 0 && p === periodAfterBreak) {
+                                    breakClashes.add(key);
+                                    breakClashes.add(`${c}-${row.id}-${p - 1}`);
+                                } else {
+                                    consecutiveClassClashes.add(key);
+                                    consecutiveClassClashes.add(`${c}-${row.id}-${p - 1}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                subjCount.forEach(keys => {
+                    if (keys.length > 1) keys.forEach(k => subjectRepetitionClashes.add(k));
+                });
+            });
+        });
+
+        return { teacherClashes, consecutiveClassClashes, breakClashes, subjectRepetitionClashes, teacherSubjectMismatchClashes };
+    }, [rows, columns, mainRoutineData, classes]);
 
     return (
         <div className="w-full space-y-3">
@@ -1578,9 +1664,28 @@ const DateRoutineTable = ({
                         ) : (
                             rows.map((row) => {
                                 const dayName = getDayNameFromDate(row.date);
+                                // Build routineData view for EditableCell rule evaluation:
+                                // - For current classes: include ALL date rows under r.id so weekly count & same-date checks work
+                                // - For other classes: include this row's other classes + mainRoutineData on that weekday
                                 const rowAsRoutineData: Record<string, Record<string, string[]>> = {};
-                                classes.forEach(c => {
-                                    rowAsRoutineData[c] = { [dayName || row.date]: row.classes?.[c] || [] };
+                                allClasses.forEach(c => {
+                                    rowAsRoutineData[c] = {};
+                                    rows.forEach(r => {
+                                        if (r.classes?.[c]) {
+                                            rowAsRoutineData[c][r.id] = r.classes[c];
+                                        }
+                                    });
+                                    // Merge mainRoutineData for other classes on this weekday if not already set in this date row
+                                    if (dayName && mainRoutineData?.[c]?.[dayName]) {
+                                        const existing = rowAsRoutineData[c][row.id] || [];
+                                        const mainPeriods = mainRoutineData[c][dayName];
+                                        const maxLen = Math.max(existing.length, mainPeriods.length);
+                                        const mergedPeriods: string[] = [];
+                                        for (let idx = 0; idx < maxLen; idx++) {
+                                            mergedPeriods.push(existing[idx] || (classes.includes(c) ? '' : mainPeriods[idx] || ''));
+                                        }
+                                        rowAsRoutineData[c][row.id] = mergedPeriods;
+                                    }
                                 });
 
                                 return classes.map((cls, classIndex) => (
@@ -1646,17 +1751,11 @@ const DateRoutineTable = ({
                                                     isEditMode={isEditMode}
                                                     onCellChange={(value) => onCellChange(row.id, cls, periodIdx, value)}
                                                     conflictKey={`${cls}-${row.id}-${periodIdx}`}
-                                                    conflicts={{
-                                                        teacherClashes: new Set(),
-                                                        consecutiveClassClashes: new Set(),
-                                                        breakClashes: new Set(),
-                                                        subjectRepetitionClashes: new Set(),
-                                                        teacherSubjectMismatchClashes: new Set()
-                                                    }}
+                                                    conflicts={dateConflicts}
                                                     teacherColorMap={teacherColorMap}
                                                     isMounted={isMounted}
                                                     cls={cls}
-                                                    day={dayName || row.date}
+                                                    day={row.id}
                                                     periodIdx={periodIdx}
                                                     routineData={rowAsRoutineData}
                                                     columns={columns}
@@ -2774,6 +2873,7 @@ export default function RoutinesPage() {
                                                     teacherColorMap={teacherColorMap}
                                                     isMounted={isMounted}
                                                     allocationsList={allocationsList}
+                                                    mainRoutineData={routineData}
                                                     onAddColumn={openAddColumn}
                                                     onDeleteColumn={openDeleteColumn}
                                                     onEditColumn={openEditColumn}
@@ -2843,7 +2943,7 @@ export default function RoutinesPage() {
                                                 <CombinedRoutineTable 
                                                     routineData={
                                                         routineScope === 'standalone' && standaloneRoutine
-                                                            ? { [selectedClassFilter]: standaloneRoutine.dayData || {} }
+                                                            ? { ...routineData, [selectedClassFilter]: standaloneRoutine.dayData || {} }
                                                             : routineData
                                                     } 
                                                     conflicts={routineScope === 'standalone' ? {
@@ -3112,6 +3212,7 @@ export default function RoutinesPage() {
                             teacherColorMap={teacherColorMap}
                             isMounted={isMounted}
                             allocationsList={allocationsList}
+                            mainRoutineData={routineData}
                             onDateChange={() => {}}
                             onCellChange={() => {}}
                         />
