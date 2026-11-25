@@ -72,6 +72,16 @@ const subjectNameNormalization: { [key: string]: string } = {
     'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি',
 };
 
+const CLASS_9_10_COMBINED_PAIRS: {
+    subjects: [string, string];
+    shortNames: [string, string];
+}[] = [
+    { subjects: ['জীব বিজ্ঞান', 'পৌরনীতি ও নাগরিকতা'], shortNames: ['জীব', 'পৌরনীতি'] },
+    { subjects: ['রসায়ন', 'ভূগোল ও পরিবেশ'], shortNames: ['রসায়ন', 'ভূগোল'] },
+    { subjects: ['পদার্থ', 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা'], shortNames: ['পদার্থ', 'ইতিহাস'] },
+    { subjects: ['বাংলাদেশ ও বিশ্ব পরিচয়', 'সাধারণ বিজ্ঞান'], shortNames: ['বা ও বি', 'বিজ্ঞান'] },
+];
+
 const teacherAllocations: Record<string, Record<string, string[]>> = {
     'ওবায়দা': {
         'বাংলা প্রথম': ['6', '7', '8', '9', '10']
@@ -835,6 +845,29 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
 
     useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
 
+    // Subjects already allocated to any teacher in the currently selected class
+    const allocatedSubjectsInClass = useMemo(() => {
+        const set = new Set<string>();
+        allocations.forEach(rec => {
+            rec.allocations.forEach(a => {
+                if (a.className === selectedClass) {
+                    set.add(a.subjectName);
+                }
+            });
+        });
+        return set;
+    }, [allocations, selectedClass]);
+
+    const availableSubjectsForClass = useMemo(() => {
+        return getSubjects(selectedClass).filter(s => !allocatedSubjectsInClass.has(s.name));
+    }, [selectedClass, allocatedSubjectsInClass]);
+
+    useEffect(() => {
+        if (selectedSubject && !availableSubjectsForClass.some(s => s.name === selectedSubject)) {
+            setSelectedSubject('');
+        }
+    }, [availableSubjectsForClass, selectedSubject]);
+
     const handleAddAllocation = async () => {
         if (!db || !selectedTeacher || !selectedClass || !selectedSubject) return;
         
@@ -915,7 +948,17 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocati
                             <Label className="font-bold">বিষয়</Label>
                             <Select value={selectedSubject} onValueChange={setSelectedSubject}>
                                 <SelectTrigger className="bg-white"><SelectValue placeholder="বিষয়" /></SelectTrigger>
-                                <SelectContent>{getSubjects(selectedClass).map((s, idx) => <SelectItem key={`${s.name}-${idx}`} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                                <SelectContent>
+                                    {availableSubjectsForClass.length === 0 ? (
+                                        <div className="py-2 px-3 text-xs text-muted-foreground font-bold text-center">
+                                            এই শ্রেণির সকল বিষয় বরাদ্দ করা হয়েছে
+                                        </div>
+                                    ) : (
+                                        availableSubjectsForClass.map((s, idx) => (
+                                            <SelectItem key={`${s.name}-${idx}`} value={s.name}>{s.name}</SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
                             </Select>
                         </div>
                         <Button onClick={handleAddAllocation} disabled={isSaving || !selectedTeacher || !selectedSubject} className="font-black h-10 shadow-md">
@@ -1489,18 +1532,20 @@ const EditableCell = ({
     // 1. Build list of allocated subject-teacher pairs for this class
     const optionsForClass = useMemo(() => {
         if (!cls) return [];
-        const list: { subject: string; teacher: string }[] = [];
+        const list: { subject: string; teacher: string; searchExtra?: string }[] = [];
         const seen = new Set<string>();
+        const allocatedByNormSub = new Map<string, string>();
+        const rawAllocations: { subject: string; teacher: string }[] = [];
 
         // From allocationsList
         if (allocationsList && allocationsList.length > 0) {
             allocationsList
                 .filter(a => a.className === cls)
                 .forEach(a => {
-                    const key = `${a.subjectName}|${a.teacherName}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        list.push({ subject: a.subjectName, teacher: a.teacherName });
+                    const norm = subjectNameNormalization[a.subjectName] || a.subjectName;
+                    if (!allocatedByNormSub.has(norm)) {
+                        allocatedByNormSub.set(norm, a.teacherName);
+                        rawAllocations.push({ subject: a.subjectName, teacher: a.teacherName });
                     }
                 });
         }
@@ -1510,22 +1555,61 @@ const EditableCell = ({
             Object.entries(teacherAllocations).forEach(([tName, subMap]) => {
                 Object.entries(subMap).forEach(([subject, classList]) => {
                     if (classList.includes(cls)) {
-                        const key = `${subject}|${tName}`;
-                        if (!seen.has(key)) {
-                            seen.add(key);
-                            list.push({ subject, teacher: tName });
+                        const norm = subjectNameNormalization[subject] || subject;
+                        if (!allocatedByNormSub.has(norm)) {
+                            allocatedByNormSub.set(norm, tName);
+                            rawAllocations.push({ subject, teacher: tName });
                         }
                     }
                 });
             });
         }
 
-        // From routineData
+        const isNineOrTen = cls === '9' || cls === '10';
+        const findCombinedPair = (subName: string) => {
+            if (!isNineOrTen) return null;
+            const norm = subjectNameNormalization[subName] || subName;
+            return CLASS_9_10_COMBINED_PAIRS.find(p =>
+                (subjectNameNormalization[p.subjects[0]] || p.subjects[0]) === norm ||
+                (subjectNameNormalization[p.subjects[1]] || p.subjects[1]) === norm
+            ) || null;
+        };
+
+        rawAllocations.forEach(({ subject, teacher }) => {
+            const pair = findCombinedPair(subject);
+            if (pair) {
+                const norm1 = subjectNameNormalization[pair.subjects[0]] || pair.subjects[0];
+                const norm2 = subjectNameNormalization[pair.subjects[1]] || pair.subjects[1];
+                const t1 = allocatedByNormSub.get(norm1) || '';
+                const t2 = allocatedByNormSub.get(norm2) || '';
+                const combinedSub = `${pair.shortNames[0]}/${pair.shortNames[1]}`;
+                const combinedTeacher = t1 && t2 ? (t1 === t2 ? t1 : `${t1}/${t2}`) : (t1 || t2);
+                const key = `${combinedSub}|${combinedTeacher}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    list.push({
+                        subject: combinedSub,
+                        teacher: combinedTeacher,
+                        searchExtra: `${pair.subjects[0]} ${pair.subjects[1]}`
+                    });
+                }
+            } else {
+                const key = `${subject}|${teacher}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    list.push({ subject, teacher });
+                }
+            }
+        });
+
+        // From routineData (only for unallocated/custom entries)
         if (routineData && routineData[cls]) {
             Object.values(routineData[cls]).forEach(pList => {
                 pList.forEach(cell => {
                     const { subject: s, teacher: t } = parseSubjectTeacher(cell);
                     if (s && t) {
+                        const norm = subjectNameNormalization[s] || s;
+                        if (allocatedByNormSub.has(norm)) return;
                         const key = `${s}|${t}`;
                         if (!seen.has(key)) {
                             seen.add(key);
@@ -1539,6 +1623,21 @@ const EditableCell = ({
         // Add class subjects from getSubjects(cls) if not present
         const classSubjects = getSubjects(cls);
         classSubjects.forEach(s => {
+            const norm = subjectNameNormalization[s.name] || s.name;
+            if (allocatedByNormSub.has(norm)) return;
+            const pair = findCombinedPair(s.name);
+            if (pair) {
+                const combinedSub = `${pair.shortNames[0]}/${pair.shortNames[1]}`;
+                const hasPair = list.some(item => item.subject === combinedSub);
+                if (!hasPair) {
+                    list.push({
+                        subject: combinedSub,
+                        teacher: '',
+                        searchExtra: `${pair.subjects[0]} ${pair.subjects[1]}`
+                    });
+                }
+                return;
+            }
             const hasSub = list.some(item => item.subject === s.name || subjectNameNormalization[item.subject] === s.name);
             if (!hasSub) {
                 list.push({ subject: s.name, teacher: '' });
@@ -1564,23 +1663,30 @@ const EditableCell = ({
         }
 
         return optionsForClass.map(opt => {
-            const teacherName = opt.teacher.trim();
+            const teachersToCheck = opt.teacher.split('/').map(t => t.trim()).filter(Boolean);
             let busyInClass = '';
             let isConsecutive = false;
             let isBreakClash = false;
             let subjectRepetitionCount = 0;
 
-            if (teacherName) {
-                // Check if teacher is busy in any other class at this day and periodIdx
+            const matchesAnyTeacher = (cellTeacherStr: string | null, fuzzy = false) => {
+                if (!cellTeacherStr || teachersToCheck.length === 0) return false;
+                const cellTeachers = cellTeacherStr.split('/').map(t => t.trim()).filter(Boolean);
+                return teachersToCheck.some(tName =>
+                    cellTeachers.some(tr =>
+                        fuzzy ? (tr === tName || tr.includes(tName) || tName.includes(tr)) : (tr === tName)
+                    )
+                );
+            };
+
+            if (teachersToCheck.length > 0) {
+                // Check if any teacher is busy in any other class at this day and periodIdx
                 Object.keys(routineData).forEach(otherCls => {
                     if (otherCls !== cls) {
                         const otherCell = routineData[otherCls]?.[day]?.[periodIdx] || '';
                         if (otherCell) {
                             const { teacher: otherTeacher } = parseSubjectTeacher(otherCell);
-                            if (otherTeacher && otherTeacher.split('/').some(t => {
-                                const tr = t.trim();
-                                return tr === teacherName || tr.includes(teacherName) || teacherName.includes(tr);
-                            })) {
+                            if (matchesAnyTeacher(otherTeacher, true)) {
                                 busyInClass = classNamesMap[otherCls] || otherCls;
                             }
                         }
@@ -1591,14 +1697,14 @@ const EditableCell = ({
                 if (periodIdx > 0) {
                     const prevCell = routineData[cls]?.[day]?.[periodIdx - 1] || '';
                     const { teacher: prevTeacher } = parseSubjectTeacher(prevCell);
-                    if (prevTeacher && prevTeacher.split('/').some(t => t.trim() === teacherName)) {
+                    if (matchesAnyTeacher(prevTeacher)) {
                         isConsecutive = true;
                     }
                 }
                 if (periodIdx < (routineData[cls]?.[day]?.length || 0) - 1) {
                     const nextCell = routineData[cls]?.[day]?.[periodIdx + 1] || '';
                     const { teacher: nextTeacher } = parseSubjectTeacher(nextCell);
-                    if (nextTeacher && nextTeacher.split('/').some(t => t.trim() === teacherName)) {
+                    if (matchesAnyTeacher(nextTeacher)) {
                         isConsecutive = true;
                     }
                 }
@@ -1607,13 +1713,13 @@ const EditableCell = ({
                 if (periodBeforeBreak >= 0 && periodIdx === periodBeforeBreak) {
                     const afterBreakCell = routineData[cls]?.[day]?.[periodAfterBreak] || '';
                     const { teacher: afterTeacher } = parseSubjectTeacher(afterBreakCell);
-                    if (afterTeacher && afterTeacher.split('/').some(t => t.trim() === teacherName)) {
+                    if (matchesAnyTeacher(afterTeacher)) {
                         isBreakClash = true;
                     }
                 } else if (periodAfterBreak >= 0 && periodIdx === periodAfterBreak) {
                     const beforeBreakCell = routineData[cls]?.[day]?.[periodBeforeBreak] || '';
                     const { teacher: beforeTeacher } = parseSubjectTeacher(beforeBreakCell);
-                    if (beforeTeacher && beforeTeacher.split('/').some(t => t.trim() === teacherName)) {
+                    if (matchesAnyTeacher(beforeTeacher)) {
                         isBreakClash = true;
                     }
                 }
@@ -1660,7 +1766,8 @@ const EditableCell = ({
         const q = searchQuery.toLowerCase();
         return evaluatedOptions.filter(o => 
             o.subject.toLowerCase().includes(q) || 
-            o.teacher.toLowerCase().includes(q)
+            o.teacher.toLowerCase().includes(q) ||
+            (o.searchExtra && o.searchExtra.toLowerCase().includes(q))
         );
     }, [evaluatedOptions, searchQuery]);
 
