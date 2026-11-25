@@ -1187,8 +1187,40 @@ const CombinedRoutineTable = ({
         return { ...col, periodIdx: -1 };
     });
 
+    const topScrollRef = useRef<HTMLDivElement>(null);
+    const tableScrollRef = useRef<HTMLDivElement>(null);
+    const isSyncing = useRef(false);
+
+    const handleTopScroll = useCallback(() => {
+        if (isSyncing.current) return;
+        isSyncing.current = true;
+        if (tableScrollRef.current && topScrollRef.current) {
+            tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+        }
+        isSyncing.current = false;
+    }, []);
+
+    const handleTableScroll = useCallback(() => {
+        if (isSyncing.current) return;
+        isSyncing.current = true;
+        if (topScrollRef.current && tableScrollRef.current) {
+            topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+        }
+        isSyncing.current = false;
+    }, []);
+
     return (
-        <div className="overflow-x-auto w-full border-2 border-green-600 rounded-lg shadow-inner bg-white">
+        <div className="w-full">
+            {/* Top scrollbar */}
+            <div
+                ref={topScrollRef}
+                onScroll={handleTopScroll}
+                className="overflow-x-auto w-full border-x-2 border-t-2 border-green-600 rounded-t-lg bg-white print:hidden"
+                style={{ height: '18px' }}
+            >
+                <div style={{ minWidth: '900px', height: '1px' }} />
+            </div>
+        <div ref={tableScrollRef} onScroll={handleTableScroll} className="overflow-x-auto w-full border-2 border-green-600 rounded-b-lg shadow-inner bg-white print:rounded-lg print:border-t-2">
            <Table className="border-collapse w-full min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
                 <TableHeader>
                    <TableRow className="bg-muted/50 h-16 print:h-8">
@@ -1351,6 +1383,7 @@ const CombinedRoutineTable = ({
                    ))}
                </TableBody>
            </Table>
+        </div>
         </div>
     );
 };
