@@ -1494,7 +1494,7 @@ const EditableCell = ({
     // 2. Evaluate rules for each option
     const evaluatedOptions = useMemo(() => {
         if (!routineData || !cls || !day || periodIdx === undefined) {
-            return optionsForClass.map(o => ({ ...o, busyInClass: '', isConsecutive: false, isBreakClash: false, subjectRepetitionCount: 0 }));
+            return optionsForClass.map(o => ({ ...o, busyInClass: '', isConsecutive: false, isBreakClash: false, subjectRepetitionCount: 0, weeklySubjectCount: 0 }));
         }
 
         const cols = columns || DEFAULT_ROUTINE_COLUMNS;
@@ -1567,10 +1567,24 @@ const EditableCell = ({
             dayRoutine.forEach((cell, idx) => {
                 if (idx !== periodIdx && cell) {
                     const { subject: s } = parseSubjectTeacher(cell);
-                    if (s === opt.subject || subjectNameNormalization[s] === subjectNameNormalization[opt.subject]) {
+                    if (s === opt.subject || (subjectNameNormalization[s] || s) === (subjectNameNormalization[opt.subject] || opt.subject)) {
                         subjectRepetitionCount++;
                     }
                 }
+            });
+
+            // Weekly subject count for this class
+            let weeklySubjectCount = 0;
+            const classRoutine = routineData[cls] || {};
+            Object.values(classRoutine).forEach((pList) => {
+                (pList || []).forEach((cell) => {
+                    if (cell) {
+                        const { subject: s } = parseSubjectTeacher(cell);
+                        if (s === opt.subject || (subjectNameNormalization[s] || s) === (subjectNameNormalization[opt.subject] || opt.subject)) {
+                            weeklySubjectCount++;
+                        }
+                    }
+                });
             });
 
             return {
@@ -1578,7 +1592,8 @@ const EditableCell = ({
                 busyInClass,
                 isConsecutive,
                 isBreakClash,
-                subjectRepetitionCount
+                subjectRepetitionCount,
+                weeklySubjectCount
             };
         });
     }, [optionsForClass, routineData, cls, day, periodIdx, columns]);
@@ -1713,6 +1728,10 @@ const EditableCell = ({
                                                 আজ {toBengaliNumber(opt.subjectRepetitionCount)}টি ক্লাস আছে
                                             </span>
                                         )}
+
+                                        <span className="text-[9px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                            সপ্তাহে {toBengaliNumber(opt.weeklySubjectCount)}টি
+                                        </span>
                                     </div>
                                 </button>
                             );
