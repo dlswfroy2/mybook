@@ -95,6 +95,7 @@ export default function TeacherDiaryPage() {
   const [routineRecords, setRoutineRecords] = useState<ClassRoutine[]>([]);
   const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
   const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
+  const [routineSourceFilter, setRoutineSourceFilter] = useState<'main' | 'standalone' | 'both'>('main');
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -183,17 +184,19 @@ export default function TeacherDiaryPage() {
     const dates: { date: string; period: number; teacher: string; source: string }[] = [];
 
     // 1. Main day-based routine
-    routineRecords
-      .filter(r => r.className === formData.classId)
-      .forEach(r => {
-        (r.periods || []).forEach((cell, idx) => {
-          const { match, teacher } = cellMatchesSubject(cell);
-          if (match) days.push({ day: r.day, period: idx + 1, teacher, source: 'মেইন রুটিন' });
+    if (routineSourceFilter === 'main' || routineSourceFilter === 'both') {
+      routineRecords
+        .filter(r => r.className === formData.classId)
+        .forEach(r => {
+          (r.periods || []).forEach((cell, idx) => {
+            const { match, teacher } = cellMatchesSubject(cell);
+            if (match) days.push({ day: r.day, period: idx + 1, teacher, source: 'মেইন রুটিন' });
+          });
         });
-      });
+    }
 
     // 2. Standalone day-based routine
-    if (standaloneRoutine?.dayData) {
+    if ((routineSourceFilter === 'standalone' || routineSourceFilter === 'both') && standaloneRoutine?.dayData) {
       Object.entries(standaloneRoutine.dayData).forEach(([day, periods]) => {
         (periods || []).forEach((cell, idx) => {
           const { match, teacher } = cellMatchesSubject(cell);
@@ -203,16 +206,18 @@ export default function TeacherDiaryPage() {
     }
 
     // 3. Main date-based routine
-    dateRoutineRows.forEach(row => {
-      const periods = row.classes?.[formData.classId] || [];
-      periods.forEach((cell, idx) => {
-        const { match, teacher } = cellMatchesSubject(cell);
-        if (match && row.date) dates.push({ date: row.date, period: idx + 1, teacher, source: 'তারিখ রুটিন' });
+    if (routineSourceFilter === 'main' || routineSourceFilter === 'both') {
+      dateRoutineRows.forEach(row => {
+        const periods = row.classes?.[formData.classId] || [];
+        periods.forEach((cell, idx) => {
+          const { match, teacher } = cellMatchesSubject(cell);
+          if (match && row.date) dates.push({ date: row.date, period: idx + 1, teacher, source: 'তারিখ রুটিন' });
+        });
       });
-    });
+    }
 
     // 4. Standalone date-based routine
-    if (standaloneRoutine?.dateRows) {
+    if ((routineSourceFilter === 'standalone' || routineSourceFilter === 'both') && standaloneRoutine?.dateRows) {
       standaloneRoutine.dateRows.forEach(row => {
         (row.periods || []).forEach((cell, idx) => {
           const { match, teacher } = cellMatchesSubject(cell);
@@ -222,7 +227,7 @@ export default function TeacherDiaryPage() {
     }
 
     return { days, dates };
-  }, [formData.classId, formData.subject, routineRecords, dateRoutineRows, standaloneRoutine]);
+  }, [formData.classId, formData.subject, routineRecords, dateRoutineRows, standaloneRoutine, routineSourceFilter]);
 
   const getNearestDateForDay = (dayName: string) => {
     const targetDayIdx = DAY_INDEX_MAP[dayName];
@@ -266,15 +271,21 @@ export default function TeacherDiaryPage() {
     };
 
     // Date-based main & standalone for this exact date
-    const mainDateRow = dateRoutineRows.find(r => r.date === dateStr);
-    collectPeriods(mainDateRow?.classes?.[formData.classId], 'তারিখ রুটিন');
-    const standaloneDateRow = standaloneRoutine?.dateRows?.find(r => r.date === dateStr);
-    collectPeriods(standaloneDateRow?.periods, standaloneRoutine?.title || 'স্বতন্ত্র তারিখ');
+    if (routineSourceFilter === 'main' || routineSourceFilter === 'both') {
+      const mainDateRow = dateRoutineRows.find(r => r.date === dateStr);
+      collectPeriods(mainDateRow?.classes?.[formData.classId], 'তারিখ রুটিন');
+    }
+    if (routineSourceFilter === 'standalone' || routineSourceFilter === 'both') {
+      const standaloneDateRow = standaloneRoutine?.dateRows?.find(r => r.date === dateStr);
+      collectPeriods(standaloneDateRow?.periods, standaloneRoutine?.title || 'স্বতন্ত্র তারিখ');
+    }
 
     // Day-based main & standalone for this weekday
-    const mainDayRec = routineRecords.find(r => r.className === formData.classId && r.day === dayName);
-    collectPeriods(mainDayRec?.periods, 'মেইন রুটিন');
-    if (standaloneRoutine?.dayData?.[dayName]) {
+    if (routineSourceFilter === 'main' || routineSourceFilter === 'both') {
+      const mainDayRec = routineRecords.find(r => r.className === formData.classId && r.day === dayName);
+      collectPeriods(mainDayRec?.periods, 'মেইন রুটিন');
+    }
+    if ((routineSourceFilter === 'standalone' || routineSourceFilter === 'both') && standaloneRoutine?.dayData?.[dayName]) {
       collectPeriods(standaloneRoutine.dayData[dayName], standaloneRoutine.title || 'স্বতন্ত্র রুটিন');
     }
 
@@ -436,7 +447,7 @@ export default function TeacherDiaryPage() {
           </CardHeader>
           <CardContent className="p-0">
             <form onSubmit={handleSave}>
-              <div className="grid grid-cols-1 md:grid-cols-2 border-b-2 border-black">
+              <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-black">
                 <div className="p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50">
                   <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">শ্রেণির ড্রপডাউন</label>
                   <Select onValueChange={v => setFormData(p => ({...p, classId: v}))} value={formData.classId}>
@@ -448,7 +459,7 @@ export default function TeacherDiaryPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="p-4 bg-slate-50">
+                <div className="p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50">
                   <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">বিষয়ের ড্রপ ডাউন</label>
                   <Select onValueChange={v => setFormData(p => ({...p, subject: v}))} value={formData.subject} disabled={!formData.classId}>
                     <SelectTrigger className="font-bold h-12 border-2 border-black bg-white ring-offset-0 focus:ring-0">
@@ -456,6 +467,19 @@ export default function TeacherDiaryPage() {
                     </SelectTrigger>
                     <SelectContent className="border-2 border-black font-kalpurush">
                       {subjectsList.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="p-4 bg-slate-50">
+                  <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">রুটিনের ধরন</label>
+                  <Select value={routineSourceFilter} onValueChange={(v: 'main' | 'standalone' | 'both') => setRoutineSourceFilter(v)}>
+                    <SelectTrigger className="font-bold h-12 border-2 border-black bg-white ring-offset-0 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-2 border-black font-kalpurush">
+                      <SelectItem value="main" className="font-bold">🔗 মেইন রুটিন</SelectItem>
+                      <SelectItem value="standalone" className="font-bold text-indigo-700">📌 স্বতন্ত্র রুটিন</SelectItem>
+                      <SelectItem value="both" className="font-bold text-emerald-700">📋 উভয় রুটিন (সব)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
