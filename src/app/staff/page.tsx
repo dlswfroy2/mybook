@@ -92,6 +92,28 @@ function toBengaliNumber(str: string | number) {
   return String(str).replace(/[0-9]/g, (w) => bengaliDigits[parseInt(w, 10)]);
 }
 
+const formatSafeDate = (val: any, fmt: string = "dd-MM-yyyy", useBnLocale = false) => {
+    if (!val) return '-';
+    try {
+        let d: Date;
+        if (val?.toDate && typeof val.toDate === 'function') {
+            d = val.toDate();
+        } else if (val?.seconds) {
+            d = new Date(val.seconds * 1000);
+        } else if (typeof val === 'string') {
+            const trimmed = val.trim();
+            if (!trimmed) return '-';
+            d = new Date(trimmed.includes('-') && !trimmed.includes('T') ? trimmed.replace(/-/g, '/') : trimmed);
+        } else {
+            d = new Date(val);
+        }
+        if (isNaN(d.getTime())) return String(val);
+        return toBengaliNumber(format(d, fmt, useBnLocale ? { locale: bn } : undefined));
+    } catch {
+        return '-';
+    }
+};
+
 const convertToEnglishDigits = (str: string) => {
     if (!str) return '';
     const bnToEn: Record<string, string> = {
@@ -176,16 +198,18 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
     const teacherRoutineInfo = useMemo(() => {
         if (!selectedStaff || selectedStaff.staffType !== 'teacher' || routineRecords.length === 0) return null;
         
-        const teacherName = selectedStaff.nameBn.trim();
+        const teacherName = (selectedStaff.nameBn || selectedStaff.nameEn || '').trim();
+        if (!teacherName) return null;
         const dailySchedule: Record<string, any[]> = {};
         const subjectSet = new Set<string>();
         let totalClasses = 0;
 
         routineRecords.forEach(routine => {
             const day = routine.day;
+            if (!day) return;
             if (!dailySchedule[day]) dailySchedule[day] = Array(6).fill(null);
             
-            routine.periods.forEach((cell, idx) => {
+            (routine.periods || []).forEach((cell, idx) => {
                 const { subject, teacher: routineTeacher } = parseSubjectTeacher(cell);
                 
                 if (routineTeacher) {
@@ -221,7 +245,7 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
             if (!isWeekend && !isHolidayDay && !isBefore(day, new Date(2020, 0, 1)) && !isAfter(day, new Date())) {
                 totalWorkDays++;
                 const record = attendanceData.find(r => r.date === dateStr);
-                const att = record?.attendance.find(a => a.staffId === selectedStaffId);
+                const att = record?.attendance?.find(a => a.staffId === selectedStaffId);
                 if (att) {
                     if (att.status === 'present') present++;
                     else if (att.status === 'leave') leave++;
@@ -271,7 +295,7 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
                                 <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
                                     <Avatar className="h-28 w-28 border-4 border-white shadow-xl">
                                         <AvatarImage src={selectedStaff.photoUrl} className="object-cover" />
-                                        <AvatarFallback className="bg-muted text-2xl font-black">{selectedStaff.nameBn.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback className="bg-muted text-2xl font-black">{(selectedStaff.nameBn || selectedStaff.nameEn || '?').charAt(0)}</AvatarFallback>
                                     </Avatar>
                                 </div>
                             </div>
@@ -291,10 +315,10 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
                                         </div>
                                     )}
                                     <div className="flex items-center gap-3 text-sm font-bold text-slate-700">
-                                        <Clock className="h-4 w-4 text-primary" /> <span>যোগদান: {toBengaliNumber(format(new Date(selectedStaff.joinDate), "dd-MM-yyyy", { locale: bn }))}</span>
+                                        <Clock className="h-4 w-4 text-primary" /> <span>যোগদান: {formatSafeDate(selectedStaff.joinDate, "dd-MM-yyyy", true)}</span>
                                     </div>
                                     <div className="flex items-center gap-3 text-sm font-bold text-slate-700">
-                                        <ChevronRight className="h-4 w-4 text-primary" /> <span>মোবাইল: {toBengaliNumber(selectedStaff.mobile)}</span>
+                                        <ChevronRight className="h-4 w-4 text-primary" /> <span>মোবাইল: {toBengaliNumber(selectedStaff.mobile || '-')}</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -411,14 +435,13 @@ const StaffProfileTab = ({ staffList, academicYear }: { staffList: Staff[], acad
                                             {attendanceData.length === 0 ? (
                                                 <TableRow><TableCell colSpan={4} className="text-center py-20 italic">তথ্য পাওয়া যায়নি</TableCell></TableRow>
                                             ) : (
-                                                attendanceData.sort((a,b) => b.date.localeCompare(a.date)).map(record => {
-                                                    const att = record.attendance.find(a => a.staffId === selectedStaffId);
-                                                    const dateObj = new Date(record.date.replace(/-/g, '/'));
+                                                [...attendanceData].filter(r => r && r.date).sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(record => {
+                                                    const att = record.attendance?.find(a => a.staffId === selectedStaffId);
                                                     return (
                                                         <TableRow key={record.id} className="h-12 border-b last:border-0 hover:bg-slate-50">
                                                             <TableCell className="pl-6">
-                                                                <span className="font-bold">{toBengaliNumber(format(dateObj, 'dd-MM-yyyy'))}</span>
-                                                                <span className="text-[10px] ml-2 text-muted-foreground">({format(dateObj, 'EEEE', { locale: bn })})</span>
+                                                                <span className="font-bold">{formatSafeDate(record.date, 'dd-MM-yyyy')}</span>
+                                                                <span className="text-[10px] ml-2 text-muted-foreground">({formatSafeDate(record.date, 'EEEE', true)})</span>
                                                             </TableCell>
                                                             <TableCell className="text-center">
                                                                 {att ? (

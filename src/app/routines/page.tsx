@@ -739,7 +739,7 @@ const ProxyManagementTab = ({ routineData, academicYear }: { routineData: Record
     );
 };
 
-const TeacherAllocationTab = ({ staffList, routineData, academicYear }: { staffList: Staff[], routineData: Record<string, Record<string, string[]>>, academicYear: string }) => {
+const TeacherAllocationTab = ({ staffList, routineData, academicYear, onAllocationUpdated }: { staffList: Staff[], routineData: Record<string, Record<string, string[]>>, academicYear: string, onAllocationUpdated?: () => void }) => {
     const db = useFirestore();
     const { toast } = useToast();
     const { hasPermission } = useAuth();
@@ -802,19 +802,20 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear }: { staffL
                 const dbRecord = data.find(r => r.teacherName === staff.nameBn);
                 const allocationMap = new Map<string, string>();
                 
-                // Add from DB
-                dbRecord?.allocations.forEach(a => allocationMap.set(`${a.className}|${a.subjectName}`, a.subjectName));
-                
-                // Add from Routine (Sync) by matching short name from routine with full name in profile
-                Object.keys(scanned).forEach(shortName => {
-                    // If short name is part of full name or vice versa
-                    if (staff.nameBn.includes(shortName) || shortName.includes(staff.nameBn)) {
-                        scanned[shortName].forEach(item => {
-                            const [cls, sub] = item.split('|');
-                            allocationMap.set(`${cls}|${sub}`, sub);
-                        });
-                    }
-                });
+                if (dbRecord) {
+                    // Use saved DB allocations as authoritative source so deletions persist
+                    dbRecord.allocations.forEach(a => allocationMap.set(`${a.className}|${a.subjectName}`, a.subjectName));
+                } else {
+                    // Initial seed from Routine (Sync) only when no DB record exists yet
+                    Object.keys(scanned).forEach(shortName => {
+                        if (staff.nameBn.includes(shortName) || shortName.includes(staff.nameBn)) {
+                            scanned[shortName].forEach(item => {
+                                const [cls, sub] = item.split('|');
+                                allocationMap.set(`${cls}|${sub}`, sub);
+                            });
+                        }
+                    });
+                }
 
                 const finalAllocations: SubjectAllocation[] = Array.from(allocationMap.entries()).map(([key, sub]) => ({
                     className: key.split('|')[0],
@@ -856,6 +857,7 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear }: { staffL
             });
             toast({ title: 'বণ্টন আপডেট হয়েছে' });
             fetchAllocations();
+            onAllocationUpdated?.();
         } catch (e) {}
         setIsSaving(false);
     };
@@ -877,6 +879,7 @@ const TeacherAllocationTab = ({ staffList, routineData, academicYear }: { staffL
             });
             toast({ title: 'বণ্টন মুছে ফেলা হয়েছে' });
             fetchAllocations();
+            onAllocationUpdated?.();
         } catch (e) {}
         setIsSaving(false);
     };
@@ -1240,7 +1243,7 @@ const CombinedRoutineTable = ({
                 <div ref={topScrollInnerRef} style={{ height: '1px', minWidth: '901px' }} />
             </div>
         <div ref={tableScrollRef} onScroll={handleTableScroll} className="overflow-x-scroll w-full border-2 border-green-600 rounded-b-lg shadow-inner bg-white print:rounded-lg print:border-t-2 print:overflow-visible">
-           <Table className="border-collapse w-full min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
+           <table className="w-full caption-bottom text-sm border-collapse min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
                 <TableHeader>
                    <TableRow className="bg-muted/50 h-16 print:h-8">
                        <TableHead className="border-r font-bold align-middle text-center w-[90px] print:w-[60px] border-green-600 text-black">
@@ -1401,7 +1404,7 @@ const CombinedRoutineTable = ({
                        ))
                    ))}
                </TableBody>
-           </Table>
+           </table>
         </div>
         </div>
     );
@@ -1502,18 +1505,20 @@ const EditableCell = ({
                 });
         }
 
-        // From default teacherAllocations
-        Object.entries(teacherAllocations).forEach(([tName, subMap]) => {
-            Object.entries(subMap).forEach(([subject, classList]) => {
-                if (classList.includes(cls)) {
-                    const key = `${subject}|${tName}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        list.push({ subject, teacher: tName });
+        // Only fall back to default teacherAllocations if DB allocationsList is empty
+        if (!allocationsList || allocationsList.length === 0) {
+            Object.entries(teacherAllocations).forEach(([tName, subMap]) => {
+                Object.entries(subMap).forEach(([subject, classList]) => {
+                    if (classList.includes(cls)) {
+                        const key = `${subject}|${tName}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            list.push({ subject, teacher: tName });
+                        }
                     }
-                }
+                });
             });
-        });
+        }
 
         // From routineData
         if (routineData && routineData[cls]) {
@@ -2324,7 +2329,7 @@ export default function RoutinesPage() {
                                         <ProxyManagementTab routineData={routineData} academicYear={selectedYear} />
                                     )}
                                     {activeSection === 'allocation' && (
-                                        <TeacherAllocationTab staffList={allStaff} routineData={routineData} academicYear={selectedYear} />
+                                        <TeacherAllocationTab staffList={allStaff} routineData={routineData} academicYear={selectedYear} onAllocationUpdated={fetchData} />
                                     )}
                                     {activeSection === 'exam-routine' && (
                                         <ExamRoutineTab />
