@@ -104,6 +104,10 @@ export default function TeacherDiaryPage() {
     notes: ''
   });
 
+  const [planRows, setPlanRows] = useState<{ id: string; date: string; topic: string; notes: string }[]>([
+    { id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }
+  ]);
+
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -228,6 +232,74 @@ export default function TeacherDiaryPage() {
     return format(addDays(today, diff), 'yyyy-MM-dd');
   };
 
+  const getRoutineForDate = (dateStr: string) => {
+    if (!dateStr || !formData.classId) return null;
+    const d = new Date(dateStr.replace(/-/g, '/'));
+    if (isNaN(d.getTime())) return null;
+    const dayIdx = d.getDay();
+    const dayName = Object.keys(DAY_INDEX_MAP).find(k => DAY_INDEX_MAP[k] === dayIdx) || '';
+    const isWeekend = dayIdx === 5 || dayIdx === 6;
+
+    const targetNorm = formData.subject ? (DIARY_SUBJ_NORM[formData.subject] || formData.subject) : '';
+    const cellMatches = (cell: string) => {
+      if (!cell || !formData.subject) return false;
+      const parts = cell.trim().split(' - ');
+      const subjPart = (parts.length > 1 ? parts.slice(0, -1).join(' - ') : parts[0]).trim();
+      return subjPart.split('/').some(sp => {
+        const s = sp.trim();
+        const sNorm = DIARY_SUBJ_NORM[s] || s;
+        return s === formData.subject || sNorm === targetNorm || sNorm.includes(targetNorm) || targetNorm.includes(sNorm);
+      });
+    };
+
+    const dayPeriods: { period: number; cell: string; isSubjectMatch: boolean; source: string }[] = [];
+    const matchedPeriods: { period: number; cell: string; source: string }[] = [];
+
+    const collectPeriods = (periods: string[] | undefined, source: string) => {
+      if (!periods) return;
+      periods.forEach((cell, idx) => {
+        if (!cell) return;
+        const isMatch = cellMatches(cell);
+        dayPeriods.push({ period: idx + 1, cell, isSubjectMatch: isMatch, source });
+        if (isMatch) matchedPeriods.push({ period: idx + 1, cell, source });
+      });
+    };
+
+    // Date-based main & standalone for this exact date
+    const mainDateRow = dateRoutineRows.find(r => r.date === dateStr);
+    collectPeriods(mainDateRow?.classes?.[formData.classId], 'তারিখ রুটিন');
+    const standaloneDateRow = standaloneRoutine?.dateRows?.find(r => r.date === dateStr);
+    collectPeriods(standaloneDateRow?.periods, standaloneRoutine?.title || 'স্বতন্ত্র তারিখ');
+
+    // Day-based main & standalone for this weekday
+    const mainDayRec = routineRecords.find(r => r.className === formData.classId && r.day === dayName);
+    collectPeriods(mainDayRec?.periods, 'মেইন রুটিন');
+    if (standaloneRoutine?.dayData?.[dayName]) {
+      collectPeriods(standaloneRoutine.dayData[dayName], standaloneRoutine.title || 'স্বতন্ত্র রুটিন');
+    }
+
+    return {
+      dayName,
+      isWeekend,
+      hasSubject: matchedPeriods.length > 0,
+      matchedPeriods,
+      dayPeriods
+    };
+  };
+
+  const applyDateToPlanRow = (dateStr: string) => {
+    setPlanRows(prev => {
+      const emptyIdx = prev.findIndex(r => !r.topic && !r.notes);
+      if (emptyIdx !== -1 && !prev.some(r => r.date === dateStr && (r.topic || r.notes))) {
+        return prev.map((r, i) => i === emptyIdx ? { ...r, date: dateStr } : r);
+      }
+      if (prev.length === 1 && !prev[0].topic && !prev[0].notes) {
+        return [{ ...prev[0], date: dateStr }];
+      }
+      return [...prev, { id: `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, date: dateStr, topic: '', notes: '' }];
+    });
+  };
+
   const allPossibleSubjects = useMemo(() => {
     if (filterClass === 'all') return HIGHER_SUBJECTS;
     return getSubjectsForClass(filterClass);
@@ -236,25 +308,47 @@ export default function TeacherDiaryPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!db || !user) return;
-    if (!formData.date || !formData.classId || !formData.subject) {
-      toast({ variant: "destructive", title: "তথ্য অসম্পূর্ণ", description: "শ্রেণি, বিষয় ও তারিখ নিশ্চিত করুন।" });
+    if (!formData.classId || !formData.subject) {
+      toast({ variant: "destructive", title: "তথ্য অসম্পূর্ণ", description: "শ্রেণি ও বিষয় নিশ্চিত করুন।" });
+      return;
+    }
+
+    const validRows = planRows.filter(r => r.date);
+    if (validRows.length === 0) {
+      toast({ variant: "destructive", title: "তারিখ নেই", description: "কমপক্ষে একটি তারিখ নিশ্চিত করুন।" });
       return;
     }
 
     setIsSaving(true);
-    const payload = {
-      ...formData,
-      userId: user.uid,
-      updatedAt: serverTimestamp(),
-    };
-
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'diary', editingId), payload);
+        const row = validRows[0];
+        await updateDoc(doc(db, 'diary', editingId), {
+          classId: formData.classId,
+          subject: formData.subject,
+          date: row.date,
+          topic: row.topic,
+          notes: row.notes,
+          userId: user.uid,
+          updatedAt: serverTimestamp(),
+        });
         toast({ title: "সফল", description: "ডায়েরি আপডেট করা হয়েছে।" });
       } else {
-        await addDoc(collection(db, 'diary'), { ...payload, createdAt: serverTimestamp() });
-        toast({ title: "সফল", description: "নতুন ডায়েরি যুক্ত করা হয়েছে।" });
+        await Promise.all(
+          validRows.map(row =>
+            addDoc(collection(db, 'diary'), {
+              classId: formData.classId,
+              subject: formData.subject,
+              date: row.date,
+              topic: row.topic,
+              notes: row.notes,
+              userId: user.uid,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            })
+          )
+        );
+        toast({ title: "সফল", description: `${toBengaliNumber(validRows.length)}টি তারিখের ডায়েরি/পরিকল্পনা সংরক্ষণ করা হয়েছে।` });
       }
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -263,6 +357,7 @@ export default function TeacherDiaryPage() {
         topic: '',
         notes: ''
       });
+      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
       setIsAdding(false);
       setEditingId(null);
     } catch (error) {
@@ -280,6 +375,7 @@ export default function TeacherDiaryPage() {
       topic: entry.topic || '',
       notes: entry.notes || ''
     });
+    setPlanRows([{ id: entry.id, date: entry.date, topic: entry.topic || '', notes: entry.notes || '' }]);
     setEditingId(entry.id);
     setIsAdding(true);
   };
@@ -316,7 +412,14 @@ export default function TeacherDiaryPage() {
           </div>
         </div>
         <Button 
-          onClick={() => { setIsAdding(!isAdding); setEditingId(null); if(!isAdding) setFormData({ date: format(new Date(), 'yyyy-MM-dd'), classId: '', subject: '', topic: '', notes: '' }); }}
+          onClick={() => {
+            setIsAdding(!isAdding);
+            setEditingId(null);
+            if (!isAdding) {
+              setFormData({ date: format(new Date(), 'yyyy-MM-dd'), classId: '', subject: '', topic: '', notes: '' });
+              setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
+            }
+          }}
           className={cn("gap-2 font-bold", isAdding ? "bg-muted text-muted-foreground" : "bg-indigo-600 hover:bg-indigo-700")}
         >
           {isAdding ? <ArrowLeft className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -374,7 +477,7 @@ export default function TeacherDiaryPage() {
                         <button
                           key={`day-${idx}`}
                           type="button"
-                          onClick={() => setFormData(p => ({ ...p, date: getNearestDateForDay(item.day) }))}
+                          onClick={() => applyDateToPlanRow(getNearestDateForDay(item.day))}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border-2 border-indigo-300 hover:border-indigo-600 hover:bg-indigo-100/60 text-xs font-black text-indigo-900 transition-all shadow-xs cursor-pointer"
                         >
                           <span>📅 {item.day} ({toBengaliNumber(item.period)}ম পিরিয়ড)</span>
@@ -389,7 +492,7 @@ export default function TeacherDiaryPage() {
                           <button
                             key={`date-${idx}`}
                             type="button"
-                            onClick={() => setFormData(p => ({ ...p, date: item.date }))}
+                            onClick={() => applyDateToPlanRow(item.date)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border-2 border-emerald-400 hover:bg-emerald-100 text-xs font-black text-emerald-900 transition-all shadow-xs cursor-pointer"
                           >
                             <span>📆 {dateLabel} ({toBengaliNumber(item.period)}ম পিরিয়ড)</span>
@@ -403,45 +506,135 @@ export default function TeacherDiaryPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-4 min-h-[200px]">
-                <div className="md:col-span-1 p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50">
-                  <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">তারিখ</label>
-                  <Input 
-                    type="date" 
-                    value={formData.date} 
-                    onChange={e => setFormData(p => ({...p, date: e.target.value}))} 
-                    className="font-bold h-12 border-2 border-black bg-white ring-offset-0 focus:ring-0"
-                  />
-                </div>
-                <div className="md:col-span-3 p-4 bg-white">
-                  <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">প্রতিদিনের ক্লাস রেকর্ড</label>
-                  <div className="space-y-3">
-                    {chaptersList.length > 0 ? (
-                      <Select onValueChange={v => setFormData(p => ({...p, topic: v}))} value={formData.topic}>
-                        <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0 mb-2">
-                          <SelectValue placeholder="অধ্যায় / টপিক নির্বাচন করুন" />
-                        </SelectTrigger>
-                        <SelectContent className="border-2 border-black font-kalpurush">
-                          {chaptersList.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input 
-                        value={formData.topic} 
-                        onChange={e => setFormData(p => ({...p, topic: e.target.value}))} 
-                        placeholder="টপিক বা শিরোনাম লিখুন..." 
-                        className="font-bold h-10 border-2 border-black bg-white mb-2 ring-offset-0 focus:ring-0"
-                      />
-                    )}
-                    <Textarea 
-                      value={formData.notes} 
-                      onChange={e => setFormData(p => ({...p, notes: e.target.value}))} 
-                      placeholder="বিস্তারিত ক্লাস রেকর্ড বা আগামী দিনের পরিকল্পনা এখানে লিখুন..." 
-                      className="min-h-[150px] font-bold text-base leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
-                    />
-                  </div>
-                </div>
+              <div className="divide-y-2 divide-black">
+                {planRows.map((row, rowIdx) => {
+                  const dateRoutineInfo = getRoutineForDate(row.date);
+                  return (
+                    <div key={row.id} className="grid grid-cols-1 md:grid-cols-4">
+                      <div className="md:col-span-1 p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-black text-indigo-700 uppercase tracking-wider">
+                            তারিখ {planRows.length > 1 ? `(${toBengaliNumber(rowIdx + 1)})` : ''}
+                          </label>
+                          {!editingId && planRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setPlanRows(prev => prev.filter(r => r.id !== row.id))}
+                              className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> মুছুন
+                            </button>
+                          )}
+                        </div>
+                        <Input 
+                          type="date" 
+                          value={row.date} 
+                          onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, date: e.target.value } : r))} 
+                          className="font-bold h-11 border-2 border-black bg-white ring-offset-0 focus:ring-0"
+                        />
+
+                        {dateRoutineInfo && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="outline" className="font-black text-[11px] bg-white border-slate-300">
+                                বার: {dateRoutineInfo.dayName}
+                              </Badge>
+                              {formData.subject && (
+                                dateRoutineInfo.hasSubject ? (
+                                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-black text-[10px]">
+                                    ✓ ঐ দিন রুটিনে আছে ({dateRoutineInfo.matchedPeriods.map(m => `${toBengaliNumber(m.period)}ম`).join(', ')} পিরিয়ড)
+                                  </Badge>
+                                ) : dateRoutineInfo.isWeekend ? (
+                                  <Badge variant="secondary" className="font-bold text-[10px]">
+                                    সাপ্তাহিক ছুটি
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-[10px]">
+                                    ⚠️ ঐ দিন রুটিনে এই বিষয় নেই
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+
+                            {dateRoutineInfo.dayPeriods.length > 0 && (
+                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1.5">
+                                <p className="text-[10px] font-black text-slate-500 uppercase">
+                                  {dateRoutineInfo.dayName}-এর সম্পূর্ণ রুটিন:
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {dateRoutineInfo.dayPeriods.map((p, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded border font-bold",
+                                        p.isSubjectMatch
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-400 font-black"
+                                          : "bg-slate-50 text-slate-700 border-slate-200"
+                                      )}
+                                    >
+                                      {toBengaliNumber(p.period)}ম: {p.cell}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="md:col-span-3 p-4 bg-white">
+                        <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">প্রতিদিনের ক্লাস রেকর্ড / পাঠ পরিকল্পনা</label>
+                        <div className="space-y-3">
+                          {chaptersList.length > 0 ? (
+                            <Select
+                              onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
+                              value={row.topic}
+                            >
+                              <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0 mb-2">
+                                <SelectValue placeholder="অধ্যায় / টপিক নির্বাচন করুন" />
+                              </SelectTrigger>
+                              <SelectContent className="border-2 border-black font-kalpurush">
+                                {chaptersList.map(ch => <SelectItem key={ch} value={ch} className="font-bold">{ch}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input 
+                              value={row.topic} 
+                              onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: e.target.value } : r))} 
+                              placeholder="টপিক বা শিরোনাম লিখুন..." 
+                              className="font-bold h-10 border-2 border-black bg-white mb-2 ring-offset-0 focus:ring-0"
+                            />
+                          )}
+                          <Textarea 
+                            value={row.notes} 
+                            onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, notes: e.target.value } : r))} 
+                            placeholder="বিস্তারিত ক্লাস রেকর্ড বা আগামী দিনের পরিকল্পনা এখানে লিখুন..." 
+                            className="min-h-[120px] font-bold text-base leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
+              {!editingId && (
+                <div className="p-3 bg-indigo-50/50 border-t-2 border-black flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const lastDate = planRows[planRows.length - 1]?.date || format(new Date(), 'yyyy-MM-dd');
+                      const d = new Date(lastDate.replace(/-/g, '/'));
+                      const nextDate = isNaN(d.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(addDays(d, 1), 'yyyy-MM-dd');
+                      setPlanRows(prev => [...prev, { id: `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, date: nextDate, topic: '', notes: '' }]);
+                    }}
+                    className="border-2 border-dashed border-indigo-500 text-indigo-700 hover:bg-indigo-100 font-black gap-2"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" /> আরও একটি তারিখ / পরিকল্পনা যোগ করুন
+                  </Button>
+                </div>
+              )}
 
               <div className="p-4 bg-slate-100 border-t-2 border-black flex justify-end">
                 <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 h-12 px-10 text-lg font-black shadow-lg border-2 border-black text-white">
