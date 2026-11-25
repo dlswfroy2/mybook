@@ -2470,13 +2470,6 @@ export default function RoutinesPage() {
         }
         return columns;
     }, [routineScope, standaloneRoutine, columns]);
-
-    const scopedAllocationsList = useMemo(() => {
-        if (routineScope === 'standalone') {
-            return allocationsList.filter(a => a.scope === 'standalone');
-        }
-        return allocationsList.filter(a => (a.scope || 'main') === 'main');
-    }, [allocationsList, routineScope]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
@@ -2506,6 +2499,13 @@ export default function RoutinesPage() {
     
     const [allStaff, setAllStaff] = useState<Staff[]>([]);
     const [allocationsList, setAllocationsList] = useState<{ className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[]>([]);
+
+    const scopedAllocationsList = useMemo(() => {
+        if (routineScope === 'standalone') {
+            return allocationsList.filter(a => a.scope === 'standalone');
+        }
+        return allocationsList.filter(a => (a.scope || 'main') === 'main');
+    }, [allocationsList, routineScope]);
 
     const canManageRoutines = hasPermission('manage:routines');
     const canViewProxy = hasPermission('view:proxy-classes');
