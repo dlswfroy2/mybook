@@ -145,7 +145,9 @@ export const getFullRoutine = async (db: Firestore, academicYear: string): Promi
       // If no routine is found for the year, create it from hardcoded data
       return await createInitialRoutine(db, academicYear);
     }
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassRoutine));
+    return querySnapshot.docs
+      .filter(d => !d.id.startsWith('columns_') && d.data().className && d.data().day)
+      .map(doc => ({ id: doc.id, ...doc.data() } as ClassRoutine));
   } catch (e: any) {
     console.error("Error getting full routine:", e);
     if (e.code === 'permission-denied') {

@@ -2280,6 +2280,7 @@ export default function RoutinesPage() {
             const seenDocIds = new Set<string>();
             
             currentRoutines.forEach(r => {
+                if (!r.className || !r.day || r.id?.startsWith('columns_')) return;
                 const docId = r.id || `${selectedYear}_${r.className}_${r.day}`;
                 seenDocIds.add(docId);
                 const docRef = doc(db, ROUTINE_COLLECTION, docId);
