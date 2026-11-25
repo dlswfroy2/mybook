@@ -2270,26 +2270,51 @@ export default function RoutinesPage() {
     };
 
     const handleMakeBlank = async () => {
-        if (!db || !isAdmin) return;
+        if (!db || (!isAdmin && !canManageRoutines)) return;
         
         setIsLoading(true);
         try {
             const numPeriods = columns.filter(c => c.type === 'period').length || 6;
             const batch = writeBatch(db);
             const currentRoutines = await getFullRoutine(db, selectedYear);
+            const seenDocIds = new Set<string>();
             
             currentRoutines.forEach(r => {
-                const docId = `${selectedYear}_${r.className}_${r.day}`;
+                const docId = r.id || `${selectedYear}_${r.className}_${r.day}`;
+                seenDocIds.add(docId);
                 const docRef = doc(db, ROUTINE_COLLECTION, docId);
-                batch.update(docRef, { periods: Array(numPeriods).fill('') });
+                batch.set(docRef, {
+                    className: r.className,
+                    day: r.day,
+                    academicYear: selectedYear,
+                    periods: Array(numPeriods).fill('')
+                }, { merge: true });
+            });
+
+            const allClasses = ['6', '7', '8', '9', '10'];
+            const allDays = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
+            allClasses.forEach(cls => {
+                allDays.forEach(day => {
+                    const docId = `${selectedYear}_${cls}_${day}`;
+                    if (!seenDocIds.has(docId)) {
+                        const docRef = doc(db, ROUTINE_COLLECTION, docId);
+                        batch.set(docRef, {
+                            className: cls,
+                            day,
+                            academicYear: selectedYear,
+                            periods: Array(numPeriods).fill('')
+                        }, { merge: true });
+                    }
+                });
             });
 
             await batch.commit();
             toast({ title: `${toBengaliNumber(selectedYear)} সালের রুটিন খালি করা হয়েছে।` });
-            fetchData();
+            await fetchData();
             setActiveSection('class-routine');
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
+            toast({ variant: 'destructive', title: 'রুটিন মুছতে সমস্যা হয়েছে', description: e?.message || 'আবার চেষ্টা করুন' });
         } finally {
             setIsLoading(false);
         }
@@ -2728,8 +2753,8 @@ function BlankRoutineTab({ onReset, selectedYear, isProcessing }: any) {
                 </CardTitle>
                 <CardDescription className="text-rose-800 font-bold">বর্তমান বছরের রুটিন পুরোপুরি পরিষ্কার করার সুবিধা</CardDescription>
             </CardHeader>
-            <CardContent className="p-8 space-y-6 text-center">
-                <div className="bg-white p-10 rounded-2xl border-2 border-rose-200 shadow-sm flex flex-col items-center gap-4">
+            <CardContent className="p-6 pb-8 space-y-5 text-center">
+                <div className="bg-white p-6 rounded-2xl border-2 border-rose-200 shadow-sm flex flex-col items-center gap-3">
                     <div className="p-4 bg-rose-100 rounded-full">
                         <AlertTriangle className="h-12 w-12 text-rose-600 animate-pulse" />
                     </div>
