@@ -163,6 +163,13 @@ export default function TeacherDiaryPage() {
   const subjectsList = useMemo(() => formData.classId ? getSubjectsForClass(formData.classId) : [], [formData.classId]);
   const chaptersList = useMemo(() => (formData.classId && formData.subject) ? getChaptersForSubject(formData.classId, formData.subject) : [], [formData.classId, formData.subject]);
 
+  const existingPlansForSubject = useMemo(() => {
+    if (!diaryEntries || !formData.classId || !formData.subject) return [];
+    return diaryEntries
+      .filter(e => e.classId === formData.classId && e.subject === formData.subject && e.id !== editingId)
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  }, [diaryEntries, formData.classId, formData.subject, editingId]);
+
   const linkedRoutineSchedule = useMemo(() => {
     if (!formData.classId || !formData.subject) return { days: [] as { day: string; period: number; teacher: string; source: string }[], dates: [] as { date: string; period: number; teacher: string; source: string }[] };
     const targetNorm = DIARY_SUBJ_NORM[formData.subject] || formData.subject;
@@ -527,6 +534,51 @@ export default function TeacherDiaryPage() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {formData.classId && formData.subject && existingPlansForSubject.length > 0 && (
+                <div className="p-4 bg-amber-50/70 border-b-2 border-black space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-black text-amber-900">
+                      <FileText className="w-4 h-4 text-amber-700" />
+                      <span>পূর্বে সংরক্ষিত ডায়েরি / পাঠ পরিকল্পনা ({toBengaliNumber(existingPlansForSubject.length)}টি):</span>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    {existingPlansForSubject.map((plan) => {
+                      const dObj = plan.date ? new Date(plan.date.replace(/-/g, '/')) : null;
+                      const isValidDate = dObj && !isNaN(dObj.getTime());
+                      const dateStr = isValidDate ? toBengaliNumber(format(dObj, 'dd-MM-yyyy')) : plan.date;
+                      const dayStr = isValidDate ? format(dObj, 'EEEE', { locale: bn }) : '';
+                      return (
+                        <div key={plan.id} className="p-2.5 rounded-xl bg-white border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="outline" className="text-[10px] font-black bg-amber-100/70 text-amber-950 border-amber-300">
+                                📅 {dateStr} {dayStr ? `(${dayStr})` : ''}
+                              </Badge>
+                              {plan.topic && (
+                                <span className="text-xs font-black text-indigo-800 truncate">{plan.topic}</span>
+                              )}
+                            </div>
+                            {plan.notes && (
+                              <p className="text-xs font-bold text-slate-600 line-clamp-2">{plan.notes}</p>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(plan)}
+                            className="h-7 px-2.5 text-[11px] font-bold border-amber-300 text-amber-900 hover:bg-amber-100 shrink-0 self-end sm:self-center"
+                          >
+                            <Edit className="w-3 h-3 mr-1" /> এডিট
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
