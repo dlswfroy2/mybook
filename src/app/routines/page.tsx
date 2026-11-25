@@ -1189,7 +1189,27 @@ const CombinedRoutineTable = ({
 
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
+    const topScrollInnerRef = useRef<HTMLDivElement>(null);
     const isSyncing = useRef(false);
+
+    // Sync top scrollbar inner width with actual table scrollWidth
+    useEffect(() => {
+        const tableEl = tableScrollRef.current;
+        if (!tableEl || !topScrollInnerRef.current) return;
+        const syncWidth = () => {
+            if (topScrollInnerRef.current && tableEl) {
+                topScrollInnerRef.current.style.width = tableEl.scrollWidth + 'px';
+            }
+        };
+        syncWidth();
+        const observer = new ResizeObserver(syncWidth);
+        observer.observe(tableEl);
+        // Also observe the first child (table) for size changes
+        if (tableEl.firstElementChild) {
+            observer.observe(tableEl.firstElementChild);
+        }
+        return () => observer.disconnect();
+    }, [columns, routineData, selectedClass]);
 
     const handleTopScroll = useCallback(() => {
         if (isSyncing.current) return;
@@ -1211,14 +1231,14 @@ const CombinedRoutineTable = ({
 
     return (
         <div className="w-full">
-            {/* Top scrollbar */}
+            {/* Top scrollbar - synced with table */}
             <div
                 ref={topScrollRef}
                 onScroll={handleTopScroll}
-                className="overflow-x-auto w-full border-x-2 border-t-2 border-green-600 rounded-t-lg bg-white print:hidden"
-                style={{ height: '18px' }}
+                className="overflow-x-auto w-full border-x-2 border-t-2 border-green-600 rounded-t-lg bg-slate-100/50 print:hidden"
+                style={{ height: '16px' }}
             >
-                <div style={{ minWidth: '900px', height: '1px' }} />
+                <div ref={topScrollInnerRef} style={{ height: '1px' }} />
             </div>
         <div ref={tableScrollRef} onScroll={handleTableScroll} className="overflow-x-auto w-full border-2 border-green-600 rounded-b-lg shadow-inner bg-white print:rounded-lg print:border-t-2">
            <Table className="border-collapse w-full min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
