@@ -10,6 +10,7 @@ import {
   Firestore,
   WriteBatch,
   writeBatch,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -146,7 +147,7 @@ export const getFullRoutine = async (db: Firestore, academicYear: string): Promi
       return await createInitialRoutine(db, academicYear);
     }
     return querySnapshot.docs
-      .filter(d => !d.id.startsWith('columns_') && d.data().className && d.data().day)
+      .filter(d => !d.id.startsWith('columns_') && !d.id.startsWith('date_') && !d.id.startsWith('standalone_') && d.data().className && d.data().day)
       .map(doc => ({ id: doc.id, ...doc.data() } as ClassRoutine));
   } catch (e: any) {
     console.error("Error getting full routine:", e);
@@ -187,4 +188,121 @@ export const saveRoutinesBatch = async (db: Firestore, routines: ClassRoutine[])
       errorEmitter.emit('permission-error', permissionError);
       throw permissionError;
     });
+};
+
+// --- Date-based Main Routine ---
+export interface DateRoutineRow {
+    id: string;
+    date: string; // yyyy-MM-dd
+    classes: Record<string, string[]>;
 }
+
+export const getDateRoutine = async (db: Firestore, academicYear: string): Promise<DateRoutineRow[]> => {
+    const localKey = `date_routine_${academicYear}`;
+    if (!db) {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(localKey);
+                if (raw) return JSON.parse(raw);
+            } catch {}
+        }
+        return [];
+    }
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `date_${academicYear}`);
+        const snap = await getDoc(docRef);
+        if (snap.exists() && Array.isArray(snap.data()?.rows)) {
+            return snap.data().rows as DateRoutineRow[];
+        }
+    } catch (e) {
+        console.warn("Failed to load date routine from Firestore:", e);
+    }
+    if (typeof window !== 'undefined') {
+        try {
+            const raw = localStorage.getItem(localKey);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    return [];
+};
+
+export const saveDateRoutine = async (db: Firestore, academicYear: string, rows: DateRoutineRow[]): Promise<void> => {
+    const localKey = `date_routine_${academicYear}`;
+    if (typeof window !== 'undefined') {
+        try { localStorage.setItem(localKey, JSON.stringify(rows)); } catch {}
+    }
+    if (!db) return;
+    const docRef = doc(db, ROUTINE_COLLECTION, `date_${academicYear}`);
+    await setDoc(docRef, {
+        academicYear,
+        type: 'date_routine',
+        rows,
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+};
+
+// --- Standalone Single-Class Routine (not merged into main routine) ---
+export interface StandaloneDateRow {
+    id: string;
+    date: string; // yyyy-MM-dd
+    periods: string[];
+}
+
+export interface StandaloneClassRoutine {
+    className: string;
+    academicYear: string;
+    title?: string;
+    dayData: Record<string, string[]>;
+    dateRows: StandaloneDateRow[];
+}
+
+export const getStandaloneRoutine = async (db: Firestore, academicYear: string, className: string): Promise<StandaloneClassRoutine> => {
+    const empty: StandaloneClassRoutine = { className, academicYear, title: '', dayData: {}, dateRows: [] };
+    const localKey = `standalone_routine_${academicYear}_${className}`;
+    if (!db) {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(localKey);
+                if (raw) return { ...empty, ...JSON.parse(raw) };
+            } catch {}
+        }
+        return empty;
+    }
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `standalone_${academicYear}_${className}`);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const d = snap.data();
+            return {
+                className,
+                academicYear,
+                title: d.title || '',
+                dayData: d.dayData || {},
+                dateRows: Array.isArray(d.dateRows) ? d.dateRows : []
+            };
+        }
+    } catch (e) {
+        console.warn("Failed to load standalone routine from Firestore:", e);
+    }
+    if (typeof window !== 'undefined') {
+        try {
+            const raw = localStorage.getItem(localKey);
+            if (raw) return { ...empty, ...JSON.parse(raw) };
+        } catch {}
+    }
+    return empty;
+};
+
+export const saveStandaloneRoutine = async (db: Firestore, data: StandaloneClassRoutine): Promise<void> => {
+    const localKey = `standalone_routine_${data.academicYear}_${data.className}`;
+    if (typeof window !== 'undefined') {
+        try { localStorage.setItem(localKey, JSON.stringify(data)); } catch {}
+    }
+    if (!db) return;
+    const docRef = doc(db, ROUTINE_COLLECTION, `standalone_${data.academicYear}_${data.className}`);
+    await setDoc(docRef, {
+        ...data,
+        type: 'standalone_routine',
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+};

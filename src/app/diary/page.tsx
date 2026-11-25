@@ -28,9 +28,36 @@ import {
 } from 'lucide-react';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject, HIGHER_SUBJECTS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { useAcademicYear } from '@/context/AcademicYearContext';
+import { getFullRoutine, getDateRoutine, getStandaloneRoutine, ClassRoutine, DateRoutineRow, StandaloneClassRoutine } from '@/lib/routine-data';
+import { subjectNameNormalization as baseSubjectNorm } from '@/lib/subjects';
+
+const DIARY_SUBJ_NORM: Record<string, string> = {
+  ...baseSubjectNorm,
+  'শারীরিক': 'শারীরিক শিক্ষা',
+  'ধর্ম': 'ধর্ম ও নৈতিক শিক্ষা',
+  'বা ও বি': 'বাংলাদেশ ও বিশ্ব পরিচয়',
+  'বিজ্ঞান': 'সাধারণ বিজ্ঞান',
+  'ইতিহাস': 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা',
+  'ভূগোল': 'ভূগোল ও পরিবেশ',
+  'পৌরনীতি': 'পৌরনীতি ও নাগরিকতা',
+  'জীব': 'জীব বিজ্ঞান',
+  'কৃষি': 'কৃষি শিক্ষা',
+  'উচ্চতর': 'উচ্চতর গণিত',
+  'বাংলা ১ম': 'বাংলা প্রথম',
+  'বাংলা ২য়': 'বাংলা দ্বিতীয়',
+  'ইংরেজি ১ম': 'ইংরেজি প্রথম',
+  'ইংরেজি ২য়': 'ইংরেজি দ্বিতীয়',
+  'আইসিটি': 'তথ্য ও যোগাযোগ প্রযুক্তি',
+};
+
+const DAY_INDEX_MAP: Record<string, number> = {
+  'রবিবার': 0, 'সোমবার': 1, 'মঙ্গলবার': 2, 'বুধবার': 3, 'বৃহস্পতিবার': 4, 'শুক্রবার': 5, 'শনিবার': 6
+};
 
 const MONTHS_BN = [
   { id: '01', name: 'জানুয়ারি' },
@@ -56,6 +83,7 @@ function toBengaliNumber(n: number | string | undefined | null): string {
 export default function TeacherDiaryPage() {
   const db = useFirestore();
   const { user, loading: userLoading } = useUser();
+  const { selectedYear: academicYear } = useAcademicYear();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -63,6 +91,10 @@ export default function TeacherDiaryPage() {
   const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
   const [filterClass, setFilterClass] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
+
+  const [routineRecords, setRoutineRecords] = useState<ClassRoutine[]>([]);
+  const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
+  const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -77,6 +109,25 @@ export default function TeacherDiaryPage() {
   useEffect(() => {
     if (!userLoading && !user) window.location.href = '/auth';
   }, [user, userLoading]);
+
+  useEffect(() => {
+    if (!db || !academicYear) return;
+    Promise.all([
+      getFullRoutine(db, academicYear),
+      getDateRoutine(db, academicYear)
+    ]).then(([full, dateRows]) => {
+      setRoutineRecords(full);
+      setDateRoutineRows(dateRows);
+    });
+  }, [db, academicYear]);
+
+  useEffect(() => {
+    if (!db || !academicYear || !formData.classId) {
+      setStandaloneRoutine(null);
+      return;
+    }
+    getStandaloneRoutine(db, academicYear, formData.classId).then(setStandaloneRoutine);
+  }, [db, academicYear, formData.classId]);
 
   const diaryQuery = useMemo(() => {
     if (!db || !user) return null;
@@ -106,6 +157,76 @@ export default function TeacherDiaryPage() {
 
   const subjectsList = useMemo(() => formData.classId ? getSubjectsForClass(formData.classId) : [], [formData.classId]);
   const chaptersList = useMemo(() => (formData.classId && formData.subject) ? getChaptersForSubject(formData.classId, formData.subject) : [], [formData.classId, formData.subject]);
+
+  const linkedRoutineSchedule = useMemo(() => {
+    if (!formData.classId || !formData.subject) return { days: [] as { day: string; period: number; teacher: string; source: string }[], dates: [] as { date: string; period: number; teacher: string; source: string }[] };
+    const targetNorm = DIARY_SUBJ_NORM[formData.subject] || formData.subject;
+
+    const cellMatchesSubject = (cell: string) => {
+      if (!cell) return { match: false, teacher: '' };
+      const parts = cell.trim().split(' - ');
+      const teacher = parts.length > 1 ? parts.pop()?.trim() || '' : '';
+      const subjPart = parts.join(' - ').trim();
+      const subParts = subjPart.split('/').map(s => s.trim());
+      const match = subParts.some(sp => {
+        const spNorm = DIARY_SUBJ_NORM[sp] || sp;
+        return sp === formData.subject || spNorm === targetNorm || spNorm.includes(targetNorm) || targetNorm.includes(spNorm);
+      });
+      return { match, teacher };
+    };
+
+    const days: { day: string; period: number; teacher: string; source: string }[] = [];
+    const dates: { date: string; period: number; teacher: string; source: string }[] = [];
+
+    // 1. Main day-based routine
+    routineRecords
+      .filter(r => r.className === formData.classId)
+      .forEach(r => {
+        (r.periods || []).forEach((cell, idx) => {
+          const { match, teacher } = cellMatchesSubject(cell);
+          if (match) days.push({ day: r.day, period: idx + 1, teacher, source: 'মেইন রুটিন' });
+        });
+      });
+
+    // 2. Standalone day-based routine
+    if (standaloneRoutine?.dayData) {
+      Object.entries(standaloneRoutine.dayData).forEach(([day, periods]) => {
+        (periods || []).forEach((cell, idx) => {
+          const { match, teacher } = cellMatchesSubject(cell);
+          if (match) days.push({ day, period: idx + 1, teacher, source: standaloneRoutine.title || 'স্বতন্ত্র রুটিন' });
+        });
+      });
+    }
+
+    // 3. Main date-based routine
+    dateRoutineRows.forEach(row => {
+      const periods = row.classes?.[formData.classId] || [];
+      periods.forEach((cell, idx) => {
+        const { match, teacher } = cellMatchesSubject(cell);
+        if (match && row.date) dates.push({ date: row.date, period: idx + 1, teacher, source: 'তারিখ রুটিন' });
+      });
+    });
+
+    // 4. Standalone date-based routine
+    if (standaloneRoutine?.dateRows) {
+      standaloneRoutine.dateRows.forEach(row => {
+        (row.periods || []).forEach((cell, idx) => {
+          const { match, teacher } = cellMatchesSubject(cell);
+          if (match && row.date) dates.push({ date: row.date, period: idx + 1, teacher, source: standaloneRoutine.title || 'স্বতন্ত্র তারিখ রুটিন' });
+        });
+      });
+    }
+
+    return { days, dates };
+  }, [formData.classId, formData.subject, routineRecords, dateRoutineRows, standaloneRoutine]);
+
+  const getNearestDateForDay = (dayName: string) => {
+    const targetDayIdx = DAY_INDEX_MAP[dayName];
+    if (targetDayIdx === undefined) return format(new Date(), 'yyyy-MM-dd');
+    const today = new Date();
+    const diff = (targetDayIdx - today.getDay() + 7) % 7;
+    return format(addDays(today, diff), 'yyyy-MM-dd');
+  };
 
   const allPossibleSubjects = useMemo(() => {
     if (filterClass === 'all') return HIGHER_SUBJECTS;
@@ -236,6 +357,51 @@ export default function TeacherDiaryPage() {
                   </Select>
                 </div>
               </div>
+
+              {formData.classId && formData.subject && (
+                <div className="p-4 bg-indigo-50/70 border-b-2 border-black space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-black text-indigo-800">
+                    <Calendar className="w-4 h-4 text-indigo-600" />
+                    <span>রুটিন অনুযায়ী নির্ধারিত বার ও তারিখ (ক্লিক করলে তারিখ অটো সেট হবে):</span>
+                  </div>
+                  {linkedRoutineSchedule.days.length === 0 && linkedRoutineSchedule.dates.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-500 italic">
+                      এই শ্রেণি ও বিষয়ের জন্য রুটিনে এখনো কোনো নির্ধারিত দিন বা তারিখ পাওয়া যায়নি।
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {linkedRoutineSchedule.days.map((item, idx) => (
+                        <button
+                          key={`day-${idx}`}
+                          type="button"
+                          onClick={() => setFormData(p => ({ ...p, date: getNearestDateForDay(item.day) }))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border-2 border-indigo-300 hover:border-indigo-600 hover:bg-indigo-100/60 text-xs font-black text-indigo-900 transition-all shadow-xs cursor-pointer"
+                        >
+                          <span>📅 {item.day} ({toBengaliNumber(item.period)}ম পিরিয়ড)</span>
+                          {item.teacher && <span className="text-[10px] font-bold text-slate-600">• {item.teacher}</span>}
+                          <Badge variant="outline" className="text-[9px] py-0 px-1.5 border-indigo-200 bg-indigo-50 text-indigo-700">{item.source}</Badge>
+                        </button>
+                      ))}
+                      {linkedRoutineSchedule.dates.map((item, idx) => {
+                        const dObj = new Date(item.date.replace(/-/g, '/'));
+                        const dateLabel = isNaN(dObj.getTime()) ? item.date : toBengaliNumber(format(dObj, 'dd-MM-yyyy'));
+                        return (
+                          <button
+                            key={`date-${idx}`}
+                            type="button"
+                            onClick={() => setFormData(p => ({ ...p, date: item.date }))}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border-2 border-emerald-400 hover:bg-emerald-100 text-xs font-black text-emerald-900 transition-all shadow-xs cursor-pointer"
+                          >
+                            <span>📆 {dateLabel} ({toBengaliNumber(item.period)}ম পিরিয়ড)</span>
+                            {item.teacher && <span className="text-[10px] font-bold text-slate-600">• {item.teacher}</span>}
+                            <Badge variant="outline" className="text-[9px] py-0 px-1.5 border-emerald-300 bg-white text-emerald-700">{item.source}</Badge>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 min-h-[200px]">
                 <div className="md:col-span-1 p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50">

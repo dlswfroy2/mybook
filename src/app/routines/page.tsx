@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns } from '@/lib/routine-data';
+import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine } from '@/lib/routine-data';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -1454,6 +1454,234 @@ const CombinedRoutineTable = ({
     );
 };
 
+const DateRoutineTable = ({
+    rows,
+    selectedClass = 'all',
+    isEditMode,
+    columns = DEFAULT_ROUTINE_COLUMNS,
+    teacherColorMap,
+    isMounted,
+    allocationsList = [],
+    onDateChange,
+    onCellChange,
+    onAddRow,
+    onDeleteRow,
+    onAddColumn,
+    onDeleteColumn,
+    onEditColumn,
+}: {
+    rows: DateRoutineRow[];
+    selectedClass?: string;
+    isEditMode: boolean;
+    columns?: RoutineColumnConfig[];
+    teacherColorMap: Map<string, string>;
+    isMounted: boolean;
+    allocationsList?: { className: string; subjectName: string; teacherName: string }[];
+    onDateChange: (rowId: string, newDate: string) => void;
+    onCellChange: (rowId: string, cls: string, periodIdx: number, value: string) => void;
+    onAddRow?: () => void;
+    onDeleteRow?: (rowId: string) => void;
+    onAddColumn?: (insertAfterIndex: number) => void;
+    onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void;
+    onEditColumn?: (col: RoutineColumnConfig, index: number) => void;
+}) => {
+    const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
+    const allClasses = ['6', '7', '8', '9', '10'];
+    const classes = (selectedClass && selectedClass !== 'all') ? [selectedClass] : allClasses;
+
+    let periodCounter = 0;
+    const columnsWithPeriodIdx = (columns || DEFAULT_ROUTINE_COLUMNS).map(col => {
+        if (col.type === 'period') {
+            const pIdx = periodCounter++;
+            return { ...col, periodIdx: pIdx };
+        }
+        return { ...col, periodIdx: -1 };
+    });
+
+    const getDayNameFromDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr.replace(/-/g, '/'));
+        if (isNaN(d.getTime())) return '';
+        return dayMap[d.getDay()] || '';
+    };
+
+    const formatDisplayDate = (dateStr: string) => {
+        if (!dateStr) return 'তারিখ নেই';
+        const d = new Date(dateStr.replace(/-/g, '/'));
+        if (isNaN(d.getTime())) return dateStr;
+        return toBengaliNumber(format(d, 'dd-MM-yyyy'));
+    };
+
+    return (
+        <div className="w-full space-y-3">
+            <div className="overflow-x-auto w-full border-2 border-green-600 rounded-lg shadow-inner bg-white print:overflow-visible">
+                <table className="w-full caption-bottom text-sm border-collapse min-w-[900px] print:min-w-full print:text-[8px] border-green-600">
+                    <TableHeader>
+                        <TableRow className="bg-muted/50 h-16 print:h-8">
+                            <TableHead className="border-r font-bold align-middle text-center w-[150px] print:w-[90px] border-green-600 text-black">
+                                তারিখ ও বার
+                            </TableHead>
+                            <TableHead className="border-r font-bold align-middle text-center w-[75px] print:w-[40px] border-green-600 text-black p-1">
+                                শ্রেণি
+                            </TableHead>
+                            {columnsWithPeriodIdx.map((col, index) => {
+                                const isBreak = col.type === 'break';
+                                return (
+                                    <TableHead
+                                        key={col.id}
+                                        className={cn(
+                                            "border-r text-center font-bold border-green-600 align-middle relative group/col p-1.5",
+                                            isBreak ? "w-14 print:w-6 bg-amber-50/30" : "min-w-[125px]"
+                                        )}
+                                    >
+                                        <div className="flex flex-col items-center justify-between min-h-[58px] print:min-h-0">
+                                            <div className="flex flex-col items-center">
+                                                <span className={cn("font-black", isBreak ? "text-[11px] text-amber-800" : "text-sm print:text-[10px] text-slate-900")}>
+                                                    {col.name}
+                                                </span>
+                                                <span className={cn("text-[10px] print:text-[7px] font-bold block mt-0.5", isBreak ? "text-amber-700" : "text-slate-600")}>
+                                                    {col.time}
+                                                </span>
+                                            </div>
+                                            {(onAddColumn || onEditColumn || onDeleteColumn) && (
+                                                <div className="flex items-center justify-center gap-1 mt-1 no-print pt-1 border-t border-slate-200/60 w-full">
+                                                    {onAddColumn && (
+                                                        <button type="button" onClick={() => onAddColumn(index)} className="h-5 px-1.5 text-[9px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded flex items-center gap-0.5 border border-emerald-200 shadow-xs cursor-pointer">
+                                                            <Plus className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" /><span>+ যোগ</span>
+                                                        </button>
+                                                    )}
+                                                    {onEditColumn && (
+                                                        <button type="button" onClick={() => onEditColumn(col, index)} className="h-5 w-5 flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 rounded border border-blue-200 shadow-xs cursor-pointer">
+                                                            <FilePen className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                        </button>
+                                                    )}
+                                                    {onDeleteColumn && (
+                                                        <button type="button" onClick={() => onDeleteColumn(col, index)} className="h-5 w-5 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded border border-rose-200 shadow-xs cursor-pointer">
+                                                            <Trash2 className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </TableHead>
+                                );
+                            })}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={2 + columnsWithPeriodIdx.length} className="text-center py-12 font-bold text-muted-foreground">
+                                    কোনো তারিখের রো যুক্ত করা হয়নি। {isEditMode ? 'নিচের "+ নতুন তারিখ / রো যোগ করুন" বাটনে ক্লিক করে রো যুক্ত করুন।' : 'এডিট মোডে গিয়ে নতুন তারিখের রো যোগ করুন।'}
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            rows.map((row) => {
+                                const dayName = getDayNameFromDate(row.date);
+                                const rowAsRoutineData: Record<string, Record<string, string[]>> = {};
+                                classes.forEach(c => {
+                                    rowAsRoutineData[c] = { [dayName || row.date]: row.classes?.[c] || [] };
+                                });
+
+                                return classes.map((cls, classIndex) => (
+                                    <TableRow
+                                        key={`${row.id}-${cls}`}
+                                        className={cn(
+                                            "h-12 print:h-7 hover:bg-muted/20 transition-colors",
+                                            classIndex === 0 && "border-t-[3px] border-t-green-600",
+                                            classIndex === classes.length - 1 && "border-b-[3px] border-b-green-600"
+                                        )}
+                                    >
+                                        {classIndex === 0 && (
+                                            <TableCell className="font-black border-r align-middle text-center bg-gray-50 print:bg-white text-xs print:text-[9px] border-l-[4px] border-l-green-600/20 border-green-600 p-2" rowSpan={classes.length}>
+                                                {isEditMode ? (
+                                                    <div className="flex flex-col items-center gap-1.5">
+                                                        <Input
+                                                            type="date"
+                                                            value={row.date}
+                                                            onChange={(e) => onDateChange(row.id, e.target.value)}
+                                                            className="h-8 text-xs font-bold border-slate-300 bg-white px-1.5"
+                                                        />
+                                                        {dayName && <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">{dayName}</Badge>}
+                                                        {onDeleteRow && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => onDeleteRow(row.id)}
+                                                                className="text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-0.5 mt-0.5 cursor-pointer"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" /> রো মুছুন
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        <span className="font-black text-slate-900">{formatDisplayDate(row.date)}</span>
+                                                        {dayName && <span className="text-[10px] font-bold text-primary">({dayName})</span>}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        <TableCell className="font-bold border-r text-center bg-gray-50/50 print:bg-white text-xs print:text-[8px] border-green-600 notranslate" translate="no">
+                                            {isEn ? `Class ${cls}` : classNamesMap[cls]}
+                                        </TableCell>
+                                        {columnsWithPeriodIdx.map((col) => {
+                                            if (col.type === 'break') {
+                                                if (classIndex === 0) {
+                                                    return (
+                                                        <TableCell key={col.id} className="border-r text-center bg-amber-50/30 font-black text-[11px] print:text-[8px] align-middle text-amber-800 border-green-600" rowSpan={classes.length}>
+                                                            <div className="[writing-mode:vertical-lr] rotate-180 py-4 print:py-1 tracking-widest uppercase">
+                                                                {col.time || col.name || 'টিফিন'}
+                                                            </div>
+                                                        </TableCell>
+                                                    );
+                                                }
+                                                return null;
+                                            }
+                                            const periodIdx = col.periodIdx;
+                                            const cellContent = (row.classes?.[cls] || [])[periodIdx] || '';
+                                            return (
+                                                <EditableCell
+                                                    key={`${row.id}-${cls}-${col.id}-${periodIdx}`}
+                                                    content={cellContent}
+                                                    isEditMode={isEditMode}
+                                                    onCellChange={(value) => onCellChange(row.id, cls, periodIdx, value)}
+                                                    conflictKey={`${cls}-${row.id}-${periodIdx}`}
+                                                    conflicts={{
+                                                        teacherClashes: new Set(),
+                                                        consecutiveClassClashes: new Set(),
+                                                        breakClashes: new Set(),
+                                                        subjectRepetitionClashes: new Set(),
+                                                        teacherSubjectMismatchClashes: new Set()
+                                                    }}
+                                                    teacherColorMap={teacherColorMap}
+                                                    isMounted={isMounted}
+                                                    cls={cls}
+                                                    day={dayName || row.date}
+                                                    periodIdx={periodIdx}
+                                                    routineData={rowAsRoutineData}
+                                                    columns={columns}
+                                                    allocationsList={allocationsList}
+                                                />
+                                            );
+                                        })}
+                                    </TableRow>
+                                ));
+                            })
+                        )}
+                    </TableBody>
+                </table>
+            </div>
+            {isEditMode && onAddRow && (
+                <div className="flex justify-center no-print">
+                    <Button type="button" onClick={onAddRow} variant="outline" className="border-2 border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-black gap-2 h-11 px-6 rounded-xl">
+                        <Plus className="w-4 h-4 stroke-[3]" /> নতুন তারিখ / রো যোগ করুন
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const EditableCell = ({ 
     content, 
     isEditMode, 
@@ -1984,6 +2212,10 @@ export default function RoutinesPage() {
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
     const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
+    const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>('day');
+    const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>('main');
+    const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
+    const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('class-routine');
@@ -2022,14 +2254,16 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
             getStaff(db),
             getRoutineColumns(db, selectedYear),
-            getTeacherAllocations(db, selectedYear)
+            getTeacherAllocations(db, selectedYear),
+            getDateRoutine(db, selectedYear)
         ]);
         setAllStaff(staffData);
         setColumns(colsFromDb);
+        setDateRoutineRows(dateRowsFromDb);
 
         const flatAllocations: { className: string; subjectName: string; teacherName: string }[] = [];
         allocationsFromDb.forEach(rec => {
@@ -2070,6 +2304,16 @@ export default function RoutinesPage() {
             setIsMounted(true);
         }
     }, [isClient]);
+
+    useEffect(() => {
+        if (!db || routineScope !== 'standalone' || selectedClassFilter === 'all') {
+            setStandaloneRoutine(null);
+            return;
+        }
+        getStandaloneRoutine(db, selectedYear, selectedClassFilter).then(res => {
+            setStandaloneRoutine(res);
+        });
+    }, [db, selectedYear, routineScope, selectedClassFilter]);
 
     const { conflicts, stats, teacherColorMap } = useRoutineAnalysis(routineData, columns);
     
@@ -2216,6 +2460,20 @@ export default function RoutinesPage() {
         
         try {
             await saveRoutineColumns(db, selectedYear, columns);
+
+            if (routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine) {
+                await saveStandaloneRoutine(db, standaloneRoutine);
+                toast({ title: `${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিন আলাদাভাবে সেভ হয়েছে` });
+                setIsEditMode(false);
+                return;
+            }
+
+            if (routineFormat === 'date') {
+                await saveDateRoutine(db, selectedYear, dateRoutineRows);
+                toast({ title: 'তারিখ-ভিত্তিক রুটিন ও কলাম সফলভাবে সেভ হয়েছে' });
+                setIsEditMode(false);
+                return;
+            }
 
             const routinesToSave: ClassRoutine[] = [];
             Object.keys(routineData).forEach(className => {
@@ -2401,62 +2659,227 @@ export default function RoutinesPage() {
                                 <div className="animate-in fade-in duration-500">
                                     {activeSection === 'class-routine' && (
                                         <div className="space-y-6">
-                                            {/* Dropdown for Combined vs Individual Class */}
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 p-4 rounded-2xl border border-slate-200 shadow-xs no-print">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2.5 rounded-xl bg-primary text-white shadow-sm">
-                                                        <LayoutGrid className="w-5 h-5" />
-                                                    </div>
+                                            {/* Dropdowns for View, Scope, and Format */}
+                                            <div className="flex flex-col gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 p-4 rounded-2xl border border-slate-200 shadow-xs no-print">
+                                                <div className="flex flex-wrap items-end gap-4">
                                                     <div>
                                                         <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
                                                             রুটিন ভিউ / শ্রেণি নির্বাচন:
                                                         </Label>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <Select value={selectedClassFilter} onValueChange={setSelectedClassFilter}>
-                                                                <SelectTrigger className="w-[250px] h-10 font-black text-sm bg-white border-2 border-primary/40 rounded-xl shadow-xs focus:ring-primary focus:border-primary">
-                                                                    <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
-                                                                </SelectTrigger>
-                                                                <SelectContent className="font-kalpurush">
+                                                        <Select
+                                                            value={selectedClassFilter}
+                                                            onValueChange={(val) => {
+                                                                setSelectedClassFilter(val);
+                                                                if (val === 'all' && routineScope === 'standalone') {
+                                                                    setRoutineScope('main');
+                                                                }
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="w-[220px] h-10 mt-1 font-black text-sm bg-white border-2 border-primary/40 rounded-xl shadow-xs">
+                                                                <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="font-kalpurush">
+                                                                {routineScope === 'main' && (
                                                                     <SelectItem value="all" className="font-black py-2 text-primary">
                                                                         📋 সকল শ্রেণি (সমন্বিত রুটিন)
                                                                     </SelectItem>
-                                                                    {Object.entries(classNamesMap).map(([val, label]) => (
-                                                                        <SelectItem key={val} value={val} className="font-bold py-2">
-                                                                            🏫 {label} শ্রেণি
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
+                                                                )}
+                                                                {Object.entries(classNamesMap).map(([val, label]) => (
+                                                                    <SelectItem key={val} value={val} className="font-bold py-2">
+                                                                        🏫 {label} শ্রেণি
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+
+                                                    <div>
+                                                        <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
+                                                            রুটিনের ধরন:
+                                                        </Label>
+                                                        <Select
+                                                            value={routineScope}
+                                                            onValueChange={(val: 'main' | 'standalone') => {
+                                                                setRoutineScope(val);
+                                                                if (val === 'standalone' && selectedClassFilter === 'all') {
+                                                                    setSelectedClassFilter('6');
+                                                                }
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="w-[260px] h-10 mt-1 font-black text-sm bg-white border-2 border-indigo-300 rounded-xl shadow-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="font-kalpurush">
+                                                                <SelectItem value="main" className="font-bold py-2">
+                                                                    🔗 মেইন রুটিন (সমন্বিত)
+                                                                </SelectItem>
+                                                                <SelectItem value="standalone" className="font-bold py-2 text-indigo-700">
+                                                                    📌 স্বতন্ত্র শ্রেণি রুটিন (মেইনে যুক্ত হবে না)
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+
+                                                    <div>
+                                                        <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
+                                                            রুটিন তৈরির পদ্ধতি:
+                                                        </Label>
+                                                        <Select value={routineFormat} onValueChange={(val: 'day' | 'date') => setRoutineFormat(val)}>
+                                                            <SelectTrigger className="w-[210px] h-10 mt-1 font-black text-sm bg-white border-2 border-emerald-300 rounded-xl shadow-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="font-kalpurush">
+                                                                <SelectItem value="day" className="font-bold py-2">
+                                                                    📅 বার হিসেবে (রবি-বৃহস্পতি)
+                                                                </SelectItem>
+                                                                <SelectItem value="date" className="font-bold py-2 text-emerald-700">
+                                                                    📆 তারিখ হিসেবে (একাধিক রো)
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/95 px-4 py-2.5 rounded-xl border border-slate-200 shadow-xs">
-                                                    <Info className="w-4 h-4 text-primary shrink-0" />
-                                                    {selectedClassFilter === 'all' ? (
-                                                        <span>সকল শ্রেণির সমন্বিত মাস্টার রুটিন প্রদর্শিত হচ্ছে।</span>
-                                                    ) : (
-                                                        <span>
-                                                            <strong className="text-primary font-black">{classNamesMap[selectedClassFilter]} শ্রেণি</strong>-র পৃথক রুটিন। এখানে তৈরিকৃত বা পরিবর্তিত রুটিন স্বয়ংক্রিয়ভাবে সমন্বিত রুটিনে যুক্ত হয়ে যাবে।
+                                                {routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine && (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-slate-200/70">
+                                                        <Input
+                                                            value={standaloneRoutine.title || ''}
+                                                            onChange={(e) => setStandaloneRoutine(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                                                            disabled={!isEditMode}
+                                                            placeholder={`${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিনের শিরোনাম (যেমন: বিশেষ কোচিং / পরীক্ষা প্রস্তুতি)...`}
+                                                            className="h-9 text-xs font-bold bg-white border-indigo-200 max-w-md"
+                                                        />
+                                                        <span className="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
+                                                            <Info className="w-4 h-4 shrink-0" />
+                                                            এটি শুধুমাত্র {classNamesMap[selectedClassFilter]} শ্রেণির জন্য আলাদাভাবে সেভ হবে — মেইন রুটিনে যুক্ত হবে না।
                                                         </span>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            <CombinedRoutineTable 
-                                                routineData={routineData} 
-                                                conflicts={displayConflicts} 
-                                                isEditMode={isEditMode} 
-                                                onCellChange={handleCellChange} 
-                                                teacherColorMap={teacherColorMap} 
-                                                isMounted={isMounted}
-                                                columns={columns}
-                                                onAddColumn={openAddColumn}
-                                                onDeleteColumn={openDeleteColumn}
-                                                onEditColumn={openEditColumn}
-                                                selectedClass={selectedClassFilter}
-                                                allocationsList={allocationsList}
-                                            />
+                                            {routineFormat === 'date' ? (
+                                                <DateRoutineTable
+                                                    rows={
+                                                        routineScope === 'standalone' && standaloneRoutine
+                                                            ? standaloneRoutine.dateRows.map(r => ({
+                                                                id: r.id,
+                                                                date: r.date,
+                                                                classes: { [selectedClassFilter]: r.periods }
+                                                            }))
+                                                            : dateRoutineRows
+                                                    }
+                                                    selectedClass={selectedClassFilter}
+                                                    isEditMode={isEditMode}
+                                                    columns={columns}
+                                                    teacherColorMap={teacherColorMap}
+                                                    isMounted={isMounted}
+                                                    allocationsList={allocationsList}
+                                                    onAddColumn={openAddColumn}
+                                                    onDeleteColumn={openDeleteColumn}
+                                                    onEditColumn={openEditColumn}
+                                                    onDateChange={(rowId, newDate) => {
+                                                        if (routineScope === 'standalone') {
+                                                            setStandaloneRoutine(prev => prev ? {
+                                                                ...prev,
+                                                                dateRows: prev.dateRows.map(r => r.id === rowId ? { ...r, date: newDate } : r)
+                                                            } : prev);
+                                                        } else {
+                                                            setDateRoutineRows(prev => prev.map(r => r.id === rowId ? { ...r, date: newDate } : r));
+                                                        }
+                                                    }}
+                                                    onCellChange={(rowId, cls, periodIdx, value) => {
+                                                        const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                        if (routineScope === 'standalone') {
+                                                            setStandaloneRoutine(prev => {
+                                                                if (!prev) return prev;
+                                                                return {
+                                                                    ...prev,
+                                                                    dateRows: prev.dateRows.map(r => {
+                                                                        if (r.id !== rowId) return r;
+                                                                        const nextPeriods = [...(r.periods || [])];
+                                                                        while (nextPeriods.length < numPeriods) nextPeriods.push('');
+                                                                        nextPeriods[periodIdx] = value;
+                                                                        return { ...r, periods: nextPeriods };
+                                                                    })
+                                                                };
+                                                            });
+                                                        } else {
+                                                            setDateRoutineRows(prev => prev.map(r => {
+                                                                if (r.id !== rowId) return r;
+                                                                const nextClasses = { ...(r.classes || {}) };
+                                                                const nextPeriods = [...(nextClasses[cls] || [])];
+                                                                while (nextPeriods.length < numPeriods) nextPeriods.push('');
+                                                                nextPeriods[periodIdx] = value;
+                                                                nextClasses[cls] = nextPeriods;
+                                                                return { ...r, classes: nextClasses };
+                                                            }));
+                                                        }
+                                                    }}
+                                                    onAddRow={() => {
+                                                        const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                        const newId = `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                                                        const todayStr = format(new Date(), 'yyyy-MM-dd');
+                                                        if (routineScope === 'standalone') {
+                                                            setStandaloneRoutine(prev => prev ? {
+                                                                ...prev,
+                                                                dateRows: [...prev.dateRows, { id: newId, date: todayStr, periods: Array(numPeriods).fill('') }]
+                                                            } : prev);
+                                                        } else {
+                                                            setDateRoutineRows(prev => [...prev, { id: newId, date: todayStr, classes: {} }]);
+                                                        }
+                                                    }}
+                                                    onDeleteRow={(rowId) => {
+                                                        if (routineScope === 'standalone') {
+                                                            setStandaloneRoutine(prev => prev ? {
+                                                                ...prev,
+                                                                dateRows: prev.dateRows.filter(r => r.id !== rowId)
+                                                            } : prev);
+                                                        } else {
+                                                            setDateRoutineRows(prev => prev.filter(r => r.id !== rowId));
+                                                        }
+                                                    }}
+                                                />
+                                            ) : (
+                                                <CombinedRoutineTable 
+                                                    routineData={
+                                                        routineScope === 'standalone' && standaloneRoutine
+                                                            ? { [selectedClassFilter]: standaloneRoutine.dayData || {} }
+                                                            : routineData
+                                                    } 
+                                                    conflicts={routineScope === 'standalone' ? {
+                                                        teacherClashes: new Set<string>(),
+                                                        consecutiveClassClashes: new Set<string>(),
+                                                        breakClashes: new Set<string>(),
+                                                        subjectRepetitionClashes: new Set<string>(),
+                                                        teacherSubjectMismatchClashes: new Set<string>()
+                                                    } : displayConflicts} 
+                                                    isEditMode={isEditMode} 
+                                                    onCellChange={(cls, day, periodIdx, value) => {
+                                                        if (routineScope === 'standalone') {
+                                                            const numPeriods = columns.filter(c => c.type === 'period').length || 6;
+                                                            setStandaloneRoutine(prev => {
+                                                                if (!prev) return prev;
+                                                                const nextDayData = { ...(prev.dayData || {}) };
+                                                                const nextPeriods = [...(nextDayData[day] || [])];
+                                                                while (nextPeriods.length < numPeriods) nextPeriods.push('');
+                                                                nextPeriods[periodIdx] = value;
+                                                                nextDayData[day] = nextPeriods;
+                                                                return { ...prev, dayData: nextDayData };
+                                                            });
+                                                        } else {
+                                                            handleCellChange(cls, day, periodIdx, value);
+                                                        }
+                                                    }} 
+                                                    teacherColorMap={teacherColorMap} 
+                                                    isMounted={isMounted}
+                                                    columns={columns}
+                                                    onAddColumn={openAddColumn}
+                                                    onDeleteColumn={openDeleteColumn}
+                                                    onEditColumn={openEditColumn}
+                                                    selectedClass={selectedClassFilter}
+                                                    allocationsList={allocationsList}
+                                                />
+                                            )}
                                         </div>
                                     )}
                                     {activeSection === 'proxy-management' && (
@@ -2662,25 +3085,53 @@ export default function RoutinesPage() {
                         <h1 className="text-2xl font-black">{schoolInfo.name}</h1>
                         <p className="text-xs font-bold">{schoolInfo.address}</p>
                         <h2 className="text-lg font-black mt-2 underline">
-                            {selectedClassFilter === 'all' 
-                                ? `সমন্বিত ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}` 
-                                : `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}`
+                            {routineScope === 'standalone' && selectedClassFilter !== 'all'
+                                ? (standaloneRoutine?.title || `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির স্বতন্ত্র রুটিন - ${toBengaliNumber(selectedYear)}`)
+                                : selectedClassFilter === 'all' 
+                                    ? `সমন্বিত ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}` 
+                                    : `${classNamesMap[selectedClassFilter] || selectedClassFilter} শ্রেণির ক্লাস রুটিন - ${toBengaliNumber(selectedYear)}`
                             }
                         </h2>
                     </div>
                 </header>
                 <div className="flex-1">
-                    <CombinedRoutineTable 
-                        routineData={routineData} 
-                        conflicts={displayConflicts} 
-                        isEditMode={false} 
-                        onCellChange={() => {}} 
-                        teacherColorMap={teacherColorMap} 
-                        isMounted={isMounted}
-                        columns={columns}
-                        selectedClass={selectedClassFilter}
-                        allocationsList={allocationsList}
-                    />
+                    {routineFormat === 'date' ? (
+                        <DateRoutineTable
+                            rows={
+                                routineScope === 'standalone' && standaloneRoutine
+                                    ? standaloneRoutine.dateRows.map(r => ({
+                                        id: r.id,
+                                        date: r.date,
+                                        classes: { [selectedClassFilter]: r.periods }
+                                    }))
+                                    : dateRoutineRows
+                            }
+                            selectedClass={selectedClassFilter}
+                            isEditMode={false}
+                            columns={columns}
+                            teacherColorMap={teacherColorMap}
+                            isMounted={isMounted}
+                            allocationsList={allocationsList}
+                            onDateChange={() => {}}
+                            onCellChange={() => {}}
+                        />
+                    ) : (
+                        <CombinedRoutineTable 
+                            routineData={
+                                routineScope === 'standalone' && standaloneRoutine
+                                    ? { [selectedClassFilter]: standaloneRoutine.dayData || {} }
+                                    : routineData
+                            } 
+                            conflicts={displayConflicts} 
+                            isEditMode={false} 
+                            onCellChange={() => {}} 
+                            teacherColorMap={teacherColorMap} 
+                            isMounted={isMounted}
+                            columns={columns}
+                            selectedClass={selectedClassFilter}
+                            allocationsList={allocationsList}
+                        />
+                    )}
                 </div>
                 <footer className="mt-12 flex justify-between border-t-2 border-black pt-4">
                     <div className="w-40 border-t border-black text-center font-bold text-xs pt-1">রুটিন কমিটির স্বাক্ষর</div>
