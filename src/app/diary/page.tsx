@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useFirestore, useUser, useCollection } from '@/firebase';
 import { collection, query, where, addDoc, deleteDoc, doc, serverTimestamp, updateDoc, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,9 +105,10 @@ export default function TeacherDiaryPage() {
     notes: ''
   });
 
-  const [planRows, setPlanRows] = useState<{ id: string; date: string; topic: string; notes: string }[]>([
+  const [planRows, setPlanRows] = useState<{ id: string; existingId?: string; date: string; topic: string; notes: string }[]>([
     { id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }
   ]);
+  const lastLoadedKeyRef = useRef<string>('');
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -166,9 +167,35 @@ export default function TeacherDiaryPage() {
   const existingPlansForSubject = useMemo(() => {
     if (!diaryEntries || !formData.classId || !formData.subject) return [];
     return diaryEntries
-      .filter(e => e.classId === formData.classId && e.subject === formData.subject && e.id !== editingId)
+      .filter(e => e.classId === formData.classId && e.subject === formData.subject)
       .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  }, [diaryEntries, formData.classId, formData.subject, editingId]);
+  }, [diaryEntries, formData.classId, formData.subject]);
+
+  useEffect(() => {
+    if (!isAdding) {
+      lastLoadedKeyRef.current = '';
+      return;
+    }
+    if (editingId) return;
+    if (!formData.classId || !formData.subject) return;
+    const key = `${formData.classId}__${formData.subject}`;
+    if (lastLoadedKeyRef.current === key) return;
+    lastLoadedKeyRef.current = key;
+
+    if (existingPlansForSubject.length > 0) {
+      setPlanRows(
+        existingPlansForSubject.map(p => ({
+          id: `saved_${p.id}`,
+          existingId: p.id,
+          date: p.date,
+          topic: p.topic || '',
+          notes: p.notes || '',
+        }))
+      );
+    } else {
+      setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '' }]);
+    }
+  }, [isAdding, editingId, formData.classId, formData.subject, existingPlansForSubject]);
 
   const linkedRoutineSchedule = useMemo(() => {
     if (!formData.classId || !formData.subject) return { days: [] as { day: string; period: number; teacher: string; source: string }[], dates: [] as { date: string; period: number; teacher: string; source: string }[] };
@@ -306,15 +333,38 @@ export default function TeacherDiaryPage() {
   };
 
   const applyDateToPlanRow = (dateStr: string) => {
+    const alreadyExistsInRows = planRows.some(r => r.date === dateStr);
+    if (alreadyExistsInRows) {
+      toast({ title: "তারিখটি রয়েছে", description: "এই তারিখের পরিকল্পনা ইতোমধ্যে নিচে দেখানো হয়েছে।" });
+      return;
+    }
+    const saved = existingPlansForSubject.find(p => p.date === dateStr);
     setPlanRows(prev => {
-      const emptyIdx = prev.findIndex(r => !r.topic && !r.notes);
-      if (emptyIdx !== -1 && !prev.some(r => r.date === dateStr && (r.topic || r.notes))) {
-        return prev.map((r, i) => i === emptyIdx ? { ...r, date: dateStr } : r);
+      if (prev.some(r => r.date === dateStr)) return prev;
+      const emptyIdx = prev.findIndex(r => !r.existingId && !r.topic && !r.notes);
+      if (emptyIdx !== -1) {
+        return prev.map((r, i) =>
+          i === emptyIdx
+            ? {
+                ...r,
+                existingId: saved?.id,
+                date: dateStr,
+                topic: saved?.topic || '',
+                notes: saved?.notes || '',
+              }
+            : r
+        );
       }
-      if (prev.length === 1 && !prev[0].topic && !prev[0].notes) {
-        return [{ ...prev[0], date: dateStr }];
-      }
-      return [...prev, { id: `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, date: dateStr, topic: '', notes: '' }];
+      return [
+        ...prev,
+        {
+          id: saved ? `saved_${saved.id}` : `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          existingId: saved?.id,
+          date: dateStr,
+          topic: saved?.topic || '',
+          notes: saved?.notes || '',
+        },
+      ];
     });
   };
 
@@ -337,6 +387,16 @@ export default function TeacherDiaryPage() {
       return;
     }
 
+    const uniqueDates = new Set(validRows.map(r => r.date));
+    if (uniqueDates.size !== validRows.length) {
+      toast({
+        variant: "destructive",
+        title: "ডুপ্লিকেট তারিখ",
+        description: "একই তারিখ একাধিকবার রয়েছে। অনুগ্রহ করে ডুপ্লিকেট তারিখ পরিবর্তন বা মুছে ফেলুন।",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (editingId) {
@@ -352,22 +412,64 @@ export default function TeacherDiaryPage() {
         });
         toast({ title: "সফল", description: "ডায়েরি আপডেট করা হয়েছে।" });
       } else {
-        await Promise.all(
-          validRows.map(row =>
-            addDoc(collection(db, 'diary'), {
-              classId: formData.classId,
-              subject: formData.subject,
-              date: row.date,
-              topic: row.topic,
-              notes: row.notes,
-              userId: user.uid,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-          )
-        );
-        toast({ title: "সফল", description: `${toBengaliNumber(validRows.length)}টি তারিখের ডায়েরি/পরিকল্পনা সংরক্ষণ করা হয়েছে।` });
+        let addedCount = 0;
+        let updatedCount = 0;
+        const ops: Promise<any>[] = [];
+
+        for (const row of validRows) {
+          const existingEntry = row.existingId
+            ? diaryEntries?.find(e => e.id === row.existingId)
+            : diaryEntries?.find(e => e.classId === formData.classId && e.subject === formData.subject && e.date === row.date);
+
+          if (existingEntry) {
+            const hasChanged =
+              (existingEntry.date || '') !== row.date ||
+              (existingEntry.topic || '') !== row.topic ||
+              (existingEntry.notes || '') !== row.notes;
+            if (hasChanged) {
+              updatedCount++;
+              ops.push(
+                updateDoc(doc(db, 'diary', existingEntry.id), {
+                  classId: formData.classId,
+                  subject: formData.subject,
+                  date: row.date,
+                  topic: row.topic,
+                  notes: row.notes,
+                  userId: user.uid,
+                  updatedAt: serverTimestamp(),
+                })
+              );
+            }
+          } else if (row.topic || row.notes || validRows.length === 1) {
+            addedCount++;
+            ops.push(
+              addDoc(collection(db, 'diary'), {
+                classId: formData.classId,
+                subject: formData.subject,
+                date: row.date,
+                topic: row.topic,
+                notes: row.notes,
+                userId: user.uid,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              })
+            );
+          }
+        }
+
+        if (ops.length === 0) {
+          toast({ title: "তথ্য অপরিবর্তিত", description: "নতুন বা পরিবর্তিত কোনো পরিকল্পনা পাওয়া যায়নি।" });
+          setIsSaving(false);
+          return;
+        }
+
+        await Promise.all(ops);
+        const parts: string[] = [];
+        if (addedCount > 0) parts.push(`${toBengaliNumber(addedCount)}টি নতুন`);
+        if (updatedCount > 0) parts.push(`${toBengaliNumber(updatedCount)}টি আপডেট`);
+        toast({ title: "সফল", description: `ডায়েরি/পরিকল্পনা সংরক্ষণ করা হয়েছে (${parts.join(', ')})।` });
       }
+      lastLoadedKeyRef.current = '';
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
         classId: '',
@@ -537,62 +639,31 @@ export default function TeacherDiaryPage() {
                 </div>
               )}
 
-              {formData.classId && formData.subject && existingPlansForSubject.length > 0 && (
-                <div className="p-4 bg-amber-50/70 border-b-2 border-black space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-black text-amber-900">
-                      <FileText className="w-4 h-4 text-amber-700" />
-                      <span>পূর্বে সংরক্ষিত ডায়েরি / পাঠ পরিকল্পনা ({toBengaliNumber(existingPlansForSubject.length)}টি):</span>
-                    </div>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                    {existingPlansForSubject.map((plan) => {
-                      const dObj = plan.date ? new Date(plan.date.replace(/-/g, '/')) : null;
-                      const isValidDate = dObj && !isNaN(dObj.getTime());
-                      const dateStr = isValidDate ? toBengaliNumber(format(dObj, 'dd-MM-yyyy')) : plan.date;
-                      const dayStr = isValidDate ? format(dObj, 'EEEE', { locale: bn }) : '';
-                      return (
-                        <div key={plan.id} className="p-2.5 rounded-xl bg-white border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
-                          <div className="space-y-0.5 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge variant="outline" className="text-[10px] font-black bg-amber-100/70 text-amber-950 border-amber-300">
-                                📅 {dateStr} {dayStr ? `(${dayStr})` : ''}
-                              </Badge>
-                              {plan.topic && (
-                                <span className="text-xs font-black text-indigo-800 truncate">{plan.topic}</span>
-                              )}
-                            </div>
-                            {plan.notes && (
-                              <p className="text-xs font-bold text-slate-600 line-clamp-2">{plan.notes}</p>
-                            )}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(plan)}
-                            className="h-7 px-2.5 text-[11px] font-bold border-amber-300 text-amber-900 hover:bg-amber-100 shrink-0 self-end sm:self-center"
-                          >
-                            <Edit className="w-3 h-3 mr-1" /> এডিট
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               <div className="divide-y-2 divide-black">
                 {planRows.map((row, rowIdx) => {
                   const dateRoutineInfo = getRoutineForDate(row.date);
+                  const savedMatch = existingPlansForSubject.find(p => p.id === row.existingId || p.date === row.date);
+                  const isDuplicateDate = Boolean(row.date && planRows.filter(r => r.date === row.date).length > 1);
                   return (
                     <div key={row.id} className="grid grid-cols-1 md:grid-cols-4">
                       <div className="md:col-span-1 p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-black text-indigo-700 uppercase tracking-wider">
-                            তারিখ {planRows.length > 1 ? `(${toBengaliNumber(rowIdx + 1)})` : ''}
-                          </label>
-                          {!editingId && planRows.length > 1 && (
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <label className="block text-xs font-black text-indigo-700 uppercase tracking-wider">
+                              তারিখ {planRows.length > 1 ? `(${toBengaliNumber(rowIdx + 1)})` : ''}
+                            </label>
+                            {savedMatch && (
+                              <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-900 border border-emerald-400 text-[10px] font-black px-1.5 py-0">
+                                ✓ সংরক্ষিত
+                              </Badge>
+                            )}
+                            {isDuplicateDate && (
+                              <Badge variant="destructive" className="text-[10px] font-black px-1.5 py-0">
+                                ⚠️ ডুপ্লিকেট তারিখ
+                              </Badge>
+                            )}
+                          </div>
+                          {!editingId && planRows.length > 1 && !savedMatch && (
                             <button
                               type="button"
                               onClick={() => setPlanRows(prev => prev.filter(r => r.id !== row.id))}
@@ -605,7 +676,29 @@ export default function TeacherDiaryPage() {
                         <Input 
                           type="date" 
                           value={row.date} 
-                          onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, date: e.target.value } : r))} 
+                          onChange={e => {
+                            const newDate = e.target.value;
+                            setPlanRows(prev => prev.map(r => {
+                              if (r.id !== row.id) return r;
+                              if (editingId) return { ...r, date: newDate };
+                              const matched = existingPlansForSubject.find(p => p.date === newDate);
+                              const usedElsewhere = prev.some(other => other.id !== row.id && other.date === newDate);
+                              if (matched && !usedElsewhere) {
+                                return {
+                                  ...r,
+                                  existingId: matched.id,
+                                  date: newDate,
+                                  topic: matched.topic || '',
+                                  notes: matched.notes || '',
+                                };
+                              }
+                              return {
+                                ...r,
+                                existingId: r.existingId && r.date === newDate ? r.existingId : undefined,
+                                date: newDate,
+                              };
+                            }));
+                          }} 
                           className="font-bold h-11 border-2 border-black bg-white ring-offset-0 focus:ring-0"
                         />
 
@@ -700,10 +793,28 @@ export default function TeacherDiaryPage() {
                     type="button"
                     variant="outline"
                     onClick={() => {
+                      const usedDates = new Set(planRows.map(r => r.date));
                       const lastDate = planRows[planRows.length - 1]?.date || format(new Date(), 'yyyy-MM-dd');
-                      const d = new Date(lastDate.replace(/-/g, '/'));
-                      const nextDate = isNaN(d.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(addDays(d, 1), 'yyyy-MM-dd');
-                      setPlanRows(prev => [...prev, { id: `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, date: nextDate, topic: '', notes: '' }]);
+                      let d = new Date(lastDate.replace(/-/g, '/'));
+                      if (isNaN(d.getTime())) d = new Date();
+                      let candidate = format(addDays(d, 1), 'yyyy-MM-dd');
+                      let guard = 0;
+                      while (usedDates.has(candidate) && guard < 365) {
+                        d = addDays(d, 1);
+                        candidate = format(addDays(d, 1), 'yyyy-MM-dd');
+                        guard++;
+                      }
+                      const saved = existingPlansForSubject.find(p => p.date === candidate);
+                      setPlanRows(prev => [
+                        ...prev,
+                        {
+                          id: saved ? `saved_${saved.id}` : `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                          existingId: saved?.id,
+                          date: candidate,
+                          topic: saved?.topic || '',
+                          notes: saved?.notes || '',
+                        },
+                      ]);
                     }}
                     className="border-2 border-dashed border-indigo-500 text-indigo-700 hover:bg-indigo-100 font-black gap-2"
                   >
