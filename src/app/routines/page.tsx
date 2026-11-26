@@ -3531,6 +3531,14 @@ export default function RoutinesPage() {
                                             currentLimitsMap={subjectLimitsMap}
                                             onLimitsUpdated={(updated) => setSubjectLimitsMap(updated)}
                                             routineDays={routineDays}
+                                            dateRoutineRows={dateRoutineRows}
+                                            standaloneRoutine={standaloneRoutine}
+                                            onNavigateToRoutine={(scope, format, cls) => {
+                                                setRoutineScope(scope);
+                                                setRoutineFormat(format);
+                                                if (cls) setSelectedClassFilter(cls);
+                                                setActiveSection('class-routine');
+                                            }}
                                         />
                                     )}
                                     {activeSection === 'exam-routine' && (
