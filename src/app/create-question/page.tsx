@@ -164,7 +164,8 @@ function CreateQuestionContent() {
 
   // Document Content for Live Visual Editor & Print
   const [documentContent, setDocumentContent] = useState<string>('');
-  const [mobileFitMode, setMobileFitMode] = useState(false);
+  const [mobileFitMode, setMobileFitMode] = useState(true);
+  const loadedDocIdRef = useRef<string | null>(null);
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const paperContainerRef = useRef<HTMLDivElement>(null);
 
@@ -558,6 +559,13 @@ function CreateQuestionContent() {
     }
   };
 
+  const getClassLabel = useCallback((cid?: string | number) => {
+    if (!cid) return '';
+    const s = String(cid).trim();
+    const found = CLASSES.find(c => c.id === s || c.label === s || c.value === s || s.includes(c.label));
+    return found ? found.label : s;
+  }, []);
+
   // Load from DB or Session
   useEffect(() => {
     if (!editId && source !== 'merge') {
@@ -574,7 +582,7 @@ function CreateQuestionContent() {
         syncQuestionsToContent(initQ);
       }
     }
-  }, [searchParams, editId, source, syncQuestionsToContent]);
+  }, [searchParams, editId, source]);
 
   useEffect(() => { 
     if (!userLoading && !user) router.push('/auth'); 
@@ -584,12 +592,31 @@ function CreateQuestionContent() {
     async function loadQuestions() {
       if (!db || !user) return;
       if (editId) {
+        if (loadedDocIdRef.current === editId) return; // Prevent re-fetching and overwriting local user edits
         try {
           const docRef = doc(db, 'questions', editId);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
+            loadedDocIdRef.current = editId;
             const data = docSnap.data();
-            setMeta(prev => ({ ...prev, ...data }));
+            
+            // Normalize classId from possible variations (e.g. number 10, label 'দশম', or string '10')
+            const rawClass = data.classId ?? data.className ?? data.class ?? '';
+            let normalizedClassId = '';
+            if (rawClass !== undefined && rawClass !== null && rawClass !== '') {
+              const str = String(rawClass).trim();
+              const matched = CLASSES.find(c => c.id === str || c.label === str || c.value === str || str.includes(c.label));
+              normalizedClassId = matched ? matched.id : str;
+            }
+
+            setMeta(prev => ({
+              ...prev,
+              ...data,
+              classId: normalizedClassId || (prev.classId ? String(prev.classId) : ''),
+              subject: data.subject || data.subjectName || prev.subject || '',
+              chapter: data.chapter || data.chapterName || prev.chapter || '',
+            }));
+
             if (data.content) {
               setDocumentContent(data.content);
             }
@@ -625,7 +652,7 @@ function CreateQuestionContent() {
       }
     }
     if (user && db) loadQuestions();
-  }, [editId, source, db, user, syncQuestionsToContent]);
+  }, [editId, source, db, user]);
 
   const subjects = useMemo(() => meta.classId ? getSubjectsForClass(meta.classId) : [], [meta.classId]);
   const chapters = useMemo(() => (meta.classId && meta.subject) ? getChaptersForSubject(meta.classId, meta.subject) : [], [meta.classId, meta.subject]);
@@ -1016,16 +1043,21 @@ function CreateQuestionContent() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">শ্রেণি</label>
-                    <Select onValueChange={v => setMeta(prev => ({...prev, classId: v}))} value={meta.classId}>
+                    <Select onValueChange={v => setMeta(prev => ({...prev, classId: v}))} value={meta.classId ? String(meta.classId) : ''}>
                       <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="শ্রেণি" /></SelectTrigger>
                       <SelectContent>{CLASSES.map(c => <SelectItem key={c.id} value={c.id} className="text-xs font-bold">{c.label} শ্রেণি</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">বিষয়</label>
-                    <Select onValueChange={v => setMeta(prev => ({...prev, subject: v}))} value={meta.subject} disabled={!meta.classId}>
+                    <Select onValueChange={v => setMeta(prev => ({...prev, subject: v}))} value={meta.subject || ''} disabled={!meta.classId}>
                       <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="বিষয়" /></SelectTrigger>
-                      <SelectContent>{subjects.map(s => <SelectItem key={s} value={s} className="text-xs font-bold">{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        {subjects.map(s => <SelectItem key={s} value={s} className="text-xs font-bold">{s}</SelectItem>)}
+                        {meta.subject && !subjects.includes(meta.subject) && (
+                          <SelectItem key={meta.subject} value={meta.subject} className="text-xs font-bold">{meta.subject}</SelectItem>
+                        )}
+                      </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
@@ -1201,11 +1233,11 @@ function CreateQuestionContent() {
               {/* Tab 1: Live Visual Paper Editor */}
               <TabsContent value="editor" className="mt-0 space-y-4">
                 <Card className="shadow-lg border-2 border-slate-200 bg-slate-100/50">
-                  <CardHeader className="py-2 px-3 sm:px-4 bg-white border-b flex flex-row items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 truncate">
+                  <CardHeader className="py-2.5 px-2 sm:px-4 bg-white border-b flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+                    <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                       📄 লাইভ প্রিন্ট-স্টাইল লেআউট
                     </span>
-                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                       {/* Mobile Canvas Controls */}
                       <div className="flex sm:hidden items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-300">
                         <Button
@@ -1254,14 +1286,14 @@ function CreateQuestionContent() {
                   </CardHeader>
                   <CardContent 
                     ref={paperContainerRef}
-                    className="p-1 sm:p-4 md:p-8 flex justify-start sm:justify-center overflow-x-auto w-full max-w-full permanent-scroll"
+                    className="p-1 sm:p-4 md:p-8 flex justify-center overflow-x-auto w-full max-w-full permanent-scroll"
                   >
                     {/* Visual A4 Paper Preview */}
                     <div className={cn(
-                      "bg-white rounded-xl shadow-2xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm shrink-0 transition-all",
+                      "bg-white rounded-xl shadow-xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm transition-all",
                       mobileFitMode 
-                        ? "w-full min-w-0 max-w-full" 
-                        : "w-[720px] min-w-[720px] sm:w-full sm:min-w-0 max-w-[8.27in]"
+                        ? "w-full min-w-0 max-w-full sm:max-w-[8.27in]" 
+                        : "w-[720px] min-w-[720px] sm:w-full sm:min-w-0 max-w-[8.27in] shrink-0"
                     )}>
                       {/* Institutional Header */}
                       <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
@@ -1271,8 +1303,8 @@ function CreateQuestionContent() {
                         <h2 className="text-base font-bold text-black mt-1 underline">
                           {meta.exam || 'পরীক্ষা'}
                         </h2>
-                        <div className="flex justify-center items-center gap-6 sm:gap-8 text-xs font-bold mt-3 px-2">
-                          <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
+                        <div className="flex justify-center items-center gap-4 sm:gap-8 text-xs font-bold mt-3 px-2 flex-wrap">
+                          <span>শ্রেণি: {getClassLabel(meta.classId)}</span>
                           {questionsB.length > 0 && <span className="text-xs font-black border border-black px-2 py-0.5">সেট: ক (A)</span>}
                           <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
                         </div>
@@ -2061,8 +2093,26 @@ function CreateQuestionContent() {
           }
         }
         @media print {
+          :root,
+          html,
+          html.dark,
+          body,
+          body.dark,
+          #__next,
+          .dark,
+          [data-theme="dark"],
+          .paper {
+            color-scheme: light !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           html, body {
-            background: white !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
@@ -2080,6 +2130,18 @@ function CreateQuestionContent() {
             display: block !important;
             visibility: visible !important;
           }
+          .paper {
+            position: relative !important;
+            margin: 0 auto !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+          }
+          .paper * {
+            color: #000000 !important;
+            text-shadow: none !important;
+          }
           body > div,
           #__next,
           .min-h-screen {
@@ -2092,7 +2154,7 @@ function CreateQuestionContent() {
             overflow: visible !important;
             margin: 0 !important;
             padding: 0 !important;
-            background: transparent !important;
+            background: #ffffff !important;
           }
           @page {
             size: auto;

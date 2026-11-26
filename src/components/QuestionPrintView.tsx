@@ -54,6 +54,13 @@ function toBengaliNumber(n: number | string | undefined | null): string {
   return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
 }
 
+function getClassLabel(cid?: string | number): string {
+  if (!cid) return '';
+  const s = String(cid).trim();
+  const found = CLASSES.find(c => c.id === s || c.label === s || c.value === s || s.includes(c.label));
+  return found ? found.label : s;
+}
+
 function stripDirtyHtml(html: string): string {
   if (typeof window === 'undefined') return html;
   if (!html) return '';
@@ -3146,7 +3153,7 @@ export function QuestionPrintView({
                           {meta.exam}
                         </h2>
                         <div className="flex justify-center items-center gap-6 sm:gap-8 text-[10.5pt] font-bold mt-2 px-2">
-                          <span>শ্রেণি: {CLASSES.find(c => c.id === meta.classId)?.label || ''}</span>
+                          <span>শ্রেণি: {getClassLabel(meta.classId)}</span>
                           {questionsB.length > 0 && <span className="text-[11pt] font-black border border-black px-2 py-0.5">সেট: ক (A)</span>}
                           <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
                         </div>
@@ -3310,8 +3317,30 @@ export function QuestionPrintView({
           }
         }
         @media print {
+          :root,
+          html,
+          html.dark,
+          body,
+          body.dark,
+          #__next,
+          .dark,
+          [data-theme="dark"],
+          .print-view-container,
+          .print-body-row,
+          .print-canvas-col,
+          .print-main-area,
+          .paper {
+            color-scheme: light !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           html, body {
-            background: white !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
@@ -3345,7 +3374,7 @@ export function QuestionPrintView({
             overflow: visible !important;
             margin: 0 !important;
             padding: 0 !important;
-            background: transparent !important;
+            background: #ffffff !important;
             border: none !important;
             box-shadow: none !important;
           }
@@ -3358,7 +3387,7 @@ export function QuestionPrintView({
             overflow: visible !important;
             padding: 0 !important;
             margin: 0 !important;
-            background: transparent !important;
+            background: #ffffff !important;
             zoom: 1 !important;
             transform: none !important;
             gap: 0 !important;
@@ -3366,6 +3395,9 @@ export function QuestionPrintView({
           .paper {
             position: relative !important;
             margin: 0 auto !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
             box-shadow: none !important;
             page-break-after: always !important;
             break-after: page !important;
@@ -3375,6 +3407,10 @@ export function QuestionPrintView({
             box-sizing: border-box !important;
             border: none !important;
             overflow: hidden !important;
+          }
+          .paper * {
+            color: #000000 !important;
+            text-shadow: none !important;
           }
           .paper:last-of-type,
           .paper:last-child {
