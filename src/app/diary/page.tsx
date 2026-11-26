@@ -912,7 +912,17 @@ export default function TeacherDiaryPage() {
                                 {chaptersList.length > 0 ? (
                                   <Select
                                     value={row.topic}
-                                    onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
+                                    onValueChange={v => setPlanRows(prev => prev.map(r => {
+                                      if (r.id !== row.id) return r;
+                                      const prevProg = chapterProgressMap[v];
+                                      const isAlreadyCompleted = prevProg?.status === 'completed';
+                                      return {
+                                        ...r,
+                                        topic: v,
+                                        // Auto-set status: if previously marked completed keep it, otherwise auto set to running!
+                                        chapterStatus: isAlreadyCompleted ? 'completed' : 'running'
+                                      };
+                                    }))}
                                   >
                                     <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
                                       <SelectValue placeholder="অধ্যায় সিলেক্ট করুন" />
@@ -938,21 +948,37 @@ export default function TeacherDiaryPage() {
                                   />
                                 )}
                               </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase block">অধ্যায়ের অবস্থা:</label>
-                                <Select
-                                  value={row.chapterStatus}
-                                  onValueChange={(v: ChapterStatus) => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, chapterStatus: v } : r))}
+                              <div className="pt-1">
+                                <label
+                                  className={cn(
+                                    "flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all select-none",
+                                    row.chapterStatus === 'completed'
+                                      ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
+                                      : "bg-amber-50/70 border-amber-300 text-amber-900 hover:bg-amber-100/50"
+                                  )}
                                 >
-                                  <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
-                                    <SelectValue placeholder="অবস্থা" />
-                                  </SelectTrigger>
-                                  <SelectContent className="border-2 border-black font-kalpurush">
-                                    <SelectItem value="planned" className="font-bold text-xs">📝 পরিকল্পিত</SelectItem>
-                                    <SelectItem value="running" className="font-bold text-amber-800 text-xs">⏳ চলমান</SelectItem>
-                                    <SelectItem value="completed" className="font-bold text-emerald-800 text-xs">✅ অধ্যায় সম্পন্ন</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                  <input
+                                    type="checkbox"
+                                    checked={row.chapterStatus === 'completed'}
+                                    onChange={e => {
+                                      const isDone = e.target.checked;
+                                      setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, chapterStatus: isDone ? 'completed' : 'running' } : r));
+                                    }}
+                                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                                  />
+                                  <div className="flex flex-col leading-tight">
+                                    <span className="text-[11px] font-black flex items-center gap-1">
+                                      {row.chapterStatus === 'completed' ? (
+                                        <><span>✅ অধ্যায় সম্পন্ন</span></>
+                                      ) : (
+                                        <><span>⏳ চলমান অধ্যায়</span></>
+                                      )}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-slate-500">
+                                      {row.chapterStatus === 'completed' ? 'আজকে এই অধ্যায় শেষ হয়েছে' : 'পড়া শেষ হলে টিক দিন'}
+                                    </span>
+                                  </div>
+                                </label>
                               </div>
                             </td>
 
