@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine, SubjectClassLimit, getSubjectClassLimits, saveSubjectClassLimits } from '@/lib/routine-data';
+import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine, SubjectClassLimit, getSubjectClassLimits, saveSubjectClassLimits, RoutineSettings, getRoutineSettings, saveRoutineSettings } from '@/lib/routine-data';
 import SubjectLimitsTab from './SubjectLimitsTab';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -2659,8 +2659,30 @@ export default function RoutinesPage() {
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
     const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
-    const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>('day');
-    const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>('main');
+    const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem('routine_settings_active');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.preferredFormat === 'date' || parsed.preferredFormat === 'day') return parsed.preferredFormat;
+                }
+            } catch {}
+        }
+        return 'day';
+    });
+    const [routineScope, setRoutineScope] = useState<'main' | 'standalone'>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem('routine_settings_active');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.preferredScope === 'main' || parsed.preferredScope === 'standalone') return parsed.preferredScope;
+                }
+            } catch {}
+        }
+        return 'main';
+    });
     const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
     const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
 
@@ -2743,18 +2765,28 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb, limitsFromDb] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb, limitsFromDb, settingsFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
             getStaff(db),
             getRoutineColumns(db, selectedYear),
             getTeacherAllocations(db, selectedYear),
             getDateRoutine(db, selectedYear),
-            getSubjectClassLimits(db, selectedYear)
+            getSubjectClassLimits(db, selectedYear),
+            getRoutineSettings(db, selectedYear)
         ]);
         setAllStaff(staffData);
         setColumns(colsFromDb);
         setDateRoutineRows(dateRowsFromDb);
         setSubjectLimitsMap(limitsFromDb);
+
+        if (settingsFromDb?.preferredFormat) {
+            setRoutineFormat(settingsFromDb.preferredFormat);
+        } else if (dateRowsFromDb && dateRowsFromDb.length > 0 && routinesFromDb.length === 0) {
+            setRoutineFormat('date');
+        }
+        if (settingsFromDb?.preferredScope) {
+            setRoutineScope(settingsFromDb.preferredScope);
+        }
 
         const flatAllocations: { className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[] = [];
         allocationsFromDb.forEach(rec => {
@@ -2804,6 +2836,11 @@ export default function RoutinesPage() {
         }
         getStandaloneRoutine(db, selectedYear, selectedClassFilter).then(res => {
             setStandaloneRoutine(res);
+            if (res?.preferredFormat) {
+                setRoutineFormat(res.preferredFormat);
+            } else if (res?.dateRows && res.dateRows.length > 0 && (!res.dayData || Object.keys(res.dayData).length === 0)) {
+                setRoutineFormat('date');
+            }
         });
     }, [db, selectedYear, routineScope, selectedClassFilter]);
 
@@ -3052,12 +3089,29 @@ export default function RoutinesPage() {
         }
         
         try {
+            // Save format and scope preference to both Firestore and localStorage
+            await saveRoutineSettings(db, selectedYear, {
+                preferredFormat: routineFormat,
+                preferredScope: routineScope,
+                lastSelectedClass: selectedClassFilter
+            });
+            if (typeof window !== 'undefined') {
+                try {
+                    localStorage.setItem('routine_settings_active', JSON.stringify({
+                        preferredFormat: routineFormat,
+                        preferredScope: routineScope,
+                        lastSelectedClass: selectedClassFilter
+                    }));
+                } catch {}
+            }
+
             if (routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine) {
                 await saveStandaloneRoutine(db, {
                     ...standaloneRoutine,
                     columns: activeColumns,
+                    preferredFormat: routineFormat,
                 });
-                toast({ title: `${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিন আলাদাভাবে সেভ হয়েছে` });
+                toast({ title: `${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিন (${routineFormat === 'date' ? 'তারিখ ভিত্তিক' : 'বার ভিত্তিক'}) সফলভাবে সেভ হয়েছে` });
                 setIsEditMode(false);
                 return;
             }
@@ -3084,7 +3138,7 @@ export default function RoutinesPage() {
             });
 
             await saveRoutinesBatch(db, routinesToSave);
-            toast({ title: 'রুটিন ও কলাম সফলভাবে সেভ হয়েছে' });
+            toast({ title: 'বার-ভিত্তিক রুটিন ও কলাম সফলভাবে সেভ হয়েছে' });
             setIsEditMode(false);
             setOriginalRoutineData(routineData);
         } catch (e) {
@@ -3298,8 +3352,25 @@ export default function RoutinesPage() {
                                                             value={routineScope}
                                                             onValueChange={(val: 'main' | 'standalone') => {
                                                                 setRoutineScope(val);
+                                                                const nextClass = (val === 'standalone' && selectedClassFilter === 'all') ? '6' : selectedClassFilter;
                                                                 if (val === 'standalone' && selectedClassFilter === 'all') {
                                                                     setSelectedClassFilter('6');
+                                                                }
+                                                                if (typeof window !== 'undefined') {
+                                                                    try {
+                                                                        localStorage.setItem('routine_settings_active', JSON.stringify({
+                                                                            preferredFormat: routineFormat,
+                                                                            preferredScope: val,
+                                                                            lastSelectedClass: nextClass
+                                                                        }));
+                                                                    } catch {}
+                                                                }
+                                                                if (db) {
+                                                                    saveRoutineSettings(db, selectedYear, {
+                                                                        preferredScope: val,
+                                                                        preferredFormat: routineFormat,
+                                                                        lastSelectedClass: nextClass
+                                                                    });
                                                                 }
                                                             }}
                                                         >
@@ -3321,7 +3392,31 @@ export default function RoutinesPage() {
                                                         <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
                                                             রুটিন তৈরির পদ্ধতি:
                                                         </Label>
-                                                        <Select value={routineFormat} onValueChange={(val: 'day' | 'date') => setRoutineFormat(val)}>
+                                                        <Select
+                                                            value={routineFormat}
+                                                            onValueChange={(val: 'day' | 'date') => {
+                                                                setRoutineFormat(val);
+                                                                if (routineScope === 'standalone') {
+                                                                    setStandaloneRoutine(prev => prev ? { ...prev, preferredFormat: val } : prev);
+                                                                }
+                                                                if (typeof window !== 'undefined') {
+                                                                    try {
+                                                                        localStorage.setItem('routine_settings_active', JSON.stringify({
+                                                                            preferredFormat: val,
+                                                                            preferredScope: routineScope,
+                                                                            lastSelectedClass: selectedClassFilter
+                                                                        }));
+                                                                    } catch {}
+                                                                }
+                                                                if (db) {
+                                                                    saveRoutineSettings(db, selectedYear, {
+                                                                        preferredFormat: val,
+                                                                        preferredScope: routineScope,
+                                                                        lastSelectedClass: selectedClassFilter
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
                                                             <SelectTrigger className="w-full lg:w-[220px] h-10 mt-1 font-black text-sm bg-white border-2 border-emerald-300 rounded-xl shadow-xs">
                                                                 <SelectValue />
                                                             </SelectTrigger>
@@ -3538,6 +3633,22 @@ export default function RoutinesPage() {
                                                 setRoutineFormat(format);
                                                 if (cls) setSelectedClassFilter(cls);
                                                 setActiveSection('class-routine');
+                                                if (typeof window !== 'undefined') {
+                                                    try {
+                                                        localStorage.setItem('routine_settings_active', JSON.stringify({
+                                                            preferredFormat: format,
+                                                            preferredScope: scope,
+                                                            lastSelectedClass: cls || selectedClassFilter
+                                                        }));
+                                                    } catch {}
+                                                }
+                                                if (db) {
+                                                    saveRoutineSettings(db, selectedYear, {
+                                                        preferredFormat: format,
+                                                        preferredScope: scope,
+                                                        lastSelectedClass: cls || selectedClassFilter
+                                                    });
+                                                }
                                             }}
                                         />
                                     )}

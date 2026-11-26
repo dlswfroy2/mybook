@@ -253,9 +253,67 @@ export interface StandaloneClassRoutine {
     academicYear: string;
     title?: string;
     columns?: RoutineColumnConfig[];
+    preferredFormat?: 'day' | 'date';
     dayData: Record<string, string[]>;
     dateRows: StandaloneDateRow[];
 }
+
+export interface RoutineSettings {
+    academicYear?: string;
+    preferredFormat?: 'day' | 'date';
+    preferredScope?: 'main' | 'standalone';
+    lastSelectedClass?: string;
+}
+
+export const getRoutineSettings = async (db: Firestore, academicYear: string): Promise<RoutineSettings> => {
+    const localKey = `routine_settings_${academicYear}`;
+    let settings: RoutineSettings = { preferredFormat: 'day', preferredScope: 'main' };
+    if (typeof window !== 'undefined') {
+        try {
+            const raw = localStorage.getItem(localKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') {
+                    settings = { ...settings, ...parsed };
+                }
+            }
+        } catch {}
+    }
+    if (!db) return settings;
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `settings_${academicYear}`);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data() as RoutineSettings;
+            const merged: RoutineSettings = { ...settings, ...data };
+            if (typeof window !== 'undefined') {
+                try { localStorage.setItem(localKey, JSON.stringify(merged)); } catch {}
+            }
+            return merged;
+        }
+    } catch (e) {
+        console.warn("Failed to load routine settings:", e);
+    }
+    return settings;
+};
+
+export const saveRoutineSettings = async (db: Firestore, academicYear: string, settings: RoutineSettings): Promise<void> => {
+    const localKey = `routine_settings_${academicYear}`;
+    if (typeof window !== 'undefined') {
+        try {
+            const current = localStorage.getItem(localKey);
+            const merged = { ...(current ? JSON.parse(current) : {}), ...settings };
+            localStorage.setItem(localKey, JSON.stringify(merged));
+        } catch {}
+    }
+    if (!db) return;
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `settings_${academicYear}`);
+        await setDoc(docRef, { ...settings, academicYear, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+        console.warn("Failed to save routine settings:", e);
+    }
+};
 
 export const getStandaloneRoutine = async (db: Firestore, academicYear: string, className: string): Promise<StandaloneClassRoutine> => {
     const empty: StandaloneClassRoutine = {
@@ -263,6 +321,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
         academicYear,
         title: '',
         columns: JSON.parse(JSON.stringify(DEFAULT_ROUTINE_COLUMNS)),
+        preferredFormat: 'day',
         dayData: {},
         dateRows: [],
     };
@@ -276,6 +335,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                     return {
                         ...empty,
                         ...parsed,
+                        preferredFormat: parsed.preferredFormat || (Array.isArray(parsed.dateRows) && parsed.dateRows.length > 0 && Object.keys(parsed.dayData || {}).length === 0 ? 'date' : 'day'),
                         columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : empty.columns,
                     };
                 }
@@ -292,6 +352,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                 className,
                 academicYear,
                 title: d.title || '',
+                preferredFormat: d.preferredFormat || (Array.isArray(d.dateRows) && d.dateRows.length > 0 && Object.keys(d.dayData || {}).length === 0 ? 'date' : 'day'),
                 columns: Array.isArray(d.columns) && d.columns.length > 0 ? d.columns : empty.columns,
                 dayData: d.dayData || {},
                 dateRows: Array.isArray(d.dateRows) ? d.dateRows : []
