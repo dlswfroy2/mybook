@@ -37,6 +37,7 @@ import { getFullRoutine, getDateRoutine, getStandaloneRoutine, ClassRoutine, Dat
 import { subjectNameNormalization as baseSubjectNorm } from '@/lib/subjects';
 
 type ChapterStatus = 'planned' | 'running' | 'completed';
+type EntryType = 'class-record' | 'lesson-plan' | 'exam-suggestion';
 
 type PlanRow = {
   id: string;
@@ -53,6 +54,12 @@ const CHAPTER_STATUS_META: Record<ChapterStatus, { label: string; badgeClass: st
   planned: { label: '📝 পরিকল্পিত', badgeClass: 'bg-slate-100 text-slate-800 border-slate-300' },
   running: { label: '⏳ চলমান', badgeClass: 'bg-amber-100 text-amber-900 border-amber-400' },
   completed: { label: '✅ সম্পন্ন', badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400' },
+};
+
+const ENTRY_TYPE_META: Record<EntryType, { label: string; shortLabel: string; badgeClass: string; icon: string }> = {
+  'class-record': { label: '📘 দৈনিক ক্লাস রেকর্ড', shortLabel: 'ক্লাস রেকর্ড', badgeClass: 'bg-blue-100 text-blue-900 border-blue-400', icon: '📘' },
+  'lesson-plan': { label: '📝 পাঠপরিকল্পনা (Lesson Plan)', shortLabel: 'পাঠপরিকল্পনা', badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400', icon: '📝' },
+  'exam-suggestion': { label: '🎯 পরীক্ষার সাজেশন (Suggestion)', shortLabel: 'সাজেশন', badgeClass: 'bg-purple-100 text-purple-900 border-purple-400', icon: '🎯' },
 };
 
 const getLessonTypeOptions = (subject: string): string[] => {
@@ -124,18 +131,27 @@ export default function TeacherDiaryPage() {
   const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
   const [filterClass, setFilterClass] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
+  const [filterEntryType, setFilterEntryType] = useState<'all' | EntryType>('all');
 
   const [routineRecords, setRoutineRecords] = useState<ClassRoutine[]>([]);
   const [dateRoutineRows, setDateRoutineRows] = useState<DateRoutineRow[]>([]);
   const [standaloneRoutine, setStandaloneRoutine] = useState<StandaloneClassRoutine | null>(null);
   const [routineSourceFilter, setRoutineSourceFilter] = useState<'main' | 'standalone' | 'both'>('main');
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    date: string;
+    classId: string;
+    subject: string;
+    topic: string;
+    notes: string;
+    entryType: EntryType;
+  }>({
     date: format(new Date(), 'yyyy-MM-dd'),
     classId: '',
     subject: '',
     topic: '',
-    notes: ''
+    notes: '',
+    entryType: 'class-record'
   });
 
   const [planRows, setPlanRows] = useState<PlanRow[]>([
@@ -189,10 +205,11 @@ export default function TeacherDiaryPage() {
       const matchMonth = m === selectedMonth && y === selectedYear;
       const matchClass = filterClass === 'all' || entry.classId === filterClass;
       const matchSubject = filterSubject === 'all' || entry.subject === filterSubject;
+      const matchEntryType = filterEntryType === 'all' || (entry.entryType || 'class-record') === filterEntryType;
       
-      return matchMonth && matchClass && matchSubject;
+      return matchMonth && matchClass && matchSubject && matchEntryType;
     });
-  }, [diaryEntries, selectedMonth, selectedYear, filterClass, filterSubject]);
+  }, [diaryEntries, selectedMonth, selectedYear, filterClass, filterSubject, filterEntryType]);
 
   const subjectsList = useMemo(() => formData.classId ? getSubjectsForClass(formData.classId) : [], [formData.classId]);
   const chaptersList = useMemo(() => (formData.classId && formData.subject) ? getChaptersForSubject(formData.classId, formData.subject) : [], [formData.classId, formData.subject]);
@@ -484,6 +501,7 @@ export default function TeacherDiaryPage() {
         await updateDoc(doc(db, 'diary', editingId), {
           classId: formData.classId,
           subject: formData.subject,
+          entryType: formData.entryType || 'class-record',
           date: row.date,
           topic: row.topic,
           notes: row.notes,
@@ -507,19 +525,22 @@ export default function TeacherDiaryPage() {
           if (existingEntry) {
             const prevTypes = Array.isArray(existingEntry.lessonTypes) ? existingEntry.lessonTypes : [];
             const typesChanged = JSON.stringify(prevTypes) !== JSON.stringify(row.lessonTypes);
+            const typeChanged = (existingEntry.entryType || 'class-record') !== (formData.entryType || 'class-record');
             const hasChanged =
               (existingEntry.date || '') !== row.date ||
               (existingEntry.topic || '') !== row.topic ||
               (existingEntry.notes || '') !== row.notes ||
               (existingEntry.chapterStatus || 'running') !== row.chapterStatus ||
               (existingEntry.coveredPortion || '') !== row.coveredPortion ||
-              typesChanged;
+              typesChanged ||
+              typeChanged;
             if (hasChanged) {
               updatedCount++;
               ops.push(
                 updateDoc(doc(db, 'diary', existingEntry.id), {
                   classId: formData.classId,
                   subject: formData.subject,
+                  entryType: formData.entryType || existingEntry.entryType || 'class-record',
                   date: row.date,
                   topic: row.topic,
                   notes: row.notes,
@@ -537,6 +558,7 @@ export default function TeacherDiaryPage() {
               addDoc(collection(db, 'diary'), {
                 classId: formData.classId,
                 subject: formData.subject,
+                entryType: formData.entryType || 'class-record',
                 date: row.date,
                 topic: row.topic,
                 notes: row.notes,
@@ -569,7 +591,8 @@ export default function TeacherDiaryPage() {
         classId: '',
         subject: '',
         topic: '',
-        notes: ''
+        notes: '',
+        entryType: 'class-record'
       });
       setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }]);
       setIsAdding(false);
@@ -587,7 +610,8 @@ export default function TeacherDiaryPage() {
       classId: entry.classId || '',
       subject: entry.subject || '',
       topic: entry.topic || '',
-      notes: entry.notes || ''
+      notes: entry.notes || '',
+      entryType: (entry.entryType as EntryType) || 'class-record'
     });
     setPlanRows([{
       id: entry.id,
@@ -640,7 +664,7 @@ export default function TeacherDiaryPage() {
             setEditingId(null);
             if (!isAdding) {
               lastLoadedKeyRef.current = '';
-              setFormData({ date: format(new Date(), 'yyyy-MM-dd'), classId: '', subject: '', topic: '', notes: '' });
+              setFormData({ date: format(new Date(), 'yyyy-MM-dd'), classId: '', subject: '', topic: '', notes: '', entryType: 'class-record' });
               setPlanRows([{ id: 'row_1', date: format(new Date(), 'yyyy-MM-dd'), topic: '', notes: '', lessonTypes: [], chapterStatus: 'running', coveredPortion: '' }]);
             }
           }}
@@ -655,12 +679,12 @@ export default function TeacherDiaryPage() {
         <Card className="shadow-2xl border-2 border-black overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 no-print">
           <CardHeader className="bg-indigo-600 text-white py-4 border-b-2 border-black">
             <CardTitle className="text-lg font-black flex items-center gap-2">
-              <FileText className="w-5 h-5" /> {editingId ? "ডায়েরি আপডেট করুন" : "নতুন ডায়েরি এন্ট্রি"}
+              <FileText className="w-5 h-5" /> {editingId ? "ডায়েরি আপডেট করুন" : formData.entryType === 'exam-suggestion' ? "নতুন পরীক্ষার সাজেশন তৈরি করুন" : formData.entryType === 'lesson-plan' ? "নতুন পাঠপরিকল্পনা (Lesson Plan) এন্ট্রি" : "নতুন ডায়েরি এন্ট্রি"}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <form onSubmit={handleSave}>
-              <div className="grid grid-cols-1 md:grid-cols-3 border-b-2 border-black">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 border-b-2 border-black">
                 <div className="p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50">
                   <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">শ্রেণির ড্রপডাউন</label>
                   <Select onValueChange={v => setFormData(p => ({...p, classId: v}))} value={formData.classId}>
@@ -680,6 +704,19 @@ export default function TeacherDiaryPage() {
                     </SelectTrigger>
                     <SelectContent className="border-2 border-black font-kalpurush">
                       {subjectsList.map(s => <SelectItem key={s} value={s} className="font-bold">{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-indigo-50/60">
+                  <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">ডায়েরির ধরন / ব্যবহার</label>
+                  <Select value={formData.entryType} onValueChange={(v: EntryType) => setFormData(p => ({ ...p, entryType: v }))}>
+                    <SelectTrigger className="font-bold h-12 border-2 border-black bg-white ring-offset-0 focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-2 border-black font-kalpurush">
+                      <SelectItem value="class-record" className="font-bold text-blue-800">📘 দৈনিক ক্লাস রেকর্ড</SelectItem>
+                      <SelectItem value="lesson-plan" className="font-bold text-emerald-800">📝 পাঠপরিকল্পনা (Lesson Plan)</SelectItem>
+                      <SelectItem value="exam-suggestion" className="font-bold text-purple-800">🎯 পরীক্ষার সাজেশন (Suggestion)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -813,11 +850,15 @@ export default function TeacherDiaryPage() {
                   <table className="w-full text-left border-collapse min-w-[900px]">
                     <thead>
                       <tr className="bg-slate-100 border-b-2 border-black text-xs font-black text-slate-800">
-                        <th className="p-3 border-r-2 border-black w-[20%] min-w-[180px]">১ম কলাম: তারিখ বা বার</th>
+                        <th className="p-3 border-r-2 border-black w-[20%] min-w-[180px]">
+                          {formData.entryType === 'exam-suggestion' ? '১ম কলাম: তারিখ / প্রস্তুতি' : formData.entryType === 'lesson-plan' ? '১ম কলাম: পরিকল্পিত তারিখ/বার' : '১ম কলাম: তারিখ বা বার'}
+                        </th>
                         <th className="p-3 border-r-2 border-black w-[22%] min-w-[200px]">২য় কলাম: অধ্যায়ের ড্রপডাউন বাটন</th>
                         <th className="p-3 border-r-2 border-black w-[18%] min-w-[170px]">৩য় কলাম: আজকের পাঠের ধরন ড্রপ বাটন</th>
                         <th className="p-3 border-r-2 border-black w-[20%] min-w-[190px]">৪র্থ কলাম: আজকের পাঠের ধরন ড্রপ বাটন</th>
-                        <th className="p-3 w-[20%] min-w-[200px]">৫ম কলাম: বিস্তারিত রেকর্ড / বাড়ির কাজ</th>
+                        <th className="p-3 w-[20%] min-w-[200px]">
+                          {formData.entryType === 'exam-suggestion' ? '৫ম কলাম: সাজেশন প্রশ্ন / দিকনির্দেশনা' : formData.entryType === 'lesson-plan' ? '৫ম কলাম: পাঠপরিকল্পনা ও বাড়ির কাজ' : '৫ম কলাম: বিস্তারিত রেকর্ড / বাড়ির কাজ'}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y-2 divide-black bg-white">
@@ -1057,7 +1098,9 @@ export default function TeacherDiaryPage() {
                             {/* ৫ম কলাম: বিস্তারিত রেকর্ড / বাড়ির কাজ ও অ্যাকশন বাটন */}
                             <td className="p-3 align-top space-y-2">
                               <div className="flex items-center justify-between gap-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase block">ক্লাস রেকর্ড / বাড়ির কাজ:</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">
+                                  {formData.entryType === 'exam-suggestion' ? 'সাজেশন প্রশ্ন / বিশেষ দিকনির্দেশনা:' : formData.entryType === 'lesson-plan' ? 'পাঠপরিকল্পনা ও বাড়ির কাজ:' : 'ক্লাস রেকর্ড / বাড়ির কাজ:'}
+                                </label>
                                 {!editingId && planRows.length > 1 && !savedMatch && (
                                   <button
                                     type="button"
@@ -1072,7 +1115,13 @@ export default function TeacherDiaryPage() {
                               <Textarea 
                                 value={row.notes} 
                                 onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, notes: e.target.value } : r))} 
-                                placeholder="ক্লাসের বিস্তারিত বিষয়বস্তু বা বাড়ির কাজ লিখুন..." 
+                                placeholder={
+                                  formData.entryType === 'exam-suggestion'
+                                    ? "আসন্ন পরীক্ষার জন্য গুরুত্বপূর্ণ প্রশ্ন (CQ/MCQ), অধ্যায়ের মূল ফোকাস বা বিশেষ দিকনির্দেশনা লিখুন..."
+                                    : formData.entryType === 'lesson-plan'
+                                      ? "আগামী ক্লাসে যা পড়ানো হবে ও বাড়ির কাজ লিখুন..."
+                                      : "ক্লাসের বিস্তারিত বিষয়বস্তু বা বাড়ির কাজ লিখুন..."
+                                } 
                                 className="min-h-[85px] font-bold text-xs leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
                               />
                             </td>
@@ -1179,6 +1228,20 @@ export default function TeacherDiaryPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-indigo-700 uppercase ml-1">ধরনের ফিল্টার</label>
+                <Select value={filterEntryType} onValueChange={(v: any) => setFilterEntryType(v)}>
+                  <SelectTrigger className="w-full sm:w-44 font-bold border-2 border-black bg-white h-11">
+                    <SelectValue placeholder="সব ধরন" />
+                  </SelectTrigger>
+                  <SelectContent className="font-kalpurush border-2 border-black">
+                    <SelectItem value="all" className="font-bold">সব ধরন (সবগুলো)</SelectItem>
+                    <SelectItem value="class-record" className="font-bold text-blue-800">📘 দৈনিক ক্লাস রেকর্ড</SelectItem>
+                    <SelectItem value="lesson-plan" className="font-bold text-emerald-800">📝 পাঠপরিকল্পনা</SelectItem>
+                    <SelectItem value="exam-suggestion" className="font-bold text-purple-800">🎯 পরীক্ষার সাজেশন</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button 
               onClick={() => window.print()}
@@ -1191,11 +1254,18 @@ export default function TeacherDiaryPage() {
 
           <div className="print-area">
             <div className="hidden print:block text-center space-y-2 mb-6">
-              <h1 className="text-3xl font-black underline">মাসিক টিচার্স ডায়েরি রেকর্ড</h1>
+              <h1 className="text-3xl font-black underline">
+                {filterEntryType === 'exam-suggestion'
+                  ? 'বিষয়ভিত্তিক পরীক্ষার সাজেশন'
+                  : filterEntryType === 'lesson-plan'
+                    ? 'শিক্ষকের বিষয়ভিত্তিক পাঠপরিকল্পনা (Lesson Plan)'
+                    : 'মাসিক টিচার্স ডায়েরি রেকর্ড'}
+              </h1>
               <p className="text-lg font-bold">
                 মাস: {MONTHS_BN.find(m => m.id === selectedMonth)?.name} | বছর: {toBengaliNumber(selectedYear)}
                 {filterClass !== 'all' && ` | শ্রেণি: ${CLASSES.find(c => c.id === filterClass)?.label} শ্রেণি`}
                 {filterSubject !== 'all' && ` | বিষয়: ${filterSubject}`}
+                {filterEntryType !== 'all' && ` | ধরন: ${ENTRY_TYPE_META[filterEntryType]?.shortLabel}`}
               </p>
             </div>
 
@@ -1265,6 +1335,11 @@ export default function TeacherDiaryPage() {
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <h4 className="font-black text-base text-foreground leading-tight">{entry.topic}</h4>
+                                {entry.entryType && ENTRY_TYPE_META[entry.entryType as EntryType] && (
+                                  <Badge className={cn("text-[10px] font-black px-1.5 py-0.5", ENTRY_TYPE_META[entry.entryType as EntryType].badgeClass)}>
+                                    {ENTRY_TYPE_META[entry.entryType as EntryType].label}
+                                  </Badge>
+                                )}
                                 {entry.chapterStatus && CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus] && (
                                   <Badge variant="outline" className={cn("text-[10px] font-black", CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus].badgeClass)}>
                                     {CHAPTER_STATUS_META[entry.chapterStatus as ChapterStatus].label}
