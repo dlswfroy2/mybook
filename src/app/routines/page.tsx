@@ -13,12 +13,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine } from '@/lib/routine-data';
+import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine, SubjectClassLimit, getSubjectClassLimits, saveSubjectClassLimits } from '@/lib/routine-data';
+import SubjectLimitsTab from './SubjectLimitsTab';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { 
     Copy, Printer, FilePen, FilePlus, Users, Info, User, 
-    FileUp, Download, CalendarClock, UserMinus, Plus, LayoutGrid, CheckCircle2, Trash2, Loader2, Save, ChevronRight, BarChart3, List, AlertTriangle, UserX, Briefcase, BookOpen, GraduationCap
+    FileUp, Download, CalendarClock, UserMinus, Plus, LayoutGrid, CheckCircle2, Trash2, Loader2, Save, ChevronRight, BarChart3, List, AlertTriangle, UserX, Briefcase, BookOpen, GraduationCap, CheckSquare
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { subjectNameNormalization as baseSubjectNameNormalization, getSubjects } from '@/lib/subjects';
@@ -1403,7 +1404,11 @@ const CombinedRoutineTable = ({
     onDeleteColumn,
     onEditColumn,
     selectedClass = 'all',
-    allocationsList = []
+    allocationsList = [],
+    routineDays,
+    onAddDay,
+    onDeleteDay,
+    subjectLimitsMap
 }: { 
     routineData: Record<string, Record<string, string[]>>, 
     conflicts: any, 
@@ -1416,10 +1421,14 @@ const CombinedRoutineTable = ({
     onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void,
     onEditColumn?: (col: RoutineColumnConfig, index: number) => void,
     selectedClass?: string,
-    allocationsList?: { className: string; subjectName: string; teacherName: string }[]
+    allocationsList?: { className: string; subjectName: string; teacherName: string }[],
+    routineDays?: string[],
+    onAddDay?: () => void,
+    onDeleteDay?: (day: string) => void,
+    subjectLimitsMap?: Record<string, Record<string, SubjectClassLimit>>
 }) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
-    const days = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
+    const days = routineDays && routineDays.length > 0 ? routineDays : ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
     const allClasses = ['6', '7', '8', '9', '10'];
     const classes = (selectedClass && selectedClass !== 'all') ? [selectedClass] : allClasses;
 
@@ -1596,8 +1605,20 @@ const CombinedRoutineTable = ({
                              )}
                            >
                                {classIndex === 0 && (
-                                    <TableCell className="font-black border-r align-middle text-center bg-gray-50 print:bg-white text-sm print:text-[10px] border-l-[4px] border-l-green-600/20 border-green-600" rowSpan={classes.length}>
-                                        {day}
+                                    <TableCell className="font-black border-r align-middle text-center bg-gray-50 print:bg-white text-sm print:text-[10px] border-l-[4px] border-l-green-600/20 border-green-600 p-2" rowSpan={classes.length}>
+                                        <div className="flex flex-col items-center justify-center gap-1">
+                                            <span>{day}</span>
+                                            {isEditMode && onDeleteDay && days.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onDeleteDay(day)}
+                                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-0.5 no-print cursor-pointer hover:bg-rose-50 px-1 py-0.5 rounded"
+                                                    title={`‘${day}’ রো মুছুন`}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </TableCell>
                                )}
                                <TableCell className="font-bold border-r text-center bg-gray-50/50 print:bg-white text-xs print:text-[8px] border-green-600 notranslate" translate="no">{isEn ? `Class ${cls}` : classNamesMap[cls]}</TableCell>
@@ -1636,6 +1657,7 @@ const CombinedRoutineTable = ({
                                            routineData={routineData}
                                            columns={columns}
                                            allocationsList={allocationsList}
+                                           subjectLimitsMap={subjectLimitsMap}
                                        />
                                    );
                                })}
@@ -1648,6 +1670,18 @@ const CombinedRoutineTable = ({
                </TableBody>
            </table>
         </div>
+            {isEditMode && onAddDay && (
+                <div className="flex justify-center mt-3 no-print">
+                    <Button 
+                        type="button" 
+                        onClick={onAddDay} 
+                        variant="outline" 
+                        className="border-2 border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-black gap-2 h-11 px-6 rounded-xl cursor-pointer"
+                    >
+                        <Plus className="w-4 h-4 stroke-[3]" /> নতুন বার / রো যোগ করুন
+                    </Button>
+                </div>
+            )}
         </div>
     );
 };
@@ -1668,6 +1702,7 @@ const DateRoutineTable = ({
     onAddColumn,
     onDeleteColumn,
     onEditColumn,
+    subjectLimitsMap
 }: {
     rows: DateRoutineRow[];
     selectedClass?: string;
@@ -1684,6 +1719,7 @@ const DateRoutineTable = ({
     onAddColumn?: (insertAfterIndex: number) => void;
     onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void;
     onEditColumn?: (col: RoutineColumnConfig, index: number) => void;
+    subjectLimitsMap?: Record<string, Record<string, SubjectClassLimit>>;
 }) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     const allClasses = ['6', '7', '8', '9', '10'];
@@ -1964,6 +2000,7 @@ const DateRoutineTable = ({
                                                     routineData={rowAsRoutineData}
                                                     columns={columns}
                                                     allocationsList={allocationsList}
+                                                    subjectLimitsMap={subjectLimitsMap}
                                                 />
                                             );
                                         })}
@@ -1998,7 +2035,8 @@ const EditableCell = ({
     periodIdx,
     routineData,
     columns,
-    allocationsList = []
+    allocationsList = [],
+    subjectLimitsMap
 }: { 
     content: string, 
     isEditMode: boolean, 
@@ -2012,7 +2050,8 @@ const EditableCell = ({
     periodIdx?: number,
     routineData?: Record<string, Record<string, string[]>>,
     columns?: RoutineColumnConfig[],
-    allocationsList?: { className: string; subjectName: string; teacherName: string }[]
+    allocationsList?: { className: string; subjectName: string; teacherName: string }[],
+    subjectLimitsMap?: Record<string, Record<string, SubjectClassLimit>>
 }) => {
     const isEn = typeof document !== 'undefined' && document.cookie.includes('googtrans=/bn/en');
     
@@ -2282,16 +2321,33 @@ const EditableCell = ({
                 });
             });
 
+            // Subject limit check for this class & subject
+            const normOptSubject = subjectNameNormalization[opt.subject] || opt.subject;
+            const classLimits = subjectLimitsMap?.[cls || ''] || {};
+            let limitObj = classLimits[normOptSubject] || classLimits[opt.subject];
+            if (!limitObj) {
+                for (const [k, v] of Object.entries(classLimits)) {
+                    if ((subjectNameNormalization[k] || k) === normOptSubject) {
+                        limitObj = v;
+                        break;
+                    }
+                }
+            }
+            const subjectLimit = limitObj && limitObj.daysCount !== undefined ? limitObj.daysCount : undefined;
+            const isLimitReached = subjectLimit !== undefined && subjectLimit > 0 && weeklySubjectCount >= subjectLimit;
+
             return {
                 ...opt,
                 busyInClass,
                 isConsecutive,
                 isBreakClash,
                 subjectRepetitionCount,
-                weeklySubjectCount
+                weeklySubjectCount,
+                subjectLimit,
+                isLimitReached
             };
         });
-    }, [optionsForClass, routineData, cls, day, periodIdx, columns]);
+    }, [optionsForClass, routineData, cls, day, periodIdx, columns, subjectLimitsMap]);
 
     const filteredOptions = useMemo(() => {
         if (!searchQuery.trim()) return evaluatedOptions;
@@ -2374,7 +2430,12 @@ const EditableCell = ({
                                 <button
                                     key={idx}
                                     type="button"
+                                    disabled={opt.isLimitReached && !isSelected}
                                     onClick={() => {
+                                        if (opt.isLimitReached && !isSelected) {
+                                            alert(`‘${opt.subject}’ বিষয়ের সাপ্তাহিক নির্ধারিত সীমা (${toBengaliNumber(opt.subjectLimit)}টি) ইতিমধ্যে পূর্ণ হয়ে গেছে। আর নতুন ক্লাস দেওয়া যাবে না।`);
+                                            return;
+                                        }
                                         const val = opt.teacher ? `${opt.subject} - ${opt.teacher}` : opt.subject;
                                         onCellChange(val);
                                         setIsPopoverOpen(false);
@@ -2382,8 +2443,10 @@ const EditableCell = ({
                                     className={cn(
                                         "w-full text-left p-2 rounded-xl transition-all flex flex-col gap-1 cursor-pointer",
                                         isSelected ? "bg-primary/10 border border-primary/30" : "hover:bg-slate-100/80",
-                                        isBusy && "bg-rose-50/50 border border-rose-200/50"
+                                        isBusy && "bg-rose-50/50 border border-rose-200/50",
+                                        opt.isLimitReached && !isSelected && "opacity-60 bg-slate-100/90 cursor-not-allowed border-dashed border-rose-300"
                                     )}
+                                    title={opt.isLimitReached && !isSelected ? `এই বিষয়ের সাপ্তাহিক সীমা (${toBengaliNumber(opt.subjectLimit)}টি) পূর্ণ হয়েছে, আর দেওয়া যাবে না` : undefined}
                                 >
                                     <div className="flex items-center justify-between w-full">
                                         <span className="text-xs font-black text-slate-800">
@@ -2425,9 +2488,26 @@ const EditableCell = ({
                                             </span>
                                         )}
 
-                                        <span className="text-[9px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                                            সপ্তাহে {toBengaliNumber(opt.weeklySubjectCount)}টি
-                                        </span>
+                                        {opt.subjectLimit !== undefined ? (
+                                            <span className={cn(
+                                                "text-[9px] font-bold px-1.5 py-0.5 rounded border",
+                                                opt.isLimitReached
+                                                    ? "text-rose-700 bg-rose-50 border-rose-300 font-black"
+                                                    : "text-purple-700 bg-purple-50 border-purple-200"
+                                            )}>
+                                                সপ্তাহে {toBengaliNumber(opt.weeklySubjectCount)}/{toBengaliNumber(opt.subjectLimit)}টি
+                                            </span>
+                                        ) : (
+                                            <span className="text-[9px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                                সপ্তাহে {toBengaliNumber(opt.weeklySubjectCount)}টি
+                                            </span>
+                                        )}
+
+                                        {opt.isLimitReached && (
+                                            <span className="text-[9px] font-black text-rose-700 bg-rose-100/90 px-1.5 py-0.5 rounded border border-rose-300">
+                                                ⚠️ সীমা পূর্ণ
+                                            </span>
+                                        )}
                                     </div>
                                 </button>
                             );
@@ -2442,6 +2522,38 @@ const EditableCell = ({
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && customText.trim()) {
                                 e.preventDefault();
+                                const { subject: customSub } = parseSubjectTeacher(customText.trim());
+                                if (customSub && cls && subjectLimitsMap) {
+                                    const norm = subjectNameNormalization[customSub] || customSub;
+                                    const classLimits = subjectLimitsMap[cls] || {};
+                                    let lim = classLimits[norm] || classLimits[customSub];
+                                    if (!lim) {
+                                        for (const [k, v] of Object.entries(classLimits)) {
+                                            if ((subjectNameNormalization[k] || k) === norm) {
+                                                lim = v;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (lim && lim.daysCount > 0) {
+                                        let count = 0;
+                                        const classRoutine = routineData?.[cls] || {};
+                                        Object.values(classRoutine).forEach((pList) => {
+                                            (pList || []).forEach((c) => {
+                                                if (c) {
+                                                    const { subject: s } = parseSubjectTeacher(c);
+                                                    if (s === customSub || (subjectNameNormalization[s] || s) === norm) {
+                                                        count++;
+                                                    }
+                                                }
+                                            });
+                                        });
+                                        if (count >= lim.daysCount && content !== customText.trim()) {
+                                            alert(`‘${customSub}’ বিষয়ের সাপ্তাহিক নির্ধারিত সীমা (${toBengaliNumber(lim.daysCount)}টি) ইতিমধ্যে পূর্ণ হয়ে গেছে। আর নতুন ক্লাস দেওয়া যাবে না।`);
+                                            return;
+                                        }
+                                    }
+                                }
                                 onCellChange(customText.trim());
                                 setIsPopoverOpen(false);
                             }
@@ -2454,6 +2566,38 @@ const EditableCell = ({
                         size="sm"
                         onClick={() => {
                             if (customText.trim()) {
+                                const { subject: customSub } = parseSubjectTeacher(customText.trim());
+                                if (customSub && cls && subjectLimitsMap) {
+                                    const norm = subjectNameNormalization[customSub] || customSub;
+                                    const classLimits = subjectLimitsMap[cls] || {};
+                                    let lim = classLimits[norm] || classLimits[customSub];
+                                    if (!lim) {
+                                        for (const [k, v] of Object.entries(classLimits)) {
+                                            if ((subjectNameNormalization[k] || k) === norm) {
+                                                lim = v;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (lim && lim.daysCount > 0) {
+                                        let count = 0;
+                                        const classRoutine = routineData?.[cls] || {};
+                                        Object.values(classRoutine).forEach((pList) => {
+                                            (pList || []).forEach((c) => {
+                                                if (c) {
+                                                    const { subject: s } = parseSubjectTeacher(c);
+                                                    if (s === customSub || (subjectNameNormalization[s] || s) === norm) {
+                                                        count++;
+                                                    }
+                                                }
+                                            });
+                                        });
+                                        if (count >= lim.daysCount && content !== customText.trim()) {
+                                            alert(`‘${customSub}’ বিষয়ের সাপ্তাহিক নির্ধারিত সীমা (${toBengaliNumber(lim.daysCount)}টি) ইতিমধ্যে পূর্ণ হয়ে গেছে। আর নতুন ক্লাস দেওয়া যাবে না।`);
+                                            return;
+                                        }
+                                    }
+                                }
                                 onCellChange(customText.trim());
                                 setIsPopoverOpen(false);
                             }
@@ -2551,6 +2695,32 @@ export default function RoutinesPage() {
     const [deletingCol, setDeletingCol] = useState<RoutineColumnConfig | null>(null);
     const [deletingColIndex, setDeletingColIndex] = useState<number>(-1);
 
+    // Subject limits state
+    const [subjectLimitsMap, setSubjectLimitsMap] = useState<Record<string, Record<string, SubjectClassLimit>>>({});
+
+    // Routine days & dialog state for adding day
+    const [routineDays, setRoutineDays] = useState<string[]>(["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"]);
+    const [addDayDialogOpen, setAddDayDialogOpen] = useState(false);
+    const [newDayName, setNewDayName] = useState('');
+
+    const handleAddDay = (dayToAdd: string) => {
+        const trimmed = dayToAdd.trim();
+        if (!trimmed) return;
+        if (routineDays.includes(trimmed)) {
+            toast({ title: `‘${trimmed}’ ইতিমধ্যে তালিকায় আছে`, variant: "destructive" });
+            return;
+        }
+        setRoutineDays(prev => [...prev, trimmed]);
+        setAddDayDialogOpen(false);
+        setNewDayName('');
+        toast({ title: `‘${trimmed}’ বার সফলভাবে যোগ করা হয়েছে` });
+    };
+
+    const handleDeleteDay = (dayToDelete: string) => {
+        setRoutineDays(prev => prev.filter(d => d !== dayToDelete));
+        toast({ title: `‘${dayToDelete}’ তালিকা থেকে বাদ দেওয়া হয়েছে` });
+    };
+
     const [targetYear, setTargetYear] = useState('');
     const { schoolInfo } = useSchoolInfo();
     const { user, hasPermission } = useAuth();
@@ -2573,16 +2743,18 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb, limitsFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
             getStaff(db),
             getRoutineColumns(db, selectedYear),
             getTeacherAllocations(db, selectedYear),
-            getDateRoutine(db, selectedYear)
+            getDateRoutine(db, selectedYear),
+            getSubjectClassLimits(db, selectedYear)
         ]);
         setAllStaff(staffData);
         setColumns(colsFromDb);
         setDateRoutineRows(dateRowsFromDb);
+        setSubjectLimitsMap(limitsFromDb);
 
         const flatAllocations: { className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[] = [];
         allocationsFromDb.forEach(rec => {
@@ -3012,6 +3184,7 @@ export default function RoutinesPage() {
         }
         if (isAdmin || canManageRoutines) {
             items.push({ id: 'allocation', label: 'শিক্ষক-বিষয় বণ্টন', icon: Briefcase, color: 'text-emerald-600 bg-emerald-50' });
+            items.push({ id: 'subject-limits', label: 'সাপ্তাহিক বিষয় সীমা', icon: CheckSquare, color: 'text-rose-600 bg-rose-50' });
         }
         items.push({ id: 'exam-routine', label: 'পরীক্ষার রুটিন', icon: List, color: 'text-blue-600 bg-blue-50' });
         
@@ -3203,13 +3376,30 @@ export default function RoutinesPage() {
                                                     onDeleteColumn={openDeleteColumn}
                                                     onEditColumn={openEditColumn}
                                                     onDateChange={(rowId, newDate) => {
+                                                        const updateRowsWithAutoIncrement = (rows: any[]) => {
+                                                            const targetIdx = rows.findIndex(r => r.id === rowId);
+                                                            if (targetIdx === -1) return rows;
+                                                            const updated = [...rows];
+                                                            updated[targetIdx] = { ...updated[targetIdx], date: newDate };
+                                                            
+                                                            // Auto-update subsequent rows based on previous date
+                                                            if (newDate) {
+                                                                let nextD = new Date(newDate.replace(/-/g, '/'));
+                                                                for (let i = targetIdx + 1; i < updated.length; i++) {
+                                                                    nextD.setDate(nextD.getDate() + 1);
+                                                                    updated[i] = { ...updated[i], date: format(nextD, 'yyyy-MM-dd') };
+                                                                }
+                                                            }
+                                                            return updated;
+                                                        };
+
                                                         if (routineScope === 'standalone') {
                                                             setStandaloneRoutine(prev => prev ? {
                                                                 ...prev,
-                                                                dateRows: prev.dateRows.map(r => r.id === rowId ? { ...r, date: newDate } : r)
+                                                                dateRows: updateRowsWithAutoIncrement(prev.dateRows)
                                                             } : prev);
                                                         } else {
-                                                            setDateRoutineRows(prev => prev.map(r => r.id === rowId ? { ...r, date: newDate } : r));
+                                                            setDateRoutineRows(prev => updateRowsWithAutoIncrement(prev));
                                                         }
                                                     }}
                                                     onCellChange={(rowId, cls, periodIdx, value) => {
@@ -3278,6 +3468,7 @@ export default function RoutinesPage() {
                                                             setDateRoutineRows(prev => prev.filter(r => r.id !== rowId));
                                                         }
                                                     }}
+                                                    subjectLimitsMap={subjectLimitsMap}
                                                 />
                                             ) : (
                                                 <CombinedRoutineTable 
@@ -3318,6 +3509,10 @@ export default function RoutinesPage() {
                                                     onEditColumn={openEditColumn}
                                                     selectedClass={selectedClassFilter}
                                                     allocationsList={scopedAllocationsList}
+                                                    routineDays={routineDays}
+                                                    onAddDay={() => setAddDayDialogOpen(true)}
+                                                    onDeleteDay={handleDeleteDay}
+                                                    subjectLimitsMap={subjectLimitsMap}
                                                 />
                                             )}
                                         </div>
@@ -3327,6 +3522,16 @@ export default function RoutinesPage() {
                                     )}
                                     {activeSection === 'allocation' && (
                                         <TeacherAllocationTab staffList={allStaff} routineData={routineData} academicYear={selectedYear} onAllocationUpdated={fetchData} />
+                                    )}
+                                    {activeSection === 'subject-limits' && (
+                                        <SubjectLimitsTab 
+                                            routineData={routineData} 
+                                            academicYear={selectedYear} 
+                                            columns={activeColumns}
+                                            currentLimitsMap={subjectLimitsMap}
+                                            onLimitsUpdated={(updated) => setSubjectLimitsMap(updated)}
+                                            routineDays={routineDays}
+                                        />
                                     )}
                                     {activeSection === 'exam-routine' && (
                                         <ExamRoutineTab />
@@ -3355,6 +3560,78 @@ export default function RoutinesPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Dialog: নতুন বার / রো যোগ */}
+                <Dialog open={addDayDialogOpen} onOpenChange={setAddDayDialogOpen}>
+                    <DialogContent className="sm:max-w-md font-kalpurush">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-emerald-600 stroke-[3]" />
+                                নতুন বার / রো যোগ করুন
+                            </DialogTitle>
+                            <DialogDescription className="text-xs font-bold text-muted-foreground">
+                                রুটিনে নতুন দিনের রো যোগ করার জন্য নিচের থেকে নির্বাচন করুন অথবা নাম লিখুন।
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-2">
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">দ্রুত নির্বাচন:</Label>
+                                <div className="flex flex-wrap gap-2 mt-1.5">
+                                    {["শুক্রবার", "শনিবার", "রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"].map(d => {
+                                        const exists = routineDays.includes(d);
+                                        return (
+                                            <Button
+                                                key={d}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={exists}
+                                                onClick={() => handleAddDay(d)}
+                                                className={cn(
+                                                    "font-bold text-xs h-8",
+                                                    exists ? "opacity-50 line-through" : "hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+                                                )}
+                                            >
+                                                {d} {exists ? '(যুক্ত)' : '+'}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-black text-slate-700">অথবা কাস্টম বারের নাম লিখুন:</Label>
+                                <Input
+                                    value={newDayName}
+                                    onChange={(e) => setNewDayName(e.target.value)}
+                                    placeholder="যেমন: বিশেষ ক্লাস, শুক্রবার..."
+                                    className="font-bold text-sm mt-1"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && newDayName.trim()) {
+                                            e.preventDefault();
+                                            handleAddDay(newDayName);
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button variant="outline" onClick={() => setAddDayDialogOpen(false)} className="font-bold">
+                                বাতিল
+                            </Button>
+                            <Button 
+                                onClick={() => handleAddDay(newDayName)} 
+                                disabled={!newDayName.trim()}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md"
+                            >
+                                <Plus className="w-4 h-4 mr-1 stroke-[3]" />
+                                রো যোগ করুন
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Dialog: নতুন কলাম যোগ */}
                 <Dialog open={addColumnDialogOpen} onOpenChange={setAddColumnDialogOpen}>

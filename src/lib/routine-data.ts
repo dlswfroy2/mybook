@@ -322,3 +322,81 @@ export const saveStandaloneRoutine = async (db: Firestore, data: StandaloneClass
         updatedAt: serverTimestamp()
     }, { merge: true });
 };
+
+export interface SubjectClassLimit {
+    subjectName: string;
+    daysCount: number; // 0 to 7
+    assignedDays?: string[]; // e.g. ['রবিবার', 'মঙ্গলবার', ...]
+}
+
+export interface SubjectClassLimitsDoc {
+    className: string;
+    academicYear: string;
+    limits: Record<string, SubjectClassLimit>;
+    updatedAt?: any;
+}
+
+export const getSubjectClassLimits = async (
+    db: Firestore, 
+    academicYear: string, 
+    className?: string
+): Promise<Record<string, Record<string, SubjectClassLimit>>> => {
+    const result: Record<string, Record<string, SubjectClassLimit>> = {};
+    const classes = className ? [className] : ['6', '7', '8', '9', '10'];
+    
+    for (const cls of classes) {
+        const localKey = `subject_limits_${academicYear}_${cls}`;
+        let loaded = false;
+        if (db) {
+            try {
+                const docRef = doc(db, ROUTINE_COLLECTION, `limits_${academicYear}_${cls}`);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data && data.limits) {
+                        result[cls] = data.limits;
+                        loaded = true;
+                        if (typeof window !== 'undefined') {
+                            try { localStorage.setItem(localKey, JSON.stringify(data.limits)); } catch {}
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch limits for class ${cls} from Firestore:`, e);
+            }
+        }
+        if (!loaded && typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(localKey);
+                if (raw) {
+                    result[cls] = JSON.parse(raw);
+                }
+            } catch {}
+        }
+        if (!result[cls]) {
+            result[cls] = {};
+        }
+    }
+    return result;
+};
+
+export const saveSubjectClassLimits = async (
+    db: Firestore, 
+    academicYear: string, 
+    className: string, 
+    limits: Record<string, SubjectClassLimit>
+): Promise<void> => {
+    const localKey = `subject_limits_${academicYear}_${className}`;
+    if (typeof window !== 'undefined') {
+        try { localStorage.setItem(localKey, JSON.stringify(limits)); } catch {}
+    }
+    if (!db) return;
+    const docRef = doc(db, ROUTINE_COLLECTION, `limits_${academicYear}_${className}`);
+    await setDoc(docRef, {
+        className,
+        academicYear,
+        limits,
+        type: 'subject_class_limits',
+        updatedAt: serverTimestamp()
+    }, { merge: true });
+};
