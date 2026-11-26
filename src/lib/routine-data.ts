@@ -267,7 +267,7 @@ export interface RoutineSettings {
 
 export const getRoutineSettings = async (db: Firestore, academicYear: string): Promise<RoutineSettings> => {
     const localKey = `routine_settings_${academicYear}`;
-    let settings: RoutineSettings = { preferredFormat: 'day', preferredScope: 'main' };
+    let settings: RoutineSettings = {};
     if (typeof window !== 'undefined') {
         try {
             const raw = localStorage.getItem(localKey);
@@ -321,7 +321,6 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
         academicYear,
         title: '',
         columns: JSON.parse(JSON.stringify(DEFAULT_ROUTINE_COLUMNS)),
-        preferredFormat: 'day',
         dayData: {},
         dateRows: [],
     };
@@ -335,7 +334,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                     return {
                         ...empty,
                         ...parsed,
-                        preferredFormat: parsed.preferredFormat || (Array.isArray(parsed.dateRows) && parsed.dateRows.length > 0 && Object.keys(parsed.dayData || {}).length === 0 ? 'date' : 'day'),
+                        preferredFormat: parsed.preferredFormat || undefined,
                         columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : empty.columns,
                     };
                 }
@@ -352,7 +351,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                 className,
                 academicYear,
                 title: d.title || '',
-                preferredFormat: d.preferredFormat || (Array.isArray(d.dateRows) && d.dateRows.length > 0 && Object.keys(d.dayData || {}).length === 0 ? 'date' : 'day'),
+                preferredFormat: d.preferredFormat || undefined,
                 columns: Array.isArray(d.columns) && d.columns.length > 0 ? d.columns : empty.columns,
                 dayData: d.dayData || {},
                 dateRows: Array.isArray(d.dateRows) ? d.dateRows : []

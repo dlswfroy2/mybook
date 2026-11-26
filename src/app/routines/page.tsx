@@ -2859,8 +2859,6 @@ export default function RoutinesPage() {
             setStandaloneRoutine(res);
             if (res?.preferredFormat) {
                 setRoutineFormat(res.preferredFormat);
-            } else if (res?.dateRows && res.dateRows.length > 0 && (!res.dayData || Object.keys(res.dayData).length === 0)) {
-                setRoutineFormat('date');
             }
         });
     }, [db, selectedYear, routineScope, selectedClassFilter]);
@@ -3127,11 +3125,13 @@ export default function RoutinesPage() {
             }
 
             if (routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine) {
-                await saveStandaloneRoutine(db, {
+                const updated = {
                     ...standaloneRoutine,
                     columns: activeColumns,
                     preferredFormat: routineFormat,
-                });
+                };
+                await saveStandaloneRoutine(db, updated);
+                setStandaloneRoutine(updated);
                 toast({ title: `${classNamesMap[selectedClassFilter]} শ্রেণির স্বতন্ত্র রুটিন (${routineFormat === 'date' ? 'তারিখ ভিত্তিক' : 'বার ভিত্তিক'}) সফলভাবে সেভ হয়েছে` });
                 setIsEditMode(false);
                 return;
@@ -3417,8 +3417,22 @@ export default function RoutinesPage() {
                                                             value={routineFormat}
                                                             onValueChange={(val: 'day' | 'date') => {
                                                                 setRoutineFormat(val);
-                                                                if (routineScope === 'standalone') {
-                                                                    setStandaloneRoutine(prev => prev ? { ...prev, preferredFormat: val } : prev);
+                                                                if (routineScope === 'standalone' && selectedClassFilter !== 'all') {
+                                                                    setStandaloneRoutine(prev => {
+                                                                        const updated = prev ? { ...prev, preferredFormat: val } : {
+                                                                            className: selectedClassFilter,
+                                                                            academicYear: selectedYear,
+                                                                            title: '',
+                                                                            columns: activeColumns,
+                                                                            preferredFormat: val,
+                                                                            dayData: {},
+                                                                            dateRows: []
+                                                                        };
+                                                                        if (db) {
+                                                                            saveStandaloneRoutine(db, updated);
+                                                                        }
+                                                                        return updated;
+                                                                    });
                                                                 }
                                                                 if (typeof window !== 'undefined') {
                                                                     try {
@@ -3427,6 +3441,7 @@ export default function RoutinesPage() {
                                                                             preferredScope: routineScope,
                                                                             lastSelectedClass: selectedClassFilter
                                                                         }));
+                                                                        localStorage.setItem(`routine_format_${selectedYear}_${selectedClassFilter}`, val);
                                                                     } catch {}
                                                                 }
                                                                 if (db) {
@@ -3443,10 +3458,10 @@ export default function RoutinesPage() {
                                                             </SelectTrigger>
                                                             <SelectContent className="font-kalpurush">
                                                                 <SelectItem value="day" className="font-bold py-2">
-                                                                    📅 বার হিসেবে (রবি-বৃহস্পতি)
+                                                                    📅 বার হিসেবে
                                                                 </SelectItem>
                                                                 <SelectItem value="date" className="font-bold py-2 text-emerald-700">
-                                                                    📆 তারিখ হিসেবে (একাধিক রো)
+                                                                    📆 তারিখ হিসেবে
                                                                 </SelectItem>
                                                             </SelectContent>
                                                         </Select>
