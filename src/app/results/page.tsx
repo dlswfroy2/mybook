@@ -105,6 +105,87 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canUploadMarks = hasPermission('upload:marks');
+    const [isImportingOmr, setIsImportingOmr] = useState(false);
+
+    const handleImportFromOmr = async () => {
+        if (!db || !className || !subject) {
+            toast({ variant: 'destructive', title: 'তথ্য অসম্পূর্ণ', description: 'শ্রেণি ও বিষয় নির্বাচন করুন।' });
+            return;
+        }
+        setIsImportingOmr(true);
+        try {
+            const snap = await getDocs(query(
+                collection(db, 'omr_evaluations'),
+                orderBy('scannedAt', 'desc')
+            ));
+
+            const rawClass = className.trim();
+            const normSub = normalize(subject);
+
+            const classMapReverse: Record<string, string[]> = {
+                '6': ['6', 'ষষ্ঠ', 'sixth'],
+                '7': ['7', 'সপ্তম', 'seventh'],
+                '8': ['8', 'অষ্টম', 'eighth'],
+                '9': ['9', 'নবম', 'ninth'],
+                '10': ['10', 'দশম', 'tenth'],
+            };
+            const validClassTokens = classMapReverse[rawClass] || [rawClass];
+
+            const matchingOmr = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(r => {
+                const rClass = String(r.classId || r.className || '').trim();
+                const classMatches = validClassTokens.some(tok => rClass.toLowerCase().includes(tok.toLowerCase()));
+                const rSub = String(r.subject || r.examSubtitle || '').trim();
+                const subMatches = normalize(rSub) === normSub || rSub.includes(subject) || subject.includes(rSub);
+                return classMatches && subMatches;
+            });
+
+            if (matchingOmr.length === 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'কোনো ওএমআর ডাটা পাওয়া যায়নি',
+                    description: `${subject} বিষয়ের শ্রেণি ${classNamesMap[className] || className}-এর কোনো ওএমআর ফলাফল পাওয়া যায়নি। ওএমআর শিট সেকশন হতে আগে ওএমআর স্ক্যান করুন।`
+                });
+                setIsImportingOmr(false);
+                return;
+            }
+
+            const newMarks = new Map(marks);
+            let count = 0;
+
+            studentsForClass.forEach(student => {
+                const sRoll = student.roll;
+                const sNameBn = (student.studentNameBn || '').trim().toLowerCase();
+                const sNameEn = (student.studentNameEn || '').trim().toLowerCase();
+
+                const matchedOmr = matchingOmr.find(r => {
+                    const rRollStr = String(r.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
+                    const rRoll = parseInt(rRollStr, 10);
+                    if (!isNaN(rRoll) && rRoll === sRoll) return true;
+                    const rName = String(r.studentName || '').trim().toLowerCase();
+                    if (rName && (rName === sNameBn || rName === sNameEn)) return true;
+                    return false;
+                });
+
+                if (matchedOmr) {
+                    const sm = { ...(newMarks.get(student.id) || {}) };
+                    sm.mcq = Number(matchedOmr.obtainedMarks) || 0;
+                    newMarks.set(student.id, sm);
+                    count++;
+                }
+            });
+
+            setMarks(newMarks);
+            toast({
+                title: '🎉 ওএমআর নম্বর সফলভাবে লোড হয়েছে!',
+                description: `${toBengaliNumber(count)} জন শিক্ষার্থীর বহুনির্বাচনী (MCQ) নম্বর ওএমআর হতে ইনপুট করা হয়েছে। সংরক্ষণ করতে নিচের "সংরক্ষণ করুন" বোতাম চাপুন।`
+            });
+        } catch (err: any) {
+            console.error(err);
+            toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message || 'ওএমআর নম্বর লোড করতে সমস্যা হয়েছে।' });
+        } finally {
+            setIsImportingOmr(false);
+        }
+    };
 
     useEffect(() => {
         if (!db || !user) return;
@@ -369,13 +450,25 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
                             <span className="font-black text-sm text-primary">{subject} ({studentsForClass.length.toLocaleString('bn-BD')} জন)</span>
                             <Badge variant="outline" className="bg-white font-black text-[10px] px-3">পূর্ণমান: {toBengaliNumber(fullMarks)}</Badge>
                          </div>
-                         {canUploadMarks && (
-                             <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={handleDownloadSample} className="h-8 text-[10px] bg-white"><Download className="mr-2 h-3.5 w-3.5" /> নমুনা</Button>
-                                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-8 text-[10px] bg-white"><FileUp className="mr-2 h-3.5 w-3.5" /> আপলোড</Button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
-                            </div>
-                         )}
+                         <div className="flex flex-wrap items-center gap-2">
+                             <Button 
+                                 variant="outline" 
+                                 size="sm" 
+                                 onClick={handleImportFromOmr} 
+                                 disabled={isImportingOmr}
+                                 className="h-8 text-[11px] bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 font-black shadow-2xs"
+                             >
+                                 {isImportingOmr ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5 text-purple-600" />}
+                                 OMR থেকে MCQ নম্বর ইনপুট
+                             </Button>
+                             {canUploadMarks && (
+                                 <>
+                                     <Button variant="outline" size="sm" onClick={handleDownloadSample} className="h-8 text-[10px] bg-white"><Download className="mr-2 h-3.5 w-3.5" /> নমুনা</Button>
+                                     <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="h-8 text-[10px] bg-white"><FileUp className="mr-2 h-3.5 w-3.5" /> আপলোড</Button>
+                                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                                 </>
+                             )}
+                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="max-h-[500px] overflow-auto">

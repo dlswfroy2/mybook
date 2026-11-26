@@ -21,11 +21,10 @@ export function getAvailableApiKeys(): string[] {
 }
 
 export const CANDIDATE_MODELS = [
-  'googleai/gemini-3.5-flash',
-  'googleai/gemini-3.6-flash',
-  'googleai/gemini-3.5-flash-lite',
-  'googleai/gemini-3.1-flash-lite',
   'googleai/gemini-flash-latest',
+  'googleai/gemini-flash-lite-latest',
+  'googleai/gemini-2.5-flash',
+  'googleai/gemini-3.5-flash',
 ];
 
 export function createAiClient(apiKey: string, modelName = 'googleai/gemini-3.5-flash') {

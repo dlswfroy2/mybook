@@ -3,10 +3,15 @@
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore } from '@/firebase';
-import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, where } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer, BarChart2, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Printer, BarChart2, Trash2, RefreshCw, Send, Sparkles, CheckCircle2, Loader2, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { getExams, Exam } from '@/lib/exam-data';
+import { saveClassResults, getResultsForClass, StudentResult } from '@/lib/results-data';
+import { CLASSES } from '@/lib/constants';
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
@@ -56,6 +61,27 @@ function OmrResultsContent() {
   const [filterSubject, setFilterSubject] = useState('');
   const [filterExam, setFilterExam] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Sync to Results Section Dialog State
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncYear, setSyncYear] = useState('2026');
+  const [syncExamName, setSyncExamName] = useState('');
+  const [syncClassId, setSyncClassId] = useState('10');
+  const [syncSubject, setSyncSubject] = useState('গণিত');
+  const [availableExams, setAvailableExams] = useState<Exam[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (db && syncDialogOpen) {
+      getExams(db, syncYear).then(exList => {
+        setAvailableExams(exList);
+        if (exList.length > 0 && !syncExamName) {
+          setSyncExamName(exList[0].name);
+        }
+      });
+    }
+  }, [db, syncDialogOpen, syncYear]);
 
   const loadResults = async () => {
     if (!db) return;
@@ -108,6 +134,86 @@ function OmrResultsContent() {
     }),
     [allResults, filterClass, filterSubject, filterExam]
   );
+
+  const handleSyncToResults = async () => {
+    if (!db || !syncExamName || !syncClassId || !syncSubject) {
+      alert('অনুগ্রহ করে পরীক্ষা, শ্রেণি ও বিষয় নির্বাচন করুন।');
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      // 1. Fetch students for this class and academic year
+      const studentsSnap = await getDocs(query(
+        collection(db, 'students'),
+        where('className', '==', syncClassId),
+        where('academicYear', '==', syncYear)
+      ));
+      const classStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+
+      if (classStudents.length === 0) {
+        alert(`${syncYear} শিক্ষাবর্ষের শ্রেণি ${syncClassId}-এ কোনো শিক্ষার্থী পাওয়া যায়নি। শিক্ষার্থী তালিকায় ছাত্র-ছাত্রী যুক্ত আছে কিনা নিশ্চিত করুন।`);
+        setIsSyncing(false);
+        return;
+      }
+
+      // 2. Fetch existing class result if any
+      const existingRes = await getResultsForClass(db, syncYear, syncExamName, syncClassId, syncSubject).catch(() => undefined);
+
+      const existingResultsMap = new Map<string, StudentResult>();
+      if (existingRes?.results) {
+        existingRes.results.forEach(r => existingResultsMap.set(r.studentId, { ...r }));
+      }
+
+      // 3. Match each student by roll & name with filtered/matching OMR evaluations
+      let matchedCount = 0;
+      const finalResults: StudentResult[] = [];
+
+      classStudents.forEach(st => {
+        const sRoll = Number(st.roll);
+        const sNameBn = (st.studentNameBn || '').trim().toLowerCase();
+        const sNameEn = (st.studentNameEn || '').trim().toLowerCase();
+
+        // Match against current filtered OMR results
+        const matchedOmr = filtered.find(omr => {
+          const omrRollStr = String(omr.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
+          const omrRoll = parseInt(omrRollStr, 10);
+          if (!isNaN(omrRoll) && omrRoll === sRoll) return true;
+          const omrName = (omr.studentName || '').trim().toLowerCase();
+          if (omrName && (omrName === sNameBn || omrName === sNameEn)) return true;
+          return false;
+        });
+
+        const current = existingResultsMap.get(st.id) || { studentId: st.id };
+        if (matchedOmr) {
+          current.mcq = Number(matchedOmr.obtainedMarks) || 0;
+          matchedCount++;
+        }
+        finalResults.push(current);
+      });
+
+      const fullMarks = existingRes?.fullMarks || 100;
+      const mcqLimit = existingRes?.mcqLimit || (filtered[0]?.totalMarks || 30);
+      const writtenLimit = existingRes?.writtenLimit || (fullMarks - mcqLimit);
+
+      await saveClassResults(db, {
+        academicYear: syncYear,
+        examName: syncExamName,
+        className: syncClassId,
+        subject: syncSubject,
+        fullMarks,
+        writtenLimit,
+        mcqLimit,
+        results: finalResults,
+      });
+
+      setSyncSuccessMessage(`${toBengaliNumber(matchedCount)} জন শিক্ষার্থীর বহুনির্বাচনী (MCQ) নম্বর ফলাফল সেকশনে (${syncExamName}) সফলভাবে এন্ট্রি করা হয়েছে!`);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'ফলাফল পাঠাতে সমস্যা হয়েছে।');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!db) return;
@@ -189,6 +295,26 @@ function OmrResultsContent() {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={loadResults} className="gap-1 font-bold text-xs h-8">
             <RefreshCw className="w-3.5 h-3.5" /> রিফ্রেশ
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={() => {
+              let defClass = '10';
+              if (filterClass) {
+                const match = CLASSES.find(c => c.label === filterClass || c.id === filterClass);
+                if (match) defClass = match.id;
+              } else if (filtered[0]?.classId) {
+                defClass = filtered[0].classId;
+              }
+              setSyncClassId(defClass);
+              setSyncSubject(filterSubject || filtered[0]?.subject || filtered[0]?.examSubtitle || 'গণিত');
+              setSyncSuccessMessage(null);
+              setSyncDialogOpen(true);
+            }} 
+            disabled={filtered.length === 0}
+            className="gap-1.5 font-black text-xs h-8 bg-purple-700 hover:bg-purple-800 text-white shadow-xs"
+          >
+            <Send className="w-3.5 h-3.5" /> ফলাফল সেকশনে পাঠান
           </Button>
           <Button size="sm" variant="outline" onClick={handleExportCsv} className="gap-1.5 font-bold text-xs h-8 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
             📊 CSV এক্সপোর্ট
@@ -394,6 +520,127 @@ function OmrResultsContent() {
           </div>
         )}
       </div>
+
+      {/* ── Dialog: Send OMR Marks to Results Section ── */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="max-w-md font-kalpurush">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-indigo-900 font-black">
+              <Sparkles className="w-5 h-5 text-purple-600" /> ফলাফল সেকশনে নম্বর ইনপুট
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-600">
+              ওএমআরের মাধ্যমে প্রাপ্ত বহুনির্বাচনী (MCQ) নম্বরগুলো রোল ও নাম অনুযায়ী মূল ফলাফল সেকশনে সরাসরি ইনপুট করা হবে।
+            </DialogDescription>
+          </DialogHeader>
+
+          {syncSuccessMessage ? (
+            <div className="py-4 space-y-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <p className="text-sm font-bold text-slate-800">{syncSuccessMessage}</p>
+              <div className="flex gap-2 justify-center pt-2">
+                <Button variant="outline" size="sm" onClick={() => setSyncDialogOpen(false)}>
+                  বন্ধ করুন
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => router.push('/results')}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1 font-bold"
+                >
+                  ফলাফল দেখতে যান <ExternalLink className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-bold">শিক্ষাবর্ষ:</Label>
+                  <select
+                    value={syncYear}
+                    onChange={(e) => setSyncYear(e.target.value)}
+                    className="w-full h-9 border rounded-md px-2 text-xs font-bold bg-white"
+                  >
+                    {['2026', '2025', '2027'].map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-bold">শ্রেণি:</Label>
+                  <select
+                    value={syncClassId}
+                    onChange={(e) => setSyncClassId(e.target.value)}
+                    className="w-full h-9 border rounded-md px-2 text-xs font-bold bg-white"
+                  >
+                    {CLASSES.map(c => (
+                      <option key={c.id} value={c.id}>{c.label} শ্রেণি</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold">বিষয়:</Label>
+                <input
+                  type="text"
+                  value={syncSubject}
+                  onChange={(e) => setSyncSubject(e.target.value)}
+                  placeholder="যেমন: গণিত, বাংলা প্রথম"
+                  className="w-full h-9 border rounded-md px-2.5 text-xs font-bold bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold">পরীক্ষার নাম (ফলাফল সেকশনের):</Label>
+                <select
+                  value={syncExamName}
+                  onChange={(e) => setSyncExamName(e.target.value)}
+                  className="w-full h-9 border rounded-md px-2 text-xs font-bold bg-white"
+                >
+                  {availableExams.length > 0 ? (
+                    availableExams.map(ex => (
+                      <option key={ex.id} value={ex.name}>{ex.name}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="১ম সাময়িক পরীক্ষা">১ম সাময়িক পরীক্ষা</option>
+                      <option value="অর্ধ-বার্ষিক পরীক্ষা">অর্ধ-বার্ষিক পরীক্ষা</option>
+                      <option value="বার্ষিক পরীক্ষা">বার্ষিক পরীক্ষা</option>
+                      <option value="মডেল টেস্ট">মডেল টেস্ট</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-900 text-[11px] space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  📌 ওএমআর ফলাফল থেকে মোট <span className="font-black text-indigo-950 underline">{toBengaliNumber(filtered.length)}</span> জন শিক্ষার্থীর নম্বর সরাসরি পাঠানো হবে।
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  শিক্ষার্থীদের রোল ও নাম অনুযায়ী বহুনির্বাচনী কলামে প্রাপ্ত নম্বর বসবে। লিখিত ও ব্যবহারিক নম্বর অপরিবর্তিত থাকবে।
+                </p>
+              </div>
+
+              <DialogFooter className="pt-2 flex gap-2 sm:justify-end">
+                <Button variant="outline" size="sm" onClick={() => setSyncDialogOpen(false)} disabled={isSyncing}>
+                  বাতিল
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={handleSyncToResults} 
+                  disabled={isSyncing || filtered.length === 0}
+                  className="bg-purple-700 hover:bg-purple-800 text-white font-bold gap-1.5"
+                >
+                  {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  এখনই নম্বর ইনপুট ও সংরক্ষণ করুন
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <style jsx global>{`
         @media print {

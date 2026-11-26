@@ -45,6 +45,40 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, or
 import { CLASSES, getSubjectsForClass } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+// Client-side image compression to prevent payload limits and speed up mobile scanning
+function compressImage(dataUrl: string, maxDim = 1600, quality = 0.85): Promise<string> {
+  if (typeof window === 'undefined') return Promise.resolve(dataUrl);
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -321,11 +355,12 @@ export function OmrScannerDialog({
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUri = event.target?.result as string;
-      setImagePreview(dataUri);
+    reader.onload = async (event) => {
+      const rawDataUri = event.target?.result as string;
+      const compressedUri = await compressImage(rawDataUri);
+      setImagePreview(compressedUri);
       // Auto-trigger scan on capture for lightning-fast flow
-      executeScan(dataUri);
+      executeScan(compressedUri);
     };
     reader.readAsDataURL(file);
   };

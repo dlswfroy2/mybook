@@ -120,11 +120,17 @@ Return ONLY a valid JSON object matching this schema:
 }`;
 
   const availableKeys = getAvailableApiKeys();
+  const candidateModels = [
+    'googleai/gemini-flash-latest',
+    'googleai/gemini-flash-lite-latest',
+    'googleai/gemini-2.5-flash',
+    'googleai/gemini-3.5-flash',
+  ];
   let rawJsonText = '';
   let lastError: any = null;
 
   for (const key of availableKeys) {
-    for (const model of CANDIDATE_MODELS) {
+    for (const model of candidateModels) {
       try {
         const client = createAiClient(key, model);
         const resp = await client.generate({
@@ -133,6 +139,9 @@ Return ONLY a valid JSON object matching this schema:
             { text: promptText },
             { media: { url: imageUri } },
           ],
+          config: {
+            responseMimeType: 'application/json',
+          },
         });
 
         const text = resp.text?.trim() || '';
