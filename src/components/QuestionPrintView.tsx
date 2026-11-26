@@ -2735,6 +2735,37 @@ export function QuestionPrintView({
     }
   };
 
+  const getDocumentFileName = useCallback(() => {
+    const classLabel = getClassLabel(meta.classId);
+    const parts = [
+      classLabel ? `${classLabel} শ্রেণি` : '',
+      meta.subject || '',
+      meta.chapter || '',
+      meta.exam || 'পরীক্ষা'
+    ].map(s => String(s).trim()).filter(Boolean);
+    return parts.length > 0 ? parts.join(' - ') : (meta.exam || 'প্রশ্নপত্র');
+  }, [meta.classId, meta.subject, meta.chapter, meta.exam]);
+
+  useEffect(() => {
+    const fileName = getDocumentFileName();
+    if (fileName && typeof document !== 'undefined') {
+      document.title = fileName;
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.title = appName || 'টপ গ্রেড টিউটোরিয়ালস';
+      }
+    };
+  }, [getDocumentFileName, appName]);
+
+  const handlePrint = useCallback(() => {
+    const fileName = getDocumentFileName();
+    if (fileName && typeof document !== 'undefined') {
+      document.title = fileName;
+    }
+    window.print();
+  }, [getDocumentFileName]);
+
   const handleAiGenerateQuestions = async () => {
     if (!meta.classId || !meta.subject) {
       toast({ variant: 'destructive', title: 'তথ্য দিন', description: 'শ্রেণি ও বিষয় নির্বাচন করুন।' });
@@ -2922,7 +2953,7 @@ export function QuestionPrintView({
           <Button size="sm" onClick={handleSaveDocument} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ করুন">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ</span>
           </Button>
-          <Button size="sm" onClick={() => window.print()} className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2 sm:px-4 shrink-0" title="প্রিন্ট করুন">
+          <Button size="sm" onClick={handlePrint} className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2 sm:px-4 shrink-0" title="প্রিন্ট করুন">
             <Printer className="w-3.5 h-3.5" /> <span className="hidden xs:inline">প্রিন্ট</span>
           </Button>
         </div>
@@ -2933,7 +2964,7 @@ export function QuestionPrintView({
         {/* Mobile backdrop for drawer sidebar */}
         {sidebarOpen && (
           <div
-            className="md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-xs transition-opacity"
+            className="no-print md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-xs transition-opacity"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -3117,7 +3148,8 @@ export function QuestionPrintView({
                     padding: `${marginT}in ${marginR}in ${marginB}in ${marginL}in`,
                     lineHeight: '1.2',
                     boxSizing: 'border-box',
-                    border: borderCss
+                    border: borderCss,
+                    backgroundColor: '#ffffff'
                   }}
                 >
                   {/* Action buttons on hover / touch */}
@@ -3350,8 +3382,13 @@ export function QuestionPrintView({
             position: static !important;
           }
           .no-print,
-          .no-print * {
+          .no-print *,
+          .backdrop-blur-xs,
+          [class*="backdrop"],
+          [class*="bg-black/"] {
             display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
           }
           .paper-institutional-header,
           .paper header {
@@ -3399,6 +3436,8 @@ export function QuestionPrintView({
             background-color: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
+            filter: none !important;
+            backdrop-filter: none !important;
             page-break-after: always !important;
             break-after: page !important;
             page-break-inside: avoid !important;
@@ -3411,6 +3450,8 @@ export function QuestionPrintView({
           .paper * {
             color: #000000 !important;
             text-shadow: none !important;
+            box-shadow: none !important;
+            filter: none !important;
           }
           .paper:last-of-type,
           .paper:last-child {

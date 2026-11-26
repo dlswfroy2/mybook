@@ -566,6 +566,21 @@ function CreateQuestionContent() {
     return found ? found.label : s;
   }, []);
 
+  // Update document title for clean print / PDF save file names
+  useEffect(() => {
+    const classLabel = getClassLabel(meta.classId);
+    const parts = [
+      classLabel ? `${classLabel} শ্রেণি` : '',
+      meta.subject || '',
+      meta.chapter || '',
+      meta.exam || 'পরীক্ষা'
+    ].map(s => String(s).trim()).filter(Boolean);
+    const title = parts.length > 0 ? parts.join(' - ') : (meta.exam || 'প্রশ্নপত্র');
+    if (typeof document !== 'undefined') {
+      document.title = title;
+    }
+  }, [meta.classId, meta.subject, meta.chapter, meta.exam, getClassLabel]);
+
   // Load from DB or Session
   useEffect(() => {
     if (!editId && source !== 'merge') {
