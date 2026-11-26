@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -8,18 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { 
     SubjectClassLimit, 
     RoutineColumnConfig, 
     DEFAULT_ROUTINE_COLUMNS, 
-    saveSubjectClassLimits, 
-    getSubjectClassLimits 
+    saveSubjectClassLimits 
 } from '@/lib/routine-data';
 import { getSubjects, subjectNameNormalization } from '@/lib/subjects';
-import { CheckSquare, Save, AlertTriangle, CheckCircle2, Info, RefreshCw, Sparkles, BookOpen } from 'lucide-react';
+import { CheckSquare, Save, AlertTriangle, CheckCircle2, Info, BookOpen, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const classNamesMap: { [key: string]: string } = {
@@ -35,16 +33,6 @@ const toBengaliNumber = (num: number | string | undefined | null) => {
     const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return String(num).replace(/[0-9]/g, (d) => bnDigits[Number(d)]);
 };
-
-const ALL_WEEK_DAYS = [
-    { id: 'রবিবার', label: 'রবি' },
-    { id: 'সোমবার', label: 'সোম' },
-    { id: 'মঙ্গলবার', label: 'মঙ্গল' },
-    { id: 'বুধবার', label: 'বুধ' },
-    { id: 'বৃহস্পতিবার', label: 'বৃহস্পতি' },
-    { id: 'শুক্রবার', label: 'শুক্র' },
-    { id: 'শনিবার', label: 'শনি' },
-];
 
 interface SubjectLimitsTabProps {
     routineData: Record<string, Record<string, string[]>>;
@@ -70,7 +58,6 @@ export default function SubjectLimitsTab({
     const [selectedGroup, setSelectedGroup] = useState<string>('all');
     const [limits, setLimits] = useState<Record<string, SubjectClassLimit>>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
 
     // Load limits for the selected class
     useEffect(() => {
@@ -132,48 +119,31 @@ export default function SubjectLimitsTab({
     const remainingClasses = totalRoutineCapacity - totalAllocated;
     const isExceeded = totalAllocated > totalRoutineCapacity;
 
-    // Method 1: Checkbox click (টিক দিয়ে সেট করা)
-    const handleToggleDay = (subjectName: string, dayName: string) => {
+    // Number change handler (সাপ্তাহিক ক্লাস সংখ্যা লিখে সেট করা)
+    const handleNumberChange = (subjectName: string, valueStr: string) => {
         const norm = subjectNameNormalization[subjectName] || subjectName;
-        const current = limits[norm] || limits[subjectName] || {
-            subjectName,
-            daysCount: 0,
-            assignedDays: []
-        };
-        const currentDays = current.assignedDays || [];
-        let nextDays: string[];
-        if (currentDays.includes(dayName)) {
-            nextDays = currentDays.filter(d => d !== dayName);
-        } else {
-            nextDays = [...currentDays, dayName];
-        }
+        const val = parseInt(valueStr, 10);
+        const count = isNaN(val) ? 0 : Math.max(0, Math.min(20, val));
 
         setLimits(prev => ({
             ...prev,
             [norm]: {
                 subjectName,
-                daysCount: nextDays.length,
-                assignedDays: nextDays
+                daysCount: count
             }
         }));
     };
 
-    // Method 2: Typing number in input (লিখে সেট করা)
-    const handleNumberChange = (subjectName: string, valueStr: string) => {
+    // Quick increment / decrement helper
+    const handleAdjustCount = (subjectName: string, delta: number) => {
         const norm = subjectNameNormalization[subjectName] || subjectName;
-        const val = parseInt(valueStr, 10);
-        const count = isNaN(val) ? 0 : Math.max(0, Math.min(7, val));
-        
-        // Auto-select the first `count` days from standard week
-        const defaultWeek = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শনিবার", "শুক্রবার"];
-        const autoDays = defaultWeek.slice(0, count);
-
+        const current = limits[norm]?.daysCount || limits[subjectName]?.daysCount || 0;
+        const newCount = Math.max(0, Math.min(20, current + delta));
         setLimits(prev => ({
             ...prev,
             [norm]: {
                 subjectName,
-                daysCount: count,
-                assignedDays: autoDays
+                daysCount: newCount
             }
         }));
     };
@@ -233,7 +203,7 @@ export default function SubjectLimitsTab({
                             </h3>
                         </div>
                         <p className="text-xs font-bold text-slate-600 mt-1">
-                            কোন বিষয়টি সপ্তাহে কত দিন দেওয়া যাবে তা <strong>টিক দিয়ে</strong> অথবা <strong>সংখ্যা লিখে</strong> দুই পদ্ধতিতেই সেট করুন।
+                            প্রতিটি বিষয়ের জন্য সপ্তাহে সর্বোচ্চ কতটি ক্লাস বরাদ্দ করা যাবে তা <strong>সরাসরি সংখ্যা লিখে</strong> নির্ধারণ করুন।
                         </p>
                     </div>
 
@@ -278,7 +248,7 @@ export default function SubjectLimitsTab({
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="h-10 px-5 font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md gap-2 rounded-xl"
+                            className="h-10 px-5 font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md gap-2 rounded-xl cursor-pointer"
                         >
                             <Save className="w-4 h-4" />
                             {isSaving ? 'সংরক্ষণ হচ্ছে...' : 'সীমা সেভ করুন'}
@@ -346,7 +316,7 @@ export default function SubjectLimitsTab({
                     <div className="mt-3 p-2.5 bg-rose-100/90 border border-rose-300 text-rose-800 rounded-xl text-xs font-black flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                         <span>
-                            ⚠️ সতর্কবার্তা: রুটিনের মোট ক্লাস ({toBengaliNumber(totalRoutineCapacity)}টি)-এর চেয়ে {toBengaliNumber(Math.abs(remainingClasses))}টি ক্লাস বেশি নির্ধারণ করা হয়েছে! দয়া করে কিছু বিষয়ের দিন/সংখ্যা কমিয়ে সামঞ্জস্য করুন।
+                            ⚠️ সতর্কবার্তা: রুটিনের মোট ক্লাস ({toBengaliNumber(totalRoutineCapacity)}টি)-এর চেয়ে {toBengaliNumber(Math.abs(remainingClasses))}টি ক্লাস বেশি নির্ধারণ করা হয়েছে! দয়া করে কিছু বিষয়ের ক্লাস সংখ্যা কমিয়ে সামঞ্জস্য করুন।
                         </span>
                     </div>
                 )}
@@ -360,16 +330,13 @@ export default function SubjectLimitsTab({
                             <TableHead className="w-16 text-center font-black text-slate-800 border-r border-slate-300">
                                 ক্রমিক
                             </TableHead>
-                            <TableHead className="w-48 font-black text-slate-800 border-r border-slate-300">
+                            <TableHead className="font-black text-slate-800 border-r border-slate-300">
                                 বিষয়ের নাম
                             </TableHead>
-                            <TableHead className="font-black text-slate-800 border-r border-slate-300 text-center">
-                                সপ্তাহে কোন কোন দিন দেওয়া যাবে (টিক দিয়ে সেট করুন)
-                            </TableHead>
-                            <TableHead className="w-36 text-center font-black text-slate-800 border-r border-slate-300">
+                            <TableHead className="w-56 text-center font-black text-slate-800 border-r border-slate-300">
                                 সাপ্তাহিক ক্লাস (সংখ্যা লিখে)
                             </TableHead>
-                            <TableHead className="w-32 text-center font-black text-slate-800">
+                            <TableHead className="w-40 text-center font-black text-slate-800">
                                 বর্তমান রুটিনে
                             </TableHead>
                         </TableRow>
@@ -377,7 +344,7 @@ export default function SubjectLimitsTab({
                     <TableBody>
                         {subjects.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="py-10 text-center font-bold text-muted-foreground">
+                                <TableCell colSpan={4} className="py-10 text-center font-bold text-muted-foreground">
                                     এই শ্রেণির জন্য কোনো বিষয় পাওয়া যায়নি।
                                 </TableCell>
                             </TableRow>
@@ -386,10 +353,8 @@ export default function SubjectLimitsTab({
                                 const norm = subjectNameNormalization[sub.name] || sub.name;
                                 const item = limits[norm] || limits[sub.name] || {
                                     subjectName: sub.name,
-                                    daysCount: 0,
-                                    assignedDays: []
+                                    daysCount: 0
                                 };
-                                const assignedDays = item.assignedDays || [];
                                 const count = item.daysCount || 0;
                                 const liveCount = routineUsageMap[norm] || routineUsageMap[sub.name] || 0;
 
@@ -406,54 +371,52 @@ export default function SubjectLimitsTab({
                                         </TableCell>
 
                                         <TableCell className="font-black text-sm text-slate-900 border-r border-slate-200">
-                                            <div className="flex items-center gap-1.5">
-                                                <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                                                <span>{sub.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="w-4 h-4 text-primary shrink-0" />
+                                                <span className="text-base font-black">{sub.name}</span>
                                             </div>
                                         </TableCell>
 
-                                        {/* Method 1: Checkbox for each day */}
-                                        <TableCell className="p-2 border-r border-slate-200">
-                                            <div className="flex flex-wrap items-center justify-center gap-1.5">
-                                                {ALL_WEEK_DAYS.map(day => {
-                                                    const isChecked = assignedDays.includes(day.id);
-                                                    return (
-                                                        <button
-                                                            key={day.id}
-                                                            type="button"
-                                                            onClick={() => handleToggleDay(sub.name, day.id)}
-                                                            className={cn(
-                                                                "h-7 px-2.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer border",
-                                                                isChecked 
-                                                                    ? "bg-rose-500 text-white border-rose-600 shadow-2xs scale-102" 
-                                                                    : "bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200"
-                                                            )}
-                                                            title={`${day.id} বারে ${sub.name} ক্লাস দিন`}
-                                                        >
-                                                            <span>{day.label}</span>
-                                                            {isChecked && <span className="text-[10px]">✓</span>}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </TableCell>
+                                        {/* Weekly Class Count Input */}
+                                        <TableCell className="p-2.5 text-center border-r border-slate-200">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => handleAdjustCount(sub.name, -1)}
+                                                    disabled={count <= 0}
+                                                    className="h-8 w-8 rounded-lg border-slate-300 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                                                >
+                                                    <Minus className="w-3.5 h-3.5" />
+                                                </Button>
 
-                                        {/* Method 2: Typing number */}
-                                        <TableCell className="p-2 text-center border-r border-slate-200">
-                                            <div className="flex items-center justify-center gap-1.5">
                                                 <Input
                                                     type="number"
                                                     min={0}
-                                                    max={7}
+                                                    max={20}
                                                     value={count === 0 ? '' : count}
                                                     onChange={(e) => handleNumberChange(sub.name, e.target.value)}
                                                     placeholder="০"
                                                     className={cn(
-                                                        "w-16 h-8 text-center font-black text-sm rounded-lg",
-                                                        count > 0 ? "border-rose-400 bg-rose-50/30 text-rose-900" : "border-slate-300"
+                                                        "w-20 h-9 text-center font-black text-base rounded-lg shadow-2xs",
+                                                        count > 0 ? "border-2 border-rose-400 bg-rose-50/40 text-rose-900" : "border-slate-300"
                                                     )}
                                                 />
-                                                <span className="text-xs font-bold text-slate-500">দিন</span>
+
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => handleAdjustCount(sub.name, 1)}
+                                                    className="h-8 w-8 rounded-lg border-slate-300 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                </Button>
+
+                                                <span className="text-xs font-bold text-slate-600 whitespace-nowrap ml-1">
+                                                    টি ক্লাস
+                                                </span>
                                             </div>
                                         </TableCell>
 
@@ -462,7 +425,7 @@ export default function SubjectLimitsTab({
                                             <Badge 
                                                 variant="outline"
                                                 className={cn(
-                                                    "text-xs font-black",
+                                                    "text-xs font-black px-2.5 py-1",
                                                     count > 0 && liveCount > count
                                                         ? "bg-rose-100 text-rose-700 border-rose-300"
                                                         : count > 0 && liveCount === count
@@ -470,7 +433,7 @@ export default function SubjectLimitsTab({
                                                             : "bg-slate-100 text-slate-600"
                                                 )}
                                             >
-                                                {toBengaliNumber(liveCount)}/{count > 0 ? toBengaliNumber(count) : '∞'}টি
+                                                {toBengaliNumber(liveCount)}/{count > 0 ? toBengaliNumber(count) : '০'}টি
                                             </Badge>
                                         </TableCell>
                                     </TableRow>
@@ -482,15 +445,12 @@ export default function SubjectLimitsTab({
                     {/* Table Footer: Total row */}
                     <tfoot className="bg-slate-100/90 font-black border-t-2 border-slate-300">
                         <TableRow className="h-12">
-                            <TableCell colSpan={2} className="text-right font-black text-sm text-slate-800 pr-4 border-r border-slate-300">
-                                সর্বমোট নির্ধারিত ক্লাস:
-                            </TableCell>
-                            <TableCell className="text-center text-xs text-slate-600 font-bold border-r border-slate-300">
-                                (টিক ও সংখ্যা উভয় পদ্ধতিতেই সেট করা হয়েছে)
+                            <TableCell colSpan={2} className="text-right font-black text-sm text-slate-800 pr-6 border-r border-slate-300">
+                                সর্বমোট নির্ধারিত সাপ্তাহিক ক্লাস:
                             </TableCell>
                             <TableCell className="text-center font-black text-base border-r border-slate-300">
                                 <span className={cn(
-                                    isExceeded ? "text-rose-600" : "text-emerald-700"
+                                    isExceeded ? "text-rose-600 font-black" : "text-emerald-700 font-black"
                                 )}>
                                     {toBengaliNumber(totalAllocated)} / {toBengaliNumber(totalRoutineCapacity)} টি
                                 </span>
@@ -498,11 +458,11 @@ export default function SubjectLimitsTab({
                             <TableCell className="text-center">
                                 <Badge 
                                     className={cn(
-                                        "font-black text-xs",
+                                        "font-black text-xs px-2.5 py-1",
                                         isExceeded 
                                             ? "bg-rose-600 text-white" 
-                                            : remainingClasses === 0
-                                                ? "bg-emerald-600 text-white"
+                                            : remainingClasses === 0 
+                                                ? "bg-emerald-600 text-white" 
                                                 : "bg-indigo-600 text-white"
                                     )}
                                 >
