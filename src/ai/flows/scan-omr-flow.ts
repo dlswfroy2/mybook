@@ -12,8 +12,12 @@ export interface ScanOmrInput {
   imageUri: string;
   questionCount: number;
   answerKey?: Record<number, string>; // e.g. { 1: 'ক', 2: 'খ', ... }
+  answerKeysBySet?: Record<string, Record<number, string>>; // e.g. { 'ক': { 1: 'ক' }, 'খ': { 1: 'খ' } }
   negativeMark?: number; // e.g. 0.25 or 0
   markPerQuestion?: number; // default 1
+  classId?: string;
+  subject?: string;
+  examType?: string;
 }
 
 export interface ScannedQuestionResult {
@@ -27,7 +31,9 @@ export interface ScannedQuestionResult {
 export interface ScanOmrOutput {
   studentName: string;
   rollNumber: string;
+  className?: string;
   subjectCode: string;
+  subjectName?: string;
   setCode: string;
   totalQuestions: number;
   attemptedCount: number;
@@ -59,37 +65,51 @@ export async function scanAndEvaluateOmr(input: ScanOmrInput): Promise<ScanOmrOu
     imageUri,
     questionCount = 30,
     answerKey = {},
+    answerKeysBySet = {},
     negativeMark = 0,
     markPerQuestion = 1,
+    classId = '',
+    subject = '',
+    examType = '',
   } = input;
 
   if (!imageUri) {
     throw new Error('ওএমআর শিটের ছবি পাওয়া যায়নি। অনুগ্রহ করে মোবাইল দিয়ে পরিষ্কার ছবি তুলুন।');
   }
 
-  const promptText = `You are a high-precision Optical Mark Recognition (OMR) Sheet Scanner AI.
-Your task is to analyze this photo of an OMR answer sheet (বহুনির্বাচনী মূল্যায়ন ওএমআর শিট) and extract the marked bubbles with high accuracy.
+  const promptText = `You are a universal, high-precision Optical Mark Recognition (OMR) Sheet Scanner AI.
+Your task is to analyze this photo of ANY OMR answer sheet (বোর্ড বা যেকোনো স্কুলের বহুনির্বাচনী ওএমআর শিট) and extract the marked bubbles and student details with extreme accuracy.
+The layout might be single-column, 2-column, 3-column, 4-column or 5-column, portrait or landscape, English or Bengali text.
+
+Expected context:
+${classId ? `- Expected Class: ${classId}` : ''}
+${subject ? `- Expected Subject: ${subject}` : ''}
+${examType ? `- Expected Exam Type: ${examType}` : ''}
 
 Instructions:
-1. Examine the Student Information section:
-   - "নাম" (Student Name): Extract if written.
-   - "রোল নম্বর" (Roll Number): Look at the 4-digit grid. First check the handwritten digits in the top boxes; also check which bubble (০-৯ or 0-9) is darkened in each column. Return the 4-digit roll number (e.g. "1024" or "১০২৪").
-   - "বিষয় কোড" (Subject Code): Look at the 3-digit grid (both top boxes and filled 0-9 bubbles). Return the 3-digit code.
-   - "প্রশ্ন সেটের কোড" (Set Code): Check which circle is darkened: 'ক' (A), 'খ' (B), 'গ' (C), or 'ঘ' (D).
+1. Student Information:
+   - "নাম" (Student Name): Extract if written anywhere (top header, student details box, or handwritten).
+   - "রোল নম্বর" (Roll Number): Look at Roll No boxes and bubbles. First check any handwritten digits in the boxes; if present, use them. Also check the vertical columns of circles (0-9 or ০-৯) where a bubble is filled. Return the clean numerical roll number string (e.g. "101", "1024", or "৫২").
+   - "শ্রেণি" (Class): Extract if visible (e.g. "নবম", "দশম", "Class 9", "10").
+   - "বিষয় / বিষয় কোড" (Subject / Code): Extract subject name or 3-digit subject code if filled or written.
+   - "প্রশ্ন সেটের কোড" (Set Code): Check which set circle is filled: 'ক' (A), 'খ' (B), 'গ' (C), or 'ঘ' (D). If unmarked, return 'ক'.
 
-2. Examine the MCQ Answer Section for questions 1 to ${questionCount}:
+2. MCQ Answer Bubbles for Questions 1 to ${questionCount}:
+   - Locate the question rows/columns numbered 1 to ${questionCount}.
    - For each question from 1 to ${questionCount}:
-     - Identify which bubble circle is darkened with pen or pencil: 'ক', 'খ', 'গ', 'ঘ'.
-     - If the student filled a bubble, return that letter ('ক', 'খ', 'গ', or 'ঘ').
-     - If NO bubble is filled for that question, return null.
-     - If the student filled MORE THAN ONE bubble for the same question, return "MULTIPLE".
-     - Be accurate in distinguishing between darkened filled bubbles vs empty white bubbles.
+     - Check the 4 (or 5) option bubbles: (ক, খ, গ, ঘ) or (A, B, C, D).
+     - If exactly ONE bubble circle is darkened / filled with ink/pencil, return that option as 'ক', 'খ', 'গ', or 'ঘ' (convert A->ক, B->খ, C->গ, D->ঘ).
+     - If NO circle is filled for that question, return null.
+     - If MORE THAN ONE circle is filled for that same question, return "MULTIPLE".
+     - Strictly distinguish darkened/shaded pencil or pen marks from empty white circles or slight stray smudges.
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "studentName": "...",
-  "rollNumber": "...",
-  "subjectCode": "...",
+  "studentName": "শিক্ষার্থীর নাম",
+  "rollNumber": "101",
+  "className": "দশম",
+  "subjectCode": "109",
+  "subjectName": "গণিত",
   "setCode": "ক",
   "answers": {
     "1": "ক",
@@ -149,8 +169,15 @@ Return ONLY a valid JSON object matching this schema:
   const rawAnswers = parsedData.answers || {};
   const studentName = String(parsedData.studentName || '').trim();
   const rollNumber = String(parsedData.rollNumber || '').trim();
+  const className = String(parsedData.className || '').trim();
+  const subjectName = String(parsedData.subjectName || '').trim();
   const subjectCode = String(parsedData.subjectCode || '').trim();
   const setCode = normalizeOption(parsedData.setCode) || 'ক';
+
+  // Determine effective answer key: check if set-specific key exists, otherwise fallback to default
+  const effectiveAnswerKey = (answerKeysBySet && answerKeysBySet[setCode])
+    ? answerKeysBySet[setCode]
+    : (answerKey || {});
 
   const questions: ScannedQuestionResult[] = [];
   let attemptedCount = 0;
@@ -162,7 +189,7 @@ Return ONLY a valid JSON object matching this schema:
   for (let q = 1; q <= questionCount; q++) {
     const rawVal = rawAnswers[String(q)] || rawAnswers[q];
     const scanned = normalizeOption(rawVal);
-    const correct = normalizeOption(answerKey[q]);
+    const correct = normalizeOption(effectiveAnswerKey[q]);
 
     let status: 'correct' | 'wrong' | 'unanswered' | 'multiple' = 'unanswered';
     let isCorrect: boolean | null = null;
@@ -213,6 +240,8 @@ Return ONLY a valid JSON object matching this schema:
   return {
     studentName,
     rollNumber,
+    className,
+    subjectName,
     subjectCode,
     setCode,
     totalQuestions: questionCount,

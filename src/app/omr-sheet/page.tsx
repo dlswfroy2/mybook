@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Printer, ArrowLeft, Scissors, LayoutGrid, FileText, CheckCircle2, RefreshCw, Camera, Key, ChevronDown, ChevronUp, BarChart2, Save, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OmrScannerDialog } from '@/components/OmrScannerDialog';
+import { CLASSES, getSubjectsForClass } from '@/lib/constants';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
@@ -269,15 +271,28 @@ function OmrSheetContent() {
   });
 
   const [layoutMode, setLayoutMode] = useState<'landscape_2up' | 'portrait_1up'>('landscape_2up');
+  const [classId, setClassId] = useState<string>('10');
+  const [subject, setSubject] = useState<string>('গণিত');
+  const [examType, setExamType] = useState<string>('মডেল টেস্ট');
   const [examTitle, setExamTitle] = useState('এস এস সি পরীক্ষা- ২০২৭');
-  const [examSubtitle, setExamSubtitle] = useState('মডেল টেস্ট');
+  const [examSubtitle, setExamSubtitle] = useState('গণিত (মডেল টেস্ট)');
   const [fullMarks, setFullMarks] = useState('৩০');
+  const [negativeMark, setNegativeMark] = useState<number>(0);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [activeSet, setActiveSet] = useState<'ক' | 'খ' | 'গ' | 'ঘ'>('ক');
+  const [answerKeysBySet, setAnswerKeysBySet] = useState<Record<string, Record<number, string>>>({
+    'ক': {},
+    'খ': {},
+    'গ': {},
+    'ঘ': {},
+  });
   const [masterAnswerKey, setMasterAnswerKey] = useState<Record<number, string>>({});
   const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
   const [savedAnswerKeys, setSavedAnswerKeys] = useState<any[]>([]);
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [loadKeyId, setLoadKeyId] = useState('');
+
+  const availableSubjects = useMemo(() => getSubjectsForClass(classId), [classId]);
 
   const softwareDocRef = React.useMemo(() => db ? doc(db, 'config', 'software') : null, [db]);
   const { data: softwareConfig } = useDoc(softwareDocRef);
@@ -332,23 +347,52 @@ function OmrSheetContent() {
     loadSavedKeys();
   }, [db]);
 
+  // Auto-match and load answer key when class or subject changes
+  useEffect(() => {
+    if (savedAnswerKeys.length === 0) return;
+    const matched = savedAnswerKeys.find(
+      (k: any) => (k.classId === classId || k.className === classId) && (k.subject === subject || k.examSubtitle === subject)
+    );
+    if (matched) {
+      if (matched.answerKeysBySet) {
+        setAnswerKeysBySet(matched.answerKeysBySet);
+        setMasterAnswerKey(matched.answerKeysBySet['ক'] || matched.answerKey || {});
+      } else if (matched.answerKey) {
+        setMasterAnswerKey(matched.answerKey);
+        setAnswerKeysBySet(prev => ({ ...prev, [activeSet]: matched.answerKey }));
+      }
+      if (matched.negativeMark !== undefined) setNegativeMark(matched.negativeMark);
+      if (matched.questionCount) setQuestionCount(matched.questionCount);
+    }
+  }, [classId, subject, savedAnswerKeys, activeSet]);
+
   const handleSaveAnswerKey = async () => {
     if (!db) return;
     if (!examTitle.trim()) {
       alert('পরীক্ষার শিরোনাম দিন।');
       return;
     }
-    if (Object.keys(masterAnswerKey).length === 0) {
+    const currentSetAnswers = answerKeysBySet[activeSet] || masterAnswerKey;
+    if (Object.keys(currentSetAnswers).length === 0 && Object.keys(masterAnswerKey).length === 0) {
       alert('অন্তত একটি উত্তর সেট করুন।');
       return;
     }
     setIsSavingKey(true);
     try {
+      const className = CLASSES.find(c => c.id === classId)?.label || classId;
       await addDoc(collection(db, 'omr_answer_keys'), {
+        classId,
+        className,
+        subject,
+        examType,
         examTitle: examTitle.trim(),
         examSubtitle: examSubtitle.trim(),
         questionCount,
-        answerKey: masterAnswerKey,
+        fullMarks,
+        negativeMark,
+        activeSet,
+        answerKey: currentSetAnswers,
+        answerKeysBySet,
         createdAt: serverTimestamp(),
         userId: user?.uid || 'anonymous',
       });
@@ -356,7 +400,7 @@ function OmrSheetContent() {
       const q = query(collection(db, 'omr_answer_keys'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
       setSavedAnswerKeys(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      alert('উত্তরমালা সংরক্ষণ করা হয়েছে! ✅');
+      alert(`[${className} শ্রেণি - ${subject}] এর উত্তরমালা সফলভাবে ডাটাবেজে সংরক্ষণ করা হয়েছে! ✅`);
     } catch (e) {
       console.error(e);
       alert('সংরক্ষণে সমস্যা হয়েছে।');
@@ -462,136 +506,236 @@ function OmrSheetContent() {
           </div>
         </div>
 
-        {/* Inline Title / Year / Subtitle Customizer */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t text-xs">
+        {/* ── 4-Column Smart Exam & Subject Selector ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t text-xs">
+          {/* 1. Class Selector */}
           <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase">পরীক্ষার শিরোনাম:</label>
+            <label className="text-[10px] font-black text-slate-700 uppercase">শ্রেণি (Class):</label>
+            <Select 
+              value={classId} 
+              onValueChange={(val) => {
+                setClassId(val);
+                const subjs = getSubjectsForClass(val);
+                if (!subjs.includes(subject)) {
+                  setSubject(subjs[0] || 'গণিত');
+                  setExamSubtitle(subjs[0] || 'গণিত');
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs font-bold bg-white mt-0.5">
+                <SelectValue placeholder="শ্রেণি নির্বাচন করুন" />
+              </SelectTrigger>
+              <SelectContent>
+                {CLASSES.map(c => (
+                  <SelectItem key={c.id} value={c.id} className="text-xs font-bold">
+                    {c.label} শ্রেণি
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 2. Subject Dropdown with Custom Input */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase">বিষয় (Subject):</label>
+            <div className="flex gap-1 mt-0.5">
+              <Select 
+                value={subject} 
+                onValueChange={(val) => {
+                  setSubject(val);
+                  setExamSubtitle(val);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs font-bold bg-white flex-1">
+                  <SelectValue placeholder="বিষয় নির্বাচন" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSubjects.map((s) => (
+                    <SelectItem key={s} value={s} className="text-xs font-bold">
+                      {s}
+                    </SelectItem>
+                  ))}
+                  {subject && !availableSubjects.includes(subject) && (
+                    <SelectItem value={subject} className="text-xs font-bold">
+                      {subject}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Input
+                value={subject}
+                onChange={(e) => {
+                  setSubject(e.target.value);
+                  setExamSubtitle(e.target.value);
+                }}
+                placeholder="বা কাস্টম বিষয়..."
+                className="h-8 text-xs font-bold w-28 bg-white shrink-0"
+              />
+            </div>
+          </div>
+
+          {/* 3. Exam Type / Title */}
+          <div>
+            <label className="text-[10px] font-black text-slate-700 uppercase">পরীক্ষার ধরন ও নাম:</label>
             <div className="relative mt-0.5">
               <input
-                list="examTitleList"
+                list="examTypeList"
                 value={examTitle}
-                onChange={(e) => setExamTitle(e.target.value)}
-                placeholder="এস এস সি পরীক্ষা- ২০২৭"
+                onChange={(e) => {
+                  setExamTitle(e.target.value);
+                  setExamType(e.target.value);
+                }}
+                placeholder="সাপ্তাহিক পরীক্ষা / মডেল টেস্ট"
                 className="h-8 text-xs font-bold w-full border rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
-              <datalist id="examTitleList">
-                {[...new Set(savedAnswerKeys.map((k: any) => k.examTitle).filter(Boolean))].map((t: any) => (
-                  <option key={String(t)} value={String(t)} />
-                ))}
-                <option value="এস এস সি পরীক্ষা- ২০২৭" />
-                <option value="জে এস সি পরীক্ষা- ২০২৭" />
+              <datalist id="examTypeList">
+                <option value="সাপ্তাহিক পরীক্ষা- ২০২৬" />
+                <option value="মডেল টেস্ট- ২০২৭" />
+                <option value="এস এস সি মডেল টেস্ট- ২০২৭" />
                 <option value="অর্ধ-বার্ষিক পরীক্ষা- ২০২৬" />
                 <option value="বার্ষিক পরীক্ষা- ২০২৬" />
-                <option value="মডেল টেস্ট ২০২৭" />
+                <option value="প্রাক-নির্বাচনি পরীক্ষা" />
+                <option value="নির্বাচনি (টেস্ট) পরীক্ষা" />
+                <option value="ক্লাস টেস্ট" />
               </datalist>
             </div>
           </div>
+
+          {/* 4. Full Marks & Negative Marks */}
           <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase">উপ-শিরোনাম / বিষয়:</label>
-            <div className="relative mt-0.5">
-              <input
-                list="examSubtitleList"
-                value={examSubtitle}
-                onChange={(e) => setExamSubtitle(e.target.value)}
-                placeholder="মডেল টেস্ট / গণিত"
-                className="h-8 text-xs font-bold w-full border rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            <label className="text-[10px] font-black text-slate-700 uppercase">পূর্ণমান ও নেগেটিভ মার্ক:</label>
+            <div className="flex gap-1.5 mt-0.5">
+              <Input
+                value={fullMarks}
+                onChange={(e) => setFullMarks(e.target.value)}
+                placeholder="৩০"
+                className="h-8 text-xs font-bold w-20 bg-white"
+                title="পূর্ণমান"
               />
-              <datalist id="examSubtitleList">
-                {[...new Set(savedAnswerKeys
-                  .filter((k: any) => !examTitle || k.examTitle === examTitle)
-                  .map((k: any) => k.examSubtitle).filter(Boolean))].map((t: any) => (
-                  <option key={String(t)} value={String(t)} />
-                ))}
-                <option value="বাংলা প্রথম পত্র" />
-                <option value="বাংলা দ্বিতীয় পত্র" />
-                <option value="ইংরেজি প্রথম পত্র" />
-                <option value="ইংরেজি দ্বিতীয় পত্র" />
-                <option value="গণিত" />
-                <option value="বিজ্ঞান" />
-                <option value="সাধারণ বিজ্ঞান" />
-                <option value="মডেল টেস্ট" />
-              </datalist>
+              <select
+                value={negativeMark}
+                onChange={(e) => setNegativeMark(parseFloat(e.target.value))}
+                className="h-8 text-xs font-bold border rounded-md px-1.5 bg-white flex-1"
+                title="নেগেটিভ মার্কিং"
+              >
+                <option value="0">নেগেটিভ: ০</option>
+                <option value="0.25">নেগেটিভ: -০.২৫</option>
+                <option value="0.5">নেগেটিভ: -০.৫০</option>
+                <option value="1">নেগেটিভ: -১.০০</option>
+              </select>
             </div>
-          </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase">পূর্ণমান:</label>
-            <Input
-              value={fullMarks}
-              onChange={(e) => setFullMarks(e.target.value)}
-              placeholder="৩০"
-              className="h-8 text-xs font-bold mt-0.5"
-            />
           </div>
         </div>
 
         {/* ── Answer Key Setup Section ── */}
         <div className="border-t pt-3 mt-1 no-print">
-          <button
-            type="button"
-            onClick={() => setAnswerKeyOpen(!answerKeyOpen)}
-            className="flex items-center gap-2 text-sm font-black text-purple-700 hover:text-purple-900 transition-colors mb-2"
-          >
-            <Key className="w-4 h-4" />
-            উত্তরমালা সেট করুন (Answer Key)
-            {answerKeyOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            <span className="text-xs font-normal text-slate-500 ml-1">
-              ({Object.keys(masterAnswerKey).length}/{questionCount} সেট করা হয়েছে)
-            </span>
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => setAnswerKeyOpen(!answerKeyOpen)}
+              className="flex items-center gap-2 text-sm font-black text-purple-700 hover:text-purple-900 transition-colors"
+            >
+              <Key className="w-4 h-4" />
+              উত্তরমালা সেট করুন (Answer Key)
+              {answerKeyOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              <span className="text-xs font-bold text-slate-600 bg-purple-100 px-2 py-0.5 rounded-full ml-1">
+                {Object.keys(answerKeysBySet[activeSet] || masterAnswerKey).length}/{questionCount} সেট করা হয়েছে
+              </span>
+            </button>
+
+            {answerKeyOpen && (
+              <div className="flex items-center gap-1 bg-white border border-purple-300 rounded-lg p-0.5 shadow-2xs">
+                <span className="text-[11px] font-bold text-slate-600 px-1.5">সেট:</span>
+                {(['ক', 'খ', 'গ', 'ঘ'] as const).map(setOpt => (
+                  <button
+                    key={setOpt}
+                    type="button"
+                    onClick={() => {
+                      setActiveSet(setOpt);
+                      if (answerKeysBySet[setOpt]) {
+                        setMasterAnswerKey(answerKeysBySet[setOpt]);
+                      }
+                    }}
+                    className={cn(
+                      "px-2.5 py-0.5 text-xs font-black rounded-md transition-all",
+                      activeSet === setOpt
+                        ? "bg-purple-700 text-white shadow-xs"
+                        : "text-slate-700 hover:bg-purple-50"
+                    )}
+                  >
+                    সেট {setOpt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {answerKeyOpen && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3">
-              <p className="text-xs text-slate-600 mb-3 font-medium">
-                প্রতিটি প্রশ্নের সঠিক উত্তর বাছাই করুন। স্ক্যানের সময় এই উত্তরমালা ব্যবহার হবে।
-              </p>
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-200/80 pb-2">
+                <p className="text-xs text-purple-900 font-bold">
+                  📍 <span className="font-black text-purple-950 underline">{CLASSES.find(c => c.id === classId)?.label} শ্রেণি - {subject} (সেট: {activeSet})</span> এর প্রতিটি প্রশ্নের সঠিক বৃত্ত সিলেক্ট করুন:
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-bold">
+                    সেট {activeSet}-এ মোট {Object.keys(answerKeysBySet[activeSet] || masterAnswerKey).length}টি উত্তর সেট করা হয়েছে
+                  </span>
+                </div>
+              </div>
+
               <div className="grid gap-y-1.5"
                 style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
               >
-                {Array.from({ length: questionCount }, (_, i) => i + 1).map((qNum) => (
-                  <div key={qNum} className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-600 w-6 text-right shrink-0">{qNum}.</span>
-                    <div className="flex gap-1">
-                      {['ক', 'খ', 'গ', 'ঘ'].map((opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => {
-                            setMasterAnswerKey(prev => {
-                              const updated = { ...prev };
-                              if (updated[qNum] === opt) {
-                                delete updated[qNum];
+                {Array.from({ length: questionCount }, (_, i) => i + 1).map((qNum) => {
+                  const currentSetMap = answerKeysBySet[activeSet] || masterAnswerKey;
+                  const currentAns = currentSetMap[qNum];
+                  return (
+                    <div key={qNum} className="flex items-center gap-2 bg-white/70 p-1 rounded-lg border border-purple-100">
+                      <span className="text-xs font-black text-slate-700 w-6 text-right shrink-0">{toBengaliNumber(qNum)}.</span>
+                      <div className="flex gap-1">
+                        {['ক', 'খ', 'গ', 'ঘ'].map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => {
+                              const updatedForSet = { ...(answerKeysBySet[activeSet] || {}) };
+                              if (updatedForSet[qNum] === opt) {
+                                delete updatedForSet[qNum];
                               } else {
-                                updated[qNum] = opt;
+                                updatedForSet[qNum] = opt;
                               }
-                              return updated;
-                            });
-                          }}
-                          className={cn(
-                            "w-7 h-7 rounded-full text-xs font-black border-2 transition-all",
-                            masterAnswerKey[qNum] === opt
-                              ? "bg-green-500 border-green-600 text-white shadow-md scale-110"
-                              : "bg-white border-slate-300 text-slate-600 hover:border-purple-400 hover:text-purple-700"
-                          )}
-                        >
-                          {opt}
-                        </button>
-                      ))}
+                              setAnswerKeysBySet(prev => ({ ...prev, [activeSet]: updatedForSet }));
+                              if (activeSet === 'ক') setMasterAnswerKey(updatedForSet);
+                            }}
+                            className={cn(
+                              "w-7 h-7 rounded-full text-xs font-black border-2 transition-all",
+                              currentAns === opt
+                                ? "bg-emerald-600 border-emerald-700 text-white shadow-md scale-110"
+                                : "bg-white border-slate-300 text-slate-600 hover:border-purple-400 hover:text-purple-700"
+                            )}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="flex flex-wrap gap-2 mt-3 items-center">
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-purple-200/80 items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setMasterAnswerKey({})}
-                  className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 border border-red-200 hover:border-red-400 rounded px-2 py-1 transition-colors"
+                  onClick={() => {
+                    setAnswerKeysBySet(prev => ({ ...prev, [activeSet]: {} }));
+                    if (activeSet === 'ক') setMasterAnswerKey({});
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 border border-red-200 hover:border-red-400 rounded px-2 py-1 transition-colors bg-white"
                 >
-                  সব মুছুন
+                  সেট {activeSet}-এর সব মুছুন
                 </button>
-                <span className="text-xs text-slate-500 flex items-center">
-                  মোট {Object.keys(masterAnswerKey).length}টি উত্তর সেট করা হয়েছে
-                </span>
-                <div className="ml-auto flex items-center gap-2">
+
+                <div className="flex items-center gap-2 flex-wrap">
                   {savedAnswerKeys.length > 0 && (
                     <select
                       value={loadKeyId}
@@ -600,34 +744,47 @@ function OmrSheetContent() {
                         setLoadKeyId(id);
                         if (!id) return;
                         const found = savedAnswerKeys.find(k => k.id === id);
-                        if (found && found.answerKey) {
-                          const loaded: Record<number, string> = {};
-                          Object.entries(found.answerKey).forEach(([k, v]) => {
-                            loaded[Number(k)] = v as string;
-                          });
-                          setMasterAnswerKey(loaded);
+                        if (found) {
+                          if (found.answerKeysBySet) {
+                            setAnswerKeysBySet(found.answerKeysBySet);
+                            setMasterAnswerKey(found.answerKeysBySet['ক'] || found.answerKey || {});
+                          } else if (found.answerKey) {
+                            const loaded: Record<number, string> = {};
+                            Object.entries(found.answerKey).forEach(([k, v]) => {
+                              loaded[Number(k)] = v as string;
+                            });
+                            setMasterAnswerKey(loaded);
+                            setAnswerKeysBySet(prev => ({ ...prev, [activeSet]: loaded }));
+                          }
+                          if (found.classId) setClassId(found.classId);
+                          if (found.subject) {
+                            setSubject(found.subject);
+                            setExamSubtitle(found.subject);
+                          }
+                          if (found.examType) setExamType(found.examType);
                           if (found.questionCount) setQuestionCount(found.questionCount);
                         }
                       }}
-                      className="h-8 text-xs font-bold border rounded-md px-2 bg-white max-w-[200px]"
+                      className="h-8 text-xs font-bold border rounded-md px-2 bg-white max-w-[220px]"
                     >
-                      <option value="">— সেভ করা উত্তরমালা লোড করুন —</option>
+                      <option value="">📂 সেভ করা উত্তরমালা লোড করুন</option>
                       {savedAnswerKeys.map((k) => (
                         <option key={k.id} value={k.id}>
-                          {k.examTitle} / {k.examSubtitle}
+                          {k.className || k.classId ? `[${k.className || k.classId} শ্রেণি] ` : ''}{k.subject || k.examSubtitle} - {k.examTitle}
                         </option>
                       ))}
                     </select>
                   )}
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={handleSaveAnswerKey}
                     disabled={isSavingKey}
-                    className="text-xs text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 border border-emerald-300 hover:border-emerald-500 rounded px-3 py-1 transition-colors bg-emerald-50 disabled:opacity-50"
+                    className="bg-purple-700 hover:bg-purple-800 text-white font-black text-xs h-8 px-3 gap-1 shadow-sm"
                   >
-                    {isSavingKey ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    {isSavingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                     উত্তরমালা সেভ করুন
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -642,7 +799,12 @@ function OmrSheetContent() {
         questionCount={questionCount}
         examTitle={examTitle}
         examSubtitle={examSubtitle}
-        defaultAnswerKey={masterAnswerKey}
+        classId={classId}
+        subject={subject}
+        examType={examType}
+        defaultAnswerKey={answerKeysBySet[activeSet] || masterAnswerKey}
+        answerKeysBySet={answerKeysBySet}
+        negativeMark={negativeMark}
       />
 
       {/* ── Main Printable Sheet Area ── */}

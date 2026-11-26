@@ -27,7 +27,11 @@ function getGrade(pct: number): { grade: string; color: string } {
 interface OmrResult {
   id: string;
   examTitle: string;
-  examSubtitle: string;
+  examSubtitle?: string;
+  classId?: string;
+  className?: string;
+  subject?: string;
+  examType?: string;
   studentName: string;
   rollNumber: string;
   subjectCode?: string;
@@ -48,8 +52,9 @@ function OmrResultsContent() {
 
   const [allResults, setAllResults] = useState<OmrResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterExam, setFilterExam] = useState('');
+  const [filterClass, setFilterClass] = useState('');
   const [filterSubject, setFilterSubject] = useState('');
+  const [filterExam, setFilterExam] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadResults = async () => {
@@ -70,28 +75,38 @@ function OmrResultsContent() {
 
   useEffect(() => { loadResults(); }, [db]);
 
-  const examTitles = useMemo(() =>
-    [...new Set(allResults.map(r => r.examTitle).filter(Boolean))],
+  const classes = useMemo(() =>
+    [...new Set(allResults.map(r => r.className || (r.classId ? `শ্রেণি: ${r.classId}` : '')).filter(Boolean))],
     [allResults]
   );
 
   const subjects = useMemo(() =>
     [...new Set(allResults
-      .filter(r => !filterExam || r.examTitle === filterExam)
-      .map(r => r.examSubtitle).filter(Boolean))],
-    [allResults, filterExam]
+      .filter(r => !filterClass || (r.className === filterClass || r.classId === filterClass))
+      .map(r => r.subject || r.examSubtitle).filter(Boolean))],
+    [allResults, filterClass]
+  );
+
+  const examTitles = useMemo(() =>
+    [...new Set(allResults
+      .filter(r => (!filterClass || (r.className === filterClass || r.classId === filterClass)) &&
+                   (!filterSubject || (r.subject === filterSubject || r.examSubtitle === filterSubject)))
+      .map(r => r.examTitle || r.examType).filter(Boolean))],
+    [allResults, filterClass, filterSubject]
   );
 
   const filtered = useMemo(() =>
-    allResults.filter(r =>
-      (!filterExam || r.examTitle === filterExam) &&
-      (!filterSubject || r.examSubtitle === filterSubject)
-    ).sort((a, b) => {
+    allResults.filter(r => {
+      const matchClass = !filterClass || r.className === filterClass || r.classId === filterClass;
+      const matchSub = !filterSubject || r.subject === filterSubject || r.examSubtitle === filterSubject;
+      const matchExam = !filterExam || r.examTitle === filterExam || r.examType === filterExam;
+      return matchClass && matchSub && matchExam;
+    }).sort((a, b) => {
       const rollA = parseInt(a.rollNumber || '9999', 10);
       const rollB = parseInt(b.rollNumber || '9999', 10);
       return rollA - rollB;
     }),
-    [allResults, filterExam, filterSubject]
+    [allResults, filterClass, filterSubject, filterExam]
   );
 
   const handleDelete = async (id: string) => {
@@ -108,6 +123,46 @@ function OmrResultsContent() {
     }
   };
 
+  const handleExportCsv = () => {
+    if (!filtered.length) return;
+    const headers = ['রোল', 'নাম', 'শ্রেণি', 'বিষয়', 'সেট', 'সঠিক', 'ভুল', 'অনুত্তর', 'প্রাপ্ত নম্বর', 'মোট নম্বর', 'শতকরা (%)', 'গ্রেড'];
+    const rows = filtered.map(r => {
+      const { grade } = getGrade(r.percentage || 0);
+      return [
+        `"${r.rollNumber || ''}"`,
+        `"${(r.studentName || '').replace(/"/g, '""')}"`,
+        `"${r.className || r.classId || ''}"`,
+        `"${r.subject || r.examSubtitle || ''}"`,
+        `"${r.setCode || ''}"`,
+        r.correctCount || 0,
+        r.wrongCount || 0,
+        r.unansweredCount || 0,
+        r.obtainedMarks || 0,
+        r.totalMarks || 0,
+        (r.percentage || 0).toFixed(1),
+        `"${grade}"`
+      ].join(',');
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const fileName = [filterClass, filterSubject, filterExam, 'ফলাফল'].filter(Boolean).join('_') || 'omr_results';
+    link.setAttribute('download', `${fileName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrint = () => {
+    const origTitle = document.title;
+    const docTitle = [filterClass, filterSubject, filterExam, 'ফলাফল'].filter(Boolean).join(' - ') || 'ওএমআর ফলাফল শিট';
+    document.title = docTitle;
+    window.print();
+    setTimeout(() => { document.title = origTitle; }, 1500);
+  };
+
   const stats = useMemo(() => {
     if (!filtered.length) return null;
     const avg = filtered.reduce((s, r) => s + (r.percentage || 0), 0) / filtered.length;
@@ -116,6 +171,7 @@ function OmrResultsContent() {
     return { avg: avg.toFixed(1), highest, passed, total: filtered.length };
   }, [filtered]);
 
+  const showClassCol = !filterClass;
   const showExamCol = !filterExam;
   const showSubjectCol = !filterSubject;
   const baseColCount = 3 + (showExamCol ? 1 : 0) + (showSubjectCol ? 1 : 0) + 5; // sl+roll+name + optional + correct+wrong+unansw+marks+pct+grade
@@ -134,7 +190,10 @@ function OmrResultsContent() {
           <Button size="sm" variant="outline" onClick={loadResults} className="gap-1 font-bold text-xs h-8">
             <RefreshCw className="w-3.5 h-3.5" /> রিফ্রেশ
           </Button>
-          <Button size="sm" onClick={() => window.print()}
+          <Button size="sm" variant="outline" onClick={handleExportCsv} className="gap-1.5 font-bold text-xs h-8 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
+            📊 CSV এক্সপোর্ট
+          </Button>
+          <Button size="sm" onClick={handlePrint}
             className="gap-1.5 font-black text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white">
             <Printer className="w-3.5 h-3.5" /> প্রিন্ট করুন
           </Button>
@@ -144,37 +203,50 @@ function OmrResultsContent() {
       <div className="max-w-6xl mx-auto p-3 sm:p-5 space-y-4">
         {/* ── Filter ── */}
         <div className="no-print bg-white rounded-xl border p-3 flex flex-wrap gap-3 items-end shadow-sm">
-          <div className="flex-1 min-w-[180px]">
-            <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">পরীক্ষার নাম:</label>
+          <div className="flex-1 min-w-[140px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">শ্রেণি:</label>
             <select
-              value={filterExam}
-              onChange={(e) => { setFilterExam(e.target.value); setFilterSubject(''); }}
+              value={filterClass}
+              onChange={(e) => { setFilterClass(e.target.value); setFilterSubject(''); setFilterExam(''); }}
               className="w-full h-9 border rounded-md px-2 text-sm font-bold bg-white"
             >
-              <option value="">— সব পরীক্ষা —</option>
-              {examTitles.map(t => <option key={t} value={t}>{t}</option>)}
+              <option value="">— সব শ্রেণি —</option>
+              {classes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="flex-1 min-w-[160px]">
+          <div className="flex-1 min-w-[150px]">
             <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">বিষয়:</label>
             <select
               value={filterSubject}
-              onChange={(e) => setFilterSubject(e.target.value)}
+              onChange={(e) => { setFilterSubject(e.target.value); setFilterExam(''); }}
               className="w-full h-9 border rounded-md px-2 text-sm font-bold bg-white"
             >
               <option value="">— সব বিষয় —</option>
               {subjects.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div className="text-xs font-bold text-slate-500">
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">পরীক্ষার নাম:</label>
+            <select
+              value={filterExam}
+              onChange={(e) => setFilterExam(e.target.value)}
+              className="w-full h-9 border rounded-md px-2 text-sm font-bold bg-white"
+            >
+              <option value="">— সব পরীক্ষা —</option>
+              {examTitles.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="text-xs font-bold text-slate-500 self-center pt-3">
             মোট: <span className="text-indigo-800 font-black">{toBengaliNumber(filtered.length)}</span> জন
           </div>
         </div>
 
         {/* ── Print Header ── */}
         <div className="hidden print:block text-center mb-4">
-          <h2 className="text-xl font-black">{filterExam || 'সকল পরীক্ষা'}</h2>
-          <p className="text-sm font-bold text-slate-600">{filterSubject || 'সকল বিষয়'} — ওএমআর ফলাফল শিট</p>
+          <h2 className="text-2xl font-black">{filterExam || 'ওএমআর মূল্যায়ন ফলাফল'}</h2>
+          <p className="text-sm font-bold text-slate-600">
+            {[filterClass, filterSubject, 'ফলাফল শিট'].filter(Boolean).join(' • ')}
+          </p>
         </div>
 
         {/* ── Summary Stats ── */}
@@ -216,8 +288,10 @@ function OmrResultsContent() {
                     <th className="px-3 py-2.5 text-left font-black">#</th>
                     <th className="px-3 py-2.5 text-left font-black">রোল</th>
                     <th className="px-3 py-2.5 text-left font-black">নাম</th>
-                    {showExamCol && <th className="px-3 py-2.5 text-left font-black">পরীক্ষা</th>}
+                    {showClassCol && <th className="px-3 py-2.5 text-left font-black">শ্রেণি</th>}
                     {showSubjectCol && <th className="px-3 py-2.5 text-left font-black">বিষয়</th>}
+                    <th className="px-3 py-2.5 text-center font-black">সেট</th>
+                    {showExamCol && <th className="px-3 py-2.5 text-left font-black">পরীক্ষা</th>}
                     <th className="px-3 py-2.5 text-center font-black text-emerald-300">সঠিক</th>
                     <th className="px-3 py-2.5 text-center font-black text-rose-300">ভুল</th>
                     <th className="px-3 py-2.5 text-center font-black text-slate-300">অনুত্তর</th>
@@ -238,8 +312,12 @@ function OmrResultsContent() {
                         <td className="px-3 py-2 font-black text-slate-400">{toBengaliNumber(idx + 1)}</td>
                         <td className="px-3 py-2 font-black text-indigo-900">{r.rollNumber || '—'}</td>
                         <td className="px-3 py-2 font-bold">{r.studentName || 'অজ্ঞাত'}</td>
-                        {showExamCol && <td className="px-3 py-2 text-xs text-slate-600 font-bold max-w-[120px] truncate">{r.examTitle}</td>}
-                        {showSubjectCol && <td className="px-3 py-2 text-xs text-slate-600 font-bold">{r.examSubtitle}</td>}
+                        {showClassCol && <td className="px-3 py-2 text-xs text-slate-600 font-bold">{r.className || r.classId || '—'}</td>}
+                        {showSubjectCol && <td className="px-3 py-2 text-xs text-slate-600 font-bold">{r.subject || r.examSubtitle || '—'}</td>}
+                        <td className="px-3 py-2 text-center font-black">
+                          {r.setCode ? <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-xs">{r.setCode}</span> : '—'}
+                        </td>
+                        {showExamCol && <td className="px-3 py-2 text-xs text-slate-600 font-bold max-w-[120px] truncate">{r.examTitle || r.examType}</td>}
                         <td className="px-3 py-2 text-center font-black text-emerald-700">{toBengaliNumber(r.correctCount)}</td>
                         <td className="px-3 py-2 text-center font-black text-rose-600">{toBengaliNumber(r.wrongCount)}</td>
                         <td className="px-3 py-2 text-center font-black text-slate-500">{toBengaliNumber(r.unansweredCount)}</td>
@@ -258,12 +336,12 @@ function OmrResultsContent() {
                                 const win = window.open('', '_blank');
                                 if (!win) return;
                                 const { grade: g } = getGrade(r.percentage || 0);
-                                win.document.write(`<!DOCTYPE html><html><head><title>ফলাফল</title>
-                                  <style>body{font-family:serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #ccc;padding:8px 12px;text-align:center;} th{background:#1e3a5f;color:white;} h2{text-align:center;margin-bottom:4px;} p{text-align:center;color:#555;margin:0 0 16px;}</style>
+                                win.document.write(`<!DOCTYPE html><html><head><title>ফলাফল - ${r.studentName || 'শিক্ষার্থী'}</title>
+                                  <style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #ccc;padding:8px 12px;text-align:center;} th{background:#1e3a5f;color:white;} h2{text-align:center;margin-bottom:4px;} p{text-align:center;color:#555;margin:0 0 16px;}</style>
                                   </head><body>
-                                  <h2>${r.examTitle || 'পরীক্ষা'}</h2><p>${r.examSubtitle || ''}</p>
-                                  <table><tr><th>নাম</th><th>রোল</th><th>সঠিক</th><th>ভুল</th><th>অনুত্তর</th><th>প্রাপ্ত নম্বর</th><th>শতকরা</th><th>গ্রেড</th></tr>
-                                  <tr><td>${r.studentName || 'অজ্ঞাত'}</td><td>${r.rollNumber || '—'}</td><td>${r.correctCount}</td><td>${r.wrongCount}</td><td>${r.unansweredCount}</td><td>${r.obtainedMarks}/${r.totalMarks}</td><td>${(r.percentage || 0).toFixed(1)}%</td><td>${g}</td></tr>
+                                  <h2>${r.examTitle || 'ওএমআর পরীক্ষা'}</h2><p>${r.className ? r.className + ' • ' : ''}${r.subject || r.examSubtitle || ''} ${r.setCode ? '(সেট: ' + r.setCode + ')' : ''}</p>
+                                  <table><tr><th>নাম</th><th>রোল</th><th>সেট</th><th>সঠিক</th><th>ভুল</th><th>অনুত্তর</th><th>প্রাপ্ত নম্বর</th><th>শতকরা</th><th>গ্রেড</th></tr>
+                                  <tr><td>${r.studentName || 'অজ্ঞাত'}</td><td>${r.rollNumber || '—'}</td><td>${r.setCode || '—'}</td><td>${r.correctCount}</td><td>${r.wrongCount}</td><td>${r.unansweredCount}</td><td>${r.obtainedMarks}/${r.totalMarks}</td><td>${(r.percentage || 0).toFixed(1)}%</td><td>${g}</td></tr>
                                   </table></body></html>`);
                                 win.document.close();
                                 win.print();
@@ -289,7 +367,7 @@ function OmrResultsContent() {
                 {filtered.length > 1 && (
                   <tfoot>
                     <tr className="bg-slate-100 border-t-2 font-black text-sm">
-                      <td colSpan={3 + (showExamCol ? 1 : 0) + (showSubjectCol ? 1 : 0)}
+                      <td colSpan={3 + (showClassCol ? 1 : 0) + (showSubjectCol ? 1 : 0) + 1 + (showExamCol ? 1 : 0)}
                         className="px-3 py-2 text-right text-xs text-slate-700">মোট / গড়:
                       </td>
                       <td className="px-3 py-2 text-center text-emerald-700">
