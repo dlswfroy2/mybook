@@ -796,243 +796,269 @@ export default function TeacherDiaryPage() {
                 );
               })()}
 
-              <div className="divide-y-2 divide-black">
-                {planRows.map((row, rowIdx) => {
-                  const dateRoutineInfo = getRoutineForDate(row.date);
-                  const savedMatch = existingPlansForSubject.find(p => p.id === row.existingId || p.date === row.date);
-                  const isDuplicateDate = Boolean(row.date && planRows.filter(r => r.date === row.date).length > 1);
-                  return (
-                    <div key={row.id} className="grid grid-cols-1 md:grid-cols-4">
-                      <div className="md:col-span-1 p-4 border-r-0 md:border-r-2 border-b-2 md:border-b-0 border-black bg-slate-50 space-y-3">
-                        <div className="flex items-center justify-between gap-1 flex-wrap">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <label className="block text-xs font-black text-indigo-700 uppercase tracking-wider">
-                              তারিখ {planRows.length > 1 ? `(${toBengaliNumber(rowIdx + 1)})` : ''}
-                            </label>
-                            {savedMatch && (
-                              <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-900 border border-emerald-400 text-[10px] font-black px-1.5 py-0">
-                                ✓ সংরক্ষিত
-                              </Badge>
-                            )}
-                            {isDuplicateDate && (
-                              <Badge variant="destructive" className="text-[10px] font-black px-1.5 py-0">
-                                ⚠️ ডুপ্লিকেট তারিখ
-                              </Badge>
-                            )}
-                          </div>
-                          {!editingId && planRows.length > 1 && !savedMatch && (
-                            <button
-                              type="button"
-                              onClick={() => setPlanRows(prev => prev.filter(r => r.id !== row.id))}
-                              className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> মুছুন
-                            </button>
-                          )}
-                        </div>
-                        <Input 
-                          type="date" 
-                          value={row.date} 
-                          onChange={e => {
-                            const newDate = e.target.value;
-                            setPlanRows(prev => prev.map(r => {
-                              if (r.id !== row.id) return r;
-                              if (editingId) return { ...r, date: newDate };
-                              const matched = existingPlansForSubject.find(p => p.date === newDate);
-                              const usedElsewhere = prev.some(other => other.id !== row.id && other.date === newDate);
-                              if (matched && !usedElsewhere) {
-                                return {
-                                  ...r,
-                                  existingId: matched.id,
-                                  date: newDate,
-                                  topic: matched.topic || '',
-                                  notes: matched.notes || '',
-                                  lessonTypes: Array.isArray(matched.lessonTypes) ? matched.lessonTypes : [],
-                                  chapterStatus: (matched.chapterStatus || 'running') as ChapterStatus,
-                                  coveredPortion: matched.coveredPortion || '',
-                                };
-                              }
-                              return {
-                                ...r,
-                                existingId: r.existingId && r.date === newDate ? r.existingId : undefined,
-                                date: newDate,
-                              };
-                            }));
-                          }} 
-                          className="font-bold h-11 border-2 border-black bg-white ring-offset-0 focus:ring-0"
-                        />
+              {(!formData.classId || !formData.subject) ? (
+                <div className="p-8 text-center bg-slate-50 space-y-2 border-b-2 border-black">
+                  <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mx-auto">
+                    <BookOpen className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-black text-slate-800">
+                    পাঠ পরিকল্পনার টেবিল দেখতে উপরে প্রথমে শ্রেণি ও বিষয় নির্বাচন করুন
+                  </p>
+                  <p className="text-xs font-bold text-slate-500">
+                    শ্রেণি, বিষয় এবং রুটিনের ধরন সিলেক্ট করলে প্রতিদিনের পাঠ পরিকল্পনার ৫টি কলামের টেবিল এখানে প্রদর্শিত হবে।
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border-b-2 border-black">
+                  <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-100 border-b-2 border-black text-xs font-black text-slate-800">
+                        <th className="p-3 border-r-2 border-black w-[20%] min-w-[180px]">১ম কলাম: তারিখ বা বার</th>
+                        <th className="p-3 border-r-2 border-black w-[22%] min-w-[200px]">২য় কলাম: অধ্যায়ের ড্রপডাউন বাটন</th>
+                        <th className="p-3 border-r-2 border-black w-[18%] min-w-[170px]">৩য় কলাম: আজকের পাঠের ধরন ড্রপ বাটন</th>
+                        <th className="p-3 border-r-2 border-black w-[20%] min-w-[190px]">৪র্থ কলাম: আজকের পাঠের ধরন ড্রপ বাটন</th>
+                        <th className="p-3 w-[20%] min-w-[200px]">৫ম কলাম: বিস্তারিত রেকর্ড / বাড়ির কাজ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-black bg-white">
+                      {planRows.map((row, rowIdx) => {
+                        const dateRoutineInfo = getRoutineForDate(row.date);
+                        const savedMatch = existingPlansForSubject.find(p => p.id === row.existingId || p.date === row.date);
+                        const isDuplicateDate = Boolean(row.date && planRows.filter(r => r.date === row.date).length > 1);
 
-                        {dateRoutineInfo && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge variant="outline" className="font-black text-[11px] bg-white border-slate-300">
-                                বার: {dateRoutineInfo.dayName}
-                              </Badge>
-                              {formData.subject && (
-                                dateRoutineInfo.hasSubject ? (
-                                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-black text-[10px]">
-                                    ✓ ঐ দিন রুটিনে আছে ({dateRoutineInfo.matchedPeriods.map(m => `${toBengaliNumber(m.period)}ম`).join(', ')} পিরিয়ড)
-                                  </Badge>
-                                ) : dateRoutineInfo.isWeekend ? (
-                                  <Badge variant="secondary" className="font-bold text-[10px]">
-                                    সাপ্তাহিক ছুটি
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-[10px]">
-                                    ⚠️ ঐ দিন রুটিনে এই বিষয় নেই
-                                  </Badge>
-                                )
-                              )}
-                            </div>
-
-                            {dateRoutineInfo.dayPeriods.length > 0 && (
-                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1.5">
-                                <p className="text-[10px] font-black text-slate-500 uppercase">
-                                  {dateRoutineInfo.dayName}-এর সম্পূর্ণ রুটিন:
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {dateRoutineInfo.dayPeriods.map((p, idx) => (
-                                    <span
-                                      key={idx}
-                                      className={cn(
-                                        "text-[10px] px-1.5 py-0.5 rounded border font-bold",
-                                        p.isSubjectMatch
-                                          ? "bg-emerald-100 text-emerald-900 border-emerald-400 font-black"
-                                          : "bg-slate-50 text-slate-700 border-slate-200"
-                                      )}
-                                    >
-                                      {toBengaliNumber(p.period)}ম: {p.cell}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="md:col-span-3 p-4 bg-white">
-                        <label className="block text-xs font-black text-indigo-700 uppercase mb-2 tracking-wider">প্রতিদিনের ক্লাস রেকর্ড / পাঠ পরিকল্পনা</label>
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div className="sm:col-span-2">
-                              {chaptersList.length > 0 ? (
-                                <Select
-                                  onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
-                                  value={row.topic}
-                                >
-                                  <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0">
-                                    <SelectValue placeholder="অধ্যায় / টপিক নির্বাচন করুন" />
-                                  </SelectTrigger>
-                                  <SelectContent className="border-2 border-black font-kalpurush">
-                                    {chaptersList.map(ch => {
-                                      const prog = chapterProgressMap[ch];
-                                      const tag = prog?.status === 'completed' ? ' [✅ সম্পন্ন]' : prog ? ' [⏳ চলমান]' : ' [○ বাকি]';
-                                      return (
-                                        <SelectItem key={ch} value={ch} className="font-bold">
-                                          {ch}{tag}
-                                        </SelectItem>
-                                      );
-                                    })}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <Input 
-                                  value={row.topic} 
-                                  onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: e.target.value } : r))} 
-                                  placeholder="টপিক বা শিরোনাম লিখুন..." 
-                                  className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0"
-                                />
-                              )}
-                            </div>
-                            <div>
-                              <Select
-                                value={row.chapterStatus}
-                                onValueChange={(v: ChapterStatus) => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, chapterStatus: v } : r))}
-                              >
-                                <SelectTrigger className="font-bold h-10 border-2 border-black bg-white ring-offset-0 focus:ring-0">
-                                  <SelectValue placeholder="অবস্থা" />
-                                </SelectTrigger>
-                                <SelectContent className="border-2 border-black font-kalpurush">
-                                  <SelectItem value="planned" className="font-bold">📝 পরিকল্পিত</SelectItem>
-                                  <SelectItem value="running" className="font-bold text-amber-800">⏳ চলমান</SelectItem>
-                                  <SelectItem value="completed" className="font-bold text-emerald-800">✅ অধ্যায় সম্পন্ন</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <Input
-                            value={row.coveredPortion}
-                            onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, coveredPortion: e.target.value } : r))}
-                            placeholder="পড়ানো অংশ / টপিক সীমা (যেমন: পৃষ্ঠা ৪২-৪৫, অনুশীলনী ১-৩, Tense-এর নিয়ম)..."
-                            className="font-bold h-9 text-sm border-2 border-slate-300 focus:border-black bg-slate-50/50 ring-offset-0 focus:ring-0"
-                          />
-
-                          {lessonTypeOptions.length > 0 && (() => {
-                            const prevCoveredForTopic = row.topic ? (chapterProgressMap[row.topic]?.coveredTypes || []) : [];
-                            const remainingTypes = lessonTypeOptions.filter(t => !prevCoveredForTopic.includes(t) && !row.lessonTypes.includes(t));
-                            return (
-                              <div className="p-2.5 rounded-xl bg-indigo-50/40 border border-indigo-200 space-y-2">
-                                <div className="flex flex-wrap items-center justify-between gap-1">
-                                  <span className="text-[11px] font-black text-indigo-900">
-                                    আজকের পাঠের ধরন (ক্লিক করে সিলেক্ট করুন):
-                                  </span>
-                                  {row.topic && prevCoveredForTopic.length > 0 && (
-                                    <span className="text-[10px] font-bold text-slate-600">
-                                      এই অধ্যায়ে ইতোমধ্যে হয়েছে: <span className="text-emerald-700 font-black">{prevCoveredForTopic.join(', ')}</span>
-                                      {remainingTypes.length > 0 && (
-                                        <> • বাকি: <span className="text-amber-700 font-black">{remainingTypes.slice(0, 3).join(', ')}</span></>
-                                      )}
-                                    </span>
+                        return (
+                          <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                            {/* ১ম কলাম: তারিখ বা বার */}
+                            <td className="p-3 align-top border-r-2 border-black bg-slate-50/50 space-y-2">
+                              <div className="flex items-center justify-between gap-1 flex-wrap">
+                                <span className="text-[11px] font-black text-indigo-700 uppercase">
+                                  {toBengaliNumber(rowIdx + 1)}. তারিখ
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {savedMatch && (
+                                    <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-900 border border-emerald-400 text-[10px] font-black px-1.5 py-0">
+                                      ✓ সংরক্ষিত
+                                    </Badge>
+                                  )}
+                                  {isDuplicateDate && (
+                                    <Badge variant="destructive" className="text-[10px] font-black px-1.5 py-0">
+                                      ⚠️ ডুপ্লিকেট
+                                    </Badge>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {lessonTypeOptions.map(typeOpt => {
-                                    const isSelected = row.lessonTypes.includes(typeOpt);
-                                    return (
-                                      <button
-                                        key={typeOpt}
-                                        type="button"
-                                        onClick={() => {
-                                          setPlanRows(prev => prev.map(r => {
-                                            if (r.id !== row.id) return r;
-                                            const next = isSelected
-                                              ? r.lessonTypes.filter(t => t !== typeOpt)
-                                              : [...r.lessonTypes, typeOpt];
-                                            return { ...r, lessonTypes: next };
-                                          }));
-                                        }}
-                                        className={cn(
-                                          "px-2.5 py-1 rounded-lg text-[11px] font-black border transition-all cursor-pointer",
-                                          isSelected
-                                            ? "bg-indigo-600 text-white border-indigo-700 shadow-xs"
-                                            : "bg-white text-slate-700 border-slate-300 hover:border-indigo-400 hover:bg-indigo-50"
-                                        )}
-                                      >
-                                        {isSelected ? '✓ ' : '+ '}{typeOpt}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
                               </div>
-                            );
-                          })()}
+                              <Input 
+                                type="date" 
+                                value={row.date} 
+                                onChange={e => {
+                                  const newDate = e.target.value;
+                                  setPlanRows(prev => prev.map(r => {
+                                    if (r.id !== row.id) return r;
+                                    if (editingId) return { ...r, date: newDate };
+                                    const matched = existingPlansForSubject.find(p => p.date === newDate);
+                                    const usedElsewhere = prev.some(other => other.id !== row.id && other.date === newDate);
+                                    if (matched && !usedElsewhere) {
+                                      return {
+                                        ...r,
+                                        existingId: matched.id,
+                                        date: newDate,
+                                        topic: matched.topic || '',
+                                        notes: matched.notes || '',
+                                        lessonTypes: Array.isArray(matched.lessonTypes) ? matched.lessonTypes : [],
+                                        chapterStatus: (matched.chapterStatus || 'running') as ChapterStatus,
+                                        coveredPortion: matched.coveredPortion || '',
+                                      };
+                                    }
+                                    return {
+                                      ...r,
+                                      existingId: r.existingId && r.date === newDate ? r.existingId : undefined,
+                                      date: newDate,
+                                    };
+                                  }));
+                                }} 
+                                className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs"
+                              />
 
-                          <Textarea 
-                            value={row.notes} 
-                            onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, notes: e.target.value } : r))} 
-                            placeholder="বিস্তারিত ক্লাস রেকর্ড বা আগামী দিনের পরিকল্পনা এখানে লিখুন..." 
-                            className="min-h-[110px] font-bold text-base leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                              {dateRoutineInfo && (
+                                <div className="space-y-1 pt-0.5">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <Badge variant="outline" className="font-black text-[10px] bg-white border-slate-300">
+                                      বার: {dateRoutineInfo.dayName}
+                                    </Badge>
+                                    {formData.subject && (
+                                      dateRoutineInfo.hasSubject ? (
+                                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-black text-[9px] px-1.5 py-0.5">
+                                          ✓ রুটিনে আছে ({dateRoutineInfo.matchedPeriods.map(m => `${toBengaliNumber(m.period)}ম`).join(', ')})
+                                        </Badge>
+                                      ) : dateRoutineInfo.isWeekend ? (
+                                        <Badge variant="secondary" className="font-bold text-[9px] px-1 py-0">
+                                          সাপ্তাহিক ছুটি
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-[9px] px-1 py-0">
+                                          ⚠️ রুটিনে নেই
+                                        </Badge>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
 
-              {!editingId && (
+                            {/* ২য় কলাম: অধ্যায়ের ড্রপডাউন বাটন ও অবস্থা */}
+                            <td className="p-3 align-top border-r-2 border-black space-y-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">অধ্যায় নির্বাচন:</label>
+                                {chaptersList.length > 0 ? (
+                                  <Select
+                                    value={row.topic}
+                                    onValueChange={v => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: v } : r))}
+                                  >
+                                    <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
+                                      <SelectValue placeholder="অধ্যায় সিলেক্ট করুন" />
+                                    </SelectTrigger>
+                                    <SelectContent className="border-2 border-black font-kalpurush max-h-56">
+                                      {chaptersList.map(ch => {
+                                        const prog = chapterProgressMap[ch];
+                                        const tag = prog?.status === 'completed' ? ' [✅ সম্পন্ন]' : prog ? ' [⏳ চলমান]' : ' [○ বাকি]';
+                                        return (
+                                          <SelectItem key={ch} value={ch} className="font-bold text-xs">
+                                            {ch}{tag}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input 
+                                    value={row.topic} 
+                                    onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, topic: e.target.value } : r))} 
+                                    placeholder="টপিক বা শিরোনাম..." 
+                                    className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs"
+                                  />
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">অধ্যায়ের অবস্থা:</label>
+                                <Select
+                                  value={row.chapterStatus}
+                                  onValueChange={(v: ChapterStatus) => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, chapterStatus: v } : r))}
+                                >
+                                  <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
+                                    <SelectValue placeholder="অবস্থা" />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-2 border-black font-kalpurush">
+                                    <SelectItem value="planned" className="font-bold text-xs">📝 পরিকল্পিত</SelectItem>
+                                    <SelectItem value="running" className="font-bold text-amber-800 text-xs">⏳ চলমান</SelectItem>
+                                    <SelectItem value="completed" className="font-bold text-emerald-800 text-xs">✅ অধ্যায় সম্পন্ন</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </td>
+
+                            {/* ৩য় কলাম: আজকের পাঠের ধরন ড্রপ বাটন (১ম) */}
+                            <td className="p-3 align-top border-r-2 border-black space-y-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">পাঠের ধরন (১ম):</label>
+                                <Select
+                                  value={row.lessonTypes?.[0] || 'none'}
+                                  onValueChange={v => {
+                                    const t1 = v === 'none' ? '' : v;
+                                    const t2 = row.lessonTypes?.[1] || '';
+                                    const next = [t1, t2].filter(Boolean);
+                                    setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, lessonTypes: next } : r));
+                                  }}
+                                >
+                                  <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
+                                    <SelectValue placeholder="ধরন নির্বাচন..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-2 border-black font-kalpurush max-h-56">
+                                    <SelectItem value="none" className="text-slate-400 font-bold text-xs">-- ধরন সিলেক্ট করুন --</SelectItem>
+                                    {lessonTypeOptions.map(opt => (
+                                      <SelectItem key={opt} value={opt} className="font-bold text-xs">
+                                        {opt}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {row.lessonTypes?.[0] && (
+                                <div className="pt-0.5">
+                                  <Badge className="bg-indigo-600 text-white font-black text-[10px] px-2 py-0.5">
+                                    ✓ {row.lessonTypes[0]}
+                                  </Badge>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* ৪র্থ কলাম: আজকের পাঠের ধরন ড্রপ বাটন (২য়) ও পড়ানো অংশ */}
+                            <td className="p-3 align-top border-r-2 border-black space-y-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">পাঠের ধরন (২য় / অতিরিক্ত):</label>
+                                <Select
+                                  value={row.lessonTypes?.[1] || 'none'}
+                                  onValueChange={v => {
+                                    const t1 = row.lessonTypes?.[0] || '';
+                                    const t2 = v === 'none' ? '' : v;
+                                    const next = [t1, t2].filter(Boolean);
+                                    setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, lessonTypes: next } : r));
+                                  }}
+                                >
+                                  <SelectTrigger className="font-bold h-9 border-2 border-black bg-white ring-offset-0 focus:ring-0 text-xs">
+                                    <SelectValue placeholder="২য় ধরন (ঐচ্ছিক)..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="border-2 border-black font-kalpurush max-h-56">
+                                    <SelectItem value="none" className="text-slate-400 font-bold text-xs">-- প্রয়োজন নেই / খালি --</SelectItem>
+                                    {lessonTypeOptions.map(opt => (
+                                      <SelectItem key={opt} value={opt} className="font-bold text-xs">
+                                        {opt}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">পড়ানো অংশ / পৃষ্ঠা সীমা:</label>
+                                <Input
+                                  value={row.coveredPortion}
+                                  onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, coveredPortion: e.target.value } : r))}
+                                  placeholder="যেমন: পৃ: ৪২-৪৫, অনু: ১.২..."
+                                  className="font-bold h-9 text-xs border-2 border-slate-300 focus:border-black bg-slate-50/50 ring-offset-0 focus:ring-0"
+                                />
+                              </div>
+                            </td>
+
+                            {/* ৫ম কলাম: বিস্তারিত রেকর্ড / বাড়ির কাজ ও অ্যাকশন বাটন */}
+                            <td className="p-3 align-top space-y-2">
+                              <div className="flex items-center justify-between gap-1">
+                                <label className="text-[10px] font-black text-slate-500 uppercase block">ক্লাস রেকর্ড / বাড়ির কাজ:</label>
+                                {!editingId && planRows.length > 1 && !savedMatch && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPlanRows(prev => prev.filter(r => r.id !== row.id))}
+                                    className="text-[10px] font-black text-rose-600 hover:text-rose-700 flex items-center gap-0.5 cursor-pointer hover:bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200"
+                                    title="এই রো মুছুন"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> মুছুন
+                                  </button>
+                                )}
+                              </div>
+                              <Textarea 
+                                value={row.notes} 
+                                onChange={e => setPlanRows(prev => prev.map(r => r.id === row.id ? { ...r, notes: e.target.value } : r))} 
+                                placeholder="ক্লাসের বিস্তারিত বিষয়বস্তু বা বাড়ির কাজ লিখুন..." 
+                                className="min-h-[85px] font-bold text-xs leading-relaxed border-2 border-black ring-offset-0 focus:ring-0"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {!editingId && formData.classId && formData.subject && (
                 <div className="p-3 bg-indigo-50/50 border-t-2 border-black flex justify-center">
                   <Button
                     type="button"

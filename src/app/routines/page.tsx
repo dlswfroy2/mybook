@@ -37,7 +37,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { getProxyClasses, saveProxyClass, deleteProxyClass, ProxyClass, NewProxyData } from '@/lib/proxy-data';
 import { getStaff, Staff } from '@/lib/staff-data';
 import { getStaffAttendanceByDate } from '@/lib/staff-attendance-data';
-import { collection, query, where, onSnapshot, writeBatch, doc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, writeBatch, doc, getDocs, deleteDoc } from 'firebase/firestore';
 import { TeacherAllocationRecord, SubjectAllocation, saveTeacherAllocation, getTeacherAllocations } from '@/lib/teacher-allocation-data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -2679,7 +2679,18 @@ export default function RoutinesPage() {
     const [originalRoutineData, setOriginalRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [routineData, setRoutineData] = useState<Record<string, Record<string, string[]>>>({});
     const [columns, setColumns] = useState<RoutineColumnConfig[]>(DEFAULT_ROUTINE_COLUMNS);
-    const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
+    const [selectedClassFilter, setSelectedClassFilter] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem('routine_settings_active');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.lastSelectedClass) return parsed.lastSelectedClass;
+                }
+            } catch {}
+        }
+        return 'all';
+    });
     const [routineFormat, setRoutineFormat] = useState<'day' | 'date'>(() => {
         if (typeof window !== 'undefined') {
             try {
@@ -2816,6 +2827,11 @@ export default function RoutinesPage() {
             });
             if (db) {
                 saveRoutineDays(db, selectedYear, nextDays);
+                const allClasses = ['6', '7', '8', '9', '10'];
+                allClasses.forEach(cls => {
+                    const docId = `${selectedYear}_${cls}_${dayToDelete}`;
+                    deleteDoc(doc(db, ROUTINE_COLLECTION, docId)).catch(() => {});
+                });
             }
         }
         setIsEditMode(true);
@@ -2860,6 +2876,11 @@ export default function RoutinesPage() {
             });
             if (db) {
                 saveRoutineDays(db, selectedYear, nextDays);
+                const allClasses = ['6', '7', '8', '9', '10'];
+                allClasses.forEach(cls => {
+                    const docId = `${selectedYear}_${cls}_${dayToDelete}`;
+                    deleteDoc(doc(db, ROUTINE_COLLECTION, docId)).catch(() => {});
+                });
             }
         }
         setIsEditMode(true);
@@ -2913,6 +2934,9 @@ export default function RoutinesPage() {
         }
         if (settingsFromDb?.preferredScope) {
             setRoutineScope(settingsFromDb.preferredScope);
+        }
+        if (settingsFromDb?.lastSelectedClass) {
+            setSelectedClassFilter(settingsFromDb.lastSelectedClass);
         }
 
         const flatAllocations: { className: string; subjectName: string; teacherName: string; scope?: 'main' | 'standalone' }[] = [];

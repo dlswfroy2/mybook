@@ -426,7 +426,7 @@ export const saveStandaloneRoutine = async (db: Firestore, data: StandaloneClass
         ...data,
         type: 'standalone_routine',
         updatedAt: serverTimestamp()
-    }, { merge: true });
+    });
 };
 
 export interface SubjectClassLimit {
