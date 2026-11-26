@@ -156,57 +156,106 @@ function OmrResultsContent() {
         return;
       }
 
-      // 2. Fetch existing class result if any
-      const existingRes = await getResultsForClass(db, syncYear, syncExamName, syncClassId, syncSubject).catch(() => undefined);
+      const groupNormalizeMap: Record<string, string> = {
+        'science': 'science', 'বিজ্ঞান': 'science',
+        'arts': 'arts', 'মানবিক': 'arts', 'humanities': 'arts',
+        'commerce': 'commerce', 'ব্যবসায় শিক্ষা': 'commerce', 'business': 'commerce',
+      };
 
-      const existingResultsMap = new Map<string, StudentResult>();
-      if (existingRes?.results) {
-        existingRes.results.forEach(r => existingResultsMap.set(r.studentId, { ...r }));
-      }
-
-      // 3. Match each student by roll & name with filtered/matching OMR evaluations
+      const isHigherClass = parseInt(syncClassId, 10) >= 9;
       let matchedCount = 0;
-      const finalResults: StudentResult[] = [];
 
-      classStudents.forEach(st => {
-        const sRoll = Number(st.roll);
-        const sNameBn = (st.studentNameBn || '').trim().toLowerCase();
-        const sNameEn = (st.studentNameEn || '').trim().toLowerCase();
-
-        // Match against current filtered OMR results
-        const matchedOmr = filtered.find(omr => {
-          const omrRollStr = String(omr.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
-          const omrRoll = parseInt(omrRollStr, 10);
-          if (!isNaN(omrRoll) && omrRoll === sRoll) return true;
-          const omrName = (omr.studentName || '').trim().toLowerCase();
-          if (omrName && (omrName === sNameBn || omrName === sNameEn)) return true;
-          return false;
+      if (isHigherClass) {
+        const studentsByGroup: Record<string, any[]> = {};
+        classStudents.forEach(st => {
+          const rawG = (st.group || 'none').toLowerCase().trim();
+          const normG = groupNormalizeMap[rawG] || 'none';
+          if (!studentsByGroup[normG]) studentsByGroup[normG] = [];
+          studentsByGroup[normG].push(st);
         });
 
-        const current = existingResultsMap.get(st.id) || { studentId: st.id };
-        if (matchedOmr) {
-          current.mcq = Number(matchedOmr.obtainedMarks) || 0;
-          matchedCount++;
+        for (const [grpKey, grpStudents] of Object.entries(studentsByGroup)) {
+          const effectiveGroup = grpKey === 'none' ? undefined : grpKey;
+          const existingRes = await getResultsForClass(db, syncYear, syncExamName, syncClassId, syncSubject, effectiveGroup).catch(() => undefined);
+          const existingMap = new Map<string, StudentResult>();
+          if (existingRes?.results) {
+            existingRes.results.forEach(r => existingMap.set(r.studentId, { ...r }));
+          }
+
+          const finalResults: StudentResult[] = [];
+          grpStudents.forEach(st => {
+            const sRoll = parseInt(String(st.roll || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+            const matchedOmr = filtered.find(omr => {
+              if ((omr as any).studentId && (omr as any).studentId === st.id) return true;
+              const omrRoll = parseInt(String(omr.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+              return !isNaN(omrRoll) && !isNaN(sRoll) && omrRoll === sRoll;
+            });
+
+            const current = existingMap.get(st.id) || { studentId: st.id };
+            if (matchedOmr) {
+              current.mcq = Number(matchedOmr.obtainedMarks) || 0;
+              matchedCount++;
+            }
+            finalResults.push(current);
+          });
+
+          const fullMarks = existingRes?.fullMarks || 100;
+          const mcqLimit = existingRes?.mcqLimit || (filtered[0]?.totalMarks || 30);
+          const writtenLimit = existingRes?.writtenLimit || (fullMarks - mcqLimit);
+
+          await saveClassResults(db, {
+            academicYear: syncYear,
+            examName: syncExamName,
+            className: syncClassId,
+            group: effectiveGroup,
+            subject: syncSubject,
+            fullMarks,
+            writtenLimit,
+            mcqLimit,
+            results: finalResults,
+          });
         }
-        finalResults.push(current);
-      });
+      } else {
+        const existingRes = await getResultsForClass(db, syncYear, syncExamName, syncClassId, syncSubject).catch(() => undefined);
+        const existingMap = new Map<string, StudentResult>();
+        if (existingRes?.results) {
+          existingRes.results.forEach(r => existingMap.set(r.studentId, { ...r }));
+        }
 
-      const fullMarks = existingRes?.fullMarks || 100;
-      const mcqLimit = existingRes?.mcqLimit || (filtered[0]?.totalMarks || 30);
-      const writtenLimit = existingRes?.writtenLimit || (fullMarks - mcqLimit);
+        const finalResults: StudentResult[] = [];
+        classStudents.forEach(st => {
+          const sRoll = parseInt(String(st.roll || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+          const matchedOmr = filtered.find(omr => {
+            if ((omr as any).studentId && (omr as any).studentId === st.id) return true;
+            const omrRoll = parseInt(String(omr.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+            return !isNaN(omrRoll) && !isNaN(sRoll) && omrRoll === sRoll;
+          });
 
-      await saveClassResults(db, {
-        academicYear: syncYear,
-        examName: syncExamName,
-        className: syncClassId,
-        subject: syncSubject,
-        fullMarks,
-        writtenLimit,
-        mcqLimit,
-        results: finalResults,
-      });
+          const current = existingMap.get(st.id) || { studentId: st.id };
+          if (matchedOmr) {
+            current.mcq = Number(matchedOmr.obtainedMarks) || 0;
+            matchedCount++;
+          }
+          finalResults.push(current);
+        });
 
-      setSyncSuccessMessage(`${toBengaliNumber(matchedCount)} জন শিক্ষার্থীর বহুনির্বাচনী (MCQ) নম্বর ফলাফল সেকশনে (${syncExamName}) সফলভাবে এন্ট্রি করা হয়েছে!`);
+        const fullMarks = existingRes?.fullMarks || 100;
+        const mcqLimit = existingRes?.mcqLimit || (filtered[0]?.totalMarks || 30);
+        const writtenLimit = existingRes?.writtenLimit || (fullMarks - mcqLimit);
+
+        await saveClassResults(db, {
+          academicYear: syncYear,
+          examName: syncExamName,
+          className: syncClassId,
+          subject: syncSubject,
+          fullMarks,
+          writtenLimit,
+          mcqLimit,
+          results: finalResults,
+        });
+      }
+
+      setSyncSuccessMessage(`${toBengaliNumber(matchedCount)} জন শিক্ষার্থীর বহুনির্বাচনী (MCQ) নম্বর রোল নম্বর অনুযায়ী ফলাফল সেকশনে (${syncExamName}) সফলভাবে এন্ট্রি করা হয়েছে!`);
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'ফলাফল পাঠাতে সমস্যা হয়েছে।');

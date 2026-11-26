@@ -87,12 +87,14 @@ ${subject ? `- Expected Subject: ${subject}` : ''}
 ${examType ? `- Expected Exam Type: ${examType}` : ''}
 
 Instructions:
-1. Student Information:
-   - "নাম" (Student Name): Extract if written anywhere (top header, student details box, or handwritten).
-   - "রোল নম্বর" (Roll Number): Look at Roll No boxes and bubbles. First check any handwritten digits in the boxes; if present, use them. Also check the vertical columns of circles (0-9 or ০-৯) where a bubble is filled. Return the clean numerical roll number string (e.g. "101", "1024", or "৫২").
-   - "শ্রেণি" (Class): Extract if visible (e.g. "নবম", "দশম", "Class 9", "10").
-   - "বিষয় / বিষয় কোড" (Subject / Code): Extract subject name or 3-digit subject code if filled or written.
+1. Roll Number and Set Identification:
+   - "রোল নম্বর" (Roll Number) is the MOST CRITICAL field:
+     - Look at the Roll No boxes and bubble columns (0-9 or ০-৯).
+     - Read both the written digits and the filled bubble circles. If bubbles are darkened, read the column values.
+     - Extract the clean numerical roll number string (e.g. "1", "12", "105", or "৫").
+     - Do NOT scan or guess student name (leave studentName as empty string; the system fetches the registered name from the school database).
    - "প্রশ্ন সেটের কোড" (Set Code): Check which set circle is filled: 'ক' (A), 'খ' (B), 'গ' (C), or 'ঘ' (D). If unmarked, return 'ক'.
+   - "বিষয় / বিষয় কোড" (Subject Code): If 3-digit subject code is visible, extract it (e.g. "109").
 
 2. MCQ Answer Bubbles for Questions 1 to ${questionCount}:
    - Locate the question rows/columns numbered 1 to ${questionCount}.
@@ -105,11 +107,11 @@ Instructions:
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "studentName": "শিক্ষার্থীর নাম",
+  "studentName": "",
   "rollNumber": "101",
-  "className": "দশম",
+  "className": "${classId || '10'}",
   "subjectCode": "109",
-  "subjectName": "গণিত",
+  "subjectName": "${subject || ''}",
   "setCode": "ক",
   "answers": {
     "1": "ক",

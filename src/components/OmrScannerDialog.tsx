@@ -41,7 +41,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { scanAndEvaluateOmr, ScanOmrOutput } from '@/ai/flows/scan-omr-flow';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { CLASSES, getSubjectsForClass } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -171,8 +171,51 @@ export function OmrScannerDialog({
   // Continuous Session Batch List (50+ students in one session without closing modal)
   const [sessionBatch, setSessionBatch] = useState<SessionBatchStudent[]>([]);
 
+  // Official class student list for instant roll-to-name lookup
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+
+  // Live Auto-Capture Camera (QR-style) states
+  const [liveCameraActive, setLiveCameraActive] = useState(false);
+  const [stabilityProgress, setStabilityProgress] = useState(0);
+  const [autoCaptureStatus, setAutoCaptureStatus] = useState<string>('ওএমআর শিট ফ্রেমের ভেতর স্থির রাখুন...');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
+  const steadyCountRef = useRef<number>(0);
+  const isCapturingRef = useRef<boolean>(false);
+
   const bubbleOptions = ['ক', 'খ', 'গ', 'ঘ'];
   const availableSubjects = useMemo(() => getSubjectsForClass(activeClassId), [activeClassId]);
+
+  // Pre-load students of activeClassId from Firestore for instant roll -> name resolution
+  useEffect(() => {
+    if (!db || !open || !activeClassId) return;
+    const q = query(collection(db, 'students'), where('className', '==', activeClassId));
+    getDocs(q).then(snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setClassStudents(list);
+    }).catch(console.error);
+  }, [db, open, activeClassId]);
+
+  // Helper to stop live camera stream cleanly
+  const stopLiveCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setLiveCameraActive(false);
+    setStabilityProgress(0);
+    steadyCountRef.current = 0;
+    prevFrameRef.current = null;
+    isCapturingRef.current = false;
+  };
+
+  // Stop camera when dialog closes
+  useEffect(() => {
+    if (!open) {
+      stopLiveCamera();
+    }
+  }, [open]);
 
   // Sync props when opened
   useEffect(() => {
@@ -274,16 +317,31 @@ export function OmrScannerDialog({
         examType: activeExamType,
       });
 
-      setResult(scanRes);
-      setEditableStudentName(scanRes.studentName || '');
-      setEditableRollNumber(scanRes.rollNumber || '');
+      // ── ROLL-TO-NAME AUTO LOOKUP FROM OFFICIAL STUDENT LIST ──
+      const rollClean = (scanRes.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
+      const rollNum = parseInt(rollClean, 10);
+
+      let matchedStudent: any = null;
+      if (!isNaN(rollNum)) {
+        matchedStudent = classStudents.find(s => {
+          const sRoll = parseInt(String(s.roll || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+          return !isNaN(sRoll) && sRoll === rollNum;
+        });
+      }
+
+      const studentNameClean = matchedStudent
+        ? (matchedStudent.studentNameBn || matchedStudent.studentNameEn || `রোল ${rollClean}`)
+        : (rollClean ? `রোল: ${toBengaliNumber(rollClean)} (তালিকায় নেই)` : 'অজ্ঞাত রোল');
+      const studentIdClean = matchedStudent?.id || '';
+
+      setResult({ ...scanRes, studentName: studentNameClean, rollNumber: rollClean });
+      setEditableStudentName(studentNameClean);
+      setEditableRollNumber(rollClean);
       setStep('result');
 
       // ── AUTO-SAVE TO FIRESTORE DIRECTLY ──
       if (db) {
         const className = CLASSES.find(c => c.id === activeClassId)?.label || activeClassId;
-        const studentNameClean = scanRes.studentName || 'অজ্ঞাত শিক্ষার্থী';
-        const rollClean = scanRes.rollNumber || 'N/A';
 
         const docRef = await addDoc(collection(db, 'omr_evaluations'), {
           userId: user?.uid || 'anonymous',
@@ -293,8 +351,9 @@ export function OmrScannerDialog({
           examType: activeExamType,
           examTitle: examTitle || `${className} শ্রেণি - ${activeExamType}`,
           examSubtitle: activeSubject,
+          studentId: studentIdClean,
           studentName: studentNameClean,
-          rollNumber: rollClean,
+          rollNumber: rollClean || 'N/A',
           subjectCode: scanRes.subjectCode || '',
           setCode: scanRes.setCode || 'ক',
           totalQuestions: scanRes.totalQuestions,
@@ -315,7 +374,7 @@ export function OmrScannerDialog({
         setSessionBatch(prev => [
           {
             docId: docRef.id,
-            rollNumber: rollClean,
+            rollNumber: rollClean || 'N/A',
             studentName: studentNameClean,
             className: className,
             subjectName: activeSubject,
@@ -330,7 +389,7 @@ export function OmrScannerDialog({
 
         toast({
           title: '✅ মূল্যায়ন ও সংরক্ষণ সম্পন্ন!',
-          description: `রোল: ${toBengaliNumber(rollClean)} | প্রাপ্ত নম্বর: ${toBengaliNumber(scanRes.obtainedMarks)} / ${toBengaliNumber(scanRes.totalMarks)}`,
+          description: `${studentNameClean} (রোল: ${toBengaliNumber(rollClean)}) | নম্বর: ${toBengaliNumber(scanRes.obtainedMarks)} / ${toBengaliNumber(scanRes.totalMarks)}`,
         });
       }
     } catch (err: any) {
@@ -343,6 +402,155 @@ export function OmrScannerDialog({
       });
     }
   };
+
+  // Play a short subtle beep when auto-capture locks
+  const playCaptureBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {}
+  };
+
+  // Capture current frame from live video element
+  const captureLiveFrame = () => {
+    if (!videoRef.current || isCapturingRef.current) return;
+    isCapturingRef.current = true;
+    const video = videoRef.current;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      isCapturingRef.current = false;
+      return;
+    }
+
+    const maxDim = 1600;
+    let w = vw;
+    let h = vh;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, w, h);
+      const compressedUri = canvas.toDataURL('image/jpeg', 0.85);
+      playCaptureBeep();
+      stopLiveCamera();
+      setImagePreview(compressedUri);
+      executeScan(compressedUri);
+    } else {
+      isCapturingRef.current = false;
+    }
+  };
+
+  // Start Live QR-Style Auto-Capture Camera
+  const startLiveCamera = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        title: 'সাধারণ ক্যামেরা চালু হচ্ছে',
+        description: 'সরাসরি লাইভ অটো-স্ক্যানারের জন্য HTTPS সংযোগ প্রয়োজন। তাই ক্যামেরা অ্যাপ দিয়ে ছবি তুলুন।',
+      });
+      cameraInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setLiveCameraActive(true);
+      setStabilityProgress(0);
+      setAutoCaptureStatus('ওএমআর শিট ফ্রেমের ভেতর স্থির রাখুন...');
+      steadyCountRef.current = 0;
+      prevFrameRef.current = null;
+      isCapturingRef.current = false;
+
+      setTimeout(() => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(console.error);
+        }
+      }, 100);
+    } catch (err: any) {
+      console.warn('Live camera unavailable, falling back to native input:', err);
+      toast({
+        title: 'ক্যামেরা পারমিশন বা সাপোর্ট পাওয়া যায়নি',
+        description: 'সাধারণ ক্যামেরা থেকে ছবি তোলার অপশন খোলা হচ্ছে।',
+      });
+      cameraInputRef.current?.click();
+    }
+  };
+
+  // Stability detection loop (like QR scanner auto-lock) when liveCameraActive
+  useEffect(() => {
+    if (!liveCameraActive) return;
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = 64;
+    sampleCanvas.height = 64;
+    const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+    const interval = setInterval(() => {
+      if (!videoRef.current || !sampleCtx || isCapturingRef.current) return;
+      const video = videoRef.current;
+      if (video.readyState < 2) return;
+
+      sampleCtx.drawImage(video, 0, 0, 64, 64);
+      const data = sampleCtx.getImageData(0, 0, 64, 64).data;
+
+      if (prevFrameRef.current) {
+        let diffSum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const lum1 = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          const lum2 = (prevFrameRef.current[i] + prevFrameRef.current[i + 1] + prevFrameRef.current[i + 2]) / 3;
+          diffSum += Math.abs(lum1 - lum2);
+        }
+        const avgDiff = diffSum / (64 * 64);
+
+        if (avgDiff < 7.5) {
+          steadyCountRef.current += 1;
+          const prog = Math.min(100, Math.round((steadyCountRef.current / 4) * 100));
+          setStabilityProgress(prog);
+          setAutoCaptureStatus(prog >= 75 ? 'ফোকাস লক হয়েছে! অটো ছবি তোলা হচ্ছে...' : 'স্থির রাখুন, ফোকাস হচ্ছে...');
+          if (steadyCountRef.current >= 4) {
+            captureLiveFrame();
+          }
+        } else {
+          steadyCountRef.current = 0;
+          setStabilityProgress(0);
+          setAutoCaptureStatus('ওএমআর শিট ফ্রেমের ভেতর স্থির রাখুন...');
+        }
+      }
+      prevFrameRef.current = new Uint8ClampedArray(data);
+    }, 280);
+
+    return () => clearInterval(interval);
+  }, [liveCameraActive]);
 
   // Handle image capture / selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -365,21 +573,41 @@ export function OmrScannerDialog({
     reader.readAsDataURL(file);
   };
 
-  // Inline update name or roll if user edits after auto-save
+  // Inline update roll & auto-sync student name from database
   const handleUpdateStudentDetails = async () => {
     if (!lastSavedDocId || !db) return;
     try {
+      const rollClean = editableRollNumber.replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
+      const rollNum = parseInt(rollClean, 10);
+
+      let matchedStudent: any = null;
+      if (!isNaN(rollNum)) {
+        matchedStudent = classStudents.find(s => {
+          const sRoll = parseInt(String(s.roll || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
+          return !isNaN(sRoll) && sRoll === rollNum;
+        });
+      }
+
+      const resolvedName = matchedStudent
+        ? (matchedStudent.studentNameBn || matchedStudent.studentNameEn)
+        : (editableStudentName.trim() || `রোল: ${toBengaliNumber(rollClean)}`);
+      const resolvedId = matchedStudent?.id || '';
+
+      setEditableStudentName(resolvedName);
+      setEditableRollNumber(rollClean);
+
       await updateDoc(doc(db, 'omr_evaluations', lastSavedDocId), {
-        studentName: editableStudentName.trim() || 'অজ্ঞাত শিক্ষার্থী',
-        rollNumber: editableRollNumber.trim() || 'N/A',
+        studentId: resolvedId,
+        studentName: resolvedName,
+        rollNumber: rollClean || 'N/A',
       });
       // Update session list as well
       setSessionBatch(prev => prev.map(s => s.docId === lastSavedDocId ? {
         ...s,
-        studentName: editableStudentName.trim() || s.studentName,
-        rollNumber: editableRollNumber.trim() || s.rollNumber,
+        studentName: resolvedName,
+        rollNumber: rollClean || s.rollNumber,
       } : s));
-      toast({ title: 'আপডেট হয়েছে! ✓', description: 'শিক্ষার্থীর তথ্য সফলভাবে আপডেট হয়েছে।' });
+      toast({ title: 'আপডেট হয়েছে! ✓', description: `${resolvedName} (রোল: ${toBengaliNumber(rollClean)})` });
     } catch (e) {
       console.error(e);
     }
@@ -392,9 +620,11 @@ export function OmrScannerDialog({
     setStep('input');
     setActiveTab('scan');
     if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) {
-      cameraInputRef.current.value = '';
-      // Immediately open camera on mobile!
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    // Automatically launch live QR-style scanner if supported
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      startLiveCamera();
+    } else if (cameraInputRef.current) {
       cameraInputRef.current.click();
     }
   };
@@ -559,35 +789,96 @@ export function OmrScannerDialog({
             {/* When at Input / Prompt to Capture */}
             {step === 'input' && (
               <div className="space-y-3">
-                <div className="border-2 border-dashed border-indigo-300 rounded-2xl p-6 text-center bg-white hover:bg-indigo-50/40 transition-colors">
-                  <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 mx-auto flex items-center justify-center mb-3 shadow-inner">
-                    <Camera className="w-8 h-8" />
-                  </div>
-                  <h3 className="font-black text-base text-slate-800 mb-1">
-                    মোবাইল ক্যামেরা দিয়ে ওএমআর শিটের ছবি তুলুন
-                  </h3>
-                  <p className="text-xs text-slate-500 font-bold max-w-sm mx-auto mb-5 leading-relaxed">
-                    ছবি তোলার সাথে সাথেই AI স্বয়ংক্রিয়ভাবে মূল্যায়ন করে ফলাফল সেভ করে নেবে।
-                  </p>
+                {liveCameraActive ? (
+                  <div className="relative rounded-2xl overflow-hidden bg-black border-2 border-indigo-500 shadow-xl">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-[320px] sm:h-[400px] object-cover"
+                    />
+                    {/* QR-Style Viewfinder Overlay */}
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
+                      <div className="relative w-full h-full max-w-sm border-2 border-white/40 rounded-xl">
+                        <div className="absolute -top-1 -left-1 w-7 h-7 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
+                        <div className="absolute -top-1 -right-1 w-7 h-7 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
+                        <div className="absolute -bottom-1 -left-1 w-7 h-7 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg" />
+                        <div className="absolute -bottom-1 -right-1 w-7 h-7 border-b-4 border-r-4 border-emerald-400 rounded-br-lg" />
+                      </div>
+                    </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <Button
-                      type="button"
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm h-11 px-6 shadow-md gap-2"
-                    >
-                      <Camera className="w-5 h-5" /> ক্যামেরা চালু করুন (ক্লিক করুন)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full sm:w-auto font-black text-sm h-11 px-5 border-slate-300 gap-2"
-                    >
-                      <Upload className="w-4 h-4" /> গ্যালারি / ফাইল থেকে আপলোড
-                    </Button>
+                    {/* Top Status & Stability Bar */}
+                    <div className="absolute top-3 inset-x-3 flex flex-col items-center gap-1.5 pointer-events-none">
+                      <div className="bg-black/75 backdrop-blur-xs text-white px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-2 shadow">
+                        <span className={cn("w-2.5 h-2.5 rounded-full", stabilityProgress >= 75 ? "bg-emerald-400 animate-ping" : "bg-amber-400 animate-pulse")} />
+                        {autoCaptureStatus}
+                      </div>
+                      <div className="w-48 h-1.5 bg-white/30 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-400 transition-all duration-200"
+                          style={{ width: `${stabilityProgress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bottom Controls */}
+                    <div className="absolute bottom-3 inset-x-3 flex items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={captureLiveFrame}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 px-4 rounded-full shadow-lg gap-1.5"
+                      >
+                        <Camera className="w-4 h-4" /> এখনই স্ক্যান করুন
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={stopLiveCamera}
+                        className="font-black text-xs h-9 px-4 rounded-full shadow-lg"
+                      >
+                        ✕ বন্ধ করুন
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="border-2 border-dashed border-indigo-300 rounded-2xl p-5 sm:p-6 text-center bg-white hover:bg-indigo-50/40 transition-colors">
+                    <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 mx-auto flex items-center justify-center mb-3 shadow-inner">
+                      <Camera className="w-8 h-8" />
+                    </div>
+                    <h3 className="font-black text-base text-slate-800 mb-1">
+                      QR স্ক্যানারের মতো অটো ওএমআর স্ক্যান করুন
+                    </h3>
+                    <p className="text-xs text-slate-500 font-bold max-w-md mx-auto mb-5 leading-relaxed">
+                      অটো স্ক্যানার চালু করে ওএমআর শিট সামনে ধরুন — আলাদা করে ছবি তুলতে হবে না! শুধু রোল স্ক্যান করেই শিক্ষার্থীদের তালিকা হতে অটো নাম নিয়ে ফলাফল সেভ করবে।
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2.5">
+                      <Button
+                        type="button"
+                        onClick={startLiveCamera}
+                        className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm h-11 px-6 shadow-md gap-2"
+                      >
+                        <Zap className="w-5 h-5" /> অটো স্ক্যানার চালু করুন (QR স্টাইল)
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-sm h-11 px-5 shadow-md gap-2"
+                      >
+                        <Camera className="w-4 h-4" /> ক্যামেরায় ছবি তুলুন
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full sm:w-auto font-black text-sm h-11 px-4 border-slate-300 gap-2"
+                      >
+                        <Upload className="w-4 h-4" /> ফাইল আপলোড
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

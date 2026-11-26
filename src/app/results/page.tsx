@@ -153,17 +153,14 @@ const MarkManagementTab = ({ allStudents }: { allStudents: Student[] }) => {
             let count = 0;
 
             studentsForClass.forEach(student => {
-                const sRoll = student.roll;
-                const sNameBn = (student.studentNameBn || '').trim().toLowerCase();
-                const sNameEn = (student.studentNameEn || '').trim().toLowerCase();
+                const sRoll = parseInt(String(student.roll || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim(), 10);
 
+                // Strictly match by studentId or EXACT numeric Roll Number (never guess by name)
                 const matchedOmr = matchingOmr.find(r => {
+                    if (r.studentId && r.studentId === student.id) return true;
                     const rRollStr = String(r.rollNumber || '').replace(/[০-৯]/g, d => "0123456789"["০১২৩৪৫৬৭৮৯".indexOf(d)]).trim();
                     const rRoll = parseInt(rRollStr, 10);
-                    if (!isNaN(rRoll) && rRoll === sRoll) return true;
-                    const rName = String(r.studentName || '').trim().toLowerCase();
-                    if (rName && (rName === sNameBn || rName === sNameEn)) return true;
-                    return false;
+                    return !isNaN(rRoll) && !isNaN(sRoll) && rRoll === sRoll;
                 });
 
                 if (matchedOmr) {
