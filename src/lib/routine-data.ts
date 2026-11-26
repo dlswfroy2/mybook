@@ -254,9 +254,52 @@ export interface StandaloneClassRoutine {
     title?: string;
     columns?: RoutineColumnConfig[];
     preferredFormat?: 'day' | 'date';
+    days?: string[];
     dayData: Record<string, string[]>;
     dateRows: StandaloneDateRow[];
 }
+
+export const getRoutineDays = async (db: Firestore, academicYear: string): Promise<string[]> => {
+    const localKey = `routine_days_${academicYear}`;
+    if (typeof window !== 'undefined') {
+        try {
+            const raw = localStorage.getItem(localKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch {}
+    }
+    if (!db) return ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `days_${academicYear}`);
+        const snap = await getDoc(docRef);
+        if (snap.exists() && Array.isArray(snap.data().days) && snap.data().days.length > 0) {
+            const days = snap.data().days as string[];
+            if (typeof window !== 'undefined') {
+                try { localStorage.setItem(localKey, JSON.stringify(days)); } catch {}
+            }
+            return days;
+        }
+    } catch (e) {
+        console.warn("Failed to load routine days:", e);
+    }
+    return ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
+};
+
+export const saveRoutineDays = async (db: Firestore, academicYear: string, days: string[]): Promise<void> => {
+    const localKey = `routine_days_${academicYear}`;
+    if (typeof window !== 'undefined') {
+        try { localStorage.setItem(localKey, JSON.stringify(days)); } catch {}
+    }
+    if (!db) return;
+    try {
+        const docRef = doc(db, ROUTINE_COLLECTION, `days_${academicYear}`);
+        await setDoc(docRef, { academicYear, days, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+        console.warn("Failed to save routine days:", e);
+    }
+};
 
 export interface RoutineSettings {
     academicYear?: string;
@@ -321,6 +364,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
         academicYear,
         title: '',
         columns: JSON.parse(JSON.stringify(DEFAULT_ROUTINE_COLUMNS)),
+        days: undefined,
         dayData: {},
         dateRows: [],
     };
@@ -335,6 +379,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                         ...empty,
                         ...parsed,
                         preferredFormat: parsed.preferredFormat || undefined,
+                        days: Array.isArray(parsed.days) && parsed.days.length > 0 ? parsed.days : undefined,
                         columns: Array.isArray(parsed.columns) && parsed.columns.length > 0 ? parsed.columns : empty.columns,
                     };
                 }
@@ -352,6 +397,7 @@ export const getStandaloneRoutine = async (db: Firestore, academicYear: string, 
                 academicYear,
                 title: d.title || '',
                 preferredFormat: d.preferredFormat || undefined,
+                days: Array.isArray(d.days) && d.days.length > 0 ? d.days : (Object.keys(d.dayData || {}).length > 0 ? Object.keys(d.dayData) : undefined),
                 columns: Array.isArray(d.columns) && d.columns.length > 0 ? d.columns : empty.columns,
                 dayData: d.dayData || {},
                 dateRows: Array.isArray(d.dateRows) ? d.dateRows : []

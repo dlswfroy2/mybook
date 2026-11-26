@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine, SubjectClassLimit, getSubjectClassLimits, saveSubjectClassLimits, RoutineSettings, getRoutineSettings, saveRoutineSettings } from '@/lib/routine-data';
+import { getFullRoutine, saveRoutinesBatch, ClassRoutine, ROUTINE_COLLECTION, RoutineColumnConfig, DEFAULT_ROUTINE_COLUMNS, getRoutineColumns, saveRoutineColumns, DateRoutineRow, getDateRoutine, saveDateRoutine, StandaloneClassRoutine, getStandaloneRoutine, saveStandaloneRoutine, SubjectClassLimit, getSubjectClassLimits, saveSubjectClassLimits, RoutineSettings, getRoutineSettings, saveRoutineSettings, getRoutineDays, saveRoutineDays } from '@/lib/routine-data';
 import SubjectLimitsTab from './SubjectLimitsTab';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -2742,25 +2742,127 @@ export default function RoutinesPage() {
     const [subjectLimitsMap, setSubjectLimitsMap] = useState<Record<string, Record<string, SubjectClassLimit>>>({});
 
     // Routine days & dialog state for adding day
-    const [routineDays, setRoutineDays] = useState<string[]>(["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"]);
+    const [routineDays, setRoutineDays] = useState<string[]>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = localStorage.getItem('routine_days_active');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                }
+            } catch {}
+        }
+        return ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"];
+    });
+
+    const activeRoutineDays = useMemo(() => {
+        if (routineScope === 'standalone' && standaloneRoutine) {
+            if (Array.isArray(standaloneRoutine.days) && standaloneRoutine.days.length > 0) {
+                return standaloneRoutine.days;
+            }
+            const dayKeys = Object.keys(standaloneRoutine.dayData || {});
+            if (dayKeys.length > 0) {
+                return dayKeys;
+            }
+        }
+        return routineDays;
+    }, [routineScope, standaloneRoutine, routineDays]);
+
     const [addDayDialogOpen, setAddDayDialogOpen] = useState(false);
     const [newDayName, setNewDayName] = useState('');
 
     const handleAddDay = (dayToAdd: string) => {
         const trimmed = dayToAdd.trim();
         if (!trimmed) return;
-        if (routineDays.includes(trimmed)) {
+        const currentDays = activeRoutineDays;
+        if (currentDays.includes(trimmed)) {
             toast({ title: `‘${trimmed}’ ইতিমধ্যে তালিকায় আছে`, variant: "destructive" });
             return;
         }
-        setRoutineDays(prev => [...prev, trimmed]);
+        const nextDays = [...currentDays, trimmed];
+        setRoutineDays(nextDays);
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem('routine_days_active', JSON.stringify(nextDays));
+                localStorage.setItem(`routine_days_${selectedYear}`, JSON.stringify(nextDays));
+            } catch {}
+        }
+        if (routineScope === 'standalone') {
+            const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
+            setStandaloneRoutine(prev => {
+                if (!prev) return prev;
+                const nextDayData = { ...(prev.dayData || {}) };
+                if (!nextDayData[trimmed]) {
+                    nextDayData[trimmed] = Array(numPeriods).fill('');
+                }
+                const updated = {
+                    ...prev,
+                    days: nextDays,
+                    dayData: nextDayData
+                };
+                if (db) {
+                    saveStandaloneRoutine(db, updated);
+                }
+                return updated;
+            });
+        } else {
+            const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
+            setRoutineData(prev => {
+                const next = { ...prev };
+                Object.keys(next).forEach(cls => {
+                    next[cls] = { ...next[cls], [trimmed]: Array(numPeriods).fill('') };
+                });
+                return next;
+            });
+            if (db) {
+                saveRoutineDays(db, selectedYear, nextDays);
+            }
+        }
+        setIsEditMode(true);
         setAddDayDialogOpen(false);
         setNewDayName('');
         toast({ title: `‘${trimmed}’ বার সফলভাবে যোগ করা হয়েছে` });
     };
 
     const handleDeleteDay = (dayToDelete: string) => {
-        setRoutineDays(prev => prev.filter(d => d !== dayToDelete));
+        const nextDays = activeRoutineDays.filter(d => d !== dayToDelete);
+        setRoutineDays(nextDays);
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem('routine_days_active', JSON.stringify(nextDays));
+                localStorage.setItem(`routine_days_${selectedYear}`, JSON.stringify(nextDays));
+            } catch {}
+        }
+        if (routineScope === 'standalone') {
+            setStandaloneRoutine(prev => {
+                if (!prev) return prev;
+                const nextDayData = { ...(prev.dayData || {}) };
+                delete nextDayData[dayToDelete];
+                const updated = {
+                    ...prev,
+                    days: nextDays,
+                    dayData: nextDayData
+                };
+                if (db) {
+                    saveStandaloneRoutine(db, updated);
+                }
+                return updated;
+            });
+        } else {
+            setRoutineData(prev => {
+                const next = { ...prev };
+                Object.keys(next).forEach(cls => {
+                    const classDays = { ...next[cls] };
+                    delete classDays[dayToDelete];
+                    next[cls] = classDays;
+                });
+                return next;
+            });
+            if (db) {
+                saveRoutineDays(db, selectedYear, nextDays);
+            }
+        }
+        setIsEditMode(true);
         toast({ title: `‘${dayToDelete}’ তালিকা থেকে বাদ দেওয়া হয়েছে` });
     };
 
@@ -2786,19 +2888,23 @@ export default function RoutinesPage() {
     const fetchData = useCallback(async () => {
         if (!db || !user) return;
         setIsLoading(true);
-        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb, limitsFromDb, settingsFromDb] = await Promise.all([
+        const [routinesFromDb, staffData, colsFromDb, allocationsFromDb, dateRowsFromDb, limitsFromDb, settingsFromDb, daysFromDb] = await Promise.all([
             getFullRoutine(db, selectedYear),
             getStaff(db),
             getRoutineColumns(db, selectedYear),
             getTeacherAllocations(db, selectedYear),
             getDateRoutine(db, selectedYear),
             getSubjectClassLimits(db, selectedYear),
-            getRoutineSettings(db, selectedYear)
+            getRoutineSettings(db, selectedYear),
+            getRoutineDays(db, selectedYear)
         ]);
         setAllStaff(staffData);
         setColumns(colsFromDb);
         setDateRoutineRows(dateRowsFromDb);
         setSubjectLimitsMap(limitsFromDb);
+        if (Array.isArray(daysFromDb) && daysFromDb.length > 0) {
+            setRoutineDays(daysFromDb);
+        }
 
         if (settingsFromDb?.preferredFormat) {
             setRoutineFormat(settingsFromDb.preferredFormat);
@@ -2859,6 +2965,11 @@ export default function RoutinesPage() {
             setStandaloneRoutine(res);
             if (res?.preferredFormat) {
                 setRoutineFormat(res.preferredFormat);
+            }
+            if (Array.isArray(res?.days) && res.days.length > 0) {
+                setRoutineDays(res.days);
+            } else if (res?.dayData && Object.keys(res.dayData).length > 0) {
+                setRoutineDays(Object.keys(res.dayData));
             }
         });
     }, [db, selectedYear, routineScope, selectedClassFilter]);
@@ -3125,10 +3236,22 @@ export default function RoutinesPage() {
             }
 
             if (routineScope === 'standalone' && selectedClassFilter !== 'all' && standaloneRoutine) {
+                const cleanDayData: Record<string, string[]> = {};
+                activeRoutineDays.forEach(day => {
+                    if (standaloneRoutine.dayData && standaloneRoutine.dayData[day]) {
+                        cleanDayData[day] = standaloneRoutine.dayData[day];
+                    } else {
+                        const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
+                        cleanDayData[day] = Array(numPeriods).fill('');
+                    }
+                });
+
                 const updated = {
                     ...standaloneRoutine,
                     columns: activeColumns,
                     preferredFormat: routineFormat,
+                    days: activeRoutineDays,
+                    dayData: cleanDayData
                 };
                 await saveStandaloneRoutine(db, updated);
                 setStandaloneRoutine(updated);
@@ -3138,6 +3261,7 @@ export default function RoutinesPage() {
             }
 
             await saveRoutineColumns(db, selectedYear, columns);
+            await saveRoutineDays(db, selectedYear, routineDays);
 
             if (routineFormat === 'date') {
                 await saveDateRoutine(db, selectedYear, dateRoutineRows);
@@ -3148,13 +3272,15 @@ export default function RoutinesPage() {
 
             const routinesToSave: ClassRoutine[] = [];
             Object.keys(routineData).forEach(className => {
-                Object.keys(routineData[className]).forEach(day => {
-                    routinesToSave.push({
-                        academicYear: selectedYear,
-                        className,
-                        day,
-                        periods: routineData[className][day]
-                    });
+                routineDays.forEach(day => {
+                    if (routineData[className]?.[day]) {
+                        routinesToSave.push({
+                            academicYear: selectedYear,
+                            className,
+                            day,
+                            periods: routineData[className][day]
+                        });
+                    }
                 });
             });
 
@@ -3696,7 +3822,8 @@ export default function RoutinesPage() {
                                                     onEditColumn={openEditColumn}
                                                     selectedClass={selectedClassFilter}
                                                     allocationsList={scopedAllocationsList}
-                                                    routineDays={routineDays}
+                                                    routineDays={activeRoutineDays}
+                                                    routineDays={activeRoutineDays}
                                                     onAddDay={() => setAddDayDialogOpen(true)}
                                                     onDeleteDay={handleDeleteDay}
                                                     subjectLimitsMap={subjectLimitsMap}
@@ -3717,7 +3844,7 @@ export default function RoutinesPage() {
                                             columns={activeColumns}
                                             currentLimitsMap={subjectLimitsMap}
                                             onLimitsUpdated={(updated) => setSubjectLimitsMap(updated)}
-                                            routineDays={routineDays}
+                                            routineDays={activeRoutineDays}
                                             dateRoutineRows={dateRoutineRows}
                                             standaloneRoutine={standaloneRoutine}
                                             onNavigateToRoutine={(scope, format, cls) => {
@@ -4027,7 +4154,7 @@ export default function RoutinesPage() {
                     : routineData;
 
                 const activeClasses = selectedClassFilter === 'all' ? ['6', '7', '8', '9', '10'] : [selectedClassFilter];
-                const activeDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার'];
+                const activeDays = activeRoutineDays;
 
                 const estimatePageZoom = (pageCols: RoutineColumnConfig[]) => {
                     const colCount = Math.max(1, pageCols.length);
@@ -4148,6 +4275,7 @@ export default function RoutinesPage() {
                                                     columns={pageCols}
                                                     selectedClass={selectedClassFilter}
                                                     allocationsList={scopedAllocationsList}
+                                                    routineDays={activeRoutineDays}
                                                 />
                                             )}
                                         </div>
