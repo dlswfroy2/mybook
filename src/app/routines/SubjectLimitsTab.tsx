@@ -17,7 +17,7 @@ import {
     saveSubjectClassLimits 
 } from '@/lib/routine-data';
 import { getSubjects, subjectNameNormalization } from '@/lib/subjects';
-import { CheckSquare, Save, AlertTriangle, CheckCircle2, Info, BookOpen, Plus, Minus } from 'lucide-react';
+import { CheckSquare, Save, AlertTriangle, CheckCircle2, Info, BookOpen, Plus, Minus, Layers, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const classNamesMap: { [key: string]: string } = {
@@ -33,6 +33,68 @@ const toBengaliNumber = (num: number | string | undefined | null) => {
     const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return String(num).replace(/[0-9]/g, (d) => bnDigits[Number(d)]);
 };
+
+// 9th and 10th class parallel / coordinated pairs
+export const CLASS_9_10_COORDINATED_PAIRS = [
+    { 
+        id: 'physics_history',
+        label: 'পদার্থ / বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা', 
+        shortLabel: 'পদার্থ / ইতিহাস',
+        groupLabel: 'বিজ্ঞান ও মানবিক',
+        subjects: ['পদার্থ', 'বাংলাদেশের ইতিহাস ও বিশ্বসভ্যতা'], 
+        shortNames: ['পদার্থ', 'ইতিহাস'] 
+    },
+    { 
+        id: 'chemistry_geography',
+        label: 'রসায়ন / ভূগোল ও পরিবেশ', 
+        shortLabel: 'রসায়ন / ভূগোল',
+        groupLabel: 'বিজ্ঞান ও মানবিক',
+        subjects: ['রসায়ন', 'ভূগোল ও পরিবেশ'], 
+        shortNames: ['রসায়ন', 'ভূগোল'] 
+    },
+    { 
+        id: 'biology_civics',
+        label: 'জীব বিজ্ঞান / পৌরনীতি ও নাগরিকতা', 
+        shortLabel: 'জীব / পৌরনীতি',
+        groupLabel: 'বিজ্ঞান ও মানবিক',
+        subjects: ['জীব বিজ্ঞান', 'পৌরনীতি ও নাগরিকতা'], 
+        shortNames: ['জীব', 'পৌরনীতি'] 
+    },
+    { 
+        id: 'bgs_gen_science',
+        label: 'বাংলাদেশ ও বিশ্ব পরিচয় / সাধারণ বিজ্ঞান', 
+        shortLabel: 'বা ও বি / সাধারণ বিজ্ঞান',
+        groupLabel: 'বিজ্ঞান ও মানবিক/ব্যবসায়',
+        subjects: ['বাংলাদেশ ও বিশ্ব পরিচয়', 'সাধারণ বিজ্ঞান'], 
+        shortNames: ['বা ও বি', 'বিজ্ঞান'] 
+    },
+    { 
+        id: 'higher_math_agri',
+        label: 'উচ্চতর গণিত / কৃষি শিক্ষা', 
+        shortLabel: 'উচ্চতর / কৃষি',
+        groupLabel: 'বিজ্ঞান ও ঐচ্ছিক',
+        subjects: ['উচ্চতর গণিত', 'কৃষি শিক্ষা'], 
+        shortNames: ['উচ্চতর', 'কৃষি'] 
+    },
+];
+
+const parseSubjectTeacher = (cell: string): { subject: string; teacher: string | null } => {
+    if (!cell) return { subject: '', teacher: null };
+    const parts = cell.split(' - ');
+    if (parts.length > 1) {
+        return { subject: parts[0].trim(), teacher: parts.slice(1).join(' - ').trim() };
+    }
+    return { subject: cell.trim(), teacher: null };
+};
+
+interface DisplaySubjectItem {
+    id: string;
+    displayName: string;
+    subLabel?: string;
+    isCoordinated?: boolean;
+    groupBadge?: string;
+    associatedSubjects: string[];
+}
 
 interface SubjectLimitsTabProps {
     routineData: Record<string, Record<string, string[]>>;
@@ -65,21 +127,130 @@ export default function SubjectLimitsTab({
         setLimits(JSON.parse(JSON.stringify(classLimits)));
     }, [selectedClass, currentLimitsMap]);
 
-    // Subjects of the selected class
-    const subjects = useMemo(() => {
-        const raw = getSubjects(selectedClass, selectedGroup);
-        // Deduplicate subjects by normalized name
+    const isNineOrTen = selectedClass === '9' || selectedClass === '10';
+
+    // Build the list of subjects / coordinated pairs for display
+    const displayItems: DisplaySubjectItem[] = useMemo(() => {
+        const rawSubjects = getSubjects(selectedClass, selectedGroup);
+
+        if (!isNineOrTen) {
+            // Class 6 to 8: simple 1-to-1 subjects
+            const seen = new Set<string>();
+            const list: DisplaySubjectItem[] = [];
+            rawSubjects.forEach(s => {
+                const norm = subjectNameNormalization[s.name] || s.name;
+                if (!seen.has(norm)) {
+                    seen.add(norm);
+                    list.push({
+                        id: norm,
+                        displayName: s.name,
+                        associatedSubjects: [s.name, norm]
+                    });
+                }
+            });
+            return list;
+        }
+
+        // For Class 9 and 10:
+        if (selectedGroup === 'all') {
+            // Coordinated View (বিজ্ঞান ও মানবিক সমন্বয়)
+            const commonSubjects = [
+                'বাংলা প্রথম',
+                'বাংলা দ্বিতীয়',
+                'ইংরেজি প্রথম',
+                'ইংরেজি দ্বিতীয়',
+                'গণিত',
+                'তথ্য ও যোগাযোগ প্রযুক্তি',
+                'ধর্ম ও নৈতিক শিক্ষা'
+            ];
+
+            const list: DisplaySubjectItem[] = [];
+
+            // 1. Add common subjects first
+            commonSubjects.forEach(subName => {
+                const norm = subjectNameNormalization[subName] || subName;
+                list.push({
+                    id: norm,
+                    displayName: subName,
+                    associatedSubjects: [subName, norm]
+                });
+            });
+
+            // 2. Add coordinated Science & Humanities pairs
+            CLASS_9_10_COORDINATED_PAIRS.forEach(pair => {
+                const associated: string[] = [
+                    pair.label,
+                    pair.shortLabel,
+                    `${pair.shortNames[0]}/${pair.shortNames[1]}`,
+                    `${pair.shortNames[0]} / ${pair.shortNames[1]}`,
+                    ...pair.subjects,
+                    ...pair.subjects.map(s => subjectNameNormalization[s] || s),
+                    ...pair.shortNames
+                ];
+                list.push({
+                    id: pair.id,
+                    displayName: pair.label,
+                    subLabel: `বিজ্ঞান: ${pair.subjects[0]} • মানবিক: ${pair.subjects[1]}`,
+                    isCoordinated: true,
+                    groupBadge: pair.groupLabel,
+                    associatedSubjects: Array.from(new Set(associated))
+                });
+            });
+
+            // 3. Add any commerce-only or other subjects not in common or coordinated pairs
+            const commerceExtra = [
+                'হিসাব বিজ্ঞান',
+                'ফিন্যান্স ও ব্যাংকিং',
+                'ব্যবসায় উদ্যোগ'
+            ];
+            commerceExtra.forEach(cName => {
+                const norm = subjectNameNormalization[cName] || cName;
+                list.push({
+                    id: norm,
+                    displayName: cName,
+                    subLabel: 'ব্যবসায় শিক্ষা বিভাগ',
+                    associatedSubjects: [cName, norm]
+                });
+            });
+
+            return list;
+        }
+
+        // If user specifically filtered by science, arts, or commerce:
         const seen = new Set<string>();
-        const list: typeof raw = [];
-        raw.forEach(s => {
+        const list: DisplaySubjectItem[] = [];
+        rawSubjects.forEach(s => {
             const norm = subjectNameNormalization[s.name] || s.name;
             if (!seen.has(norm)) {
                 seen.add(norm);
-                list.push(s);
+                // Check if it belongs to a coordinated pair
+                const pair = CLASS_9_10_COORDINATED_PAIRS.find(p => 
+                    p.subjects.includes(s.name) || 
+                    p.subjects.some(ps => (subjectNameNormalization[ps] || ps) === norm)
+                );
+                
+                const associated = [s.name, norm];
+                if (pair) {
+                    associated.push(
+                        pair.label, 
+                        pair.shortLabel, 
+                        `${pair.shortNames[0]}/${pair.shortNames[1]}`,
+                        ...pair.subjects
+                    );
+                }
+
+                list.push({
+                    id: norm,
+                    displayName: s.name,
+                    subLabel: pair ? `সমন্বিত বিষয়: ${pair.shortLabel}` : undefined,
+                    isCoordinated: !!pair,
+                    groupBadge: pair ? 'সমন্বিত বিষয়' : undefined,
+                    associatedSubjects: Array.from(new Set(associated))
+                });
             }
         });
         return list;
-    }, [selectedClass, selectedGroup]);
+    }, [selectedClass, selectedGroup, isNineOrTen]);
 
     // Calculate total available periods in the routine for this class
     const totalRoutineCapacity = useMemo(() => {
@@ -88,64 +259,105 @@ export default function SubjectLimitsTab({
         return periodCols * daysCount;
     }, [columns, routineDays]);
 
-    // Current live usage count in routineData for each subject in this class
-    const routineUsageMap = useMemo(() => {
+    // Helper to get limit count for an item
+    const getItemCount = useCallback((item: DisplaySubjectItem): number => {
+        for (const sub of item.associatedSubjects) {
+            const found = limits[sub] || limits[subjectNameNormalization[sub] || sub];
+            if (found && typeof found.daysCount === 'number') {
+                return found.daysCount;
+            }
+        }
+        return 0;
+    }, [limits]);
+
+    // Live usage count in routineData for each display item
+    const liveUsageMap = useMemo(() => {
         const counts: Record<string, number> = {};
         const classData = routineData[selectedClass] || {};
-        Object.values(classData).forEach(periods => {
-            periods.forEach(cell => {
-                if (cell) {
-                    const rawSub = cell.split(' - ')[0]?.trim();
-                    if (rawSub) {
-                        const norm = subjectNameNormalization[rawSub] || rawSub;
-                        counts[norm] = (counts[norm] || 0) + 1;
-                        counts[rawSub] = (counts[rawSub] || 0) + 1;
-                    }
-                }
-            });
-        });
-        return counts;
-    }, [routineData, selectedClass]);
 
-    // Sum of currently allocated classes across all subjects
+        displayItems.forEach(item => {
+            let usedCount = 0;
+            const matchSet = new Set(item.associatedSubjects.map(s => (subjectNameNormalization[s] || s).toLowerCase()));
+
+            Object.values(classData).forEach(periods => {
+                periods.forEach(cell => {
+                    if (!cell) return;
+                    const { subject: cellSub } = parseSubjectTeacher(cell);
+                    if (!cellSub) return;
+                    const normCell = (subjectNameNormalization[cellSub] || cellSub).toLowerCase();
+
+                    // Check exact normalized match
+                    if (matchSet.has(normCell)) {
+                        usedCount++;
+                        return;
+                    }
+
+                    // Check if cell is combined e.g. "পদার্থ/ইতিহাস"
+                    const parts = cellSub.split('/').map(p => p.trim());
+                    if (parts.length > 1) {
+                        const hasMatch = parts.some(p => matchSet.has((subjectNameNormalization[p] || p).toLowerCase()));
+                        if (hasMatch) {
+                            usedCount++;
+                            return;
+                        }
+                    }
+
+                    // Check partial match for coordinated pairs
+                    if (item.isCoordinated) {
+                        const pair = CLASS_9_10_COORDINATED_PAIRS.find(p => p.id === item.id);
+                        if (pair) {
+                            if (cellSub.includes(pair.shortNames[0]) || cellSub.includes(pair.shortNames[1])) {
+                                usedCount++;
+                            }
+                        }
+                    }
+                });
+            });
+
+            counts[item.id] = usedCount;
+        });
+
+        return counts;
+    }, [routineData, selectedClass, displayItems]);
+
+    // Sum of currently allocated classes across all display items (1 slot = 1 count)
     const totalAllocated = useMemo(() => {
-        return subjects.reduce((sum, sub) => {
-            const norm = subjectNameNormalization[sub.name] || sub.name;
-            const item = limits[norm] || limits[sub.name];
-            return sum + (item?.daysCount || 0);
-        }, 0);
-    }, [subjects, limits]);
+        return displayItems.reduce((sum, item) => sum + getItemCount(item), 0);
+    }, [displayItems, getItemCount]);
 
     const remainingClasses = totalRoutineCapacity - totalAllocated;
     const isExceeded = totalAllocated > totalRoutineCapacity;
 
-    // Number change handler (সাপ্তাহিক ক্লাস সংখ্যা লিখে সেট করা)
-    const handleNumberChange = (subjectName: string, valueStr: string) => {
-        const norm = subjectNameNormalization[subjectName] || subjectName;
+    // Number change handler: updates all coordinated subject keys together
+    const handleNumberChange = (item: DisplaySubjectItem, valueStr: string) => {
         const val = parseInt(valueStr, 10);
         const count = isNaN(val) ? 0 : Math.max(0, Math.min(20, val));
 
-        setLimits(prev => ({
-            ...prev,
-            [norm]: {
-                subjectName,
-                daysCount: count
-            }
-        }));
+        setLimits(prev => {
+            const next = { ...prev };
+            item.associatedSubjects.forEach(sub => {
+                const norm = subjectNameNormalization[sub] || sub;
+                next[norm] = { subjectName: sub, daysCount: count };
+                next[sub] = { subjectName: sub, daysCount: count };
+            });
+            return next;
+        });
     };
 
     // Quick increment / decrement helper
-    const handleAdjustCount = (subjectName: string, delta: number) => {
-        const norm = subjectNameNormalization[subjectName] || subjectName;
-        const current = limits[norm]?.daysCount || limits[subjectName]?.daysCount || 0;
+    const handleAdjustCount = (item: DisplaySubjectItem, delta: number) => {
+        const current = getItemCount(item);
         const newCount = Math.max(0, Math.min(20, current + delta));
-        setLimits(prev => ({
-            ...prev,
-            [norm]: {
-                subjectName,
-                daysCount: newCount
-            }
-        }));
+
+        setLimits(prev => {
+            const next = { ...prev };
+            item.associatedSubjects.forEach(sub => {
+                const norm = subjectNameNormalization[sub] || sub;
+                next[norm] = { subjectName: sub, daysCount: newCount };
+                next[sub] = { subjectName: sub, daysCount: newCount };
+            });
+            return next;
+        });
     };
 
     // Save handler
@@ -191,7 +403,7 @@ export default function SubjectLimitsTab({
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header & Class Selectors */}
-            <div className="bg-gradient-to-r from-rose-50 via-white to-amber-50 p-5 rounded-2xl border-2 border-rose-200/80 shadow-xs">
+            <div className="bg-gradient-to-r from-rose-50 via-white to-indigo-50/40 p-5 rounded-2xl border-2 border-rose-200/80 shadow-xs">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2">
@@ -203,7 +415,7 @@ export default function SubjectLimitsTab({
                             </h3>
                         </div>
                         <p className="text-xs font-bold text-slate-600 mt-1">
-                            প্রতিটি বিষয়ের জন্য সপ্তাহে সর্বোচ্চ কতটি ক্লাস বরাদ্দ করা যাবে তা <strong>সরাসরি সংখ্যা লিখে</strong> নির্ধারণ করুন।
+                            প্রতিটি বিষয়ের জন্য সপ্তাহে সর্বোচ্চ কতটি ক্লাস বরাদ্দ করা যাবে তা <strong>সংখ্যা লিখে</strong> নির্ধারণ করুন।
                         </p>
                     </div>
 
@@ -226,19 +438,21 @@ export default function SubjectLimitsTab({
                             </Select>
                         </div>
 
-                        {(selectedClass === '9' || selectedClass === '10') && (
+                        {isNineOrTen && (
                             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
                                 <Label className="text-xs font-black text-slate-700 whitespace-nowrap">
-                                    গ্রুপ:
+                                    গ্রুপ ভিউ:
                                 </Label>
                                 <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                                    <SelectTrigger className="w-32 h-9 font-black text-sm border-rose-300">
+                                    <SelectTrigger className="w-44 h-9 font-black text-sm border-indigo-300">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="font-kalpurush">
-                                        <SelectItem value="all" className="font-bold">সকল বিষয়</SelectItem>
-                                        <SelectItem value="science" className="font-bold">বিজ্ঞান</SelectItem>
-                                        <SelectItem value="arts" className="font-bold">মানবিক</SelectItem>
+                                        <SelectItem value="all" className="font-bold">
+                                            🔗 সকল বিষয় (সমন্বিত)
+                                        </SelectItem>
+                                        <SelectItem value="science" className="font-bold">বিজ্ঞান বিভাগ</SelectItem>
+                                        <SelectItem value="arts" className="font-bold">মানবিক বিভাগ</SelectItem>
                                         <SelectItem value="commerce" className="font-bold">ব্যবসায় শিক্ষা</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -312,6 +526,15 @@ export default function SubjectLimitsTab({
                     </div>
                 </div>
 
+                {isNineOrTen && (
+                    <div className="mt-3 p-2.5 bg-indigo-50/80 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>
+                            💡 <strong>বিজ্ঞান ও মানবিক সমন্বয়:</strong> ৯ম ও ১০ম শ্রেণিতে বিজ্ঞান ও মানবিক শাখার যেসব বিষয় একই পিরিয়ডে সমান্তরালে চলে (যেমন: পদার্থ/ইতিহাস, রসায়ন/ভূগোল, জীব/পৌরনীতি) সেগুলোকে ১টি পিরিয়ড হিসেবে সমন্বয় করা হয়েছে, যাতে মোট ক্লাসের সীমা সঠিকভাবে মিলে যায়।
+                        </span>
+                    </div>
+                )}
+
                 {isExceeded && (
                     <div className="mt-3 p-2.5 bg-rose-100/90 border border-rose-300 text-rose-800 rounded-xl text-xs font-black flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -333,7 +556,7 @@ export default function SubjectLimitsTab({
                             <TableHead className="font-black text-slate-800 border-r border-slate-300">
                                 বিষয়ের নাম
                             </TableHead>
-                            <TableHead className="w-56 text-center font-black text-slate-800 border-r border-slate-300">
+                            <TableHead className="w-60 text-center font-black text-slate-800 border-r border-slate-300">
                                 সাপ্তাহিক ক্লাস (সংখ্যা লিখে)
                             </TableHead>
                             <TableHead className="w-40 text-center font-black text-slate-800">
@@ -342,27 +565,23 @@ export default function SubjectLimitsTab({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {subjects.length === 0 ? (
+                        {displayItems.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={4} className="py-10 text-center font-bold text-muted-foreground">
                                     এই শ্রেণির জন্য কোনো বিষয় পাওয়া যায়নি।
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            subjects.map((sub, idx) => {
-                                const norm = subjectNameNormalization[sub.name] || sub.name;
-                                const item = limits[norm] || limits[sub.name] || {
-                                    subjectName: sub.name,
-                                    daysCount: 0
-                                };
-                                const count = item.daysCount || 0;
-                                const liveCount = routineUsageMap[norm] || routineUsageMap[sub.name] || 0;
+                            displayItems.map((item, idx) => {
+                                const count = getItemCount(item);
+                                const liveCount = liveUsageMap[item.id] || 0;
 
                                 return (
                                     <TableRow 
-                                        key={sub.code || sub.name}
+                                        key={item.id}
                                         className={cn(
                                             "hover:bg-slate-50/70 border-b border-slate-200 transition-colors",
+                                            item.isCoordinated ? "bg-indigo-50/20" : "",
                                             count > 0 ? "bg-white" : "bg-slate-50/30 text-slate-400"
                                         )}
                                     >
@@ -370,10 +589,24 @@ export default function SubjectLimitsTab({
                                             {toBengaliNumber(idx + 1)}
                                         </TableCell>
 
-                                        <TableCell className="font-black text-sm text-slate-900 border-r border-slate-200">
-                                            <div className="flex items-center gap-2">
-                                                <BookOpen className="w-4 h-4 text-primary shrink-0" />
-                                                <span className="text-base font-black">{sub.name}</span>
+                                        <TableCell className="font-black text-slate-900 border-r border-slate-200 py-3">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <BookOpen className="w-4 h-4 text-primary shrink-0" />
+                                                    <span className="text-base font-black text-slate-800">
+                                                        {item.displayName}
+                                                    </span>
+                                                    {item.groupBadge && (
+                                                        <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                            🔗 {item.groupBadge}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {item.subLabel && (
+                                                    <span className="text-xs font-bold text-slate-500 pl-6">
+                                                        {item.subLabel}
+                                                    </span>
+                                                )}
                                             </div>
                                         </TableCell>
 
@@ -384,7 +617,7 @@ export default function SubjectLimitsTab({
                                                     type="button"
                                                     variant="outline"
                                                     size="icon"
-                                                    onClick={() => handleAdjustCount(sub.name, -1)}
+                                                    onClick={() => handleAdjustCount(item, -1)}
                                                     disabled={count <= 0}
                                                     className="h-8 w-8 rounded-lg border-slate-300 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
                                                 >
@@ -396,7 +629,7 @@ export default function SubjectLimitsTab({
                                                     min={0}
                                                     max={20}
                                                     value={count === 0 ? '' : count}
-                                                    onChange={(e) => handleNumberChange(sub.name, e.target.value)}
+                                                    onChange={(e) => handleNumberChange(item, e.target.value)}
                                                     placeholder="০"
                                                     className={cn(
                                                         "w-20 h-9 text-center font-black text-base rounded-lg shadow-2xs",
@@ -408,7 +641,7 @@ export default function SubjectLimitsTab({
                                                     type="button"
                                                     variant="outline"
                                                     size="icon"
-                                                    onClick={() => handleAdjustCount(sub.name, 1)}
+                                                    onClick={() => handleAdjustCount(item, 1)}
                                                     className="h-8 w-8 rounded-lg border-slate-300 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer"
                                                 >
                                                     <Plus className="w-3.5 h-3.5" />
