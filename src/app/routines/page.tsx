@@ -1714,7 +1714,7 @@ const DateRoutineTable = ({
     mainRoutineData?: Record<string, Record<string, string[]>>;
     onDateChange: (rowId: string, newDate: string) => void;
     onCellChange: (rowId: string, cls: string, periodIdx: number, value: string) => void;
-    onAddRow?: () => void;
+    onAddRow?: (insertAfterIndex?: number) => void;
     onDeleteRow?: (rowId: string) => void;
     onAddColumn?: (insertAfterIndex: number) => void;
     onDeleteColumn?: (col: RoutineColumnConfig, index: number) => void;
@@ -1891,12 +1891,21 @@ const DateRoutineTable = ({
                     <TableBody>
                         {rows.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={2 + columnsWithPeriodIdx.length} className="text-center py-12 font-bold text-muted-foreground">
-                                    কোনো তারিখের রো যুক্ত করা হয়নি। {isEditMode ? 'নিচের "+ নতুন তারিখ / রো যোগ করুন" বাটনে ক্লিক করে রো যুক্ত করুন।' : 'এডিট মোডে গিয়ে নতুন তারিখের রো যোগ করুন।'}
+                                <TableCell colSpan={2 + columnsWithPeriodIdx.length} className="text-center py-10 font-bold text-muted-foreground">
+                                    <p className="mb-3 text-sm">কোনো তারিখের রো যুক্ত করা হয়নি।</p>
+                                    {isEditMode && onAddRow && (
+                                        <Button
+                                            type="button"
+                                            onClick={() => onAddRow()}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 px-4 rounded-xl gap-1.5 shadow-sm"
+                                        >
+                                            <Plus className="w-4 h-4 stroke-[3]" /> প্রথম তারিখের রো যোগ করুন
+                                        </Button>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            rows.map((row) => {
+                            rows.map((row, rowIndex) => {
                                 const dayName = getDayNameFromDate(row.date);
                                 const isHolidayDay = dayName === 'শুক্রবার' || dayName === 'শনিবার';
                                 // Build routineData view for EditableCell rule evaluation:
@@ -1939,7 +1948,7 @@ const DateRoutineTable = ({
                                                     <div className="flex flex-col items-center gap-1.5">
                                                         <Input
                                                             type="date"
-                                                            value={row.date}
+                                                            value={row.date || ''}
                                                             onChange={(e) => onDateChange(row.id, e.target.value)}
                                                             className={cn("h-8 text-xs font-bold bg-white px-1.5", isHolidayDay ? "border-rose-400 text-rose-700" : "border-slate-300")}
                                                         />
@@ -1948,15 +1957,27 @@ const DateRoutineTable = ({
                                                                 {dayName}{isHolidayDay ? ' • ছুটি' : ''}
                                                             </Badge>
                                                         )}
-                                                        {onDeleteRow && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => onDeleteRow(row.id)}
-                                                                className="text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-0.5 mt-0.5 cursor-pointer"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" /> রো মুছুন
-                                                            </button>
-                                                        )}
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            {onAddRow && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onAddRow(rowIndex)}
+                                                                    title="এর পরের তারিখ দিয়ে নতুন রো যোগ করুন"
+                                                                    className="text-[10px] text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 font-bold flex items-center gap-0.5 cursor-pointer shadow-2xs"
+                                                                >
+                                                                    <Plus className="w-2.5 h-2.5 stroke-[3]" /> +রো
+                                                                </button>
+                                                            )}
+                                                            {onDeleteRow && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onDeleteRow(row.id)}
+                                                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" /> রো মুছুন
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center gap-0.5">
@@ -2013,7 +2034,7 @@ const DateRoutineTable = ({
             </div>
             {isEditMode && onAddRow && (
                 <div className="flex justify-center no-print">
-                    <Button type="button" onClick={onAddRow} variant="outline" className="border-2 border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-black gap-2 h-11 px-6 rounded-xl">
+                    <Button type="button" onClick={() => onAddRow(rows.length - 1)} variant="outline" className="border-2 border-dashed border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-black gap-2 h-11 px-6 rounded-xl">
                         <Plus className="w-4 h-4 stroke-[3]" /> নতুন তারিখ / রো যোগ করুন
                     </Button>
                 </div>
@@ -3478,11 +3499,17 @@ export default function RoutinesPage() {
                                                             updated[targetIdx] = { ...updated[targetIdx], date: newDate };
                                                             
                                                             // Auto-update subsequent rows based on previous date
-                                                            if (newDate) {
-                                                                let nextD = new Date(newDate.replace(/-/g, '/'));
-                                                                for (let i = targetIdx + 1; i < updated.length; i++) {
-                                                                    nextD.setDate(nextD.getDate() + 1);
-                                                                    updated[i] = { ...updated[i], date: format(nextD, 'yyyy-MM-dd') };
+                                                            if (newDate && newDate.trim()) {
+                                                                const clean = newDate.trim().replace(/-/g, '/');
+                                                                const parsed = new Date(clean);
+                                                                if (!isNaN(parsed.getTime())) {
+                                                                    let nextD = new Date(parsed.getTime());
+                                                                    for (let i = targetIdx + 1; i < updated.length; i++) {
+                                                                        nextD.setDate(nextD.getDate() + 1);
+                                                                        try {
+                                                                            updated[i] = { ...updated[i], date: format(nextD, 'yyyy-MM-dd') };
+                                                                        } catch {}
+                                                                    }
                                                                 }
                                                             }
                                                             return updated;
@@ -3525,32 +3552,82 @@ export default function RoutinesPage() {
                                                             }));
                                                         }
                                                     }}
-                                                    onAddRow={() => {
+                                                    onAddRow={(insertAfterIndex?: number) => {
                                                         const numPeriods = activeColumns.filter(c => c.type === 'period').length || 6;
                                                         const newId = `row_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-                                                        const getNextDateStr = (lastDateStr?: string) => {
-                                                            if (!lastDateStr) return format(new Date(), 'yyyy-MM-dd');
-                                                            const d = new Date(lastDateStr.replace(/-/g, '/'));
-                                                            if (isNaN(d.getTime())) return format(new Date(), 'yyyy-MM-dd');
-                                                            d.setDate(d.getDate() + 1);
-                                                            return format(d, 'yyyy-MM-dd');
+
+                                                        const insertAndAutoIncrement = (currentRows: any[], isStandalone: boolean) => {
+                                                            let baseRows = [...currentRows];
+                                                            const atIndex = (insertAfterIndex !== undefined && insertAfterIndex >= 0) ? insertAfterIndex + 1 : baseRows.length;
+                                                            
+                                                            // Find reference date from prior row
+                                                            let refDateStr = '';
+                                                            for (let i = atIndex - 1; i >= 0; i--) {
+                                                                if (baseRows[i]?.date && baseRows[i].date.trim()) {
+                                                                    refDateStr = baseRows[i].date.trim();
+                                                                    break;
+                                                                }
+                                                            }
+                                                            if (!refDateStr) {
+                                                                for (let i = atIndex; i < baseRows.length; i++) {
+                                                                    if (baseRows[i]?.date && baseRows[i].date.trim()) {
+                                                                        refDateStr = baseRows[i].date.trim();
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            let newRowDate = format(new Date(), 'yyyy-MM-dd');
+                                                            if (refDateStr) {
+                                                                const parsed = new Date(refDateStr.replace(/-/g, '/'));
+                                                                if (!isNaN(parsed.getTime())) {
+                                                                    parsed.setDate(parsed.getDate() + 1);
+                                                                    try {
+                                                                        newRowDate = format(parsed, 'yyyy-MM-dd');
+                                                                    } catch {}
+                                                                }
+                                                            }
+
+                                                            const newRowItem = isStandalone
+                                                                ? { id: newId, date: newRowDate, periods: Array(numPeriods).fill('') }
+                                                                : { id: newId, date: newRowDate, classes: {} };
+
+                                                            baseRows.splice(atIndex, 0, newRowItem);
+
+                                                            // Auto-increment any rows after the inserted row
+                                                            if (newRowDate) {
+                                                                const parsed = new Date(newRowDate.replace(/-/g, '/'));
+                                                                if (!isNaN(parsed.getTime())) {
+                                                                    let curD = new Date(parsed.getTime());
+                                                                    for (let i = atIndex + 1; i < baseRows.length; i++) {
+                                                                        curD.setDate(curD.getDate() + 1);
+                                                                        try {
+                                                                            baseRows[i] = { ...baseRows[i], date: format(curD, 'yyyy-MM-dd') };
+                                                                        } catch {}
+                                                                    }
+                                                                }
+                                                            }
+                                                            return baseRows;
                                                         };
+
                                                         if (routineScope === 'standalone') {
                                                             setStandaloneRoutine(prev => {
-                                                                if (!prev) return prev;
-                                                                const lastDate = prev.dateRows[prev.dateRows.length - 1]?.date;
-                                                                const nextDate = getNextDateStr(lastDate);
+                                                                const base = prev || {
+                                                                    className: selectedClassFilter,
+                                                                    academicYear: selectedYear,
+                                                                    title: '',
+                                                                    columns: activeColumns,
+                                                                    preferredFormat: 'date' as const,
+                                                                    dayData: {},
+                                                                    dateRows: []
+                                                                };
                                                                 return {
-                                                                    ...prev,
-                                                                    dateRows: [...prev.dateRows, { id: newId, date: nextDate, periods: Array(numPeriods).fill('') }]
+                                                                    ...base,
+                                                                    dateRows: insertAndAutoIncrement(base.dateRows, true)
                                                                 };
                                                             });
                                                         } else {
-                                                            setDateRoutineRows(prev => {
-                                                                const lastDate = prev[prev.length - 1]?.date;
-                                                                const nextDate = getNextDateStr(lastDate);
-                                                                return [...prev, { id: newId, date: nextDate, classes: {} }];
-                                                            });
+                                                            setDateRoutineRows(prev => insertAndAutoIncrement(prev, false));
                                                         }
                                                     }}
                                                     onDeleteRow={(rowId) => {
