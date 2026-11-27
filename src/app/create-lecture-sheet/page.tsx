@@ -4363,7 +4363,7 @@ function CreateLectureSheetContent() {
             {/* Backdrop on mobile */}
             {sidebarOpen && (
               <div
-                className="fixed inset-0 bg-black/40 z-40 md:hidden backdrop-blur-xs transition-opacity"
+                className="no-print fixed inset-0 bg-black/40 z-40 md:hidden backdrop-blur-xs transition-opacity"
                 onClick={() => setSidebarOpen(false)}
               />
             )}
@@ -4735,10 +4735,10 @@ function CreateLectureSheetContent() {
         }
         @media print {
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; width: 100% !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .no-print { display: none !important; }
+          .no-print, [class*="bg-black/"], [class*="backdrop-blur"] { display: none !important; }
           .print-view-container { position: absolute !important; top: 0 !important; left: 0 !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; display: block !important; background: white !important; width: 100% !important; }
           .print-main-area { background: white !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; display: block !important; height: auto !important; position: static !important; width: 100% !important; }
-          .paper { position: relative !important; margin: 0 !important; box-shadow: none !important; width: 8.27in !important; height: 11.69in !important; page-break-after: always !important; break-after: page !important; break-inside: avoid !important; display: block !important; box-sizing: border-box !important; border: none !important; overflow: hidden !important; }
+          .paper { background: white !important; background-color: #ffffff !important; color: #000000 !important; position: relative !important; margin: 0 !important; box-shadow: none !important; width: 8.27in !important; height: 11.69in !important; page-break-after: always !important; break-after: page !important; break-inside: avoid !important; display: block !important; box-sizing: border-box !important; border: none !important; overflow: hidden !important; }
           @page { size: A4; margin: 0 !important; }
         }
       `}} />
