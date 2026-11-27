@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { formatQuestionToBoardStandardHtml, stripAnswers, ensureQuestionIntegrity } from '@/lib/question-formatter';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
@@ -39,6 +40,7 @@ import {
   BrainCircuit,
   Plus,
   LayoutTemplate,
+  Library,
   X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -2583,11 +2585,8 @@ export function QuestionPrintView({
     setRepaginateVersion(v => v + 1);
   }, [globalFontSize, globalLineHeight, pageStyles, activeEditIdx, documentContent, initialContent, manualPages]);
 
-  // Initial pagination
+  // Initial pagination & sync with loaded meta
   useEffect(() => {
-    if (hasInitiallyPaginatedRef.current) return;
-    hasInitiallyPaginatedRef.current = true;
-
     // If meta.manualPages exists (i.e. document was previously saved in editor), load those exact pages directly!
     if (meta.manualPages && Object.keys(meta.manualPages).length > 0) {
       const sortedKeys = Object.keys(meta.manualPages).map(Number).sort((a, b) => a - b);
@@ -2597,10 +2596,12 @@ export function QuestionPrintView({
       if (meta.pageStyles) {
         setPageStyles(meta.pageStyles);
       }
+      hasInitiallyPaginatedRef.current = true;
       return;
     }
 
-    if (measurementRef.current) {
+    if (initialContent && measurementRef.current && (!hasInitiallyPaginatedRef.current || paginatedPages.length === 0)) {
+      hasInitiallyPaginatedRef.current = true;
       repaginateDocument({ sourceContent: initialContent });
     }
   }, [repaginateDocument, initialContent, meta.manualPages, meta.pageStyles]);
@@ -3032,9 +3033,14 @@ export function QuestionPrintView({
           </div>
 
           {/* Back, Save, Print */}
-          <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white px-2 sm:px-3 shrink-0" title="ফিরে যান">
-            <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
+          <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2 sm:px-3 shrink-0" title="মেইন এডিটরে ফিরে যান">
+            <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">মেইন এডিটর</span>
           </Button>
+          <Link href="/my-questions">
+            <Button variant="outline" size="sm" className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 px-2 sm:px-3 shrink-0" title="আমার লাইব্রেরিতে যান">
+              <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">লাইব্রেরি</span>
+            </Button>
+          </Link>
           <Button size="sm" onClick={handleOpenSaveModal} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ ও PDF তৈরি করুন">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ ও PDF</span>
           </Button>

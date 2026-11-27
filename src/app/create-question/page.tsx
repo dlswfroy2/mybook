@@ -634,13 +634,10 @@ function CreateQuestionContent() {
 
             if (data.content) {
               setDocumentContent(data.content);
+              setMeta(prev => ({ ...prev, content: data.content }));
             }
             if (data.manualPages) {
               setMeta(prev => ({ ...prev, manualPages: data.manualPages, pageStyles: data.pageStyles }));
-            }
-            if ((data.isEditorSaved || data.content) && !searchParams.get('print')) {
-              router.replace(`/create-question?id=${editId}&print=true`);
-              return;
             }
             const reconstructed = (data.questions || []).map((q: any) => {
               const id = Math.random().toString(36).substr(2, 9);

@@ -5,6 +5,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback, Fra
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -68,7 +69,8 @@ import {
   Ruler,
   Home as HomeIcon,
   Columns as LayoutIcon,
-  PlusSquare
+  PlusSquare,
+  Library
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateLectureSheet, expandLectureContent } from '@/ai/flows/generate-lecture-sheet-flow';
@@ -2551,10 +2553,6 @@ function CreateLectureSheetContent() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const docData = docSnap.data();
-          if ((docData.isEditorSaved || docData.manualPages || docData.hasPageDocs) && !searchParams.get('print')) {
-            router.replace(`/create-lecture-sheet?id=${editId}&print=true`);
-            return;
-          }
           const cleanContent = stripDirtyHtml(docData.content || '');
           setData({
             institution: docData.institution || 'টপ গ্রেড টিউটোরিয়ালস',
@@ -4446,9 +4444,29 @@ function CreateLectureSheetContent() {
               </div>
 
               {/* ফিরে যান, সেভ এবং প্রিন্ট বাটন */}
-              <Button variant="outline" size="sm" onClick={() => router.back()} className="h-8 gap-1.5 font-bold border-slate-300 text-slate-700 bg-white">
-                <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const p = new URLSearchParams(window.location.search);
+                  p.delete('print');
+                  router.push(`${window.location.pathname}?${p.toString()}`);
+                }}
+                className="h-8 gap-1.5 font-bold border-indigo-200 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100"
+                title="মেইন এডিটরে ফিরে যান"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">মেইন এডিটর</span>
               </Button>
+              <Link href="/my-questions">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+                  title="আমার লাইব্রেরিতে যান"
+                >
+                  <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">লাইব্রেরি</span>
+                </Button>
+              </Link>
               <Button size="sm" onClick={handleOpenSaveModal} disabled={saving} className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-3 shadow-xs">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ ও PDF
               </Button>
