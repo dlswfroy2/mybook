@@ -3389,9 +3389,9 @@ function CreateLectureSheetContent() {
   if (loading || userLoading) return <div className="flex flex-col items-center justify-center p-20 min-h-[50vh]"><Loader2 className="w-12 h-12 animate-spin text-primary mb-4" /><p className="font-bold">অ্যাক্সেস চেক করা হচ্ছে...</p></div>;
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-kalpurush">
+    <div className="max-w-[1400px] mx-auto space-y-6 sm:space-y-8 px-2.5 sm:px-4 md:px-6 pb-16 font-kalpurush w-full max-w-full overflow-x-hidden box-border">
       <div ref={measurementRef} className="font-kalpurush" style={{ position: 'fixed', top: '-10000px', left: '-10000px', visibility: 'hidden', pointerEvents: 'none', width: '7.27in', lineHeight: '1.2' }} />
-      <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
+      <div className={cn("no-print space-y-6 sm:space-y-8 w-full max-w-full overflow-x-hidden", isPrintMode && "hidden")}>
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm"><BookOpen className="w-7 h-7" /></div>

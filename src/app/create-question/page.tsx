@@ -951,10 +951,10 @@ function CreateQuestionContent() {
   }, [isEnglish]);
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 pb-36 sm:pb-16 font-kalpurush">
-      <div className={cn("no-print space-y-8", isPrintMode && "hidden")}>
+    <div className="max-w-[1400px] mx-auto space-y-6 sm:space-y-8 px-2.5 sm:px-4 md:px-6 pb-36 sm:pb-16 font-kalpurush w-full max-w-full overflow-x-hidden box-border">
+      <div className={cn("no-print space-y-6 sm:space-y-8 w-full max-w-full overflow-x-hidden", isPrintMode && "hidden")}>
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 w-full max-w-full">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
               <FileText className="w-5 h-5 sm:w-7 sm:h-7" />
@@ -1076,6 +1076,7 @@ function CreateQuestionContent() {
                       value={['সাপ্তাহিক পরীক্ষা', 'মাসিক পরীক্ষা', 'মডেল টেস্ট', '১ম সাময়িক পরীক্ষা', '২য় সাময়িক পরীক্ষা', 'অর্ধ-বার্ষিক পরীক্ষা', 'বার্ষিক পরীক্ষা', 'প্রাক-নির্বাচনি পরীক্ষা', 'নির্বাচনি (টেস্ট) পরীক্ষা', 'ক্লাস টেস্ট'].includes(meta.exam) ? meta.exam : 'custom'} 
                       onValueChange={v => {
                         if (v !== 'custom') setMeta(prev => ({...prev, exam: v}));
+                        else setMeta(prev => ({...prev, exam: ''}));
                       }}
                     >
                       <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="পরীক্ষা বেছে নিন" /></SelectTrigger>
@@ -1093,12 +1094,14 @@ function CreateQuestionContent() {
                         <SelectItem value="custom" className="text-xs font-bold">কাস্টম নাম লিখুন...</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Input 
-                      value={meta.exam || ''} 
-                      onChange={e => setMeta(prev => ({...prev, exam: e.target.value}))} 
-                      placeholder="পরীক্ষার নাম..." 
-                      className="h-8 text-xs font-bold mt-1" 
-                    />
+                    {(!['সাপ্তাহিক পরীক্ষা', 'মাসিক পরীক্ষা', 'মডেল টেস্ট', '১ম সাময়িক পরীক্ষা', '২য় সাময়িক পরীক্ষা', 'অর্ধ-বার্ষিক পরীক্ষা', 'বার্ষিক পরীক্ষা', 'প্রাক-নির্বাচনি পরীক্ষা', 'নির্বাচনি (টেস্ট) পরীক্ষা', 'ক্লাস টেস্ট'].includes(meta.exam)) && (
+                      <Input 
+                        value={meta.exam || ''} 
+                        onChange={e => setMeta(prev => ({...prev, exam: e.target.value}))} 
+                        placeholder="কাস্টম পরীক্ষার নাম লিখুন..." 
+                        className="h-8 text-xs font-bold mt-1" 
+                      />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">শ্রেণি</label>
@@ -1179,6 +1182,7 @@ function CreateQuestionContent() {
                         value={['২০ মিনিট', '২৫ মিনিট', '৩০ মিনিট', '৪০ মিনিট', '৪৫ মিনিট', '৫০ মিনিট', '১ ঘণ্টা', '১ ঘণ্টা ১৫ মিনিট', '১ ঘণ্টা ২০ মিনিট', '১ ঘণ্টা ৩০ মিনিট', '১ ঘণ্টা ৪৫ মিনিট', '২ ঘণ্টা', '২ ঘণ্টা ১৫ মিনিট', '২ ঘণ্টা ৩০ মিনিট', '৩ ঘণ্টা'].includes(meta.time) ? meta.time : 'custom'} 
                         onValueChange={v => {
                           if (v !== 'custom') setMeta(prev => ({...prev, time: v}));
+                          else setMeta(prev => ({...prev, time: ''}));
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs font-bold"><SelectValue placeholder="সময়" /></SelectTrigger>
@@ -1200,12 +1204,14 @@ function CreateQuestionContent() {
                           <SelectItem value="custom" className="text-xs font-bold">কাস্টম...</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Input 
-                        value={meta.time || ''} 
-                        onChange={e => setMeta(prev => ({...prev, time: e.target.value}))} 
-                        placeholder="যেমন: ২ ঘণ্টা ৩০ মিনিট" 
-                        className="h-8 text-xs font-bold mt-1" 
-                      />
+                      {(!['২০ মিনিট', '২৫ মিনিট', '৩০ মিনিট', '৪০ মিনিট', '৪৫ মিনিট', '৫০ মিনিট', '১ ঘণ্টা', '১ ঘণ্টা ১৫ মিনিট', '১ ঘণ্টা ২০ মিনিট', '১ ঘণ্টা ৩০ মিনিট', '১ ঘণ্টা ৪৫ মিনিট', '২ ঘণ্টা', '২ ঘণ্টা ১৫ মিনিট', '২ ঘণ্টা ৩০ মিনিট', '৩ ঘণ্টা'].includes(meta.time)) && (
+                        <Input 
+                          value={meta.time || ''} 
+                          onChange={e => setMeta(prev => ({...prev, time: e.target.value}))} 
+                          placeholder="যেমন: ২ ঘণ্টা ৩০ মিনিট" 
+                          className="h-8 text-xs font-bold mt-1" 
+                        />
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">পূর্ণমান</label>
@@ -1218,28 +1224,28 @@ function CreateQuestionContent() {
           </aside>
 
           {/* Right Main Editor Area */}
-          <div className="flex-1 min-w-0 space-y-6">
-            <Tabs value={activeMainTab} onValueChange={(v: any) => setActiveMainTab(v)} className="w-full">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <TabsList className="bg-slate-100 p-1 h-auto flex flex-wrap sm:flex-nowrap border border-slate-200 w-full sm:w-auto">
-                  <TabsTrigger value="editor" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <Eye className="w-3.5 h-3.5" /> লাইভ এডিটর
+          <div className="flex-1 min-w-0 space-y-6 w-full max-w-full overflow-hidden">
+            <Tabs value={activeMainTab} onValueChange={(v: any) => setActiveMainTab(v)} className="w-full max-w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 w-full">
+                <TabsList className="grid grid-cols-2 sm:flex sm:flex-wrap bg-slate-100 p-1 h-auto border border-slate-200 w-full sm:w-auto rounded-xl gap-1">
+                  <TabsTrigger value="editor" className="py-2 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700 rounded-lg justify-center">
+                    <Eye className="w-3.5 h-3.5 shrink-0" /> লাইভ এডিটর
                   </TabsTrigger>
-                  <TabsTrigger value="cards" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <ListChecks className="w-3.5 h-3.5" /> কার্ড তালিকা ({toBengaliNumber(activeSet === 'A' ? questions.length : questionsB.length)})
+                  <TabsTrigger value="cards" className="py-2 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700 rounded-lg justify-center">
+                    <ListChecks className="w-3.5 h-3.5 shrink-0" /> কার্ড তালিকা ({toBengaliNumber(activeSet === 'A' ? questions.length : questionsB.length)})
                   </TabsTrigger>
-                  <TabsTrigger value="board" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-amber-800">
-                    <Award className="w-3.5 h-3.5 text-amber-600" /> বোর্ড প্রশ্ন
+                  <TabsTrigger value="board" className="py-2 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-amber-800 rounded-lg justify-center">
+                    <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" /> বোর্ড প্রশ্ন
                   </TabsTrigger>
-                  <TabsTrigger value="raw_code" className="flex-1 sm:flex-initial py-1.5 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700">
-                    <Code2 className="w-3.5 h-3.5" /> কোড ভিউ
+                  <TabsTrigger value="raw_code" className="py-2 px-2 sm:px-3 font-bold text-xs gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-700 rounded-lg justify-center">
+                    <Code2 className="w-3.5 h-3.5 shrink-0" /> কোড ভিউ
                   </TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Tab 1: Live Visual Paper Editor */}
-              <TabsContent value="editor" className="mt-0 space-y-4">
-                <Card className="shadow-lg border-2 border-slate-200 bg-slate-100/50">
+              <TabsContent value="editor" className="mt-0 space-y-4 w-full max-w-full">
+                <Card className="shadow-lg border-2 border-slate-200 bg-slate-100/50 w-full max-w-full overflow-hidden rounded-2xl">
                   <CardHeader className="py-2.5 px-3 sm:px-4 bg-white border-b flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
                     <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                       📄 লাইভ প্রিন্ট-স্টাইল লেআউট
@@ -1255,10 +1261,10 @@ function CreateQuestionContent() {
                   </CardHeader>
                   <CardContent 
                     ref={paperContainerRef}
-                    className="p-1 sm:p-4 md:p-8 flex justify-center w-full max-w-full overflow-hidden"
+                    className="p-1 sm:p-4 md:p-8 flex justify-center w-full max-w-full overflow-hidden box-border"
                   >
                     {/* Visual A4 Paper Preview - 100% responsive on mobile, standard A4 on desktop */}
-                    <div className="w-full min-w-0 max-w-full sm:max-w-[8.27in] bg-white rounded-xl shadow-xl border-2 border-slate-300 p-3 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm transition-all overflow-x-hidden break-words">
+                    <div className="w-full min-w-0 max-w-full sm:max-w-[8.27in] bg-white rounded-xl shadow-md border-2 border-slate-300 p-2.5 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm transition-all overflow-hidden break-words box-border">
                       {/* Institutional Header */}
                       <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
                         <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
@@ -1272,9 +1278,9 @@ function CreateQuestionContent() {
                           {questionsB.length > 0 && <span className="text-xs font-black border border-black px-2 py-0.5">সেট: ক (A)</span>}
                           <span>বিষয়: {meta.subject} {meta.chapter && `(${meta.chapter})`}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[11px] font-bold mt-1.5 px-2 italic border-t pt-1 border-dashed border-slate-300">
-                          <span>সময়: {meta.time}</span>
-                          <span>পূর্ণমান: {toBengaliNumber(meta.totalMarks)}</span>
+                        <div className="flex justify-between items-center text-[10px] sm:text-[11px] font-bold mt-1.5 px-1 sm:px-2 italic border-t pt-1 border-dashed border-slate-300 gap-2 w-full max-w-full">
+                          <span className="shrink-0">সময়: {meta.time}</span>
+                          <span className="shrink-0">পূর্ণমান: {toBengaliNumber(meta.totalMarks)}</span>
                         </div>
                       </div>
 
