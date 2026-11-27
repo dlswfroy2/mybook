@@ -20,7 +20,10 @@ import {
   Layers, 
   Search,
   Settings2,
-  Columns
+  Columns,
+  Type,
+  SlidersHorizontal,
+  Split
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,6 +45,27 @@ import { useFirestore, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import 'katex/dist/katex.min.css';
 import { formatMathToHtml } from '@/lib/math-formatter';
+
+// Font & Typography configuration for board print
+const FONT_SIZE_CONFIG = {
+  sm: { label: 'ছোট (১১.৫ px)', font: '11.5px', line: '1.35', serial: '12.5px' },
+  base: { label: 'স্বাভাবিক (১৩ px - বোর্ড স্ট্যান্ডার্ড)', font: '13px', line: '1.45', serial: '14px' },
+  lg: { label: 'বড় (১৪.৫ px)', font: '14.5px', line: '1.55', serial: '15.5px' },
+  xl: { label: 'খুব বড় (১৬ px)', font: '16px', line: '1.65', serial: '17px' }
+};
+
+const FONT_FAMILY_CONFIG = {
+  kalpurush: { label: 'কালপুরুষ (Kalpurush - ডিফল্ট)', font: "'Kalpurush', 'Inter', sans-serif" },
+  solaiman: { label: 'সোলাইমান লিপি (SolaimanLipi)', font: "'SolaimanLipi', 'Kalpurush', sans-serif" },
+  nikosh: { label: 'নিকোশ (Nikosh)', font: "'Nikosh', 'Kalpurush', sans-serif" },
+  sans: { label: 'আধুনিক বাংলা (System Sans)', font: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }
+};
+
+const LINE_SPACING_CONFIG = {
+  compact: { label: 'আঁটসাঁট / কম্প্যাক্ট', line: '1.25' },
+  normal: { label: 'স্বাভাবিক (বোর্ড মান)', line: '1.45' },
+  relaxed: { label: 'আরামদায়ক (বেশি ফাঁকা)', line: '1.65' }
+};
 
 const CLASSES = [
   { id: '6', label: '৬ষ্ঠ' },
@@ -346,6 +370,30 @@ export default function QuestionBankPage() {
   const [creativeInstruction, setCreativeInstruction] = useState('যেকোনো ৩টি প্রশ্নের উত্তর দাও: ৩ × ১০ = ৩০');
   const [creativeStartSerial, setCreativeStartSerial] = useState('১');
 
+  // Creative Questions multiple sections (ক-বিভাগ, খ-বিভাগ, গ-বিভাগ, ঘ-বিভাগ ইত্যাদি)
+  const [creativeSections, setCreativeSections] = useState<Array<{
+    id: string;
+    title: string;
+    instruction: string;
+    startSerial: string;
+    fromQ: number;
+    toQ: number;
+  }>>([
+    {
+      id: 'cq-sec-1',
+      title: 'ক-বিভাগ: সৃজনশীল প্রশ্ন',
+      instruction: 'যেকোনো ৩টি প্রশ্নের উত্তর দাও: ৩ × ১০ = ৩০',
+      startSerial: '১',
+      fromQ: 1,
+      toQ: 11
+    }
+  ]);
+
+  // Print typography controls
+  const [printFontSize, setPrintFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
+  const [printFontFamily, setPrintFontFamily] = useState<'kalpurush' | 'solaiman' | 'nikosh' | 'sans'>('kalpurush');
+  const [printLineSpacing, setPrintLineSpacing] = useState<'compact' | 'normal' | 'relaxed'>('normal');
+
   const [includeMcq, setIncludeMcq] = useState(true);
   const [mcqTitle, setMcqTitle] = useState('খ-বিভাগ: বহুনির্বাচনী প্রশ্ন');
   const [mcqInstruction, setMcqInstruction] = useState('সঠিক উত্তরের বিপরীতের বৃত্তটি বল পয়েন্ট কলম দ্বারা ভরাট কর। সকল প্রশ্নের উত্তর দিতে হবে।');
@@ -569,14 +617,27 @@ export default function QuestionBankPage() {
     
     const mcqStart = (cqEnd > 0 && hasCq) ? cqEnd + 1 : 1;
     setMcqStartSerial(String(mcqStart));
-    const mcqEnd = cqEnd + (selectedMcqs.length > 0 ? selectedMcqs.length : 0);
 
-    const shortStart = (mcqEnd > 0 && (hasCq || hasMcq)) ? mcqEnd + 1 : 1;
-    setShortStartSerial(String(shortStart));
+    // Short question serial number ALWAYS starts from 1 as per board standard and user request!
+    setShortStartSerial('1');
 
     // Auto-configure instructions based on selected count
     const cqAns = Math.max(1, selectedCreatives.length > 7 ? 7 : (selectedCreatives.length || 1));
-    setCreativeInstruction(`যেকোনো ${toBengaliNumber(cqAns)}টি প্রশ্নের উত্তর দাও: ${toBengaliNumber(cqAns)} × ১০ = ${toBengaliNumber(cqAns * 10)}`);
+    const defaultCqTitle = isSingleSectionOnly ? '' : 'ক-বিভাগ: সৃজনশীল প্রশ্ন';
+    const defaultCqInstruction = `যেকোনো ${toBengaliNumber(cqAns)}টি প্রশ্নের উত্তর দাও: ${toBengaliNumber(cqAns)} × ১০ = ${toBengaliNumber(cqAns * 10)}`;
+    setCreativeInstruction(defaultCqInstruction);
+
+    // Initialize creative sections (supports multiple sections: ক, খ, গ, ঘ বিভাগ)
+    setCreativeSections([
+      {
+        id: 'cq-sec-1',
+        title: defaultCqTitle,
+        instruction: defaultCqInstruction,
+        startSerial: '১',
+        fromQ: 1,
+        toQ: Math.max(1, selectedCreatives.length)
+      }
+    ]);
     
     const mcqCount = selectedMcqs.length || 20;
     setMcqInstruction(`সঠিক উত্তরের বিপরীতের বৃত্তটি বল পয়েন্ট কলম দ্বারা ভরাট কর। সকল প্রশ্নের উত্তর দিতে হবে: ${toBengaliNumber(mcqCount)} × ১ = ${toBengaliNumber(mcqCount)}`);
@@ -585,6 +646,103 @@ export default function QuestionBankPage() {
     setShortInstruction(`সকল প্রশ্নের উত্তর দাও: ${toBengaliNumber(shortCount)} × ২ = ${toBengaliNumber(shortCount * 2)}`);
 
     setSetupModalOpen(true);
+  };
+
+  // Helper to add a new creative sub-section
+  const handleAddCreativeSection = () => {
+    setCreativeSections(prev => {
+      const nextIndex = prev.length + 1;
+      const letters = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+      const letter = letters[prev.length] || `বিভাগ ${toBengaliNumber(nextIndex)}`;
+      const lastSec = prev[prev.length - 1];
+      const cqTotal = selectedCreatives.length || 1;
+      const fromQ = lastSec ? Math.min(cqTotal, lastSec.toQ + 1) : 1;
+      const toQ = Math.min(cqTotal, fromQ + 2);
+      const startSerial = toBengaliNumber(fromQ);
+
+      return [
+        ...prev,
+        {
+          id: `cq-sec-${Date.now()}`,
+          title: `${letter}-বিভাগ`,
+          instruction: 'যেকোনো ২টি প্রশ্নের উত্তর দাও: ২ × ১০ = ২০',
+          startSerial: startSerial,
+          fromQ: fromQ,
+          toQ: Math.max(fromQ, toQ)
+        }
+      ];
+    });
+  };
+
+  // Helper to remove a creative sub-section
+  const handleRemoveCreativeSection = (id: string) => {
+    setCreativeSections(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter(s => s.id !== id);
+    });
+  };
+
+  // Helper to update a section
+  const handleUpdateCreativeSection = (id: string, field: string, value: any) => {
+    setCreativeSections(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      return { ...s, [field]: value };
+    }));
+  };
+
+  // Preset 4-Section Template (Board Standard for Math)
+  const handleApplyBoard4SectionPreset = () => {
+    const totalQ = selectedCreatives.length || 11;
+    setCreativeSections([
+      {
+        id: 'cq-sec-1',
+        title: 'ক-বিভাগ: বীজগণিত',
+        instruction: 'যেকোনো ২টি প্রশ্নের উত্তর দাও: ২ × ১০ = ২০',
+        startSerial: '১',
+        fromQ: 1,
+        toQ: Math.min(totalQ, 3)
+      },
+      {
+        id: 'cq-sec-2',
+        title: 'খ-বিভাগ: জ্যামিতি',
+        instruction: 'যেকোনো ২টি প্রশ্নের উত্তর দাও: ২ × ১০ = ২০',
+        startSerial: '৪',
+        fromQ: Math.min(totalQ, 4),
+        toQ: Math.min(totalQ, 6)
+      },
+      {
+        id: 'cq-sec-3',
+        title: 'গ-বিভাগ: ত্রিকোণমিতি ও পরিমিতি',
+        instruction: 'যেকোনো ২টি প্রশ্নের উত্তর দাও: ২ × ১০ = ২০',
+        startSerial: '৭',
+        fromQ: Math.min(totalQ, 7),
+        toQ: Math.min(totalQ, 9)
+      },
+      {
+        id: 'cq-sec-4',
+        title: 'ঘ-বিভাগ: পরিসংখ্যান',
+        instruction: 'যেকোনো ১টি প্রশ্নের উত্তর দাও: ১ × ১০ = ১০',
+        startSerial: '১০',
+        fromQ: Math.min(totalQ, 10),
+        toQ: totalQ
+      }
+    ]);
+  };
+
+  // Reset to single creative section
+  const handleResetToSingleSection = () => {
+    const totalQ = selectedCreatives.length || 1;
+    const ansQ = Math.max(1, totalQ > 7 ? 7 : totalQ);
+    setCreativeSections([
+      {
+        id: 'cq-sec-1',
+        title: 'ক-বিভাগ: সৃজনশীল প্রশ্ন',
+        instruction: `যেকোনো ${toBengaliNumber(ansQ)}টি প্রশ্নের উত্তর দাও: ${toBengaliNumber(ansQ)} × ১০ = ${toBengaliNumber(ansQ * 10)}`,
+        startSerial: '১',
+        fromQ: 1,
+        toQ: totalQ
+      }
+    ]);
   };
 
   // Confirm setup and go to final 2-column print paper
@@ -629,11 +787,18 @@ export default function QuestionBankPage() {
     const isSingleTypeExam = isOnlyMcq || isOnlyCreative || isOnlyShort;
     const singleTypeInstruction = isOnlyMcq ? mcqInstruction : isOnlyCreative ? creativeInstruction : shortInstruction;
 
+    const activeFont = FONT_FAMILY_CONFIG[printFontFamily]?.font || FONT_FAMILY_CONFIG.kalpurush.font;
+    const activeSize = FONT_SIZE_CONFIG[printFontSize] || FONT_SIZE_CONFIG.base;
+    const activeLeading = LINE_SPACING_CONFIG[printLineSpacing]?.line || activeSize.line;
+
     return (
-      <div className="print-wrapper min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush print:bg-white print:p-0 print:m-0 print:min-h-0 print:w-full">
+      <div 
+        style={{ fontFamily: activeFont }}
+        className="print-wrapper min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush print:bg-white print:p-0 print:m-0 print:min-h-0 print:w-full"
+      >
         {/* Floating Top Control Bar (Strictly hidden during print) */}
         <div className="no-print max-w-[8.27in] mx-auto mb-6 bg-white p-3 sm:p-4 rounded-2xl shadow-lg border-2 border-indigo-200 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button 
               variant="outline" 
               size="sm"
@@ -672,6 +837,34 @@ export default function QuestionBankPage() {
               </button>
             </div>
 
+            {/* Quick Font Size Switcher */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300">
+              <span className="text-[10px] font-bold text-slate-500 px-1.5 flex items-center gap-0.5">
+                <Type className="w-3 h-3" /> ফন্ট:
+              </span>
+              <button
+                type="button"
+                onClick={() => setPrintFontSize('sm')}
+                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'sm' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
+              >
+                ছোট
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFontSize('base')}
+                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'base' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
+              >
+                স্বাভাবিক
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFontSize('lg')}
+                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'lg' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
+              >
+                বড়
+              </button>
+            </div>
+
             <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 hidden sm:inline">
               মোট প্রশ্ন: {toBengaliNumber(selectedIds.size)}টি | পূর্ণমান: {examTotalMarks}
             </span>
@@ -704,7 +897,10 @@ export default function QuestionBankPage() {
         </div>
 
         {/* The Printable Board A4 Paper Container */}
-        <div className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-lg p-6 sm:p-10 border-0 min-h-[11in] text-black leading-normal box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
+        <div 
+          style={{ fontFamily: activeFont, fontSize: activeSize.font }}
+          className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-lg p-6 sm:p-10 border-0 min-h-[11in] text-black leading-normal box-border print:p-0 print:border-none print:shadow-none print:max-w-none"
+        >
           {/* Institutional Header (Spans across full width of both columns) */}
           <div className="text-center border-b-2 border-black pb-2.5 mb-3 select-none [column-span:all]">
             <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
@@ -738,43 +934,53 @@ export default function QuestionBankPage() {
               ? "columns-1 md:columns-2 print:columns-2 [column-rule:0.5pt_solid_black]" 
               : "columns-1 print:columns-1"
           )}>
-            {/* Section 1: Creative Questions (CQ) */}
-            {includeCreative && selectedCreatives.length > 0 && (
-              <div className="section-block mb-3">
-                {/* Centered Section Header Banner (Omitted if single-type exam) */}
-                {!isSingleTypeExam && (creativeTitle || creativeInstruction) && (
-                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
-                    {creativeTitle && (
-                      <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
-                        {creativeTitle}
-                      </div>
-                    )}
-                    {creativeInstruction && (
-                      <div className="text-[11px] font-bold italic text-slate-800 mt-0.5">
-                        [{creativeInstruction}]
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="space-y-2.5">
-                  {selectedCreatives.map((q, idx) => {
-                    const startNum = parseInt(creativeStartSerial, 10) || 1;
-                    const qNum = toBengaliNumber(startNum + idx);
-                    return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2.5">
-                        <div className="flex items-start gap-1.5">
-                          <span className="font-black text-sm shrink-0">{qNum}।</span>
-                          <div 
-                            className="flex-1 math-rendered"
-                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { subject: selectedSubject }) }}
-                          />
+            {/* Section 1: Creative Questions (CQ) - Supports multiple sections (ক, খ, গ, ঘ বিভাগ) */}
+            {includeCreative && selectedCreatives.length > 0 && creativeSections.map((sec, secIdx) => {
+              const startIdx = Math.max(0, (sec.fromQ || 1) - 1);
+              const endIdx = Math.min(selectedCreatives.length, sec.toQ || selectedCreatives.length);
+              const secQuestions = selectedCreatives.slice(startIdx, endIdx);
+
+              if (secQuestions.length === 0) return null;
+
+              const startNum = parseInt(sec.startSerial, 10) || 1;
+              const showHeader = !isSingleTypeExam || creativeSections.length > 1;
+
+              return (
+                <div key={sec.id || secIdx} className="section-block mb-3">
+                  {/* Centered Section Header Banner */}
+                  {showHeader && (sec.title || sec.instruction) && (
+                    <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                      {sec.title && (
+                        <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
+                          {sec.title}
                         </div>
-                      </div>
-                    );
-                  })}
+                      )}
+                      {sec.instruction && (
+                        <div className="text-[11px] font-bold italic text-slate-800 mt-0.5">
+                          [{sec.instruction}]
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="space-y-2.5">
+                    {secQuestions.map((q, idx) => {
+                      const qNum = toBengaliNumber(startNum + idx);
+                      return (
+                        <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2.5">
+                          <div className="flex items-start gap-1.5">
+                            <span className="font-black text-sm shrink-0">{qNum}।</span>
+                            <div 
+                              className="flex-1 math-rendered"
+                              dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { subject: selectedSubject }) }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
 
             {/* Section 2: Multiple Choice Questions (MCQ) */}
             {includeMcq && selectedMcqs.length > 0 && (
@@ -813,7 +1019,7 @@ export default function QuestionBankPage() {
               </div>
             )}
 
-            {/* Section 3: Short Questions */}
+            {/* Section 3: Short Questions - ALWAYS starts from 1 by default */}
             {includeShort && selectedShorts.length > 0 && (
               <div className="section-block mb-3">
                 {/* Centered Section Header Banner (Omitted if single-type exam) */}
@@ -853,7 +1059,7 @@ export default function QuestionBankPage() {
           </div>
         </div>
 
-        {/* Global Print Stylesheet: ZERO clutter, no grey borders, clean hairlines */}
+        {/* Global Print Stylesheet: ZERO clutter, no grey borders, clean hairlines, custom font */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             *, *::before, *::after {
@@ -869,6 +1075,7 @@ export default function QuestionBankPage() {
               width: 100% !important;
               height: auto !important;
               min-height: 0 !important;
+              font-family: ${activeFont} !important;
             }
             .no-print, header, nav, footer, button, .app-header, .site-header {
               display: none !important;
@@ -889,6 +1096,7 @@ export default function QuestionBankPage() {
               height: auto !important;
               background: #ffffff !important;
               background-color: #ffffff !important;
+              font-family: ${activeFont} !important;
             }
             .print-question-flow {
               column-count: ${columnLayout} !important;
@@ -910,6 +1118,13 @@ export default function QuestionBankPage() {
               page-break-inside: avoid !important;
               border: none !important;
               border-bottom: none !important;
+            }
+            .question-item, .question-item .math-rendered, .question-item div, .question-item span:not(.font-black) {
+              font-size: ${activeSize.font} !important;
+              line-height: ${activeLeading} !important;
+            }
+            .question-item span.shrink-0 {
+              font-size: ${activeSize.serial} !important;
             }
           }
         ` }} />
@@ -1456,7 +1671,7 @@ export default function QuestionBankPage() {
                     <Columns className="w-3.5 h-3.5 text-indigo-600" /> কলাম সংখ্যা (লেআউট)
                   </label>
                   <Select value={columnLayout} onValueChange={(v: '1' | '2') => setColumnLayout(v)}>
-                    <SelectTrigger className="h-8 font-bold text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="2" className="text-xs font-bold">২ কলাম (বোর্ড স্ট্যান্ডার্ড - ডিফল্ট)</SelectItem>
                       <SelectItem value="1" className="text-xs font-bold">১ কলাম (ফুল পেজ লেআউট)</SelectItem>
@@ -1466,9 +1681,64 @@ export default function QuestionBankPage() {
               </div>
             </div>
 
-            {/* Section 1 Setup: Creative (ক-বিভাগ) - Always Available */}
-            <div className={cn("p-3 rounded-xl border space-y-2 transition-all", includeCreative ? "bg-indigo-50/50 border-indigo-200" : "bg-slate-50 border-slate-200 opacity-70")}>
+            {/* Typography & Font Settings (২. প্রিন্ট লেখার ফন্ট ও সাইজ নির্ধারণ) */}
+            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 space-y-2.5">
               <div className="flex items-center justify-between">
+                <span className="font-black text-indigo-950 text-xs flex items-center gap-1.5">
+                  <Type className="w-4 h-4 text-indigo-600" /> ২. প্রিন্ট লেখার ফন্ট ও সাইজ নির্ধারণ
+                </span>
+                <span className="text-[10px] text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 font-bold">
+                  কাস্টম ফন্ট ও সাইজ
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Font Size */}
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">ফন্ট সাইজ (লেখার আকার)</label>
+                  <Select value={printFontSize} onValueChange={(v: any) => setPrintFontSize(v)}>
+                    <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sm" className="text-xs font-bold">ছোট (১১.৫ px - বেশি প্রশ্ন আটবে)</SelectItem>
+                      <SelectItem value="base" className="text-xs font-bold">স্বাভাবিক (১৩ px - বোর্ড মান)</SelectItem>
+                      <SelectItem value="lg" className="text-xs font-bold">বড় (১৪.৫ px - স্পষ্ট পাঠযোগ্য)</SelectItem>
+                      <SelectItem value="xl" className="text-xs font-bold">খুব বড় (১৬ px)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Font Family */}
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">ফন্ট পরিবার (লিপি)</label>
+                  <Select value={printFontFamily} onValueChange={(v: any) => setPrintFontFamily(v)}>
+                    <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kalpurush" className="text-xs font-bold">কালপুরুষ (Kalpurush - ডিফল্ট)</SelectItem>
+                      <SelectItem value="solaiman" className="text-xs font-bold">সোলাইমান লিপি (SolaimanLipi)</SelectItem>
+                      <SelectItem value="nikosh" className="text-xs font-bold">নিকোশ (Nikosh)</SelectItem>
+                      <SelectItem value="sans" className="text-xs font-bold">সিস্টেম বাংলা (Bangla Sans)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Line Height */}
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">লাইনের ফাঁকা (স্পেসিং)</label>
+                  <Select value={printLineSpacing} onValueChange={(v: any) => setPrintLineSpacing(v)}>
+                    <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compact" className="text-xs font-bold">আঁটসাঁট / কম্প্যাক্ট</SelectItem>
+                      <SelectItem value="normal" className="text-xs font-bold">স্বাভাবিক (বোর্ড মান)</SelectItem>
+                      <SelectItem value="relaxed" className="text-xs font-bold">আরামদায়ক (বেশি ফাঁকা)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 1 Setup: Creative (ক-বিভাগ, খ-বিভাগ ইত্যাদি - একাধিক বিভাগ সাপোর্ট) */}
+            <div className={cn("p-3 rounded-xl border space-y-3 transition-all", includeCreative ? "bg-indigo-50/50 border-indigo-200" : "bg-slate-50 border-slate-200 opacity-70")}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="flex items-center gap-2 font-black text-indigo-950 text-xs cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -1476,33 +1746,121 @@ export default function QuestionBankPage() {
                     onChange={e => setIncludeCreative(e.target.checked)}
                     className="w-4 h-4 accent-indigo-600 rounded"
                   />
-                  <span>১. সৃজনশীল বিভাগ (ক-বিভাগ)</span>
+                  <span>৩. সৃজনশীল বিভাগ (একাধিক বিভাগ যোগ করার সুবিধা)</span>
                 </label>
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", selectedCreatives.length > 0 ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-600")}>
                   {selectedCreatives.length > 0 ? `নির্বাচিত: ${toBengaliNumber(selectedCreatives.length)}টি প্রশ্ন` : 'বর্তমানে নির্বাচিত নেই'}
                 </span>
               </div>
+
               {includeCreative && (
-                <>
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    <div className="col-span-2 space-y-1">
-                      <label className="font-bold text-slate-700">বিভাগের শিরোনাম</label>
-                      <Input value={creativeTitle} onChange={e => setCreativeTitle(e.target.value)} className="h-8 font-bold" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700">শুরুর ক্রমিক</label>
-                      <Input value={creativeStartSerial} onChange={e => setCreativeStartSerial(e.target.value)} className="h-8 font-bold text-center" />
-                    </div>
+                <div className="space-y-3 pt-1">
+                  {/* Preset & Add Section Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-white rounded-lg border border-indigo-100">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddCreativeSection}
+                      className="text-[11px] font-bold h-7 gap-1 text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> + আরেকটি বিভাগ যোগ করুন
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleApplyBoard4SectionPreset}
+                      className="text-[11px] font-bold h-7 gap-1 text-purple-700 border-purple-300 hover:bg-purple-50"
+                    >
+                      <Split className="w-3.5 h-3.5" /> বোর্ড ৪-বিভাগ (বীজগণিত, জ্যামিতি...)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleResetToSingleSection}
+                      className="text-[11px] font-bold h-7 text-slate-600 hover:text-slate-900"
+                    >
+                      একক বিভাগ (রিসেট)
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
-                    <Input value={creativeInstruction} onChange={e => setCreativeInstruction(e.target.value)} className="h-8 font-bold" />
-                  </div>
-                </>
+
+                  {/* Render Creative Sections list */}
+                  {creativeSections.map((sec, secIdx) => (
+                    <div key={sec.id} className="p-2.5 bg-white rounded-lg border border-indigo-200 space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <span className="font-black text-xs text-indigo-950 flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                            {toBengaliNumber(secIdx + 1)}
+                          </span>
+                          বিভাগ {toBengaliNumber(secIdx + 1)}: {sec.title || 'শিরোনামহীন'}
+                        </span>
+                        {creativeSections.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCreativeSection(sec.id)}
+                            className="text-red-500 hover:text-red-700 text-[11px] font-bold flex items-center gap-0.5 hover:underline"
+                          >
+                            <Trash2 className="w-3 h-3" /> বিভাগ মুছুন
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                        <div className="sm:col-span-2 space-y-1">
+                          <label className="font-bold text-slate-700 text-[11px]">বিভাগের শিরোনাম</label>
+                          <Input 
+                            value={sec.title} 
+                            onChange={e => handleUpdateCreativeSection(sec.id, 'title', e.target.value)} 
+                            placeholder="যেমন: ক-বিভাগ: বীজগণিত"
+                            className="h-7 text-xs font-bold" 
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 text-[11px]">প্রশ্ন পরিসীমা</label>
+                          <div className="flex items-center gap-1">
+                            <Input 
+                              type="number" 
+                              value={sec.fromQ} 
+                              onChange={e => handleUpdateCreativeSection(sec.id, 'fromQ', parseInt(e.target.value, 10) || 1)} 
+                              className="h-7 text-xs font-bold text-center px-1" 
+                            />
+                            <span className="text-slate-400 font-bold">-</span>
+                            <Input 
+                              type="number" 
+                              value={sec.toQ} 
+                              onChange={e => handleUpdateCreativeSection(sec.id, 'toQ', parseInt(e.target.value, 10) || 1)} 
+                              className="h-7 text-xs font-bold text-center px-1" 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 text-[11px]">শুরুর ক্রমিক</label>
+                          <Input 
+                            value={sec.startSerial} 
+                            onChange={e => handleUpdateCreativeSection(sec.id, 'startSerial', e.target.value)} 
+                            className="h-7 text-xs font-bold text-center" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 text-[11px]">উত্তর দেওয়ার নির্দেশনা</label>
+                        <Input 
+                          value={sec.instruction} 
+                          onChange={e => handleUpdateCreativeSection(sec.id, 'instruction', e.target.value)} 
+                          placeholder="যেমন: যেকোনো ২টি প্রশ্নের উত্তর দাও: ২ × ১০ = ২০"
+                          className="h-7 text-xs font-bold" 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Section 2 Setup: MCQ (খ-বিভাগ) - Always Available */}
+            {/* Section 2 Setup: MCQ (খ-বিভাগ) */}
             <div className={cn("p-3 rounded-xl border space-y-2 transition-all", includeMcq ? "bg-amber-50/50 border-amber-200" : "bg-slate-50 border-slate-200 opacity-70")}>
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 font-black text-amber-950 text-xs cursor-pointer select-none">
@@ -1512,7 +1870,7 @@ export default function QuestionBankPage() {
                     onChange={e => setIncludeMcq(e.target.checked)}
                     className="w-4 h-4 accent-amber-600 rounded"
                   />
-                  <span>২. বহুনির্বাচনী বিভাগ (খ-বিভাগ)</span>
+                  <span>৪. বহুনির্বাচনী বিভাগ (MCQ)</span>
                 </label>
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", selectedMcqs.length > 0 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-600")}>
                   {selectedMcqs.length > 0 ? `নির্বাচিত: ${toBengaliNumber(selectedMcqs.length)}টি প্রশ্ন` : 'বর্তমানে নির্বাচিত নেই'}
@@ -1534,16 +1892,11 @@ export default function QuestionBankPage() {
                     <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
                     <Input value={mcqInstruction} onChange={e => setMcqInstruction(e.target.value)} className="h-8 font-bold" />
                   </div>
-                  {selectedMcqs.length === 0 && (
-                    <div className="text-[11px] text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                      💡 আপনি বর্তমানে প্রশ্ন ব্যাংকের বহুনির্বাচনী টেবিল থেকে কোনো প্রশ্নে টিক দেননি। প্রশ্ন যুক্ত করতে চাইলে তালিকায় ফিরে গিয়ে বহুনির্বাচনী প্রশ্নে টিক দিন।
-                    </div>
-                  )}
                 </>
               )}
             </div>
 
-            {/* Section 3 Setup: Short (গ-বিভাগ) - Always Available */}
+            {/* Section 3 Setup: Short (গ-বিভাগ) - Serial always starts from 1 */}
             <div className={cn("p-3 rounded-xl border space-y-2 transition-all", includeShort ? "bg-emerald-50/50 border-emerald-200" : "bg-slate-50 border-slate-200 opacity-70")}>
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 font-black text-emerald-950 text-xs cursor-pointer select-none">
@@ -1553,7 +1906,7 @@ export default function QuestionBankPage() {
                     onChange={e => setIncludeShort(e.target.checked)}
                     className="w-4 h-4 accent-emerald-600 rounded"
                   />
-                  <span>৩. সংক্ষিপ্ত প্রশ্ন বিভাগ (গ-বিভাগ)</span>
+                  <span>৫. সংক্ষিপ্ত প্রশ্ন বিভাগ</span>
                 </label>
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded", selectedShorts.length > 0 ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600")}>
                   {selectedShorts.length > 0 ? `নির্বাচিত: ${toBengaliNumber(selectedShorts.length)}টি প্রশ্ন` : 'বর্তমানে নির্বাচিত নেই'}
@@ -1567,19 +1920,24 @@ export default function QuestionBankPage() {
                       <Input value={shortTitle} onChange={e => setShortTitle(e.target.value)} className="h-8 font-bold" />
                     </div>
                     <div className="space-y-1">
-                      <label className="font-bold text-slate-700">শুরুর ক্রমিক</label>
-                      <Input value={shortStartSerial} onChange={e => setShortStartSerial(e.target.value)} className="h-8 font-bold text-center" />
+                      <label className="font-bold text-slate-700 flex items-center justify-between">
+                        <span>শুরুর ক্রমিক</span>
+                        <span className="text-[10px] text-emerald-700 font-bold">(ডিফল্ট ১)</span>
+                      </label>
+                      <Input 
+                        value={shortStartSerial} 
+                        onChange={e => setShortStartSerial(e.target.value)} 
+                        className="h-8 font-bold text-center bg-white border-emerald-300" 
+                      />
                     </div>
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
                     <Input value={shortInstruction} onChange={e => setShortInstruction(e.target.value)} className="h-8 font-bold" />
                   </div>
-                  {selectedShorts.length === 0 && (
-                    <div className="text-[11px] text-emerald-900 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
-                      💡 আপনি বর্তমানে প্রশ্ন ব্যাংকের সংক্ষিপ্ত টেবিল থেকে কোনো প্রশ্নে টিক দেননি। প্রশ্ন যুক্ত করতে চাইলে তালিকায় ফিরে গিয়ে সংক্ষিপ্ত প্রশ্নে টিক দিন।
-                    </div>
-                  )}
+                  <div className="text-[10px] font-bold text-emerald-800 bg-emerald-100/70 p-1.5 rounded">
+                    ★ সংক্ষিপ্ত প্রশ্নের ক্রমিক বোর্ড মান অনুযায়ী সব সময় ১ থেকে শুরু হবে।
+                  </div>
                 </>
               )}
             </div>
