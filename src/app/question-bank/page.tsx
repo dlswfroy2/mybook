@@ -422,7 +422,7 @@ export default function QuestionBankPage() {
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Load questions from storage & sync with central cloud Firestore
-  const reloadQuestions = useCallback(async () => {
+  const reloadQuestions = useCallback(async (isManual = false) => {
     // 1. Instant load from local cache
     const list = getBankQuestions();
     setQuestions(list);
@@ -433,13 +433,26 @@ export default function QuestionBankPage() {
       try {
         const unified = await fetchBankQuestionsFromFirestore(db);
         setQuestions(unified);
-      } catch (err) {
+        if (isManual) {
+          toast({
+            title: 'সার্ভার সিঙ্ক সফল! ☁️',
+            description: `মোট ${toBengaliNumber(unified.length)}টি প্রশ্ন কেন্দ্রীয় ক্লাউড সার্ভারের সাথে সফলভাবে সিঙ্ক হয়েছে।`
+          });
+        }
+      } catch (err: any) {
         console.warn('Central server sync error:', err);
+        if (isManual) {
+          toast({
+            variant: 'destructive',
+            title: 'সার্ভার সংযোগ সমস্যা',
+            description: err?.message || 'কেন্দ্রীয় সার্ভারে প্রশ্ন সিঙ্ক করা যায়নি।'
+          });
+        }
       } finally {
         setIsSyncingCloud(false);
       }
     }
-  }, [db]);
+  }, [db, toast]);
 
   useEffect(() => {
     reloadQuestions();
@@ -1216,7 +1229,7 @@ export default function QuestionBankPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => reloadQuestions()}
+              onClick={() => reloadQuestions(true)}
               disabled={isSyncingCloud}
               className="font-bold text-xs text-emerald-800 bg-emerald-50 border-emerald-300 hover:bg-emerald-100 h-8 gap-1.5 shadow-2xs"
               title="কেন্দ্রীয় ক্লাউড সার্ভারের সাথে রিয়েলটাইম সিঙ্ক করুন"

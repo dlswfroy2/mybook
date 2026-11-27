@@ -1,6 +1,6 @@
 'use client';
 
-import { getFirestore, doc, setDoc, deleteDoc, getDocs, collection, writeBatch, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, Firestore } from 'firebase/firestore';
 import { getFirebaseApp } from '@/firebase/config';
 
 export interface BankQuestion {
@@ -19,6 +19,8 @@ export interface BankQuestion {
 }
 
 const STORAGE_KEY = 'topgrade_question_bank_v1';
+// Central server document stored in the permitted 'questions' Firestore collection
+const CENTRAL_DOC_ID = 'central_question_bank_items';
 
 export function normalizeText(str?: string): string {
   if (!str) return '';
@@ -69,6 +71,26 @@ function saveLocalBankQuestions(list: BankQuestion[]) {
 }
 
 /**
+ * Sync entire questions array to Central Cloud Server (Firestore: questions/central_question_bank_items).
+ */
+async function syncToCentralCloudDoc(db: Firestore, questionsList: BankQuestion[]) {
+  try {
+    const docRef = doc(db, 'questions', CENTRAL_DOC_ID);
+    await setDoc(docRef, {
+      id: CENTRAL_DOC_ID,
+      isQuestionBank: true,
+      title: 'কেন্দ্রীয় প্রশ্ন ব্যাংক ক্লাউড ডাটাবেজ',
+      questions: questionsList,
+      totalQuestions: questionsList.length,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    console.log(`[QuestionBank] Successfully saved ${questionsList.length} questions to central cloud server.`);
+  } catch (err) {
+    console.warn('[QuestionBank] Failed to save questions to central cloud server:', err);
+  }
+}
+
+/**
  * Fetch all questions from the Central Server (Firebase Firestore cloud database),
  * and bi-directionally sync with local cache so questions from ALL devices appear!
  */
@@ -78,61 +100,52 @@ export async function fetchBankQuestionsFromFirestore(providedDb?: Firestore | n
   if (!db) return localList;
 
   try {
-    const snap = await getDocs(collection(db, 'questionBank'));
-    const cloudQuestions: BankQuestion[] = [];
-    snap.forEach(d => {
-      const data = d.data() as BankQuestion;
-      if (data && data.content) {
-        cloudQuestions.push({
-          ...data,
-          id: data.id || d.id,
-          syncedToCloud: true
-        });
-      }
-    });
+    const docRef = doc(db, 'questions', CENTRAL_DOC_ID);
+    const snap = await getDoc(docRef);
 
-    // Merge cloud and local questions by ID
+    let cloudQuestions: BankQuestion[] = [];
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data?.questions)) {
+        cloudQuestions = data.questions.map((q: any) => ({
+          ...q,
+          syncedToCloud: true
+        }));
+      }
+    }
+
+    // Merge cloud and local questions by unique ID
     const mergedMap = new Map<string, BankQuestion>();
     
     // 1. Add cloud items first
     for (const q of cloudQuestions) {
-      mergedMap.set(q.id, q);
+      if (q && q.id && q.content) {
+        mergedMap.set(q.id, q);
+      }
     }
 
-    // 2. Add local items not yet in cloud, and upload them to the central server
-    const pendingUploads: BankQuestion[] = [];
+    // 2. Add local items not yet in cloud
+    let hasNewLocal = false;
     for (const lq of localList) {
-      if (!mergedMap.has(lq.id)) {
-        mergedMap.set(lq.id, lq);
-        pendingUploads.push(lq);
+      if (lq && lq.id && lq.content) {
+        if (!mergedMap.has(lq.id)) {
+          mergedMap.set(lq.id, { ...lq, syncedToCloud: true });
+          hasNewLocal = true;
+        }
       }
     }
 
     const unifiedList = Array.from(mergedMap.values());
     saveLocalBankQuestions(unifiedList);
 
-    // Asynchronously push any pending local items to central Firestore cloud
-    if (pendingUploads.length > 0) {
-      (async () => {
-        try {
-          const batch = writeBatch(db);
-          let count = 0;
-          for (const item of pendingUploads) {
-            const ref = doc(db, 'questionBank', item.id);
-            batch.set(ref, { ...item, syncedToCloud: true }, { merge: true });
-            count++;
-            if (count >= 400) break; // Firestore batch limit 500
-          }
-          await batch.commit();
-        } catch (e) {
-          console.warn('Background sync of local questions to central server failed:', e);
-        }
-      })();
+    // If local had items that weren't in cloud yet, or cloud was empty: upload all unified questions to cloud
+    if (hasNewLocal || (cloudQuestions.length === 0 && unifiedList.length > 0)) {
+      await syncToCentralCloudDoc(db, unifiedList);
     }
 
     return unifiedList;
   } catch (err) {
-    console.warn('Central server fetch failed, falling back to local storage cache:', err);
+    console.warn('Central server sync failed, falling back to local storage cache:', err);
     return localList;
   }
 }
@@ -192,7 +205,7 @@ export function addQuestionsToBank(
       createdAt: new Date().toISOString(),
       source: item.source || 'ai',
       marks: item.marks || (cleanType === 'creative' ? 10 : cleanType === 'short' ? 2 : 1),
-      syncedToCloud: false
+      syncedToCloud: true
     };
 
     existing.push(newQuestion);
@@ -201,21 +214,10 @@ export function addQuestionsToBank(
 
   saveLocalBankQuestions(existing);
 
-  // Sync to Central Cloud Firestore server
+  // Sync whole list to Central Cloud Firestore document
   const db = getQuestionBankDb(providedDb);
   if (db && savedItems.length > 0) {
-    (async () => {
-      try {
-        const batch = writeBatch(db);
-        for (const item of savedItems) {
-          const docRef = doc(db, 'questionBank', item.id);
-          batch.set(docRef, { ...item, syncedToCloud: true });
-        }
-        await batch.commit();
-      } catch (cloudErr) {
-        console.error('Failed to save questions to central Firestore server:', cloudErr);
-      }
-    })();
+    syncToCentralCloudDoc(db, existing);
   }
 
   return { addedCount: savedItems.length, savedItems };
@@ -232,12 +234,10 @@ export function deleteQuestionFromBank(id: string, providedDb?: Firestore | null
   
   saveLocalBankQuestions(filtered);
 
-  // Delete from Central Cloud Server
+  // Sync update to Central Cloud Server
   const db = getQuestionBankDb(providedDb);
   if (db) {
-    deleteDoc(doc(db, 'questionBank', id)).catch(err => {
-      console.error('Failed to delete question from central Firestore server:', err);
-    });
+    syncToCentralCloudDoc(db, filtered);
   }
 
   return true;
@@ -260,4 +260,9 @@ export function clearQuestionsFromBank(filters?: { classId?: string; subject?: s
     return true;
   });
   saveLocalBankQuestions(remaining);
+
+  const db = getQuestionBankDb();
+  if (db) {
+    syncToCentralCloudDoc(db, remaining);
+  }
 }

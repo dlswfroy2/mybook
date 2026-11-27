@@ -244,7 +244,7 @@ function MyLibraryContent() {
   const { data: rawPdfSheets, loading: pdfSheetsLoading } = useCollection(pdfSheetsQuery);
 
   const libraryData = useMemo(() => ({ 
-    questions: rawQuestions || [], 
+    questions: (rawQuestions || []).filter((q: any) => !q.isQuestionBank && q.id !== 'central_question_bank_items'), 
     sheets: rawSheets || [],
     pdfSheets: rawPdfSheets || []
   }), [rawQuestions, rawSheets, rawPdfSheets]);
