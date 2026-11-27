@@ -212,18 +212,35 @@ function renderMcqFormatted(content: string, rawOptions?: string[]) {
     );
   }
 
-  // Calculate layout strictly (4 columns, 2 columns, or 1 column; NEVER 3 columns or 3 lines)
-  const lengths = options.map(o => o.text.length);
-  const maxLen = Math.max(...lengths);
-  const totalLen = lengths.reduce((a, b) => a + b, 0);
+  // Clean and measure visible text length
+  const cleanOptionLengths = options.map(o => {
+    const plain = o.text
+      .replace(/\\(?:sqrt|frac|text|dot|vec|log)\b/g, '')
+      .replace(/[{}\[\]$()\\_]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return plain.length;
+  });
+  const maxLen = Math.max(...cleanOptionLengths);
+  const totalLen = cleanOptionLengths.reduce((a, b) => a + b, 0);
 
+  // Strict Board Standard Layout selection:
+  // - 1 line (4 columns across): ONLY if ALL 4 options are very short digits/symbols (<= 4 chars, e.g. N, Z, 0, 1)
+  // - 2 lines (2 columns each: row 1 (ক, খ), row 2 (গ, ঘ)): medium options up to 15 chars (e.g. দুই প্রকার, তিন প্রকার, ধনাত্মক সংখ্যা)
+  // - 4 lines (1 column each: 1 option per line): longer sentences or phrases
+  // STRICT RULE: Never wrap text to a second line within an option!
   let gridClass = 'grid-cols-4';
-  if (maxLen <= 11 && totalLen <= 42) {
+  let isNowrap = false;
+
+  if (maxLen <= 4 && totalLen <= 16) {
     gridClass = 'grid-cols-4'; // 1 Line (4 options across)
-  } else if (maxLen <= 26 && totalLen <= 95) {
+    isNowrap = true;
+  } else if (maxLen <= 16 && totalLen <= 60) {
     gridClass = 'grid-cols-2'; // 2 Lines (2 options per row: row 1 (ক, খ), row 2 (গ, ঘ))
+    isNowrap = true;
   } else {
     gridClass = 'grid-cols-1'; // 4 Lines (1 option per row)
+    isNowrap = false;
   }
 
   return (
@@ -234,12 +251,12 @@ function renderMcqFormatted(content: string, rawOptions?: string[]) {
         dangerouslySetInnerHTML={{ __html: formatMathToHtml(stem) }}
       />
       {/* 4 options in exact mathematical grid */}
-      <div className={cn("grid gap-x-2 gap-y-0.5 mt-1 text-slate-900 select-none", gridClass)}>
+      <div className={cn("grid gap-x-3 gap-y-0.5 mt-1 text-slate-900 select-none", gridClass)}>
         {options.map((opt, i) => (
-          <div key={i} className="flex items-start gap-1 math-rendered">
+          <div key={i} className={cn("flex items-start gap-1 math-rendered", isNowrap && "whitespace-nowrap")}>
             <span className="font-bold shrink-0">{opt.letter}</span>
             <span 
-              className="flex-1 text-left"
+              className={cn("flex-1 text-left", isNowrap && "whitespace-nowrap")}
               dangerouslySetInnerHTML={{ __html: formatMathToHtml(opt.text) }}
             />
           </div>
@@ -565,6 +582,12 @@ export default function QuestionBankPage() {
   // VIEW 1: PRINT VIEW (বোর্ডমানের রেডিমেড প্রশ্নপত্র)
   // ──────────────────────────────────────────────────────────
   if (isPrintView) {
+    const isOnlyMcq = includeMcq && !includeCreative && !includeShort;
+    const isOnlyCreative = includeCreative && !includeMcq && !includeShort;
+    const isOnlyShort = includeShort && !includeCreative && !includeMcq;
+    const isSingleTypeExam = isOnlyMcq || isOnlyCreative || isOnlyShort;
+    const singleTypeInstruction = isOnlyMcq ? mcqInstruction : isOnlyCreative ? creativeInstruction : shortInstruction;
+
     return (
       <div className="min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush">
         {/* Floating Top Control Bar (Strictly hidden during print) */}
@@ -641,8 +664,8 @@ export default function QuestionBankPage() {
 
         {/* The Printable Board A4 Paper Container */}
         <div className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-lg p-6 sm:p-10 border-0 min-h-[11in] text-black leading-normal box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
-          {/* Institutional Header (Spans across full width) */}
-          <div className="text-center border-b-2 border-black pb-2.5 mb-4 select-none [column-span:all]">
+          {/* Institutional Header (Spans across full width of both columns) */}
+          <div className="text-center border-b-2 border-black pb-2.5 mb-3 select-none [column-span:all]">
             <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
               {institutionName}
             </h1>
@@ -658,6 +681,13 @@ export default function QuestionBankPage() {
               <span>সময়: {examTime}</span>
               <span>পূর্ণমান: {examTotalMarks}</span>
             </div>
+
+            {/* When single section (e.g. only MCQ test or only CQ test), display instruction centered across full page width */}
+            {isSingleTypeExam && singleTypeInstruction && (
+              <div className="text-xs font-bold text-slate-900 mt-2 pt-1 border-t border-black">
+                [{singleTypeInstruction}]
+              </div>
+            )}
           </div>
 
           {/* Question Flow (1 or 2 columns based on columnLayout) */}
@@ -669,9 +699,9 @@ export default function QuestionBankPage() {
           )}>
             {/* Section 1: Creative Questions (CQ) */}
             {includeCreative && selectedCreatives.length > 0 && (
-              <div className="section-block mb-4">
-                {/* Centered Section Header Banner (Omitted if title is empty) */}
-                {(creativeTitle || creativeInstruction) && (
+              <div className="section-block mb-3">
+                {/* Centered Section Header Banner (Omitted if single-type exam) */}
+                {!isSingleTypeExam && (creativeTitle || creativeInstruction) && (
                   <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
                     {creativeTitle && (
                       <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
@@ -707,9 +737,9 @@ export default function QuestionBankPage() {
 
             {/* Section 2: Multiple Choice Questions (MCQ) */}
             {includeMcq && selectedMcqs.length > 0 && (
-              <div className="section-block mb-4">
-                {/* Centered Section Header Banner (Omitted if title is empty) */}
-                {(mcqTitle || mcqInstruction) && (
+              <div className="section-block mb-3">
+                {/* Centered Section Header Banner (Omitted if single-type exam) */}
+                {!isSingleTypeExam && (mcqTitle || mcqInstruction) && (
                   <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
                     {mcqTitle && (
                       <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
@@ -744,9 +774,9 @@ export default function QuestionBankPage() {
 
             {/* Section 3: Short Questions */}
             {includeShort && selectedShorts.length > 0 && (
-              <div className="section-block mb-4">
-                {/* Centered Section Header Banner (Omitted if title is empty) */}
-                {(shortTitle || shortInstruction) && (
+              <div className="section-block mb-3">
+                {/* Centered Section Header Banner (Omitted if single-type exam) */}
+                {!isSingleTypeExam && (shortTitle || shortInstruction) && (
                   <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
                     {shortTitle && (
                       <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
@@ -798,7 +828,7 @@ export default function QuestionBankPage() {
             }
             @page {
               size: A4 portrait;
-              margin: 10mm 12mm 10mm 12mm;
+              margin: 8mm 10mm 8mm 10mm;
             }
             .print-page-container {
               width: 100% !important;
@@ -806,9 +836,11 @@ export default function QuestionBankPage() {
               padding: 0 !important;
               margin: 0 !important;
               border: none !important;
+              outline: none !important;
               box-shadow: none !important;
               min-height: auto !important;
               height: auto !important;
+              background: transparent !important;
             }
             .print-question-flow {
               column-count: ${columnLayout} !important;
