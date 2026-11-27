@@ -161,6 +161,18 @@ function MyLibraryContent() {
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [activeFileType, setActiveFileType] = useState<FileTypeFilter>('all');
 
+  const handleSelectDate = useCallback((val: string | null) => {
+    setSelectedDate(val);
+    if (val) {
+      setSelectedClass(null);
+      setSelectedSubject(null);
+      setSelectedChapter(null);
+      setActiveCategory('all');
+      setActiveFileType('all');
+      setViewMode('content');
+    }
+  }, []);
+
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [merging, setMerging] = useState(false);
@@ -193,8 +205,7 @@ function MyLibraryContent() {
     const dateParam = searchParams.get('date');
 
     if (dateParam) {
-      setSelectedDate(dateParam);
-      setViewMode('content');
+      handleSelectDate(dateParam);
     }
 
     if (hl) {
@@ -429,10 +440,20 @@ function MyLibraryContent() {
     return null;
   };
 
+  const getItemDate = (i: any): Date | null => {
+    return toDate(i.updatedAt) || 
+           toDate((i as any).createdAt) || 
+           toDate((i as any).uploadedAt) || 
+           toDate((i as any).date) || 
+           toDate((i as any).savedAt) || 
+           toDate((i as any).timestamp) || 
+           null;
+  };
+
   const combinedItems = useMemo(() => {
     let all = [
       ...currentItemsRaw.sheets.map(i => {
-        const date = toDate(i.updatedAt) || toDate((i as any).createdAt) || null;
+        const date = getItemDate(i);
         return { 
           ...i, 
           source: 'lecture-sheets' as const, 
@@ -445,7 +466,7 @@ function MyLibraryContent() {
         };
       }),
       ...currentItemsRaw.pdfSheets.map(i => {
-        const date = toDate(i.uploadedAt) || toDate((i as any).createdAt) || null;
+        const date = getItemDate(i);
         const url = (i.pdfUrl || '').toLowerCase();
         const fName = (i.fileName || '').toLowerCase();
         const isWord = url.includes('officedocument') || url.includes('msword') || fName.endsWith('.doc') || fName.endsWith('.docx');
@@ -462,7 +483,7 @@ function MyLibraryContent() {
         };
       }),
       ...currentItemsRaw.questions.map(i => {
-        const date = toDate(i.updatedAt) || toDate((i as any).createdAt) || null;
+        const date = getItemDate(i);
         return { 
           ...i, 
           source: 'questions' as const, 
@@ -799,10 +820,7 @@ function MyLibraryContent() {
                     <Input 
                         type="date"
                         value={selectedDate || ''}
-                        onChange={(e) => {
-                            setSelectedDate(e.target.value || null);
-                            setViewMode('content');
-                        }}
+                        onChange={(e) => handleSelectDate(e.target.value || null)}
                         className="h-8 w-36 text-xs font-bold border-2 border-black bg-white rounded-lg"
                         title="তারিখ নির্বাচন করে ফাইল ফিল্টার করুন"
                     />
@@ -1098,13 +1116,7 @@ function MyLibraryContent() {
                         <Input 
                             type="date" 
                             value={selectedDate || ''}
-                            onChange={(e) => {
-                                const val = e.target.value || null;
-                                setSelectedDate(val);
-                                if (val) {
-                                    setViewMode('content');
-                                }
-                            }}
+                            onChange={(e) => handleSelectDate(e.target.value || null)}
                             className="h-10 font-bold border-2 border-black text-sm bg-slate-50 focus:bg-white"
                         />
                     </div>
@@ -1116,8 +1128,7 @@ function MyLibraryContent() {
                             size="sm"
                             onClick={() => {
                                 const today = format(new Date(), 'yyyy-MM-dd');
-                                setSelectedDate(today);
-                                setViewMode('content');
+                                handleSelectDate(today);
                             }}
                             className={cn(
                                 "flex-1 text-[11px] font-black h-8 border-2 border-black",
@@ -1134,8 +1145,7 @@ function MyLibraryContent() {
                                 const yesterday = new Date();
                                 yesterday.setDate(yesterday.getDate() - 1);
                                 const yStr = format(yesterday, 'yyyy-MM-dd');
-                                setSelectedDate(yStr);
-                                setViewMode('content');
+                                handleSelectDate(yStr);
                             }}
                             className={cn(
                                 "flex-1 text-[11px] font-black h-8 border-2 border-black",
@@ -1149,10 +1159,7 @@ function MyLibraryContent() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                    setSelectedDate(null);
-                                    if (!selectedClass) setViewMode('classes');
-                                }}
+                                onClick={() => handleSelectDate(null)}
                                 className="text-[11px] font-black h-8 border-2 border-red-500 text-red-600 hover:bg-red-50"
                             >
                                 সব

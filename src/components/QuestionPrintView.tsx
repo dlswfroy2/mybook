@@ -2268,8 +2268,23 @@ export function QuestionPrintView({
       }
       return parts.join('\n\n');
     }
-    return '';
-  }, [questions, questionsB, isEnglish, meta.content]);
+    // 3. Fallback: Always provide at least a standard question header so the document NEVER starts at 0 pages!
+    return `
+      <div class="institutional-header" style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px;">
+        <h1 style="font-size: 18pt; font-weight: bold; margin: 0;">${meta.institution || appName}</h1>
+        <h2 style="font-size: 13pt; font-weight: bold; margin: 4px 0;">${meta.exam || 'পরীক্ষা'}</h2>
+        <div style="display: flex; justify-content: center; gap: 16px; font-size: 10pt; font-weight: bold; margin-top: 6px;">
+          <span>শ্রেণি: ${meta.classId ? `${meta.classId} শ্রেণি` : ''}</span>
+          <span>বিষয়: ${meta.subject || ''} ${meta.chapter ? `(${meta.chapter})` : ''}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 9.5pt; font-weight: bold; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
+          <span>সময়: ${meta.time || '২ ঘণ্টা ৩০ মিনিট'}</span>
+          <span>পূর্ণমান: ${toBengaliNumber(meta.totalMarks || 100)}</span>
+        </div>
+      </div>
+      <p style="margin: 8px 0;"><br></p>
+    `.trim();
+  }, [questions, questionsB, isEnglish, meta.content, meta.institution, meta.exam, meta.classId, meta.subject, meta.chapter, meta.time, meta.totalMarks, appName]);
 
   const [documentContent, setDocumentContent] = useState(initialContent);
 
@@ -2607,9 +2622,16 @@ export function QuestionPrintView({
       return;
     }
 
-    if (initialContent && measurementRef.current && (!hasInitiallyPaginatedRef.current || paginatedPages.length === 0)) {
+    if (measurementRef.current && (!hasInitiallyPaginatedRef.current || paginatedPages.length === 0)) {
       hasInitiallyPaginatedRef.current = true;
-      repaginateDocument({ sourceContent: initialContent });
+      const contentToPaginate = (initialContent && initialContent.trim()) ? initialContent : `
+        <div class="institutional-header" style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px;">
+          <h1 style="font-size: 18pt; font-weight: bold; margin: 0;">${meta.institution || appName}</h1>
+          <h2 style="font-size: 13pt; font-weight: bold; margin: 4px 0;">${meta.exam || 'পরীক্ষা'}</h2>
+        </div>
+        <p style="margin: 8px 0;"><br></p>
+      `.trim();
+      repaginateDocument({ sourceContent: contentToPaginate });
     }
   }, [repaginateDocument, initialContent, meta.manualPages, meta.pageStyles]);
 

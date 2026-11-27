@@ -197,6 +197,7 @@ function CreateQuestionContent() {
     const res = parts.join('\n');
     setDocumentContent(res);
     setMeta(prev => ({ ...prev, content: res }));
+    return res;
   }, [meta.subject]);
 
   const insertSnippet = useCallback((snippetHtml: string) => {
@@ -760,19 +761,42 @@ function CreateQuestionContent() {
   const isEnglish = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
 
   const handleGoToPrint = useCallback(() => {
-    if (!meta.content && questions && questions.length > 0) {
-      syncQuestionsToContent(questions, questionsB);
-    } else if (contentEditableRef.current && !meta.content) {
+    let contentToUse = meta.content || documentContent || '';
+    if (contentEditableRef.current) {
       ensureQuestionIntegrity(contentEditableRef.current, Boolean(isEnglish));
-      const currentHtml = contentEditableRef.current.innerHTML;
-      setDocumentContent(currentHtml);
-      setMeta(prev => ({ ...prev, content: currentHtml }));
+      const currentHtml = contentEditableRef.current.innerHTML?.trim() || '';
+      if (currentHtml && !currentHtml.includes('এখানে আপনার প্রশ্নপত্রের কন্টেন্ট সরাসরি লিখুন')) {
+        contentToUse = currentHtml;
+      }
     }
+    if (!contentToUse && questions && questions.length > 0) {
+      contentToUse = syncQuestionsToContent(questions, questionsB);
+    }
+    if (!contentToUse || !contentToUse.trim()) {
+      contentToUse = `
+        <div class="institutional-header" style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 16px;">
+          <h1 style="font-size: 18pt; font-weight: bold; margin: 0;">${meta.institution || appName}</h1>
+          <h2 style="font-size: 13pt; font-weight: bold; margin: 4px 0;">${meta.exam || 'পরীক্ষা'}</h2>
+          <div style="display: flex; justify-content: center; gap: 16px; font-size: 10pt; font-weight: bold; margin-top: 6px;">
+            <span>শ্রেণি: ${getClassLabel(meta.classId)}</span>
+            <span>বিষয়: ${meta.subject || ''} ${meta.chapter ? `(${meta.chapter})` : ''}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 9.5pt; font-weight: bold; margin-top: 4px; border-top: 1px dashed #ccc; padding-top: 4px;">
+            <span>সময়: ${meta.time || '২ ঘণ্টা ৩০ মিনিট'}</span>
+            <span>পূর্ণমান: ${toBengaliNumber(meta.totalMarks || 100)}</span>
+          </div>
+        </div>
+        <p style="margin: 8px 0;"><br></p>
+      `.trim();
+    }
+    setDocumentContent(contentToUse);
+    setMeta(prev => ({ ...prev, content: contentToUse }));
+
     const p = new URLSearchParams(window.location.search);
     p.set('print', 'true');
     if (editId) p.set('id', editId);
     router.push(`${window.location.pathname}?${p.toString()}`);
-  }, [questions, questionsB, syncQuestionsToContent, isEnglish, editId, router, meta.content]);
+  }, [questions, questionsB, syncQuestionsToContent, isEnglish, editId, router, meta, documentContent, appName]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = contentEditableRef.current;
@@ -1903,11 +1927,21 @@ function CreateQuestionContent() {
       {/* ── Print & Word-like Full-screen Mode ── */}
       {isPrintMode && (
         <QuestionPrintView
-          meta={meta}
+          meta={{
+            ...meta,
+            content: (contentEditableRef.current?.innerHTML?.trim() && !contentEditableRef.current?.innerHTML?.includes('এখানে আপনার প্রশ্নপত্রের কন্টেন্ট সরাসরি লিখুন'))
+              ? contentEditableRef.current.innerHTML
+              : (documentContent || meta.content)
+          }}
           questions={questions}
           questionsB={questionsB}
           appName={appName}
           softwareConfig={softwareConfig}
+          onBack={() => {
+            const p = new URLSearchParams(window.location.search);
+            p.delete('print');
+            router.push(`${window.location.pathname}?${p.toString()}`);
+          }}
           onSave={async (updatedContent, styles, extra) => {
             if (!user || !db) return;
             const docId = editId || doc(collection(db, 'questions')).id;
