@@ -18,11 +18,11 @@ import {
   Download, 
   CheckCircle2, 
   Layers, 
-  RefreshCw,
-  Search
+  Search,
+  Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,11 +33,9 @@ import {
   getBankQuestions, 
   addQuestionsToBank, 
   deleteQuestionFromBank, 
-  clearQuestionsFromBank,
   normalizeText 
 } from '@/lib/question-bank-storage';
 import { CHAPTERS_DATA } from '@/lib/subject-chapters';
-import { subjectNameNormalization } from '@/lib/subjects';
 import { toBengaliNumber, cn } from '@/lib/utils';
 import { useFirestore, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -52,6 +50,70 @@ const CLASSES = [
   { id: '10', label: '১০ম' },
 ];
 
+/**
+ * Intelligent chapter normalization and matching.
+ * Handles variations like:
+ * "১ম অধ্যায়: বাস্তব সংখ্যা" <-> "প্রথম অধ্যায়: বাস্তব সংখ্যা" <-> "বাস্তব সংখ্যা"
+ */
+function canonicalizeChapter(ch?: string): string {
+  if (!ch) return '';
+  let s = ch.trim().toLowerCase();
+
+  // Standardize ordinal numbers and words into digits
+  s = s
+    .replace(/(^|[^০-৯0-9])(প্রথম|১ম|1st|১|1)([^০-৯0-9]|$)/g, '$1#1#$3')
+    .replace(/(^|[^০-৯0-9])(দ্বিতীয়|২য়|2nd|২|2)([^০-৯0-9]|$)/g, '$1#2#$3')
+    .replace(/(^|[^০-৯0-9])(তৃতীয়|৩য়|3rd|৩|3)([^০-৯0-9]|$)/g, '$1#3#$3')
+    .replace(/(^|[^০-৯0-9])(চতুর্থ|৪র্থ|4th|৪|4)([^০-৯0-9]|$)/g, '$1#4#$3')
+    .replace(/(^|[^০-৯0-9])(পঞ্চম|৫ম|5th|৫|5)([^০-৯0-9]|$)/g, '$1#5#$3')
+    .replace(/(^|[^০-৯0-9])(ষষ্ঠ|৬ষ্ঠ|6th|৬|6)([^০-৯0-9]|$)/g, '$1#6#$3')
+    .replace(/(^|[^০-৯0-9])(সপ্তম|৭ম|7th|৭|7)([^০-৯0-9]|$)/g, '$1#7#$3')
+    .replace(/(^|[^০-৯0-9])(অষ্টম|৮ম|8th|৮|8)([^০-৯0-9]|$)/g, '$1#8#$3')
+    .replace(/(^|[^০-৯0-9])(নবম|৯ম|9th|৯|9)([^০-৯0-9]|$)/g, '$1#9#$3')
+    .replace(/(^|[^০-৯0-9])(দশম|১০ম|10th|১০|10)([^০-৯0-9]|$)/g, '$1#10#$3')
+    .replace(/(^|[^০-৯0-9])(একাদশ|১১শ|11th|১১|11)([^০-৯0-9]|$)/g, '$1#11#$3')
+    .replace(/(^|[^০-৯0-9])(দ্বাদশ|১২শ|12th|১২|12)([^০-৯0-9]|$)/g, '$1#12#$3')
+    .replace(/(^|[^০-৯0-9])(ত্রয়োদশ|ত্রয়োদশ|১৩শ|13th|১৩|13)([^০-৯0-9]|$)/g, '$1#13#$3')
+    .replace(/(^|[^০-৯0-9])(চতুর্দশ|১৪শ|14th|১৪|14)([^০-৯0-9]|$)/g, '$1#14#$3')
+    .replace(/(^|[^০-৯0-9])(পঞ্চদশ|১৫শ|15th|১৫|15)([^০-৯0-9]|$)/g, '$1#15#$3')
+    .replace(/(^|[^০-৯0-9])(ষোড়শ|ষোড়শ|১৬শ|16th|১৬|16)([^০-৯0-9]|$)/g, '$1#16#$3')
+    .replace(/(^|[^০-৯0-9])(সপ্তদশ|১৭শ|17th|১৭|17)([^০-৯0-9]|$)/g, '$1#17#$3');
+
+  // Strip prefixes like "অধ্যায়", "অধ্যায়", "chapter", colons, and spaces
+  s = s.replace(/অধ্যায়|অধ্যায়|chapter|lesson/gi, '');
+  s = s.replace(/[:\-–—.,]/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function isSameChapter(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const ca = canonicalizeChapter(a);
+  const cb = canonicalizeChapter(b);
+  if (ca === cb) return true;
+  const strippedA = ca.replace(/#[0-9]+#/g, '').trim();
+  const strippedB = cb.replace(/#[0-9]+#/g, '').trim();
+  if (strippedA && strippedB && (strippedA === strippedB || strippedA.includes(strippedB) || strippedB.includes(strippedA))) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Format questions for board display:
+ * Cleans ugly [২], [৪], [2], [4] brackets and converts them into right-aligned board marks.
+ */
+function formatContentWithBoardMarks(content: string): string {
+  if (!content) return '';
+  // Convert [২], [৪], [2], [4] at the end of lines or clauses into board mark badge
+  let cleaned = content.replace(/(?:\[|\()([০-৯0-9]+)(?:\]|\))\s*(\r?\n|$)/g, (_, num, trailing) => {
+    const bnNum = toBengaliNumber(num);
+    return `<span class="board-mark">${bnNum}</span>${trailing}`;
+  });
+  return formatMathToHtml(cleaned);
+}
+
 export default function QuestionBankPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -63,7 +125,7 @@ export default function QuestionBankPage() {
 
   // Bank Data & Filters
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string>('10');
+  const [selectedClass, setSelectedClass] = useState<string>('9');
   const [selectedSubject, setSelectedSubject] = useState<string>('গণিত');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -71,19 +133,35 @@ export default function QuestionBankPage() {
   // Selected question IDs for paper compilation
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Print Mode state
+  // Setup Popup Modal state (before direct print)
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [isPrintView, setIsPrintView] = useState(false);
+
+  // Board Setup Config values
   const [institutionName, setInstitutionName] = useState('টপ গ্রেড টিউটোরিয়ালস');
   const [examName, setExamName] = useState('মূল্যায়ন পরীক্ষা');
   const [examTime, setExamTime] = useState('২ ঘণ্টা ৩০ মিনিট');
   const [examTotalMarks, setExamTotalMarks] = useState('১০০');
 
+  // Section headline & instruction configs
+  const [creativeTitle, setCreativeTitle] = useState('ক-বিভাগ: সৃজনশীল প্রশ্ন');
+  const [creativeInstruction, setCreativeInstruction] = useState('যেকোনো ৭টি প্রশ্নের উত্তর দাও');
+  const [creativeStartSerial, setCreativeStartSerial] = useState('১');
+
+  const [mcqTitle, setMcqTitle] = useState('খ-বিভাগ: বহুনির্বাচনী প্রশ্ন');
+  const [mcqInstruction, setMcqInstruction] = useState('সঠিক উত্তরের বিপরীতের বৃত্তটি বল পয়েন্ট কলম দ্বারা ভরাট কর। সকল প্রশ্নের উত্তর দিতে হবে।');
+  const [mcqStartSerial, setMcqStartSerial] = useState('১');
+
+  const [shortTitle, setShortTitle] = useState('গ-বিভাগ: সংক্ষিপ্ত প্রশ্ন');
+  const [shortInstruction, setShortInstruction] = useState('সকল প্রশ্নের উত্তর দাও');
+  const [shortStartSerial, setShortStartSerial] = useState('১');
+
   // Add Question Modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newType, setNewType] = useState<'creative' | 'mcq' | 'short'>('creative');
-  const [newClass, setNewClass] = useState('10');
+  const [newClass, setNewClass] = useState('9');
   const [newSubject, setNewSubject] = useState('গণিত');
-  const [newChapter, setNewChapter] = useState('২য় অধ্যায়: মুনাফা');
+  const [newChapter, setNewChapter] = useState('১ম অধ্যায়: বাস্তব সংখ্যা');
   const [newContent, setNewContent] = useState('');
 
   // Load questions from storage
@@ -110,7 +188,7 @@ export default function QuestionBankPage() {
     return subjects;
   }, [selectedClass]);
 
-  // Available chapters for selected class & subject
+  // Available chapters for selected class & subject with smart deduplication
   const availableChapters = useMemo(() => {
     const classData = CHAPTERS_DATA[selectedClass] || {};
     const rawChapters = classData[selectedSubject] || [];
@@ -121,8 +199,15 @@ export default function QuestionBankPage() {
       .map(q => q.chapter)
       .filter(Boolean);
 
-    const merged = Array.from(new Set([...rawChapters, ...storedChapters]));
-    return merged;
+    // Merge and deduplicate using isSameChapter
+    const list: string[] = [];
+    [...storedChapters, ...rawChapters].forEach(ch => {
+      if (!list.some(existing => isSameChapter(existing, ch))) {
+        list.push(ch);
+      }
+    });
+
+    return list;
   }, [selectedClass, selectedSubject, questions]);
 
   // Set default subject if not available
@@ -132,12 +217,12 @@ export default function QuestionBankPage() {
     }
   }, [availableSubjects, selectedSubject]);
 
-  // Filtered Questions
+  // Filtered Questions with robust chapter matching
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => {
       if (selectedClass && String(q.classId) !== String(selectedClass)) return false;
       if (selectedSubject && normalizeText(q.subject) !== normalizeText(selectedSubject)) return false;
-      if (selectedChapter !== 'all' && normalizeText(q.chapter) !== normalizeText(selectedChapter)) return false;
+      if (selectedChapter !== 'all' && !isSameChapter(q.chapter, selectedChapter)) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchContent = q.content.toLowerCase().includes(query);
@@ -230,6 +315,46 @@ export default function QuestionBankPage() {
     }
   };
 
+  // Open the Board Setup Popup Modal
+  const handleOpenSetupModal = () => {
+    if (selectedIds.size === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'প্রশ্ন নির্বাচন করুন',
+        description: 'প্রিন্ট করার জন্য অন্তত একটি প্রশ্নের টিক বক্সে ক্লিক করে নির্বাচন করুন।'
+      });
+      return;
+    }
+
+    // Auto-calculate full marks & default time
+    const totalM = (selectedCreatives.length * 10) + (selectedMcqs.length * 1) + (selectedShorts.length * 2);
+    setExamTotalMarks(toBengaliNumber(totalM));
+    if (totalM <= 25) setExamTime('৪০ মিনিট');
+    else if (totalM <= 50) setExamTime('১ ঘণ্টা ১৫ মিনিট');
+    else setExamTime('২ ঘণ্টা ৩০ মিনিট');
+
+    // Auto-configure instructions based on selected count
+    if (selectedCreatives.length > 0) {
+      const toAnswer = Math.max(1, selectedCreatives.length > 7 ? 7 : selectedCreatives.length);
+      setCreativeInstruction(`যেকোনো ${toBengaliNumber(toAnswer)}টি প্রশ্নের উত্তর দাও: ${toBengaliNumber(toAnswer)} × ১০ = ${toBengaliNumber(toAnswer * 10)}`);
+    }
+    if (selectedMcqs.length > 0) {
+      setMcqInstruction(`সঠিক উত্তরের বিপরীতের বৃত্তটি বল পয়েন্ট কলম দ্বারা ভরাট কর। সকল প্রশ্নের উত্তর দিতে হবে: ${toBengaliNumber(selectedMcqs.length)} × ১ = ${toBengaliNumber(selectedMcqs.length)}`);
+    }
+    if (selectedShorts.length > 0) {
+      setShortInstruction(`সকল প্রশ্নের উত্তর দাও: ${toBengaliNumber(selectedShorts.length)} × ২ = ${toBengaliNumber(selectedShorts.length * 2)}`);
+    }
+
+    setSetupModalOpen(true);
+  };
+
+  // Confirm setup and go to final 2-column print paper
+  const handleConfirmAndProceedToPrint = () => {
+    setSetupModalOpen(false);
+    setIsPrintView(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Add Question handler
   const handleAddNewQuestion = () => {
     if (!newContent.trim()) {
@@ -255,106 +380,36 @@ export default function QuestionBankPage() {
     });
   };
 
-  // Add Sample Seed Questions for demo/testing if bank is empty
-  const handleSeedSampleQuestions = () => {
-    const samples = [
-      // MCQs for Math Class 10 Ch 2
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'mcq' as const,
-        content: 'ত্রিভুজের তিন বাহুর দৈর্ঘ্য সেন্টিমিটারে দেওয়া আছে। নিচের কোন ক্ষেত্রে ত্রিভুজ আঁকা সম্ভব নয়?\n(ক) ৩, ৪, ৫     (খ) ২, ৩, ৬     (গ) ৫, ৭, ১০     (ঘ) ৬, ৮, ১০'
-      },
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'mcq' as const,
-        content: 'একটি বৃত্তের ব্যাস ১০ সে.মি. হলে কেন্দ্র থেকে জ্যা এর উপর অঙ্কিত লম্বের দৈর্ঘ্য ৫ সে.মি. হলে জ্যা-এর দৈর্ঘ্য কত?\n(ক) ৫ সেমি.     (খ) ৮ সেমি.     (গ) ১০ সেমি.     (ঘ) ১২ সেমি.'
-      },
-      // Creatives for Math Class 10 Ch 2
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'creative' as const,
-        content: `U = {x ∈ ℕ : x < 10}, A = {x ∈ ℕ : x মৌলিক সংখ্যা এবং x < 10}, B = {x ∈ ℕ : x জোড় সংখ্যা এবং x < 10} এবং C = {x ∈ ℤ : x² - 5x + 6 = 0} তিনটি সেট।
-ক. C সেটটিকে তালিকা পদ্ধতিতে প্রকাশ কর।
-খ. দেখাও যে, (A ∪ B)' = A' ∩ B'।
-গ. প্রমাণ কর যে, A × (B ∩ C) = (A × B) ∩ (A × C)।`
-      },
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'creative' as const,
-        content: `কোনো ক্লাসের ৩০ জন শিক্ষার্থীর মধ্যে ২০ জন গণিত পছন্দ করে, ১৫ জন বিজ্ঞান পছন্দ করে এবং ৫ জন কোনোটিই পছন্দ করে না। অন্যদিকে, f(x) = 2x + 1/2x - 1 একটি ফাংশন।
-ক. কতজন শিক্ষার্থী উভয় বিষয় পছন্দ করে, তা সেট সূত্রের সাহায্যে নির্ণয় কর।
-খ. সার্বিক সেটের সাপেক্ষে ভেনচিত্রের মাধ্যমে প্রমাণ তথ্যটি যাচাই কর।
-গ. f(1/x) এর মান নির্ণয় করে দেখাও যে, f(x) + 1/f(x) - 1 = x।`
-      },
-      // Shorts for Math Class 10 Ch 2
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'short' as const,
-        content: "U = {x ∈ ℕ : x < 10}, A = {x ∈ ℕ : x মৌলিক সংখ্যা} এবং B = {x ∈ ℕ : x জোড় সংখ্যা} হলে, (A ∪ B)' নির্ণয় কর।"
-      },
-      {
-        classId: '10',
-        subject: 'গণিত',
-        chapter: '২য় অধ্যায়: সেট ও ফাংশন',
-        type: 'short' as const,
-        content: "P = {1, 2, 3} সেটের শক্তি সেট (Power Set) নির্ণয় কর এবং দেখাও যে, P(P) এর উপাদানের সংখ্যা 2ⁿ কে সমর্থন করে, যেখানে n হলো P সেটের উপাদানের সংখ্যা।"
-      }
-    ];
-
-    addQuestionsToBank(samples);
-    reloadQuestions();
-    toast({ title: 'নমুনা প্রশ্ন যুক্ত হয়েছে!', description: 'ছবিতে প্রদর্শিত নমুনা প্রশ্নগুলো সফলভাবে ব্যাংকে সেভ করা হয়েছে।' });
-  };
-
-  // Go to Print Mode
-  const handleProceedToPrint = () => {
-    if (selectedIds.size === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'প্রশ্ন নির্বাচন করুন',
-        description: 'প্রিন্ট করার জন্য অন্তত একটি প্রশ্নের টিক বক্সে ক্লিক করে নির্বাচন করুন।'
-      });
-      return;
-    }
-    // Calculate estimated marks & time
-    const totalM = (selectedCreatives.length * 10) + (selectedMcqs.length * 1) + (selectedShorts.length * 2);
-    setExamTotalMarks(toBengaliNumber(totalM));
-    if (totalM <= 25) setExamTime('৪০ মিনিট');
-    else if (totalM <= 50) setExamTime('১ ঘণ্টা ১৫ মিনিট');
-    else setExamTime('২ ঘণ্টা ৩০ মিনিট');
-
-    setIsPrintView(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   // ──────────────────────────────────────────────────────────
-  // VIEW 1: PRINT VIEW (বোর্ডমানে সরাসরি প্রিন্ট, কোনো এডিট নয়)
+  // VIEW 1: PRINT VIEW (বোর্ডমানের ২ কলাম রেডিমেড প্রশ্নপত্র)
   // ──────────────────────────────────────────────────────────
   if (isPrintView) {
     return (
       <div className="min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush">
-        {/* Floating Top Control Bar (Hidden during print) */}
-        <div className="no-print max-w-[8.27in] mx-auto mb-6 bg-white p-4 rounded-2xl shadow-lg border-2 border-indigo-200 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        {/* Floating Top Control Bar (Strictly hidden during print) */}
+        <div className="no-print max-w-[8.27in] mx-auto mb-6 bg-white p-3 sm:p-4 rounded-2xl shadow-lg border-2 border-indigo-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
+              size="sm"
               onClick={() => setIsPrintView(false)} 
-              className="font-bold text-xs gap-1.5 h-9"
+              className="font-bold text-xs gap-1.5 h-8"
             >
-              <ArrowLeft className="w-4 h-4" /> তালিকায় ফিরে যান
+              <ArrowLeft className="w-3.5 h-3.5" /> তালিকায় ফিরে যান
             </Button>
-            <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200">
-              নির্বাচিত প্রশ্ন: {toBengaliNumber(selectedIds.size)}টি (সৃজনশীল: {toBengaliNumber(selectedCreatives.length)}, বহুনির্বাচনী: {toBengaliNumber(selectedMcqs.length)}, সংক্ষিপ্ত: {toBengaliNumber(selectedShorts.length)})
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsPrintView(false);
+                setSetupModalOpen(true);
+              }}
+              className="font-bold text-xs gap-1.5 h-8 border-indigo-300 text-indigo-800"
+            >
+              <Settings2 className="w-3.5 h-3.5" /> সেটিংস পরিবর্তন
+            </Button>
+            <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 hidden sm:inline">
+              মোট প্রশ্ন: {toBengaliNumber(selectedIds.size)}টি | পূর্ণমান: {examTotalMarks}
             </span>
           </div>
 
@@ -366,9 +421,9 @@ export default function QuestionBankPage() {
                 }
                 window.print();
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs gap-1.5 h-9 px-5 shadow-md"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs gap-1.5 h-8 px-4 shadow-sm"
             >
-              <Printer className="w-4 h-4" /> এখনই প্রিন্ট করুন
+              <Printer className="w-3.5 h-3.5" /> এখনই প্রিন্ট করুন
             </Button>
             <Button
               onClick={() => {
@@ -377,17 +432,17 @@ export default function QuestionBankPage() {
                 }
                 window.print();
               }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs gap-1.5 h-9 px-4 shadow-md"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs gap-1.5 h-8 px-4 shadow-sm"
             >
-              <Download className="w-4 h-4" /> PDF ডাউনলোড
+              <Download className="w-3.5 h-3.5" /> PDF ডাউনলোড
             </Button>
           </div>
         </div>
 
-        {/* The Printable Board A4 Paper */}
-        <div className="max-w-[8.27in] mx-auto bg-white shadow-2xl rounded-sm p-6 sm:p-10 border border-slate-300 min-h-[11in] text-black leading-relaxed box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
-          {/* Institutional Header */}
-          <div className="text-center border-b-2 border-black pb-3 mb-6 select-none">
+        {/* The Printable Board A4 Paper Container */}
+        <div className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-2xl rounded-sm p-6 sm:p-10 border border-slate-300 min-h-[11in] text-black leading-relaxed box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
+          {/* Institutional Header (Spans across both columns) */}
+          <div className="text-center border-b-2 border-black pb-3 mb-5 select-none [column-span:all]">
             <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
               {institutionName}
             </h1>
@@ -405,87 +460,149 @@ export default function QuestionBankPage() {
             </div>
           </div>
 
-          {/* Section 1: Creative Questions (CQ) */}
-          {selectedCreatives.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between border-b border-black pb-1 mb-4">
-                <span className="font-black text-sm bg-black text-white px-3 py-0.5 rounded-sm">
-                  ক-বিভাগ: সৃজনশীল প্রশ্ন
-                </span>
-                <span className="text-xs font-bold italic">
-                  [যেকোনো {toBengaliNumber(selectedCreatives.length)}টি প্রশ্নের উত্তর দাও: {toBengaliNumber(selectedCreatives.length)} × ১০ = {toBengaliNumber(selectedCreatives.length * 10)}]
-                </span>
-              </div>
-              <div className="space-y-6">
-                {selectedCreatives.map((q, idx) => (
-                  <div key={q.id} className="text-xs sm:text-sm leading-relaxed">
-                    <div className="flex items-start gap-2">
-                      <span className="font-black text-base shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div 
-                        className="space-y-1.5 flex-1 whitespace-pre-line text-justify math-rendered"
-                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
-                      />
-                    </div>
+          {/* 2-Column Board Question Flow */}
+          <div className="print-two-columns columns-1 md:columns-2 gap-6 [column-rule:0.5pt_solid_#94a3b8]">
+            {/* Section 1: Creative Questions (CQ) */}
+            {selectedCreatives.length > 0 && (
+              <div className="break-inside-avoid-column mb-6">
+                <div className="border-b border-black pb-1 mb-3">
+                  <div className="font-black text-xs sm:text-sm text-black">
+                    {creativeTitle}
                   </div>
-                ))}
+                  {creativeInstruction && (
+                    <div className="text-[11px] font-bold italic text-slate-700">
+                      [{creativeInstruction}]
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {selectedCreatives.map((q, idx) => {
+                    const startNum = parseInt(creativeStartSerial, 10) || 1;
+                    const qNum = toBengaliNumber(startNum + idx);
+                    return (
+                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed border-b border-slate-100 pb-3">
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-black text-sm shrink-0">{qNum}।</span>
+                          <div 
+                            className="space-y-1.5 flex-1 whitespace-pre-line text-justify math-rendered"
+                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Section 2: Multiple Choice Questions (MCQ) */}
-          {selectedMcqs.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between border-b border-black pb-1 mb-4">
-                <span className="font-black text-sm bg-black text-white px-3 py-0.5 rounded-sm">
-                  {selectedCreatives.length > 0 ? 'খ-বিভাগ: বহুনির্বাচনী প্রশ্ন' : 'বহুনির্বাচনী প্রশ্ন'}
-                </span>
-                <span className="text-xs font-bold italic">
-                  [সঠিক উত্তরের বৃত্তটি ভরাট কর। সকল প্রশ্নের উত্তর দিতে হবে: {toBengaliNumber(selectedMcqs.length)} × ১ = {toBengaliNumber(selectedMcqs.length)}]
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {selectedMcqs.map((q, idx) => (
-                  <div key={q.id} className="text-xs leading-relaxed border-b border-slate-200 pb-2">
-                    <div className="flex items-start gap-1.5">
-                      <span className="font-black shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div 
-                        className="space-y-1 flex-1 whitespace-pre-line math-rendered"
-                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
-                      />
-                    </div>
+            {/* Section 2: Multiple Choice Questions (MCQ) */}
+            {selectedMcqs.length > 0 && (
+              <div className="break-inside-avoid-column mb-6">
+                <div className="border-b border-black pb-1 mb-3">
+                  <div className="font-black text-xs sm:text-sm text-black">
+                    {mcqTitle}
                   </div>
-                ))}
+                  {mcqInstruction && (
+                    <div className="text-[11px] font-bold italic text-slate-700">
+                      [{mcqInstruction}]
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {selectedMcqs.map((q, idx) => {
+                    const startNum = parseInt(mcqStartSerial, 10) || 1;
+                    const qNum = toBengaliNumber(startNum + idx);
+                    return (
+                      <div key={q.id} className="question-item break-inside-avoid text-xs leading-relaxed border-b border-slate-100 pb-2">
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-black shrink-0">{qNum}।</span>
+                          <div 
+                            className="space-y-1 flex-1 whitespace-pre-line math-rendered"
+                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Section 3: Short Questions */}
-          {selectedShorts.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between border-b border-black pb-1 mb-4">
-                <span className="font-black text-sm bg-black text-white px-3 py-0.5 rounded-sm">
-                  {selectedCreatives.length > 0 && selectedMcqs.length > 0 ? 'গ-বিভাগ: সংক্ষিপ্ত প্রশ্ন' : 'সংক্ষিপ্ত প্রশ্ন'}
-                </span>
-                <span className="text-xs font-bold italic">
-                  [সকল প্রশ্নের উত্তর দাও: {toBengaliNumber(selectedShorts.length)} × ২ = {toBengaliNumber(selectedShorts.length * 2)}]
-                </span>
-              </div>
-              <div className="space-y-3">
-                {selectedShorts.map((q, idx) => (
-                  <div key={q.id} className="text-xs sm:text-sm leading-relaxed">
-                    <div className="flex items-start gap-2">
-                      <span className="font-black shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div 
-                        className="space-y-1 flex-1 whitespace-pre-line math-rendered"
-                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
-                      />
-                    </div>
+            {/* Section 3: Short Questions */}
+            {selectedShorts.length > 0 && (
+              <div className="break-inside-avoid-column mb-6">
+                <div className="border-b border-black pb-1 mb-3">
+                  <div className="font-black text-xs sm:text-sm text-black">
+                    {shortTitle}
                   </div>
-                ))}
+                  {shortInstruction && (
+                    <div className="text-[11px] font-bold italic text-slate-700">
+                      [{shortInstruction}]
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {selectedShorts.map((q, idx) => {
+                    const startNum = parseInt(shortStartSerial, 10) || 1;
+                    const qNum = toBengaliNumber(startNum + idx);
+                    return (
+                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed border-b border-slate-100 pb-2">
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-black shrink-0">{qNum}।</span>
+                          <div 
+                            className="space-y-1 flex-1 whitespace-pre-line math-rendered"
+                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {/* Global Print Stylesheet: Ensures ZERO clutter and exact 2-column A4 output */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            html, body {
+              background: white !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              color: black !important;
+            }
+            .no-print, header, nav, footer, button, .app-header, .site-header {
+              display: none !important;
+            }
+            @page {
+              size: A4 portrait;
+              margin: 0.35in 0.4in;
+            }
+            .print-page-container {
+              width: 100% !important;
+              max-width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+            }
+            .print-two-columns {
+              column-count: 2 !important;
+              column-gap: 24px !important;
+              column-rule: 0.5pt solid #94a3b8 !important;
+            }
+            .question-item {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+            .board-mark {
+              float: right !important;
+              font-weight: bold !important;
+              margin-left: 8px !important;
+            }
+          }
+        ` }} />
       </div>
     );
   }
@@ -521,16 +638,6 @@ export default function QuestionBankPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {questions.length === 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSeedSampleQuestions}
-                className="font-bold text-xs text-amber-700 border-amber-300 hover:bg-amber-50 h-8 gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" /> নমুনা প্রশ্ন লোড করুন
-              </Button>
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -540,7 +647,7 @@ export default function QuestionBankPage() {
               <Plus className="w-3.5 h-3.5" /> নতুন প্রশ্ন যুক্ত করুন
             </Button>
             <Button
-              onClick={handleProceedToPrint}
+              onClick={handleOpenSetupModal}
               disabled={selectedIds.size === 0}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs h-8 px-4 gap-1.5 shadow-sm"
             >
@@ -561,7 +668,7 @@ export default function QuestionBankPage() {
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                   <BookOpen className="w-3.5 h-3.5 text-indigo-600" /> শ্রেণি নির্বাচন
                 </label>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedChapter('all'); }}>
                   <SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CLASSES.map(c => (
@@ -578,7 +685,7 @@ export default function QuestionBankPage() {
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                   <Layers className="w-3.5 h-3.5 text-indigo-600" /> বিষয় নির্বাচন
                 </label>
-                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <Select value={selectedSubject} onValueChange={(v) => { setSelectedSubject(v); setSelectedChapter('all'); }}>
                   <SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {availableSubjects.map(s => (
@@ -618,7 +725,7 @@ export default function QuestionBankPage() {
                 <Input
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="যেমন: ত্রিভুজ, সেট, গতি..."
+                  placeholder="যেমন: বাস্তব সংখ্যা, ত্রিভুজ..."
                   className="h-9 text-xs font-bold"
                 />
               </div>
@@ -630,7 +737,7 @@ export default function QuestionBankPage() {
         <div className="bg-indigo-900 text-white rounded-xl p-3 sm:p-4 shadow-md flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
             <span className="bg-indigo-800 px-3 py-1 rounded-md text-amber-300 font-black">
-              মোট সংরক্ষিত প্রশ্ন: {toBengaliNumber(filteredQuestions.length)}টি
+              মোট প্রশ্ন: {toBengaliNumber(filteredQuestions.length)}টি
             </span>
             <span className="bg-indigo-700/80 px-2.5 py-1 rounded-md">
               বহুনির্বাচনী: {toBengaliNumber(mcqQuestions.length)}টি (নির্বাচিত: {toBengaliNumber(selectedMcqs.length)})
@@ -662,7 +769,7 @@ export default function QuestionBankPage() {
             </Button>
             <Button
               size="sm"
-              onClick={handleProceedToPrint}
+              onClick={handleOpenSetupModal}
               disabled={selectedIds.size === 0}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-8 px-4 gap-1.5 shadow"
             >
@@ -680,9 +787,6 @@ export default function QuestionBankPage() {
               প্রশ্ন তৈরি (`/create-question`) বা লেকচার শিট পেজ থেকে 'প্রশ্ন ব্যাংকে সংরক্ষণ' বাটনে ক্লিক করে প্রশ্ন যোগ করতে পারেন।
             </p>
             <div className="pt-2 flex justify-center gap-3">
-              <Button onClick={handleSeedSampleQuestions} variant="outline" className="font-bold text-xs gap-1.5 border-amber-400 text-amber-800">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" /> ডেমো নমুনা প্রশ্ন লোড করুন
-              </Button>
               <Button onClick={() => setAddModalOpen(true)} className="font-bold text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white">
                 <Plus className="w-3.5 h-3.5" /> নতুন প্রশ্ন লিখুন
               </Button>
@@ -737,7 +841,7 @@ export default function QuestionBankPage() {
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
                         <div 
                           className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
                         />
                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
@@ -821,7 +925,7 @@ export default function QuestionBankPage() {
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
                         <div 
                           className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
                         />
                         <div className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
@@ -905,7 +1009,7 @@ export default function QuestionBankPage() {
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
                         <div 
                           className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
                         />
                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
@@ -942,6 +1046,127 @@ export default function QuestionBankPage() {
           </div>
         )}
       </main>
+
+      {/* ── POPUP MODAL: BOARD EXAM CONFIGURATION (বোর্ড সেটআপ ও বিভাগ নির্ধারণ) ── */}
+      <Dialog open={setupModalOpen} onOpenChange={setSetupModalOpen}>
+        <DialogContent className="max-w-xl font-kalpurush bg-white border-2 border-indigo-200 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-black flex items-center gap-2 text-indigo-950 border-b pb-2">
+              <Settings2 className="w-5 h-5 text-indigo-600" /> বোর্ড প্রশ্নপত্র প্রস্তুত ও বিভাগীয় সেটআপ
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* Top Exam Header Settings */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+              <span className="font-black text-slate-800 text-xs">১. পরীক্ষার মূল তথ্য (স্বয়ংক্রিয় প্রস্তুত)</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">প্রতিষ্ঠানের নাম</label>
+                  <Input value={institutionName} onChange={e => setInstitutionName(e.target.value)} className="h-8 font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">পরীক্ষার নাম</label>
+                  <Input value={examName} onChange={e => setExamName(e.target.value)} className="h-8 font-bold" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">পরীক্ষার সময়</label>
+                  <Input value={examTime} onChange={e => setExamTime(e.target.value)} className="h-8 font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">পূর্ণমান</label>
+                  <Input value={examTotalMarks} onChange={e => setExamTotalMarks(e.target.value)} className="h-8 font-bold" />
+                </div>
+              </div>
+            </div>
+
+            {/* Creative Section Setup (if CQ selected) */}
+            {selectedCreatives.length > 0 && (
+              <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-indigo-950 text-xs">সৃজনশীল বিভাগ (ক-বিভাগ: {toBengaliNumber(selectedCreatives.length)}টি প্রশ্ন)</span>
+                  <span className="text-[10px] font-bold text-indigo-700">শুরুর ক্রমিক:</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 space-y-1">
+                    <label className="font-bold text-slate-700">বিভাগের শিরোনাম</label>
+                    <Input value={creativeTitle} onChange={e => setCreativeTitle(e.target.value)} className="h-8 font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700">শুরুর ক্রমিক</label>
+                    <Input value={creativeStartSerial} onChange={e => setCreativeStartSerial(e.target.value)} className="h-8 font-bold text-center" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
+                  <Input value={creativeInstruction} onChange={e => setCreativeInstruction(e.target.value)} className="h-8 font-bold" />
+                </div>
+              </div>
+            )}
+
+            {/* MCQ Section Setup (if MCQ selected) */}
+            {selectedMcqs.length > 0 && (
+              <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 text-xs">বহুনির্বাচনী বিভাগ (খ-বিভাগ: {toBengaliNumber(selectedMcqs.length)}টি প্রশ্ন)</span>
+                  <span className="text-[10px] font-bold text-amber-700">শুরুর ক্রমিক:</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 space-y-1">
+                    <label className="font-bold text-slate-700">বিভাগের শিরোনাম</label>
+                    <Input value={mcqTitle} onChange={e => setMcqTitle(e.target.value)} className="h-8 font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700">শুরুর ক্রমিক</label>
+                    <Input value={mcqStartSerial} onChange={e => setMcqStartSerial(e.target.value)} className="h-8 font-bold text-center" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
+                  <Input value={mcqInstruction} onChange={e => setMcqInstruction(e.target.value)} className="h-8 font-bold" />
+                </div>
+              </div>
+            )}
+
+            {/* Short Section Setup (if Short selected) */}
+            {selectedShorts.length > 0 && (
+              <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-emerald-950 text-xs">সংক্ষিপ্ত প্রশ্ন বিভাগ (গ-বিভাগ: {toBengaliNumber(selectedShorts.length)}টি প্রশ্ন)</span>
+                  <span className="text-[10px] font-bold text-emerald-700">শুরুর ক্রমিক:</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 space-y-1">
+                    <label className="font-bold text-slate-700">বিভাগের শিরোনাম</label>
+                    <Input value={shortTitle} onChange={e => setShortTitle(e.target.value)} className="h-8 font-bold" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700">শুরুর ক্রমিক</label>
+                    <Input value={shortStartSerial} onChange={e => setShortStartSerial(e.target.value)} className="h-8 font-bold text-center" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">উত্তর দেওয়ার নির্দেশনা</label>
+                  <Input value={shortInstruction} onChange={e => setShortInstruction(e.target.value)} className="h-8 font-bold" />
+                </div>
+              </div>
+            )}
+
+            <div className="p-2.5 bg-blue-50 text-blue-900 rounded-lg text-[11px] font-bold">
+              ✓ প্রশ্নপত্রটি স্বয়ংক্রিয়ভাবে ২-কলাম বোর্ড লেআউটে এবং অপ্রয়োজনীয় উপাদান ছাড়াই প্রিন্টের জন্য প্রস্তুত হবে।
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 border-t pt-3">
+            <Button variant="outline" size="sm" onClick={() => setSetupModalOpen(false)}>বাতিল</Button>
+            <Button size="sm" onClick={handleConfirmAndProceedToPrint} className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 gap-1.5 shadow-sm">
+              <Printer className="w-4 h-4" /> প্রশ্নপত্র প্রস্তুত ও প্রিন্ট ভিউ দেখুন ↗
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add New Question Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
@@ -1019,6 +1244,12 @@ export default function QuestionBankPage() {
         .math-rendered .math-den { padding: 0 2px; }
         .math-rendered sub { font-size: 0.75em; vertical-align: sub; line-height: 0; }
         .math-rendered sup { font-size: 0.75em; vertical-align: super; line-height: 0; }
+        .board-mark {
+          float: right;
+          font-weight: bold;
+          color: #1e293b;
+          margin-left: 8px;
+        }
       ` }} />
     </div>
   );
