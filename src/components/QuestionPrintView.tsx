@@ -2359,6 +2359,13 @@ export function QuestionPrintView({
     setPreviewZoom(fitZoom);
   }, [sidebarOpen]);
 
+  // Auto-fit on mobile when opened
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      handleFitToScreen();
+    }
+  }, [handleFitToScreen]);
+
   // Safeguard against browser / extension runaway zoom (e.g. 9960% or 10000%)
   useEffect(() => {
     const handleWheelZoom = (e: WheelEvent) => {
@@ -2908,28 +2915,177 @@ export function QuestionPrintView({
       <div ref={measurementRef} style={{ position: 'absolute', top: -99999, left: -99999, visibility: 'hidden', pointerEvents: 'none' }} />
 
       {/* ── Top Header Toolbar ── */}
-      <header className="no-print h-12 bg-white border-b flex items-center justify-between px-2 sm:px-4 shrink-0 shadow-sm z-50 select-none">
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(prev => !prev)}
-            className="h-8 w-8 text-slate-600 hover:text-slate-900 shrink-0"
-            title={sidebarOpen ? "সাইড মেনুবার লুকান" : "সাইড মেনুবার দেখান"}
-          >
-            {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-          </Button>
-          <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center shrink-0">
-            <Eye className="w-4 h-4" />
+      <header className="no-print bg-white border-b shrink-0 shadow-sm z-50 select-none">
+        {/* Tier 1 / Main Row: Always fits perfectly */}
+        <div className="h-11 md:h-12 flex items-center justify-between px-2 sm:px-4">
+          {/* Left: Sidebar toggle + Back to Editor + Library */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(prev => !prev)}
+              className="h-8 w-8 text-slate-600 hover:text-slate-900 shrink-0"
+              title={sidebarOpen ? "সাইড মেনুবার লুকান" : "সাইড মেনুবার দেখান"}
+            >
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onBack} 
+              className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs" 
+              title="মেইন এডিটরে ফিরে যান"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> <span className="inline">মেইন এডিটর</span>
+            </Button>
+            <Link href="/my-questions">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 px-2 sm:px-2.5 shrink-0 text-xs" 
+                title="আমার লাইব্রেরিতে যান"
+              >
+                <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">লাইব্রেরি</span>
+              </Button>
+            </Link>
+            <h3 className="font-bold text-sm hidden lg:inline text-slate-800 truncate max-w-xs xl:max-w-md ml-1">
+              প্রিন্ট প্রিভিউ - {meta.institution || appName}
+            </h3>
           </div>
-          <h3 className="font-bold text-sm hidden md:inline text-slate-800 truncate max-w-xs md:max-w-md">
-            প্রিন্ট প্রিভিউ ও এডিটর - {meta.institution || appName}
-          </h3>
+
+          {/* Desktop Middle Tools (Font, Zoom, Ruler, AI, Page Count) */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2">
+            {/* Font Size +/- */}
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5 shrink-0" title="ফন্ট সাইজ পরিবর্তন করুন">
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => {
+                  const newSize = Math.max(6, (parseFloat(fontSizeDraft) || globalFontSize) - 0.5);
+                  setFontSizeDraft(String(newSize));
+                  handleSmartFontSizeChange(newSize);
+                }}
+                className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+                title="ফন্ট ছোট করুন"
+              >−</button>
+              <input
+                type="number"
+                min={6} max={72} step={0.5}
+                value={fontSizeDraft || globalFontSize}
+                onChange={e => setFontSizeDraft(e.target.value)}
+                onBlur={e => { if (e.target.value) handleSmartFontSizeChange(e.target.value); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
+                    handleSmartFontSizeChange((e.target as HTMLInputElement).value);
+                  }
+                }}
+                className="w-10 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
+                title="ফন্ট সাইজ লিখুন (pt)"
+              />
+              <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => {
+                  const newSize = Math.min(72, (parseFloat(fontSizeDraft) || globalFontSize) + 0.5);
+                  setFontSizeDraft(String(newSize));
+                  handleSmartFontSizeChange(newSize);
+                }}
+                className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+                title="ফন্ট বড় করুন"
+              >+</button>
+            </div>
+
+            {/* Zoom controls with Fit to screen */}
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
+                className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
+                title="জুম কমান"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleFitToScreen}
+                className="text-[11px] font-bold px-1.5 py-0.5 rounded text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 transition-colors"
+                title="স্ক্রিনে ফিট করুন"
+              >
+                ফিট
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(100)}
+                className="text-[11px] font-bold px-1.5 min-w-[45px] text-center text-slate-700 hover:text-indigo-600 cursor-pointer transition-colors"
+                title="ক্লিক করে ১০০% রিসেট করুন"
+              >
+                {toBengaliNumber(effectiveZoom)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(Math.min(200, effectiveZoom + 10))}
+                className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
+                title="জুম বাড়ান"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Ruler Toggle */}
+            <Button
+              variant={showRuler ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowRuler(prev => !prev)}
+              className={cn("h-8 text-xs font-bold gap-1 px-2.5", showRuler && "bg-indigo-100 text-indigo-700")}
+              title="রুলার দেখান / লুকান"
+            >
+              <Ruler className="w-3.5 h-3.5" />
+              <span>রুলার</span>
+            </Button>
+
+            {/* AI Assistant */}
+            <Button
+              size="sm"
+              onClick={() => setAiModalOpen(true)}
+              className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 shadow-xs shrink-0 text-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span>AI সহকারী</span>
+            </Button>
+
+            {/* Page Count */}
+            <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 shrink-0">
+              মোট পাতা: {toBengaliNumber(paginatedPages.length)}
+            </div>
+          </div>
+
+          {/* Right: Save & Print (ALWAYS 100% visible on both mobile and desktop!) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button 
+              size="sm" 
+              onClick={handleOpenSaveModal} 
+              disabled={saving} 
+              className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2.5 sm:px-3 shrink-0 text-xs shadow-xs" 
+              title="সেভ ও PDF তৈরি করুন"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span>সেভ ও PDF</span>
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={handlePrint} 
+              className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
+              title="প্রিন্ট করুন"
+            >
+              <Printer className="w-3.5 h-3.5" /> <span>প্রিন্ট</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-1">
-          {/* Font Size +/- */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5 shrink-0" title="ফন্ট সাইজ পরিবর্তন করুন (সিলেক্ট করা অংশে বা পুরো পেজে)">
+        {/* Tier 2 / Mobile-only Formatting & Zoom Bar: 100% visible, perfectly sized */}
+        <div className="flex md:hidden items-center justify-between px-2 py-1 bg-slate-50 border-t border-slate-200 text-xs gap-1">
+          {/* Mobile Font Size +/- */}
+          <div className="flex items-center bg-white rounded-md p-0.5 border border-slate-300 gap-0.5 shrink-0">
             <button
               type="button"
               onMouseDown={e => e.preventDefault()}
@@ -2938,7 +3094,7 @@ export function QuestionPrintView({
                 setFontSizeDraft(String(newSize));
                 handleSmartFontSizeChange(newSize);
               }}
-              className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+              className="p-1 hover:bg-slate-100 rounded text-slate-700 font-black text-xs"
               title="ফন্ট ছোট করুন"
             >−</button>
             <input
@@ -2947,15 +3103,10 @@ export function QuestionPrintView({
               value={fontSizeDraft || globalFontSize}
               onChange={e => setFontSizeDraft(e.target.value)}
               onBlur={e => { if (e.target.value) handleSmartFontSizeChange(e.target.value); }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                  handleSmartFontSizeChange((e.target as HTMLInputElement).value);
-                }
-              }}
-              className="w-9 sm:w-11 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
-              title="ফন্ট সাইজ লিখুন (pt)"
+              className="w-8 text-center text-[11px] font-bold bg-transparent border-none outline-none text-slate-800 no-arrows"
+              title="ফন্ট সাইজ (pt)"
             />
-            <span className="text-[9px] text-slate-500 font-bold pr-0.5 hidden xs:inline">pt</span>
+            <span className="text-[9px] text-slate-500 font-bold pr-0.5">pt</span>
             <button
               type="button"
               onMouseDown={e => e.preventDefault()}
@@ -2964,89 +3115,56 @@ export function QuestionPrintView({
                 setFontSizeDraft(String(newSize));
                 handleSmartFontSizeChange(newSize);
               }}
-              className="p-1 hover:bg-white rounded text-slate-600 transition-colors font-bold text-xs"
+              className="p-1 hover:bg-slate-100 rounded text-slate-700 font-black text-xs"
               title="ফন্ট বড় করুন"
             >+</button>
           </div>
 
-          {/* Zoom controls with Fit to screen */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 shrink-0">
-            <button
-              type="button"
-              onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
-              className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
-              title="জুম কমান"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
+          {/* Mobile Zoom & Fit */}
+          <div className="flex items-center bg-white rounded-md p-0.5 border border-slate-300 gap-0.5 shrink-0">
             <button
               type="button"
               onClick={handleFitToScreen}
-              className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 transition-colors"
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
               title="স্ক্রিনে ফিট করুন"
             >
               ফিট
             </button>
             <button
               type="button"
-              onClick={() => setPreviewZoom(100)}
-              className="text-[11px] font-bold px-1 sm:px-1.5 min-w-[38px] sm:min-w-[50px] text-center text-slate-700 hover:text-indigo-600 cursor-pointer transition-colors"
-              title="ক্লিক করে ১০০% রিসেট করুন"
+              onClick={() => setPreviewZoom(Math.max(50, effectiveZoom - 10))}
+              className="p-1 hover:bg-slate-100 rounded text-slate-600"
+              title="জুম কমান"
             >
-              {toBengaliNumber(effectiveZoom)}%
+              <ZoomOut className="w-3 h-3" />
             </button>
+            <span className="text-[10px] font-bold px-1 text-slate-700 min-w-[32px] text-center">
+              {toBengaliNumber(effectiveZoom)}%
+            </span>
             <button
               type="button"
               onClick={() => setPreviewZoom(Math.min(200, effectiveZoom + 10))}
-              className="p-1 hover:bg-white rounded text-slate-600 transition-colors"
+              className="p-1 hover:bg-slate-100 rounded text-slate-600"
               title="জুম বাড়ান"
             >
-              <ZoomIn className="w-3.5 h-3.5" />
+              <ZoomIn className="w-3 h-3" />
             </button>
           </div>
 
-          {/* Ruler Toggle - Hidden on mobile, visible on md: */}
-          <Button
-            variant={showRuler ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowRuler(prev => !prev)}
-            className={cn("h-8 text-xs font-bold gap-1 px-2.5 hidden md:flex shrink-0", showRuler && "bg-indigo-100 text-indigo-700")}
-            title="রুলার দেখান / লুকান"
-          >
-            <Ruler className="w-3.5 h-3.5" />
-            <span>রুলার</span>
-          </Button>
-
-          {/* AI Question Assistant Button */}
-          <Button
-            size="sm"
-            onClick={() => setAiModalOpen(true)}
-            className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2 sm:px-3 shadow-xs shrink-0"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-            <span className="hidden sm:inline">AI সহকারী</span>
-          </Button>
-
-          {/* Page Count */}
-          <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 hidden lg:block shrink-0">
-            মোট পাতা: {toBengaliNumber(paginatedPages.length)}
+          {/* Mobile Page Count & Ruler */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowRuler(prev => !prev)}
+              className={cn("p-1.5 rounded-md border text-slate-600", showRuler ? "bg-indigo-100 border-indigo-300 text-indigo-700" : "bg-white border-slate-300")}
+              title="রুলার"
+            >
+              <Ruler className="w-3.5 h-3.5" />
+            </button>
+            <div className="text-[10px] font-bold text-slate-700 bg-white px-1.5 py-1 rounded-md border border-slate-300">
+              পাতা: {toBengaliNumber(paginatedPages.length)}
+            </div>
           </div>
-
-          {/* Back, Save, Print */}
-          <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2 sm:px-3 shrink-0" title="মেইন এডিটরে ফিরে যান">
-            <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">মেইন এডিটর</span>
-          </Button>
-          <Link href="/my-questions">
-            <Button variant="outline" size="sm" className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 px-2 sm:px-3 shrink-0" title="আমার লাইব্রেরিতে যান">
-              <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">লাইব্রেরি</span>
-            </Button>
-          </Link>
-          <Button size="sm" onClick={handleOpenSaveModal} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ ও PDF তৈরি করুন">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ ও PDF</span>
-          </Button>
-          <Button size="sm" onClick={handlePrint} className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2 sm:px-4 shrink-0" title="প্রিন্ট করুন">
-            <Printer className="w-3.5 h-3.5" /> <span className="hidden xs:inline">প্রিন্ট</span>
-          </Button>
         </div>
       </header>
 
