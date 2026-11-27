@@ -29,8 +29,10 @@ import {
   ChevronRight,
   GraduationCap,
   Filter,
-  ListTodo
+  ListTodo,
+  Calendar
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,6 +76,18 @@ function toBengaliNumber(n: number | string | undefined | null): string {
   if (n === undefined || n === null || n === '') return '০';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
   return n.toString().replace(/\d/g, (digit) => bengaliDigits[parseInt(digit)]);
+}
+
+function toBengaliDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return `${toBengaliNumber(d)}/${toBengaliNumber(m)}/${toBengaliNumber(y)}`;
+    }
+  } catch {}
+  return toBengaliNumber(dateStr);
 }
 
 function getNormalizedKey(name: string): string {
@@ -143,6 +157,7 @@ function MyLibraryContent() {
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [activeFileType, setActiveFileType] = useState<FileTypeFilter>('all');
 
@@ -175,6 +190,12 @@ function MyLibraryContent() {
     const sub = searchParams.get('subject');
     const ch = searchParams.get('chapter');
     const cat = searchParams.get('category');
+    const dateParam = searchParams.get('date');
+
+    if (dateParam) {
+      setSelectedDate(dateParam);
+      setViewMode('content');
+    }
 
     if (hl) {
       setHighlightedId(hl);
@@ -400,12 +421,16 @@ function MyLibraryContent() {
     if (!ts) return null;
     if (typeof ts.toDate === 'function') return ts.toDate();
     if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
-    if (ts instanceof Date) return ts;
+    if (ts instanceof Date) return isNaN(ts.getTime()) ? null : ts;
+    if (typeof ts === 'string' || typeof ts === 'number') {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) return d;
+    }
     return null;
   };
 
   const combinedItems = useMemo(() => {
-    const all = [
+    let all = [
       ...currentItemsRaw.sheets.map(i => {
         const date = toDate(i.updatedAt) || toDate((i as any).createdAt) || null;
         return { 
@@ -413,7 +438,10 @@ function MyLibraryContent() {
           source: 'lecture-sheets' as const, 
           displayTitle: i.topic || 'শিরোনামহীন শিট',
           fileType: 'EDITOR' as const,
-          date
+          date,
+          classId: i.classId,
+          subject: i.subject,
+          chapter: i.topic
         };
       }),
       ...currentItemsRaw.pdfSheets.map(i => {
@@ -425,9 +453,12 @@ function MyLibraryContent() {
         return { 
           ...i, 
           source: 'pdf-sheets' as const, 
-          displayTitle: `${i.chapterName} - ${i.subject}`,
+          displayTitle: `${i.chapterName ? `${i.chapterName} - ` : ''}${i.subject || 'পিডিএফ'}`,
           fileType: ft,
-          date
+          date,
+          classId: i.classId,
+          subject: i.subject,
+          chapter: i.chapterName
         };
       }),
       ...currentItemsRaw.questions.map(i => {
@@ -435,16 +466,31 @@ function MyLibraryContent() {
         return { 
           ...i, 
           source: 'questions' as const, 
-          displayTitle: `${i.exam || 'পরীক্ষা'} - ${i.chapter || 'অধ্যায় নেই'}`,
+          displayTitle: `${i.exam || 'পরীক্ষা'}${i.chapter ? ` - ${i.chapter}` : ''}`,
           fileType: 'EDITOR' as const,
-          date
+          date,
+          classId: i.classId,
+          subject: i.subject,
+          chapter: i.chapter
         };
       })
     ];
+
+    if (selectedDate) {
+      all = all.filter((item: any) => {
+        if (!item.date) return false;
+        try {
+          return format(item.date, 'yyyy-MM-dd') === selectedDate;
+        } catch {
+          return false;
+        }
+      });
+    }
+
     return all.sort((a: any, b: any) => {
       return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
     });
-  }, [currentItemsRaw]);
+  }, [currentItemsRaw, selectedDate]);
 
   const getGranularChapterStats = (chapterName: string) => {
     const isGeneral = chapterName === 'সাধারণ অধ্যায়';
@@ -551,7 +597,20 @@ function MyLibraryContent() {
 
   const handleBack = () => {
     if (isSelecting) { setIsSelecting(false); setSelectedDocIds([]); return; }
-    if (viewMode === 'content') { setViewMode('chapters'); setSelectedChapter(null); setActiveCategory('all'); setActiveFileType('all'); return; }
+    if (selectedDate) {
+      setSelectedDate(null);
+      if (!selectedClass) {
+        setViewMode('classes');
+        return;
+      }
+    }
+    if (viewMode === 'content') { 
+      if (!selectedChapter && !selectedSubject && !selectedClass) {
+        setViewMode('classes');
+        return;
+      }
+      setViewMode('chapters'); setSelectedChapter(null); setActiveCategory('all'); setActiveFileType('all'); return; 
+    }
     if (viewMode === 'chapters') { setViewMode('subjects'); setSelectedSubject(null); return; }
     if (viewMode === 'subjects') { setViewMode('classes'); setSelectedClass(null); return; }
     router.back();
@@ -683,11 +742,85 @@ function MyLibraryContent() {
 
   const renderSubjectContent = () => (
     <div className="space-y-4">
+        {selectedDate && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-primary/10 border-2 border-primary/30 p-4 rounded-2xl text-primary font-bold shadow-xs no-print animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary text-white rounded-xl shadow-xs">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-black text-slate-900 text-base">
+                  📅 {toBengaliDate(selectedDate)} তারিখে সংরক্ষিত ফাইলসমূহ
+                </h4>
+                <p className="text-xs text-slate-600 font-bold">
+                  নির্বাচিত এই তারিখে মোট {toBengaliNumber(combinedItems.length)} টি ফাইল সংরক্ষিত পাওয়া গেছে
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedClass && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedClass(null);
+                    setSelectedSubject(null);
+                    setSelectedChapter(null);
+                  }}
+                  className="h-9 border-2 border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl"
+                >
+                  সকল শ্রেণি দেখুন
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedDate(null);
+                  if (!selectedClass) setViewMode('classes');
+                }}
+                className="h-9 border-2 border-primary text-primary hover:bg-primary hover:text-white font-black text-xs gap-1.5 rounded-xl shadow-xs"
+              >
+                <X className="w-4 h-4" /> ফিল্টার মুছুন
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Filter Section directly above table */}
         <div className="space-y-4 bg-white/40 p-4 rounded-2xl border-2 border-black/5 shadow-inner no-print">
-            <div className="flex items-center gap-2 mb-2">
-                <LayoutGrid className="w-5 h-5 text-slate-800" />
-                <h3 className="font-black text-slate-800">আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                    <LayoutGrid className="w-5 h-5 text-slate-800" />
+                    <h3 className="font-black text-slate-800">আমার সংগ্রহ ({toBengaliNumber(combinedItems.length)})</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-600" />
+                    <Input 
+                        type="date"
+                        value={selectedDate || ''}
+                        onChange={(e) => {
+                            setSelectedDate(e.target.value || null);
+                            setViewMode('content');
+                        }}
+                        className="h-8 w-36 text-xs font-bold border-2 border-black bg-white rounded-lg"
+                        title="তারিখ নির্বাচন করে ফাইল ফিল্টার করুন"
+                    />
+                    {selectedDate && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                                setSelectedDate(null);
+                                if (!selectedClass) setViewMode('classes');
+                            }}
+                            className="h-8 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 font-bold"
+                            title="তারিখ ফিল্টার মুছুন"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Category Row */}
@@ -817,13 +950,32 @@ function MyLibraryContent() {
                       "font-bold border-r-2 border-black px-4 text-xs md:text-sm",
                       isHighlighted ? "bg-red-100 text-red-950 font-black" : "bg-green-100"
                     )}>
-                      <div className="flex items-center gap-2">
-                        {isHighlighted && (
-                          <Badge className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] px-2 py-0.5 animate-pulse shadow-xs shrink-0">
-                            👉 এই ফাইলটি
-                          </Badge>
-                        )}
-                        <span>{item.displayTitle}</span>
+                      <div className="flex flex-col gap-1 py-1">
+                        <div className="flex items-center gap-2">
+                          {isHighlighted && (
+                            <Badge className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] px-2 py-0.5 animate-pulse shadow-xs shrink-0">
+                              👉 এই ফাইলটি
+                            </Badge>
+                          )}
+                          <span className="font-black text-slate-900">{item.displayTitle}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                          {item.classId && (
+                            <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-300">
+                              {classNamesMap[item.classId] ? `${classNamesMap[item.classId]} শ্রেণি` : `${item.classId} শ্রেণি`}
+                            </span>
+                          )}
+                          {item.subject && (
+                            <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-300">
+                              {item.subject}
+                            </span>
+                          )}
+                          {item.chapter && (
+                            <span className="bg-amber-50 text-amber-900 px-1.5 py-0.5 rounded border border-amber-200 truncate max-w-[200px]">
+                              {item.chapter}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="font-bold border-r-2 border-black px-4 text-xs">
@@ -920,6 +1072,119 @@ function MyLibraryContent() {
         <aside className="w-full md:w-72 shrink-0 space-y-6 no-print bg-white md:bg-transparent p-4 md:p-0 border-b md:border-0 md:sticky md:top-28 self-start">
             <h2 className="text-2xl font-black mb-4 px-4 hidden md:block text-slate-900 tracking-tight">লাইব্রেরি অপশন</h2>
             
+            {/* Date Filter Card */}
+            <Card className="border-2 border-black rounded-2xl overflow-hidden shadow-sm bg-white">
+                <CardHeader className="bg-primary/5 p-3 border-b flex flex-row items-center justify-between">
+                    <CardTitle className="text-xs font-black uppercase text-primary flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5" /> তারিখ দিয়ে খুঁজুন
+                    </CardTitle>
+                    {selectedDate && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                                setSelectedDate(null);
+                                if (!selectedClass) setViewMode('classes');
+                            }}
+                            className="h-6 px-2 text-[10px] text-red-600 font-bold hover:bg-red-50 hover:text-red-700"
+                        >
+                            মুছুন
+                        </Button>
+                    )}
+                </CardHeader>
+                <CardContent className="p-3.5 space-y-3">
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">তারিখ নির্বাচন:</Label>
+                        <Input 
+                            type="date" 
+                            value={selectedDate || ''}
+                            onChange={(e) => {
+                                const val = e.target.value || null;
+                                setSelectedDate(val);
+                                if (val) {
+                                    setViewMode('content');
+                                }
+                            }}
+                            className="h-10 font-bold border-2 border-black text-sm bg-slate-50 focus:bg-white"
+                        />
+                    </div>
+
+                    <div className="flex gap-1.5 pt-0.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const today = format(new Date(), 'yyyy-MM-dd');
+                                setSelectedDate(today);
+                                setViewMode('content');
+                            }}
+                            className={cn(
+                                "flex-1 text-[11px] font-black h-8 border-2 border-black",
+                                selectedDate === format(new Date(), 'yyyy-MM-dd') ? "bg-primary text-white hover:bg-primary/90" : "bg-white hover:bg-slate-100"
+                            )}
+                        >
+                            আজকে
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const yesterday = new Date();
+                                yesterday.setDate(yesterday.getDate() - 1);
+                                const yStr = format(yesterday, 'yyyy-MM-dd');
+                                setSelectedDate(yStr);
+                                setViewMode('content');
+                            }}
+                            className={cn(
+                                "flex-1 text-[11px] font-black h-8 border-2 border-black",
+                                selectedDate === format(new Date(Date.now() - 86400000), 'yyyy-MM-dd') ? "bg-primary text-white hover:bg-primary/90" : "bg-white hover:bg-slate-100"
+                            )}
+                        >
+                            গতকাল
+                        </Button>
+                        {selectedDate && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setSelectedDate(null);
+                                    if (!selectedClass) setViewMode('classes');
+                                }}
+                                className="text-[11px] font-black h-8 border-2 border-red-500 text-red-600 hover:bg-red-50"
+                            >
+                                সব
+                            </Button>
+                        )}
+                    </div>
+
+                    {selectedDate && (
+                        <div className="bg-primary/10 border border-primary/20 p-2 rounded-xl text-center space-y-1">
+                            <p className="text-[11px] font-black text-primary">
+                                📅 {toBengaliDate(selectedDate)}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-700">
+                                মোট {toBengaliNumber(combinedItems.length)} টি ফাইল সংরক্ষিত
+                            </p>
+                            {selectedClass && (
+                                <button 
+                                    onClick={() => {
+                                        setSelectedClass(null);
+                                        setSelectedSubject(null);
+                                        setSelectedChapter(null);
+                                    }}
+                                    className="text-[10px] text-blue-600 hover:underline font-bold block mx-auto pt-0.5"
+                                >
+                                    (সকল শ্রেণির ফাইল দেখুন)
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
             {/* 1. Selectors Section */}
             <Card className="border-2 border-black rounded-2xl overflow-hidden shadow-sm bg-white">
                 <CardHeader className="bg-primary/5 p-3 border-b">
@@ -1021,13 +1286,25 @@ function MyLibraryContent() {
         {/* Content Area */}
         <div className="flex-1 min-w-0 space-y-6">
             <header className="mb-4">
-              <h2 className="text-2xl font-black text-foreground">
-                {viewMode === 'classes' ? 'শ্রেণি নির্বাচন করুন' : 
-                 viewMode === 'subjects' ? `${classNamesMap[selectedClass || '']} শ্রেণির বিষয়সমূহ` :
-                 viewMode === 'chapters' ? `${selectedSubject} - অধ্যায়সমূহ` :
-                 `${selectedSubject} - ${selectedChapter}`}
+              <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+                {selectedDate ? (
+                  <>
+                    <Calendar className="w-6 h-6 text-primary" />
+                    <span>{toBengaliDate(selectedDate)} তারিখে সংরক্ষিত ফাইলসমূহ {selectedClass ? `(${classNamesMap[selectedClass] || selectedClass} শ্রেণি)` : ''}</span>
+                  </>
+                ) : viewMode === 'classes' ? (
+                  'শ্রেণি নির্বাচন করুন'
+                ) : viewMode === 'subjects' ? (
+                  `${classNamesMap[selectedClass || '']} শ্রেণির বিষয়সমূহ`
+                ) : viewMode === 'chapters' ? (
+                  `${selectedSubject} - অধ্যায়সমূহ`
+                ) : (
+                  `${selectedSubject || ''}${selectedChapter ? ` - ${selectedChapter}` : ''}`.trim() || 'সংগ্রহের তালিকা'
+                )}
               </h2>
-              <p className="text-sm font-bold text-muted-foreground mt-1">আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে</p>
+              <p className="text-sm font-bold text-muted-foreground mt-1">
+                {selectedDate ? `নির্বাচিত তারিখে মোট ${toBengaliNumber(combinedItems.length)} টি ফাইল সংরক্ষিত পাওয়া গেছে` : 'আপনার সব সংগ্রহ এখানে সুসংগঠিতভাবে সাজানো আছে'}
+              </p>
             </header>
 
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
