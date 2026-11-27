@@ -2970,6 +2970,16 @@ export function QuestionPrintView({
                 <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">লাইব্রেরি</span>
               </Button>
             </Link>
+            <Link href="/question-bank">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 gap-1 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 px-2 sm:px-2.5 shrink-0 text-xs" 
+                title="প্রশ্ন ব্যাংকে যান"
+              >
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংক</span>
+              </Button>
+            </Link>
             <h3 className="font-bold text-sm hidden lg:inline text-slate-800 truncate max-w-xs xl:max-w-md ml-1">
               প্রিন্ট প্রিভিউ - {meta.institution || appName}
             </h3>

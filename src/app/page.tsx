@@ -2387,7 +2387,7 @@ export default function Home() {
       </section>
 
       <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-1.5 md:gap-2">
-        <Link href="/create-question" className="block w-full">
+        <Link href="/question-bank" className="block w-full">
           <div className="bg-[#dc2626] hover:bg-[#b91c1c] border-b-[6px] border-[#7f1d1d] text-white h-10 md:h-11 px-1 sm:px-1.5 md:px-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 group active:translate-y-1 w-full">
             <BrainCircuit className="w-3.5 h-3.5 md:w-4 md:h-4 text-white shrink-0 group-hover:scale-110 transition-transform drop-shadow-md" />
             <span className="font-black text-[9.5px] sm:text-[10px] md:text-[10.5px] xl:text-[11px] leading-normal text-center whitespace-nowrap drop-shadow-sm">প্রশ্ন ব্যাংক</span>

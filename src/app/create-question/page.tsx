@@ -58,6 +58,7 @@ import { cn } from '@/lib/utils';
 import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
 import { getSubjectCategory } from '@/lib/subject-utils';
 import { expandLectureContent, generateLectureSheet } from '@/ai/flows/generate-lecture-sheet-flow';
+import { addQuestionsToBank } from '@/lib/question-bank-storage';
 import { performAiOcr } from '@/ai/flows/ocr-flow';
 import { QuestionPrintView } from '@/components/QuestionPrintView';
 import { formatQuestionToBoardStandardHtml, stripAnswers, parseGeneratedQuestions, ensureQuestionIntegrity } from '@/lib/question-formatter';
@@ -559,6 +560,34 @@ function CreateQuestionContent() {
     }
   };
 
+  // Save current questions to the central Question Bank
+  const handleSaveToQuestionBank = () => {
+    const list = activeSet === 'A' ? questions : questionsB;
+    if (!list || list.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'কোনো প্রশ্ন নেই',
+        description: 'প্রশ্ন ব্যাংকে সংরক্ষণ করার জন্য প্রথমে প্রশ্ন তৈরি বা যোগ করুন।'
+      });
+      return;
+    }
+
+    const itemsToSave = list.map(q => ({
+      classId: String(meta.classId || '10'),
+      subject: meta.subject || 'সাধারণ',
+      chapter: meta.chapter || '১ম অধ্যায়',
+      type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
+      content: q.content,
+      source: 'create-question'
+    }));
+
+    const result = addQuestionsToBank(itemsToSave);
+    toast({
+      title: 'প্রশ্ন ব্যাংকে সংরক্ষিত! 📥',
+      description: `মোট ${toBengaliNumber(result.addedCount)}টি প্রশ্ন আপনার প্রশ্ন ব্যাংকে ক্রমানুসারে সফলভাবে সংরক্ষিত হয়েছে।`
+    });
+  };
+
   const getClassLabel = useCallback((cid?: string | number) => {
     if (!cid) return '';
     const s = String(cid).trim();
@@ -967,6 +996,21 @@ function CreateQuestionContent() {
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button variant="ghost" onClick={() => router.back()} className="gap-1.5 font-bold h-9 text-xs">
               <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleSaveToQuestionBank} 
+              className="gap-1.5 font-bold border-indigo-400 text-indigo-800 hover:bg-indigo-50 h-9 text-xs"
+              title="বর্তমান প্রশ্নগুলো সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
+            >
+              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> প্রশ্ন ব্যাংকে সেভ
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/question-bank')} 
+              className="gap-1.5 font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 text-xs"
+            >
+              📚 প্রশ্ন ব্যাংক
             </Button>
             <Button 
               variant="default" 
