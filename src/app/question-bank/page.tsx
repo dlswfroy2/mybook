@@ -103,16 +103,42 @@ function isSameChapter(a?: string, b?: string): boolean {
 
 /**
  * Format questions for board display:
- * Separates sub-questions (ক, খ, গ, ঘ) and aligns their marks (২, ৪, ৪)
- * into a clean, unified, straight vertical column on the right edge!
+ * - Separates sub-questions (ক, খ, গ, ঘ) and aligns their marks (২, ৪, ৪)
+ * - Math CQ standard marks: ক=২, খ=৪, গ=৪
+ * - Science / Other subjects CQ standard marks: ক=১, খ=২, গ=৩, ঘ=৪
+ * - For Short Questions (isShortQuestion = true): Trailing marks like [২] are completely stripped as per board standard!
  */
-function formatContentWithBoardMarks(content: string): string {
+function formatContentWithBoardMarks(
+  content: string, 
+  options?: { subject?: string; isShortQuestion?: boolean }
+): string {
   if (!content) return '';
   // Strip any duplicate leading serial number like "১। " or "১. " or "1. " from start
-  const cleaned = content.replace(/^[০-৯0-9]+[।.)]\s*/, '').trim();
+  let cleaned = content.replace(/^[০-৯0-9]+[।.)]\s*/, '').trim();
+
+  // If this is a Short Question, strip all trailing/embedded marks like [২], [2], (২), etc.
+  if (options?.isShortQuestion) {
+    cleaned = cleaned
+      .replace(/\[\s*[০-৯0-9]+\s*\]/g, '')
+      .replace(/\(\s*[০-৯0-9]+\s*\)/g, '')
+      .replace(/(?:(।|\.)\s*|\s+)[১-৯1-9][০-৯0-9]?\s*$/gm, '$1')
+      .trim();
+  }
+
   const rawLines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   
   const rendered = rawLines.map(line => {
+    // If Short Question, render clean text without any trailing marks
+    if (options?.isShortQuestion) {
+      const strippedLine = line
+        .replace(/\[\s*[০-৯0-9]+\s*\]/g, '')
+        .replace(/\(\s*[০-৯0-9]+\s*\)/g, '')
+        .replace(/(?:(।|\.)\s*|\s+)[১-৯1-9][০-৯0-9]?\s*$/, '$1')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return `<div class="leading-relaxed text-justify my-0.5 math-rendered">${formatMathToHtml(strippedLine)}</div>`;
+    }
+
     // Check if line is an MCQ options line with multiple options like "(ক) ... (খ) ..."
     const isMcqOptionsLine = /\([খ-ঘb-d]\)|\b[খ-ঘb-d]\./i.test(line);
 
@@ -138,13 +164,28 @@ function formatContentWithBoardMarks(content: string): string {
         }
       }
 
+      const norm = prefix.replace(/[^ক-ঘa-d]/gi, '').toLowerCase();
+      const isMath = !options?.subject || /গণিত|math/i.test(options.subject);
+
+      if (isMath) {
+        // Math standard board marks: ক=২, খ=৪, গ=৪
+        if (!mark) {
+          if (norm === 'ক' || norm === 'a') mark = '২';
+          else if (norm === 'খ' || norm === 'b') mark = '৪';
+          else if (norm === 'গ' || norm === 'c') mark = '৪';
+          else if (norm === 'ঘ' || norm === 'd') mark = '৪';
+        }
+      } else {
+        // Other subjects (Science, Arts, Business, etc. Board CQ): ক=১, খ=২, গ=৩, ঘ=৪
+        if (norm === 'ক' || norm === 'a') mark = '১';
+        else if (norm === 'খ' || norm === 'b') mark = '২';
+        else if (norm === 'গ' || norm === 'c') mark = '৩';
+        else if (norm === 'ঘ' || norm === 'd') mark = '৪';
+        else if (!mark) mark = '১';
+      }
+
       const formattedText = formatMathToHtml(`${prefix} ${rest}`);
-      return `
-        <div class="flex items-start justify-between gap-2 w-full my-1">
-          <div class="flex-1 leading-relaxed text-justify math-rendered">${formattedText}</div>
-          ${mark ? `<div class="w-6 text-right font-black text-slate-950 shrink-0 select-none pl-1 text-sm">${mark}</div>` : ''}
-        </div>
-      `;
+      return `<div class="flex items-start justify-between gap-2 w-full my-0.5"><div class="flex-1 leading-relaxed text-justify math-rendered">${formattedText}</div>${mark ? `<div class="w-6 text-right font-black text-slate-950 shrink-0 select-none pl-1 text-sm">${mark}</div>` : ''}</div>`;
     }
 
     // Normal stimulus or MCQ line
@@ -589,7 +630,7 @@ export default function QuestionBankPage() {
     const singleTypeInstruction = isOnlyMcq ? mcqInstruction : isOnlyCreative ? creativeInstruction : shortInstruction;
 
     return (
-      <div className="min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush">
+      <div className="print-wrapper min-h-screen bg-slate-200 py-6 px-2 sm:px-6 font-kalpurush print:bg-white print:p-0 print:m-0 print:min-h-0 print:w-full">
         {/* Floating Top Control Bar (Strictly hidden during print) */}
         <div className="no-print max-w-[8.27in] mx-auto mb-6 bg-white p-3 sm:p-4 rounded-2xl shadow-lg border-2 border-indigo-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -725,7 +766,7 @@ export default function QuestionBankPage() {
                           <span className="font-black text-sm shrink-0">{qNum}।</span>
                           <div 
                             className="flex-1 math-rendered"
-                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { subject: selectedSubject }) }}
                           />
                         </div>
                       </div>
@@ -800,7 +841,7 @@ export default function QuestionBankPage() {
                           <span className="font-black shrink-0 text-xs">{qNum}।</span>
                           <div 
                             className="flex-1 math-rendered"
-                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { isShortQuestion: true }) }}
                           />
                         </div>
                       </div>
@@ -815,13 +856,19 @@ export default function QuestionBankPage() {
         {/* Global Print Stylesheet: ZERO clutter, no grey borders, clean hairlines */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            html, body {
-              background: white !important;
+            *, *::before, *::after {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body, .print-wrapper, .min-h-screen {
+              background: #ffffff !important;
+              background-color: #ffffff !important;
+              color: #000000 !important;
               margin: 0 !important;
               padding: 0 !important;
-              color: black !important;
               width: 100% !important;
               height: auto !important;
+              min-height: 0 !important;
             }
             .no-print, header, nav, footer, button, .app-header, .site-header {
               display: none !important;
@@ -840,7 +887,8 @@ export default function QuestionBankPage() {
               box-shadow: none !important;
               min-height: auto !important;
               height: auto !important;
-              background: transparent !important;
+              background: #ffffff !important;
+              background-color: #ffffff !important;
             }
             .print-question-flow {
               column-count: ${columnLayout} !important;
@@ -1246,10 +1294,10 @@ export default function QuestionBankPage() {
                       </td>
 
                       {/* Column 2: Question Content */}
-                      <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
+                      <td className="py-2.5 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
                         <div 
-                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                          className="font-medium text-slate-900 math-rendered space-y-0.5"
+                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { subject: selectedSubject }) }}
                         />
                         <div className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
@@ -1330,10 +1378,10 @@ export default function QuestionBankPage() {
                       </td>
 
                       {/* Column 2: Question Content */}
-                      <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
+                      <td className="py-2.5 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
                         <div 
-                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
+                          className="font-medium text-slate-900 math-rendered space-y-0.5"
+                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content, { isShortQuestion: true }) }}
                         />
                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
