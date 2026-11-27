@@ -41,6 +41,8 @@ import { subjectNameNormalization } from '@/lib/subjects';
 import { toBengaliNumber, cn } from '@/lib/utils';
 import { useFirestore, useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import 'katex/dist/katex.min.css';
+import { formatMathToHtml } from '@/lib/math-formatter';
 
 const CLASSES = [
   { id: '6', label: '৬ষ্ঠ' },
@@ -419,9 +421,10 @@ export default function QuestionBankPage() {
                   <div key={q.id} className="text-xs sm:text-sm leading-relaxed">
                     <div className="flex items-start gap-2">
                       <span className="font-black text-base shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div className="space-y-1.5 flex-1 whitespace-pre-line text-justify">
-                        {q.content}
-                      </div>
+                      <div 
+                        className="space-y-1.5 flex-1 whitespace-pre-line text-justify math-rendered"
+                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -445,9 +448,10 @@ export default function QuestionBankPage() {
                   <div key={q.id} className="text-xs leading-relaxed border-b border-slate-200 pb-2">
                     <div className="flex items-start gap-1.5">
                       <span className="font-black shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div className="space-y-1 flex-1 whitespace-pre-line">
-                        {q.content}
-                      </div>
+                      <div 
+                        className="space-y-1 flex-1 whitespace-pre-line math-rendered"
+                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -471,9 +475,10 @@ export default function QuestionBankPage() {
                   <div key={q.id} className="text-xs sm:text-sm leading-relaxed">
                     <div className="flex items-start gap-2">
                       <span className="font-black shrink-0">{toBengaliNumber(idx + 1)}।</span>
-                      <div className="space-y-1 flex-1 whitespace-pre-line">
-                        {q.content}
-                      </div>
+                      <div 
+                        className="space-y-1 flex-1 whitespace-pre-line math-rendered"
+                        dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -730,9 +735,10 @@ export default function QuestionBankPage() {
 
                       {/* Column 2: Question Content */}
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
-                        <div className="whitespace-pre-line font-medium text-slate-900">
-                          {q.content}
-                        </div>
+                        <div 
+                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
+                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                        />
                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
                           <button
@@ -813,9 +819,10 @@ export default function QuestionBankPage() {
 
                       {/* Column 2: Question Content */}
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
-                        <div className="whitespace-pre-line font-medium text-slate-900">
-                          {q.content}
-                        </div>
+                        <div 
+                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
+                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                        />
                         <div className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
                           <button
@@ -896,9 +903,10 @@ export default function QuestionBankPage() {
 
                       {/* Column 2: Question Content */}
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
-                        <div className="whitespace-pre-line font-medium text-slate-900">
-                          {q.content}
-                        </div>
+                        <div 
+                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
+                          dangerouslySetInnerHTML={{ __html: formatMathToHtml(q.content) }}
+                        />
                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
                           <button
@@ -1002,6 +1010,16 @@ export default function QuestionBankPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .math-rendered .katex { font-size: 1.05em; line-height: 1.2; text-indent: 0; }
+        .math-rendered .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
+        .math-rendered .math-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.88em; margin: 0 2px; }
+        .math-rendered .math-num { border-bottom: 1px solid currentColor; padding: 0 2px; }
+        .math-rendered .math-den { padding: 0 2px; }
+        .math-rendered sub { font-size: 0.75em; vertical-align: sub; line-height: 0; }
+        .math-rendered sup { font-size: 0.75em; vertical-align: super; line-height: 0; }
+      ` }} />
     </div>
   );
 }

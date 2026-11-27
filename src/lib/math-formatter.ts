@@ -1,16 +1,20 @@
 import katex from 'katex';
 
 /**
- * Universal math and science formatter that transforms LaTeX, math equations,
- * and scientific symbols into HTML rendered with KaTeX and standard Unicode.
+ * Universal math, physics, and chemistry formatter that transforms LaTeX,
+ * math equations, and scientific symbols into HTML rendered with KaTeX and standard Unicode.
  */
 export function formatMathToHtml(text: string): string {
   if (!text) return '';
 
-  // 1. Convert markdown bold **text** to <strong>text</strong>
+  // 1. Clean markdown headers and bold
   text = text.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/(^|[^\*])\*([^\*]+?)\*([^\*]|$)/g, '$1<strong>$2</strong>$3');
 
-  // 2. Convert $$ ... $$ (display math)
+  // 2. Unbalanced / Escaped bracket fixes
+  text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+  // 3. Convert $$ ... $$ (display math)
   text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
@@ -19,7 +23,7 @@ export function formatMathToHtml(text: string): string {
     }
   });
 
-  // 3. Convert $ ... $ (inline math)
+  // 4. Convert $ ... $ (inline math)
   text = text.replace(/\$([^$\n]+?)\$/g, (_, math) => {
     try {
       return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
@@ -28,7 +32,23 @@ export function formatMathToHtml(text: string): string {
     }
   });
 
-  // 4. Standalone \sqrt expressions
+  // 5. Convert \[ ... \] and \( ... \)
+  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: true, output: 'html' });
+    } catch {
+      return math;
+    }
+  });
+  text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { throwOnError: false, displayMode: false, output: 'html' });
+    } catch {
+      return math;
+    }
+  });
+
+  // 6. Standalone \sqrt expressions
   const sqrtChainedRegex = /\\sqrt(?:\[[^\]]+\])?\{[^}]+\}(?:\s*(?:\\cdot|\\times|\+|-|\/|\*|=)\s*\\sqrt(?:\[[^\]]+\])?\{[^}]+\})*/g;
   text = text.replace(sqrtChainedRegex, (math) => {
     try {
@@ -38,16 +58,16 @@ export function formatMathToHtml(text: string): string {
     }
   });
 
-  // 5. Standalone \frac{...}{...}
+  // 7. Standalone \frac{...}{...}
   text = text.replace(/\\frac\{((?:[^{}]|\{[^{}]*\})*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, (match, num, den) => {
     try {
       return katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false, output: 'html' });
     } catch {
-      return `(${num}/${den})`;
+      return `<span class="math-frac"><span class="math-num">${num}</span><span class="math-den">${den}</span></span>`;
     }
   });
 
-  // 6. Standalone \log expressions: \log_x 400
+  // 8. Standalone \log expressions: \log_x 400
   const logRegex = /\\log(?:_[a-zA-Z0-9]+|_\{[^}]+\})?(?:\s*(?:\([^)]+\)|[a-zA-Z0-9]+))?/g;
   text = text.replace(logRegex, (match) => {
     try {
@@ -57,7 +77,40 @@ export function formatMathToHtml(text: string): string {
     }
   });
 
-  // 7. Math & Science Symbols (Sets, Algebra, Physics, Chemistry)
+  // 9. Recurring decimals (পৌনঃপুনিক) outside math tags: \dot{5} -> 5̇
+  text = text.replace(/\\dot\{([^}]+)\}/g, (_, inner) => {
+    return `<span style="display:inline-block;position:relative;text-align:center;padding-top:2px;"><span style="position:absolute;top:-0.45em;left:0;right:0;font-size:1.1em;line-height:1;text-align:center;">•</span>${inner}</span>`;
+  });
+
+  // 10. Chemistry & Physics formulas outside math tags
+  // Chemical subscript numbers: H_2O, CO_2, H_2SO_4, CaCO_3
+  text = text.replace(/([A-Z][a-z]?)_\{?(\d+)\}?/g, '$1<sub>$2</sub>');
+  // Chemical and atomic ions: Fe^{2+}, Na^+, Cl^-, SO_4^{2-}
+  text = text.replace(/\^\{?([0-9]*[+-])\}?/g, '<sup>$1</sup>');
+  // Physics Vectors: \vec{v}, \vec{F}, \vec{a}
+  text = text.replace(/\\vec\{([A-Za-z])\}/g, '$1⃗');
+
+  // 11. Physics & Chemistry Arrows & States
+  text = text
+    .replace(/\\rightarrow|\\to|\\longrightarrow/g, ' → ')
+    .replace(/\\rightleftharpoons/g, ' ⇌ ')
+    .replace(/\\uparrow/g, ' ↑ ')
+    .replace(/\\downarrow/g, ' ↓ ')
+    .replace(/\\Delta/g, 'Δ')
+    .replace(/\\Omega/g, 'Ω')
+    .replace(/\\mu/g, 'µ')
+    .replace(/\\lambda/g, 'λ')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\rho/g, 'ρ')
+    .replace(/\\omega/g, 'ω')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
+    .replace(/\\tau/g, 'τ')
+    .replace(/\\eta/g, 'η');
+
+  // 12. Mathematics, Set Theory & Geometry Symbols
   text = text
     .replace(/\\mathbb\{N\}/g, 'ℕ')
     .replace(/\\mathbb\{R\}/g, 'ℝ')
@@ -87,28 +140,18 @@ export function formatMathToHtml(text: string): string {
     .replace(/\\because/g, ' ∵ ')
     .replace(/\\circ/g, '°')
     .replace(/\\degree/g, '°')
-    .replace(/\\rightarrow|\\to/g, ' → ')
-    .replace(/\\rightleftharpoons/g, ' ⇌ ')
-    .replace(/\\uparrow/g, ' ↑ ')
-    .replace(/\\downarrow/g, ' ↓ ')
-    .replace(/\\Delta/g, 'Δ')
-    .replace(/\\Omega/g, 'Ω')
-    .replace(/\\mu/g, 'µ')
-    .replace(/\\lambda/g, 'λ')
-    .replace(/\\theta/g, 'θ')
-    .replace(/\\pi/g, 'π')
-    .replace(/\\rho/g, 'ρ')
+    .replace(/\\angle/g, '∠')
+    .replace(/\\triangle/g, '△')
+    .replace(/\\perp/g, '⊥')
+    .replace(/\\parallel/g, '∥')
+    .replace(/\\cong/g, '≅')
     .replace(/\\text\{([^}]+)\}/g, '$1')
-    .replace(/\\omega/g, 'ω')
-    .replace(/\\alpha/g, 'α')
-    .replace(/\\beta/g, 'β')
-    .replace(/\\gamma/g, 'γ')
     .replace(/\\left\(/g, '(')
     .replace(/\\right\)/g, ')')
     .replace(/\\\{/g, '{')
     .replace(/\\\}/g, '}');
 
-  // 8. Superscript exponents ^2, ^3, ^4, ^-1, ^-2
+  // 13. Exponent characters outside math tags: ^2, ^3, ^4
   text = text.replace(/\^\{?(-?\d+)\}?/g, (_, p1) => {
     const superMap: Record<string, string> = {
       '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
