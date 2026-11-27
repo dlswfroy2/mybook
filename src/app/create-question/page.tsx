@@ -970,32 +970,37 @@ function CreateQuestionContent() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
-                {/* 1. AI Quick Full Generator */}
-                <Button
-                  type="button"
-                  onClick={() => setAiModalOpen(true)}
-                  className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs h-10 shadow-md"
-                >
-                  <BrainCircuit className="w-4 h-4 mr-2 text-amber-300 animate-pulse" /> AI দিয়ে প্রশ্নপত্র তৈরি করুন
-                </Button>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {/* 1. AI Quick Full Generator */}
+                  <Button
+                    type="button"
+                    title="AI দিয়ে প্রশ্নপত্র তৈরি করুন"
+                    onClick={() => setAiModalOpen(true)}
+                    className="w-full px-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-[11px] h-9 shadow-sm gap-1 whitespace-nowrap"
+                  >
+                    <BrainCircuit className="w-3.5 h-3.5 text-amber-300 shrink-0" /> AI প্রশ্নপত্র
+                  </Button>
 
-                {/* 2. AI Multi-type Assistant */}
-                <Button
-                  type="button"
-                  onClick={handleOpenAiAssistant}
-                  className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 hover:from-emerald-700 hover:to-indigo-800 text-white font-black text-xs h-10 shadow-md"
-                >
-                  <Sparkles className="w-4 h-4 mr-2 text-amber-300 animate-spin" /> AI সহকারী (মান ও ধরণ নিয়ন্ত্রণ)
-                </Button>
+                  {/* 2. AI Multi-type Assistant */}
+                  <Button
+                    type="button"
+                    title="AI সহকারী (মান ও ধরণ নিয়ন্ত্রণ)"
+                    onClick={handleOpenAiAssistant}
+                    className="w-full px-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 hover:from-emerald-700 hover:to-indigo-800 text-white font-bold text-[11px] h-9 shadow-sm gap-1 whitespace-nowrap"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" /> AI সহকারী
+                  </Button>
 
-                {/* 3. Board Question Bank & AI Section */}
-                <Button
-                  type="button"
-                  onClick={() => setActiveMainTab('board')}
-                  className="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800 text-white font-black text-xs h-10 shadow-md"
-                >
-                  <Award className="w-4 h-4 mr-2 text-yellow-200" /> 🏛️ বোর্ড প্রশ্ন ব্যাংক (AI)
-                </Button>
+                  {/* 3. Board Question Bank & AI Section */}
+                  <Button
+                    type="button"
+                    title="বোর্ড প্রশ্ন ব্যাংক (AI)"
+                    onClick={() => setActiveMainTab('board')}
+                    className="w-full px-1.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-800 text-white font-bold text-[11px] h-9 shadow-sm gap-1 whitespace-nowrap"
+                  >
+                    <Award className="w-3.5 h-3.5 text-yellow-200 shrink-0" /> বোর্ড ব্যাংক
+                  </Button>
+                </div>
 
                 {/* 3. Ready-made Template Dialog */}
                 <Button
