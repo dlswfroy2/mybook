@@ -154,6 +154,101 @@ function formatContentWithBoardMarks(content: string): string {
   return rendered.join('');
 }
 
+/**
+ * Intelligent MCQ Options Formatter:
+ * - Automatically detects options (ক, খ, গ, ঘ) from content or options array.
+ * - Formats in strict Board Standard Grid layouts:
+ *     * 1 Line (4 columns): Short options all fit on 1 line.
+ *     * 2 Lines (2 columns: 2 on row 1, 2 on row 2): Medium options.
+ *     * 4 Lines (1 column: 1 per row): Long sentences.
+ *     * STRICT RULE: Never 3 lines!
+ *     * Ensures (ক) aligns under (ক), (খ) under (খ), etc.
+ */
+function renderMcqFormatted(content: string, rawOptions?: string[]) {
+  // Strip duplicate leading serial like "১। " or "1. " from start
+  let cleaned = content.replace(/^[০-৯0-9]+[।.)]\s*/, '').trim();
+
+  let stem = cleaned;
+  let options: Array<{ letter: string; text: string }> = [];
+
+  if (rawOptions && rawOptions.length >= 4) {
+    const letters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+    options = rawOptions.slice(0, 4).map((opt, i) => ({
+      letter: letters[i],
+      text: opt.replace(/^\(?[ক-ঘa-d]\)?[.)]\s*/i, '').trim()
+    }));
+  } else {
+    // Check if options are inside cleaned text
+    const marker = /(?:^|\n|\s)(?:\(|)([কaA])(?:[\.\)]|\))\s+/;
+    const match = cleaned.match(marker);
+    if (match && match.index !== undefined) {
+      stem = cleaned.slice(0, match.index).trim();
+      const optionsPart = cleaned.slice(match.index).trim();
+
+      const splitRegex = /(?:^|\s+)(?:\(|)([ক-ঘa-d])(?:[\.\)]|\))\s*/gi;
+      const matches = [...optionsPart.matchAll(splitRegex)];
+      if (matches.length >= 4) {
+        const letters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+        for (let i = 0; i < 4; i++) {
+          const cur = matches[i];
+          const start = cur.index + cur[0].length;
+          const end = (i + 1 < matches.length) ? matches[i + 1].index : optionsPart.length;
+          options.push({
+            letter: letters[i],
+            text: optionsPart.slice(start, end).trim()
+          });
+        }
+      }
+    }
+  }
+
+  // If we could not extract 4 distinct options, fallback to standard markdown renderer
+  if (options.length !== 4) {
+    return (
+      <div 
+        className="leading-relaxed text-justify my-0.5 math-rendered"
+        dangerouslySetInnerHTML={{ __html: formatMathToHtml(cleaned) }}
+      />
+    );
+  }
+
+  // Calculate layout strictly (4 columns, 2 columns, or 1 column; NEVER 3 columns or 3 lines)
+  const lengths = options.map(o => o.text.length);
+  const maxLen = Math.max(...lengths);
+  const totalLen = lengths.reduce((a, b) => a + b, 0);
+
+  let gridClass = 'grid-cols-4';
+  if (maxLen <= 11 && totalLen <= 42) {
+    gridClass = 'grid-cols-4'; // 1 Line (4 options across)
+  } else if (maxLen <= 26 && totalLen <= 95) {
+    gridClass = 'grid-cols-2'; // 2 Lines (2 options per row: row 1 (ক, খ), row 2 (গ, ঘ))
+  } else {
+    gridClass = 'grid-cols-1'; // 4 Lines (1 option per row)
+  }
+
+  return (
+    <div className="w-full">
+      {/* Question stem */}
+      <div 
+        className="font-medium text-justify my-0.5 math-rendered"
+        dangerouslySetInnerHTML={{ __html: formatMathToHtml(stem) }}
+      />
+      {/* 4 options in exact mathematical grid */}
+      <div className={cn("grid gap-x-2 gap-y-0.5 mt-1 text-slate-900 select-none", gridClass)}>
+        {options.map((opt, i) => (
+          <div key={i} className="flex items-start gap-1 math-rendered">
+            <span className="font-bold shrink-0">{opt.letter}</span>
+            <span 
+              className="flex-1 text-left"
+              dangerouslySetInnerHTML={{ __html: formatMathToHtml(opt.text) }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function QuestionBankPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -169,6 +264,9 @@ export default function QuestionBankPage() {
   const [selectedSubject, setSelectedSubject] = useState<string>('গণিত');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Interactive Tab: 'all' | 'creative' | 'mcq' | 'short'
+  const [activeTab, setActiveTab] = useState<'all' | 'creative' | 'mcq' | 'short'>('all');
 
   // Selected question IDs for paper compilation
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -378,19 +476,44 @@ export default function QuestionBankPage() {
     else setExamTime('২ ঘণ্টা ৩০ মিনিট');
 
     // Auto-set section inclusion
-    setIncludeCreative(selectedCreatives.length > 0);
-    setIncludeMcq(selectedMcqs.length > 0);
-    setIncludeShort(selectedShorts.length > 0);
+    const hasCq = selectedCreatives.length > 0;
+    const hasMcq = selectedMcqs.length > 0;
+    const hasShort = selectedShorts.length > 0;
+
+    setIncludeCreative(hasCq);
+    setIncludeMcq(hasMcq);
+    setIncludeShort(hasShort);
+
+    // If an exam consists of only ONE section, omit the "ক/খ/গ-বিভাগ" prefix so it's a clean standalone test!
+    const isSingleSectionOnly = (hasMcq && !hasCq && !hasShort) || (hasCq && !hasMcq && !hasShort) || (hasShort && !hasCq && !hasMcq);
+
+    if (hasMcq && !hasCq && !hasShort) {
+      setMcqTitle(''); // No "খ-বিভাগ" needed for standalone MCQ test
+      setCreativeTitle('ক-বিভাগ: সৃজনশীল প্রশ্ন');
+      setShortTitle('গ-বিভাগ: সংক্ষিপ্ত প্রশ্ন');
+    } else if (hasCq && !hasMcq && !hasShort) {
+      setCreativeTitle(''); // No "ক-বিভাগ" needed for standalone CQ test
+      setMcqTitle('খ-বিভাগ: বহুনির্বাচনী প্রশ্ন');
+      setShortTitle('গ-বিভাগ: সংক্ষিপ্ত প্রশ্ন');
+    } else if (hasShort && !hasCq && !hasMcq) {
+      setShortTitle('');
+      setCreativeTitle('ক-বিভাগ: সৃজনশীল প্রশ্ন');
+      setMcqTitle('খ-বিভাগ: বহুনির্বাচনী প্রশ্ন');
+    } else {
+      setCreativeTitle('ক-বিভাগ: সৃজনশীল প্রশ্ন');
+      setMcqTitle('খ-বিভাগ: বহুনির্বাচনী প্রশ্ন');
+      setShortTitle('গ-বিভাগ: সংক্ষিপ্ত প্রশ্ন');
+    }
 
     // Auto-calculate continuous serial numbers across sections
     setCreativeStartSerial('1');
     const cqEnd = selectedCreatives.length > 0 ? selectedCreatives.length : 0;
     
-    const mcqStart = cqEnd > 0 ? cqEnd + 1 : 1;
+    const mcqStart = (cqEnd > 0 && hasCq) ? cqEnd + 1 : 1;
     setMcqStartSerial(String(mcqStart));
     const mcqEnd = cqEnd + (selectedMcqs.length > 0 ? selectedMcqs.length : 0);
 
-    const shortStart = mcqEnd > 0 ? mcqEnd + 1 : 1;
+    const shortStart = (mcqEnd > 0 && (hasCq || hasMcq)) ? mcqEnd + 1 : 1;
     setShortStartSerial(String(shortStart));
 
     // Auto-configure instructions based on selected count
@@ -517,21 +640,21 @@ export default function QuestionBankPage() {
         </div>
 
         {/* The Printable Board A4 Paper Container */}
-        <div className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-2xl rounded-sm p-6 sm:p-10 border border-slate-300 min-h-[11in] text-black leading-relaxed box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
+        <div className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-lg p-6 sm:p-10 border-0 min-h-[11in] text-black leading-normal box-border print:p-0 print:border-none print:shadow-none print:max-w-none">
           {/* Institutional Header (Spans across full width) */}
-          <div className="text-center border-b-2 border-black pb-3 mb-5 select-none [column-span:all]">
+          <div className="text-center border-b-2 border-black pb-2.5 mb-4 select-none [column-span:all]">
             <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
               {institutionName}
             </h1>
-            <h2 className="text-base font-bold text-black mt-1 underline">
+            <h2 className="text-base font-bold text-black mt-0.5 underline">
               {examName}
             </h2>
-            <div className="flex justify-center items-center gap-6 sm:gap-10 text-xs font-bold mt-2.5 px-2 flex-wrap">
+            <div className="flex justify-center items-center gap-6 sm:gap-10 text-xs font-bold mt-2 px-2 flex-wrap">
               <span>শ্রেণি: {CLASSES.find(c => c.id === selectedClass)?.label || selectedClass} শ্রেণি</span>
               <span>বিষয়: {selectedSubject}</span>
               {selectedChapter !== 'all' && <span>অধ্যায়: {selectedChapter}</span>}
             </div>
-            <div className="flex justify-between items-center text-xs font-bold mt-2 px-2 italic border-t pt-1 border-dashed border-black">
+            <div className="flex justify-between items-center text-xs font-bold mt-1.5 px-2 italic border-t pt-1 border-dashed border-black">
               <span>সময়: {examTime}</span>
               <span>পূর্ণমান: {examTotalMarks}</span>
             </div>
@@ -539,31 +662,35 @@ export default function QuestionBankPage() {
 
           {/* Question Flow (1 or 2 columns based on columnLayout) */}
           <div className={cn(
-            "print-question-flow gap-6",
+            "print-question-flow gap-5",
             columnLayout === '2' 
-              ? "columns-1 md:columns-2 print:columns-2 [column-rule:0.5pt_solid_#94a3b8]" 
+              ? "columns-1 md:columns-2 print:columns-2 [column-rule:0.5pt_solid_black]" 
               : "columns-1 print:columns-1"
           )}>
             {/* Section 1: Creative Questions (CQ) */}
             {includeCreative && selectedCreatives.length > 0 && (
-              <div className="section-block mb-6">
-                {/* Centered Section Header Banner */}
-                <div className="section-header text-center my-3 pb-1.5 border-b-2 border-black break-after-avoid break-inside-avoid">
-                  <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
-                    {creativeTitle}
+              <div className="section-block mb-4">
+                {/* Centered Section Header Banner (Omitted if title is empty) */}
+                {(creativeTitle || creativeInstruction) && (
+                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                    {creativeTitle && (
+                      <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
+                        {creativeTitle}
+                      </div>
+                    )}
+                    {creativeInstruction && (
+                      <div className="text-[11px] font-bold italic text-slate-800 mt-0.5">
+                        [{creativeInstruction}]
+                      </div>
+                    )}
                   </div>
-                  {creativeInstruction && (
-                    <div className="text-[11px] font-bold italic text-slate-800 mt-1">
-                      [{creativeInstruction}]
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-4">
+                )}
+                <div className="space-y-2.5">
                   {selectedCreatives.map((q, idx) => {
                     const startNum = parseInt(creativeStartSerial, 10) || 1;
                     const qNum = toBengaliNumber(startNum + idx);
                     return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed border-b border-slate-200 pb-3 mb-3">
+                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2.5">
                         <div className="flex items-start gap-1.5">
                           <span className="font-black text-sm shrink-0">{qNum}।</span>
                           <div 
@@ -580,30 +707,33 @@ export default function QuestionBankPage() {
 
             {/* Section 2: Multiple Choice Questions (MCQ) */}
             {includeMcq && selectedMcqs.length > 0 && (
-              <div className="section-block mb-6">
-                {/* Centered Section Header Banner */}
-                <div className="section-header text-center my-3 pb-1.5 border-b-2 border-black break-after-avoid break-inside-avoid">
-                  <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
-                    {mcqTitle}
+              <div className="section-block mb-4">
+                {/* Centered Section Header Banner (Omitted if title is empty) */}
+                {(mcqTitle || mcqInstruction) && (
+                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                    {mcqTitle && (
+                      <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
+                        {mcqTitle}
+                      </div>
+                    )}
+                    {mcqInstruction && (
+                      <div className="text-[11px] font-bold italic text-slate-800 mt-0.5">
+                        [{mcqInstruction}]
+                      </div>
+                    )}
                   </div>
-                  {mcqInstruction && (
-                    <div className="text-[11px] font-bold italic text-slate-800 mt-1">
-                      [{mcqInstruction}]
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-3">
+                )}
+                <div className="space-y-2">
                   {selectedMcqs.map((q, idx) => {
                     const startNum = parseInt(mcqStartSerial, 10) || 1;
                     const qNum = toBengaliNumber(startNum + idx);
                     return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs leading-relaxed border-b border-slate-200 pb-2 mb-2">
+                      <div key={q.id} className="question-item break-inside-avoid text-xs leading-normal mb-2">
                         <div className="flex items-start gap-1.5">
-                          <span className="font-black shrink-0">{qNum}।</span>
-                          <div 
-                            className="flex-1 math-rendered"
-                            dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
-                          />
+                          <span className="font-black shrink-0 text-xs">{qNum}।</span>
+                          <div className="flex-1 math-rendered">
+                            {renderMcqFormatted(q.content, q.options)}
+                          </div>
                         </div>
                       </div>
                     );
@@ -614,26 +744,30 @@ export default function QuestionBankPage() {
 
             {/* Section 3: Short Questions */}
             {includeShort && selectedShorts.length > 0 && (
-              <div className="section-block mb-6">
-                {/* Centered Section Header Banner */}
-                <div className="section-header text-center my-3 pb-1.5 border-b-2 border-black break-after-avoid break-inside-avoid">
-                  <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
-                    {shortTitle}
+              <div className="section-block mb-4">
+                {/* Centered Section Header Banner (Omitted if title is empty) */}
+                {(shortTitle || shortInstruction) && (
+                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                    {shortTitle && (
+                      <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
+                        {shortTitle}
+                      </div>
+                    )}
+                    {shortInstruction && (
+                      <div className="text-[11px] font-bold italic text-slate-800 mt-0.5">
+                        [{shortInstruction}]
+                      </div>
+                    )}
                   </div>
-                  {shortInstruction && (
-                    <div className="text-[11px] font-bold italic text-slate-800 mt-1">
-                      [{shortInstruction}]
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-3">
+                )}
+                <div className="space-y-2">
                   {selectedShorts.map((q, idx) => {
                     const startNum = parseInt(shortStartSerial, 10) || 1;
                     const qNum = toBengaliNumber(startNum + idx);
                     return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed border-b border-slate-200 pb-2 mb-2">
+                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2">
                         <div className="flex items-start gap-1.5">
-                          <span className="font-black shrink-0">{qNum}।</span>
+                          <span className="font-black shrink-0 text-xs">{qNum}।</span>
                           <div 
                             className="flex-1 math-rendered"
                             dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
@@ -648,7 +782,7 @@ export default function QuestionBankPage() {
           </div>
         </div>
 
-        {/* Global Print Stylesheet: Ensures ZERO clutter and exact A4 output */}
+        {/* Global Print Stylesheet: ZERO clutter, no grey borders, clean hairlines */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             html, body {
@@ -678,8 +812,8 @@ export default function QuestionBankPage() {
             }
             .print-question-flow {
               column-count: ${columnLayout} !important;
-              column-gap: ${columnLayout === '2' ? '24px' : '0'} !important;
-              column-rule: ${columnLayout === '2' ? '0.5pt solid #64748b' : 'none'} !important;
+              column-gap: ${columnLayout === '2' ? '20px' : '0'} !important;
+              column-rule: ${columnLayout === '2' ? '0.5pt solid black' : 'none'} !important;
               width: 100% !important;
             }
             .section-block {
@@ -694,6 +828,8 @@ export default function QuestionBankPage() {
             .question-item {
               break-inside: avoid !important;
               page-break-inside: avoid !important;
+              border: none !important;
+              border-bottom: none !important;
             }
           }
         ` }} />
@@ -827,31 +963,94 @@ export default function QuestionBankPage() {
           </CardContent>
         </Card>
 
-        {/* Floating Selection Summary Banner */}
-        <div className="bg-indigo-900 text-white rounded-xl p-3 sm:p-4 shadow-md flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
-            <span className="bg-indigo-800 px-3 py-1 rounded-md text-amber-300 font-black">
-              মোট প্রশ্ন: {toBengaliNumber(filteredQuestions.length)}টি
-            </span>
-            <span className="bg-indigo-700/80 px-2.5 py-1 rounded-md">
-              বহুনির্বাচনী: {toBengaliNumber(mcqQuestions.length)}টি (নির্বাচিত: {toBengaliNumber(selectedMcqs.length)})
-            </span>
-            <span className="bg-indigo-700/80 px-2.5 py-1 rounded-md">
-              সৃজনশীল: {toBengaliNumber(creativeQuestions.length)}টি (নির্বাচিত: {toBengaliNumber(selectedCreatives.length)})
-            </span>
-            <span className="bg-indigo-700/80 px-2.5 py-1 rounded-md">
-              সংক্ষিপ্ত: {toBengaliNumber(shortQuestions.length)}টি (নির্বাচিত: {toBengaliNumber(selectedShorts.length)})
-            </span>
+        {/* Floating Category Filter Tabs Banner */}
+        <div className="bg-indigo-950 text-white rounded-xl p-3 sm:p-4 shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs font-bold">
+            {/* Tab 1: All */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                activeTab === 'all'
+                  ? "bg-amber-400 text-indigo-950 shadow-sm"
+                  : "bg-indigo-900/80 hover:bg-indigo-800 text-white"
+              )}
+            >
+              <span>সকল প্রশ্ন</span>
+              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", activeTab === 'all' ? "bg-indigo-950 text-amber-300" : "bg-black/30 text-white")}>
+                {toBengaliNumber(filteredQuestions.length)}
+              </span>
+            </button>
+
+            {/* Tab 2: Creative (CQ) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('creative')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                activeTab === 'creative'
+                  ? "bg-amber-400 text-indigo-950 shadow-sm"
+                  : "bg-indigo-800/80 hover:bg-indigo-700 text-white"
+              )}
+            >
+              <span>সৃজনশীল</span>
+              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", activeTab === 'creative' ? "bg-indigo-950 text-amber-300" : "bg-black/30 text-white")}>
+                {toBengaliNumber(creativeQuestions.length)}
+                {selectedCreatives.length > 0 && ` (নির্বাচিত: ${toBengaliNumber(selectedCreatives.length)})`}
+              </span>
+            </button>
+
+            {/* Tab 3: MCQ */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('mcq')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                activeTab === 'mcq'
+                  ? "bg-amber-400 text-indigo-950 shadow-sm"
+                  : "bg-indigo-800/80 hover:bg-indigo-700 text-white"
+              )}
+            >
+              <span>বহুনির্বাচনী</span>
+              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", activeTab === 'mcq' ? "bg-indigo-950 text-amber-300" : "bg-black/30 text-white")}>
+                {toBengaliNumber(mcqQuestions.length)}
+                {selectedMcqs.length > 0 && ` (নির্বাচিত: ${toBengaliNumber(selectedMcqs.length)})`}
+              </span>
+            </button>
+
+            {/* Tab 4: Short */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('short')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                activeTab === 'short'
+                  ? "bg-amber-400 text-indigo-950 shadow-sm"
+                  : "bg-indigo-800/80 hover:bg-indigo-700 text-white"
+              )}
+            >
+              <span>সংক্ষিপ্ত</span>
+              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-black", activeTab === 'short' ? "bg-indigo-950 text-amber-300" : "bg-black/30 text-white")}>
+                {toBengaliNumber(shortQuestions.length)}
+                {selectedShorts.length > 0 && ` (নির্বাচিত: ${toBengaliNumber(selectedShorts.length)})`}
+              </span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               variant="outline"
-              onClick={handleSelectAllVisible}
+              onClick={() => {
+                if (activeTab === 'creative') handleSelectAllType(creativeQuestions);
+                else if (activeTab === 'mcq') handleSelectAllType(mcqQuestions);
+                else if (activeTab === 'short') handleSelectAllType(shortQuestions);
+                else handleSelectAllVisible();
+              }}
               className="text-xs font-bold h-8 text-black bg-white hover:bg-slate-100 border-none"
             >
-              সব নির্বাচন করুন
+              {activeTab === 'creative' ? 'সব সৃজনশীল নির্বাচন' : activeTab === 'mcq' ? 'সব বহুনির্বাচনী নির্বাচন' : activeTab === 'short' ? 'সব সংক্ষিপ্ত নির্বাচন' : 'সব নির্বাচন করুন'}
             </Button>
             <Button
               size="sm"
@@ -891,7 +1090,7 @@ export default function QuestionBankPage() {
         {/* ────────────────────────────────────────────────────────── */}
         {/* TABLE 1: বহুনির্বাচনী প্রশ্ন (MCQ TABLE)                     */}
         {/* ────────────────────────────────────────────────────────── */}
-        {mcqQuestions.length > 0 && (
+        {(activeTab === 'all' || activeTab === 'mcq') && mcqQuestions.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border-2 border-black overflow-hidden">
             <table className="w-full border-collapse text-black">
               <thead>
@@ -931,13 +1130,12 @@ export default function QuestionBankPage() {
                         {toBengaliNumber(q.serialNo)}।
                       </td>
 
-                      {/* Column 2: Question Content */}
+                      {/* Column 2: Question Content with formatted options */}
                       <td className="py-3 px-3 sm:px-4 border-r-2 border-black align-top text-xs sm:text-sm leading-relaxed">
-                        <div 
-                          className="whitespace-pre-line font-medium text-slate-900 math-rendered"
-                          dangerouslySetInnerHTML={{ __html: formatContentWithBoardMarks(q.content) }}
-                        />
-                        <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-between">
+                        <div className="font-medium text-slate-900 math-rendered">
+                          {renderMcqFormatted(q.content, q.options)}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center justify-between">
                           <span>অধ্যায়: {q.chapter}</span>
                           <button
                             type="button"
@@ -975,7 +1173,7 @@ export default function QuestionBankPage() {
         {/* ────────────────────────────────────────────────────────── */}
         {/* TABLE 2: সৃজনশীল প্রশ্ন (CREATIVE TABLE)                    */}
         {/* ────────────────────────────────────────────────────────── */}
-        {creativeQuestions.length > 0 && (
+        {(activeTab === 'all' || activeTab === 'creative') && creativeQuestions.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border-2 border-black overflow-hidden">
             <table className="w-full border-collapse text-black">
               <thead>
@@ -1059,7 +1257,7 @@ export default function QuestionBankPage() {
         {/* ────────────────────────────────────────────────────────── */}
         {/* TABLE 3: সংক্ষিপ্ত প্রশ্ন (SHORT QUESTIONS TABLE)             */}
         {/* ────────────────────────────────────────────────────────── */}
-        {shortQuestions.length > 0 && (
+        {(activeTab === 'all' || activeTab === 'short') && shortQuestions.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border-2 border-black overflow-hidden">
             <table className="w-full border-collapse text-black">
               <thead>
