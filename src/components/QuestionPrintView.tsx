@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { formatQuestionToBoardStandardHtml, stripAnswers, ensureQuestionIntegrity } from '@/lib/question-formatter';
+import { formatQuestionToBoardStandardHtml, stripAnswers, ensureQuestionIntegrity, parseGeneratedQuestions } from '@/lib/question-formatter';
+import { addQuestionsToBank } from '@/lib/question-bank-storage';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 import { Button } from '@/components/ui/button';
@@ -2850,6 +2851,74 @@ export function QuestionPrintView({
     }
   };
 
+  // Direct save from Word-like editor into Question Bank (captures live edited DOM)
+  const handleSaveToQuestionBankFromWord = () => {
+    try {
+      const contentAreas = typeof document !== 'undefined' ? document.querySelectorAll('.content-area') : null;
+      let textToParse = '';
+      if (contentAreas && contentAreas.length > 0) {
+        const liveTexts: string[] = [];
+        contentAreas.forEach(ca => {
+          const t = (ca as HTMLElement).innerText || (ca as HTMLElement).textContent || '';
+          if (t.trim()) liveTexts.push(t.trim());
+        });
+        textToParse = liveTexts.join('\n\n');
+      }
+
+      let itemsToSave: any[] = [];
+      if (textToParse && textToParse.length > 20) {
+        // Strip institutional header
+        const cleaned = textToParse
+          .replace(/^[^\n]*\b(টিউটোরিয়ালস|বিদ্যালয়|মাদ্রাসা|স্কুল|পরীক্ষা|শ্রেণি|বিষয়|সময়|পূর্ণমান)[^\n]*\n+/gi, '')
+          .trim();
+        const defaultT = (questions[0]?.type || 'creative') as 'creative' | 'short' | 'mcq';
+        const parsed = parseGeneratedQuestions(cleaned, defaultT);
+        if (parsed && parsed.length > 0) {
+          itemsToSave = parsed.map(p => ({
+            classId: String(saveClassId || meta.classId || '10'),
+            subject: saveSubject || meta.subject || 'সাধারণ',
+            chapter: saveChapter || meta.chapter || '১ম অধ্যায়',
+            type: p.type,
+            content: p.content,
+            source: 'word-editor'
+          }));
+        }
+      }
+
+      if (itemsToSave.length === 0 && questions && questions.length > 0) {
+        itemsToSave = questions.map(q => ({
+          classId: String(saveClassId || meta.classId || '10'),
+          subject: saveSubject || meta.subject || 'সাধারণ',
+          chapter: saveChapter || meta.chapter || '১ম অধ্যায়',
+          type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
+          content: q.content,
+          source: 'word-editor'
+        }));
+      }
+
+      if (itemsToSave.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'কোনো প্রশ্ন পাওয়া যায়নি',
+          description: 'প্রশ্ন ব্যাংকে সংরক্ষণ করার জন্য উপযুক্ত প্রশ্ন টেক্সট প্রয়োজন।'
+        });
+        return;
+      }
+
+      const res = addQuestionsToBank(itemsToSave);
+      toast({
+        title: 'প্রশ্ন ব্যাংকে সংরক্ষিত! 📥',
+        description: `মোট ${toBengaliNumber(res.addedCount)}টি প্রশ্ন আপনার প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
+      });
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'সংরক্ষণ ব্যর্থ হয়েছে',
+        description: err.message || 'প্রশ্ন ব্যাংকে সেভ করা যায়নি।'
+      });
+    }
+  };
+
   const getDocumentFileName = useCallback(() => {
     const classLabel = getClassLabel(meta.classId);
     const parts = [
@@ -3094,6 +3163,15 @@ export function QuestionPrintView({
 
           {/* Right: Save & Print (ALWAYS 100% visible on both mobile and desktop!) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleSaveToQuestionBankFromWord} 
+              className="h-8 gap-1.5 font-bold border-indigo-300 text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs shadow-xs" 
+              title="বর্তমান এডিটর থেকে সরাসরি সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
+            >
+              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংকে সেভ</span><span className="sm:hidden">ব্যাংকে সেভ</span>
+            </Button>
             <Button 
               size="sm" 
               onClick={handleOpenSaveModal} 
@@ -3835,19 +3913,31 @@ export function QuestionPrintView({
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0 border-t pt-3">
-            <Button variant="outline" size="sm" onClick={() => setSaveModalOpen(false)}>
-              বাতিল
-            </Button>
+          <DialogFooter className="gap-2 sm:gap-2 border-t pt-3 flex flex-wrap items-center justify-between">
             <Button
+              type="button"
+              variant="outline"
               size="sm"
-              onClick={handleConfirmSave}
-              disabled={saving}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 gap-1.5"
+              onClick={handleSaveToQuestionBankFromWord}
+              className="text-xs font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 gap-1.5"
+              title="বর্তমান প্রশ্নগুলো সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {saveTarget === 'pdf' ? 'PDF তৈরি করুন' : 'নিশ্চিত করুন ও সেভ করুন'}
+              <BrainCircuit className="w-4 h-4 text-indigo-600" /> সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ
             </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSaveModalOpen(false)}>
+                বাতিল
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmSave}
+                disabled={saving}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 gap-1.5"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {saveTarget === 'pdf' ? 'PDF তৈরি করুন' : 'নিশ্চিত করুন ও সেভ করুন'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

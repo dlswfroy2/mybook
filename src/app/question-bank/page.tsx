@@ -46,12 +46,17 @@ import { doc } from 'firebase/firestore';
 import 'katex/dist/katex.min.css';
 import { formatMathToHtml } from '@/lib/math-formatter';
 
-// Font & Typography configuration for board print
-const FONT_SIZE_CONFIG = {
-  sm: { label: 'ছোট (১১.৫ px)', font: '11.5px', line: '1.35', serial: '12.5px' },
-  base: { label: 'স্বাভাবিক (১৩ px - বোর্ড স্ট্যান্ডার্ড)', font: '13px', line: '1.45', serial: '14px' },
-  lg: { label: 'বড় (১৪.৫ px)', font: '14.5px', line: '1.55', serial: '15.5px' },
-  xl: { label: 'খুব বড় (১৬ px)', font: '16px', line: '1.65', serial: '17px' }
+// Font & Typography configuration for board print - starts from 8px as requested!
+const FONT_SIZE_CONFIG: Record<string, { label: string; font: string; line: string; serial: string }> = {
+  '8': { label: '৮ px (অতি ক্ষুদ্র)', font: '8px', line: '1.2', serial: '9px' },
+  '9': { label: '৯ px (ক্ষুদ্র)', font: '9px', line: '1.25', serial: '10px' },
+  '10': { label: '১০ px (খুব ছোট)', font: '10px', line: '1.3', serial: '11px' },
+  '11': { label: '১১ px (ছোট)', font: '11px', line: '1.35', serial: '12px' },
+  '12': { label: '১২ px (পরিমিত)', font: '12px', line: '1.4', serial: '13px' },
+  '13': { label: '১৩ px (স্বাভাবিক - বোর্ড মান)', font: '13px', line: '1.45', serial: '14px' },
+  '14': { label: '১৪ px (বড়)', font: '14px', line: '1.5', serial: '15px' },
+  '15': { label: '১৫ px (অনেক বড়)', font: '15px', line: '1.55', serial: '16px' },
+  '16': { label: '১৬ px (সর্বোচ্চ বড়)', font: '16px', line: '1.6', serial: '17px' },
 };
 
 const FONT_FAMILY_CONFIG = {
@@ -389,8 +394,8 @@ export default function QuestionBankPage() {
     }
   ]);
 
-  // Print typography controls
-  const [printFontSize, setPrintFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>('base');
+  // Print typography controls - default is 13px (board standard), options start from 8px!
+  const [printFontSize, setPrintFontSize] = useState<string>('13');
   const [printFontFamily, setPrintFontFamily] = useState<'kalpurush' | 'solaiman' | 'nikosh' | 'sans'>('kalpurush');
   const [printLineSpacing, setPrintLineSpacing] = useState<'compact' | 'normal' | 'relaxed'>('normal');
 
@@ -837,32 +842,53 @@ export default function QuestionBankPage() {
               </button>
             </div>
 
-            {/* Quick Font Size Switcher */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300">
-              <span className="text-[10px] font-bold text-slate-500 px-1.5 flex items-center gap-0.5">
+            {/* Quick Font Size Stepper (৮ px থেকে ১৬ px) */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300 gap-1">
+              <span className="text-[10px] font-bold text-slate-500 pl-1.5 flex items-center gap-0.5">
                 <Type className="w-3 h-3" /> ফন্ট:
               </span>
               <button
                 type="button"
-                onClick={() => setPrintFontSize('sm')}
-                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'sm' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
+                onClick={() => {
+                  const cur = parseInt(printFontSize, 10) || 13;
+                  setPrintFontSize(String(Math.max(8, cur - 1)));
+                }}
+                disabled={parseInt(printFontSize, 10) <= 8}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-white text-slate-700 font-black text-xs disabled:opacity-30"
+                title="ফন্ট সাইজ ছোট করুন (৮ পর্যন্ত)"
               >
-                ছোট
+                −
               </button>
+              <span className="px-1 text-[11px] font-black text-indigo-700 min-w-[36px] text-center">
+                {toBengaliNumber(printFontSize)} px
+              </span>
               <button
                 type="button"
-                onClick={() => setPrintFontSize('base')}
-                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'base' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
+                onClick={() => {
+                  const cur = parseInt(printFontSize, 10) || 13;
+                  setPrintFontSize(String(Math.min(16, cur + 1)));
+                }}
+                disabled={parseInt(printFontSize, 10) >= 16}
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-white text-slate-700 font-black text-xs disabled:opacity-30"
+                title="ফন্ট সাইজ বড় করুন (১৬ পর্যন্ত)"
               >
-                স্বাভাবিক
+                +
               </button>
-              <button
-                type="button"
-                onClick={() => setPrintFontSize('lg')}
-                className={cn("px-2 py-0.5 text-[11px] font-bold rounded transition-colors", printFontSize === 'lg' ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600")}
-              >
-                বড়
-              </button>
+              <div className="h-3 w-px bg-slate-300 mx-0.5" />
+              {['8', '10', '12', '13', '15'].map(sz => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => setPrintFontSize(sz)}
+                  className={cn(
+                    "px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors",
+                    printFontSize === sz ? "bg-white shadow text-indigo-700 font-black" : "text-slate-600 hover:text-slate-900"
+                  )}
+                  title={`${sz} px ফন্ট সাইজ`}
+                >
+                  {toBengaliNumber(sz)}
+                </button>
+              ))}
             </div>
 
             <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 hidden sm:inline">
@@ -902,26 +928,26 @@ export default function QuestionBankPage() {
           className="print-page-container max-w-[8.27in] mx-auto bg-white shadow-lg p-6 sm:p-10 border-0 min-h-[11in] text-black leading-normal box-border print:p-0 print:border-none print:shadow-none print:max-w-none"
         >
           {/* Institutional Header (Spans across full width of both columns) */}
-          <div className="text-center border-b-2 border-black pb-2.5 mb-3 select-none [column-span:all]">
+          <div className="text-center border-b border-black pb-2 mb-2 select-none [column-span:all]">
             <h1 className="font-black text-2xl text-black leading-tight uppercase tracking-wide">
               {institutionName}
             </h1>
             <h2 className="text-base font-bold text-black mt-0.5 underline">
               {examName}
             </h2>
-            <div className="flex justify-center items-center gap-6 sm:gap-10 text-xs font-bold mt-2 px-2 flex-wrap">
+            <div className="flex justify-center items-center gap-6 sm:gap-10 text-xs font-bold mt-1 px-2 flex-wrap">
               <span>শ্রেণি: {CLASSES.find(c => c.id === selectedClass)?.label || selectedClass} শ্রেণি</span>
               <span>বিষয়: {selectedSubject}</span>
               {selectedChapter !== 'all' && <span>অধ্যায়: {selectedChapter}</span>}
             </div>
-            <div className="flex justify-between items-center text-xs font-bold mt-1.5 px-2 italic border-t pt-1 border-dashed border-black">
+            <div className="flex justify-between items-center text-xs font-bold mt-1 px-2 italic">
               <span>সময়: {examTime}</span>
               <span>পূর্ণমান: {examTotalMarks}</span>
             </div>
 
             {/* When single section (e.g. only MCQ test or only CQ test), display instruction centered across full page width */}
             {isSingleTypeExam && singleTypeInstruction && (
-              <div className="text-xs font-bold text-slate-900 mt-2 pt-1 border-t border-black">
+              <div className="text-xs font-bold text-slate-900 mt-1">
                 [{singleTypeInstruction}]
               </div>
             )}
@@ -942,14 +968,13 @@ export default function QuestionBankPage() {
 
               if (secQuestions.length === 0) return null;
 
-              const startNum = parseInt(sec.startSerial, 10) || 1;
               const showHeader = !isSingleTypeExam || creativeSections.length > 1;
 
               return (
-                <div key={sec.id || secIdx} className="section-block mb-3">
-                  {/* Centered Section Header Banner */}
+                <div key={sec.id || secIdx} className="section-block mb-2">
+                  {/* Centered Section Header Banner (NO big column-wide line, ONLY section title underline) */}
                   {showHeader && (sec.title || sec.instruction) && (
-                    <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                    <div className="section-header text-center my-1.5 break-after-avoid break-inside-avoid">
                       {sec.title && (
                         <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
                           {sec.title}
@@ -962,11 +987,12 @@ export default function QuestionBankPage() {
                       )}
                     </div>
                   )}
-                  <div className="space-y-2.5">
+                  <div className="space-y-1">
                     {secQuestions.map((q, idx) => {
-                      const qNum = toBengaliNumber(startNum + idx);
+                      // Continuous serial numbering across all creative sections: ১, ২, ৩, ৪...
+                      const qNum = toBengaliNumber(startIdx + idx + 1);
                       return (
-                        <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2.5">
+                        <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-1">
                           <div className="flex items-start gap-1.5">
                             <span className="font-black text-sm shrink-0">{qNum}।</span>
                             <div 
@@ -984,10 +1010,10 @@ export default function QuestionBankPage() {
 
             {/* Section 2: Multiple Choice Questions (MCQ) */}
             {includeMcq && selectedMcqs.length > 0 && (
-              <div className="section-block mb-3">
+              <div className="section-block mb-2">
                 {/* Centered Section Header Banner (Omitted if single-type exam) */}
                 {!isSingleTypeExam && (mcqTitle || mcqInstruction) && (
-                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                  <div className="section-header text-center my-1.5 break-after-avoid break-inside-avoid">
                     {mcqTitle && (
                       <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
                         {mcqTitle}
@@ -1000,12 +1026,12 @@ export default function QuestionBankPage() {
                     )}
                   </div>
                 )}
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {selectedMcqs.map((q, idx) => {
                     const startNum = parseInt(mcqStartSerial, 10) || 1;
                     const qNum = toBengaliNumber(startNum + idx);
                     return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs leading-normal mb-2">
+                      <div key={q.id} className="question-item break-inside-avoid text-xs leading-normal mb-1">
                         <div className="flex items-start gap-1.5">
                           <span className="font-black shrink-0 text-xs">{qNum}।</span>
                           <div className="flex-1 math-rendered">
@@ -1019,12 +1045,12 @@ export default function QuestionBankPage() {
               </div>
             )}
 
-            {/* Section 3: Short Questions - ALWAYS starts from 1 by default */}
+            {/* Section 3: Short Questions - ALWAYS starts from 1 by default (১, ২, ৩...) */}
             {includeShort && selectedShorts.length > 0 && (
-              <div className="section-block mb-3">
+              <div className="section-block mb-2">
                 {/* Centered Section Header Banner (Omitted if single-type exam) */}
                 {!isSingleTypeExam && (shortTitle || shortInstruction) && (
-                  <div className="section-header text-center my-2 pb-1 border-b-2 border-black break-after-avoid break-inside-avoid">
+                  <div className="section-header text-center my-1.5 break-after-avoid break-inside-avoid">
                     {shortTitle && (
                       <div className="inline-block font-black text-xs sm:text-sm text-black border-b border-black pb-0.5 uppercase tracking-wide">
                         {shortTitle}
@@ -1037,12 +1063,12 @@ export default function QuestionBankPage() {
                     )}
                   </div>
                 )}
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {selectedShorts.map((q, idx) => {
-                    const startNum = parseInt(shortStartSerial, 10) || 1;
-                    const qNum = toBengaliNumber(startNum + idx);
+                    // Strictly starts from 1 for short questions
+                    const qNum = toBengaliNumber(idx + 1);
                     return (
-                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-2">
+                      <div key={q.id} className="question-item break-inside-avoid text-xs sm:text-[13px] leading-relaxed mb-1">
                         <div className="flex items-start gap-1.5">
                           <span className="font-black shrink-0 text-xs">{qNum}।</span>
                           <div 
@@ -1112,12 +1138,18 @@ export default function QuestionBankPage() {
               break-inside: avoid !important;
               break-after: avoid !important;
               page-break-after: avoid !important;
+              border: none !important;
+              border-bottom: none !important;
+              margin-top: 4px !important;
+              margin-bottom: 4px !important;
+              padding: 0 !important;
             }
             .question-item {
               break-inside: avoid !important;
               page-break-inside: avoid !important;
               border: none !important;
               border-bottom: none !important;
+              margin-bottom: 4px !important;
             }
             .question-item, .question-item .math-rendered, .question-item div, .question-item span:not(.font-black) {
               font-size: ${activeSize.font} !important;
@@ -1693,16 +1725,17 @@ export default function QuestionBankPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {/* Font Size */}
+                {/* Font Size (starts from 8px) */}
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700">ফন্ট সাইজ (লেখার আকার)</label>
                   <Select value={printFontSize} onValueChange={(v: any) => setPrintFontSize(v)}>
                     <SelectTrigger className="h-8 font-bold text-xs bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sm" className="text-xs font-bold">ছোট (১১.৫ px - বেশি প্রশ্ন আটবে)</SelectItem>
-                      <SelectItem value="base" className="text-xs font-bold">স্বাভাবিক (১৩ px - বোর্ড মান)</SelectItem>
-                      <SelectItem value="lg" className="text-xs font-bold">বড় (১৪.৫ px - স্পষ্ট পাঠযোগ্য)</SelectItem>
-                      <SelectItem value="xl" className="text-xs font-bold">খুব বড় (১৬ px)</SelectItem>
+                      {Object.entries(FONT_SIZE_CONFIG).map(([val, cfg]) => (
+                        <SelectItem key={val} value={val} className="text-xs font-bold">
+                          {cfg.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1837,11 +1870,9 @@ export default function QuestionBankPage() {
                         </div>
                         <div className="space-y-1">
                           <label className="font-bold text-slate-700 text-[11px]">শুরুর ক্রমিক</label>
-                          <Input 
-                            value={sec.startSerial} 
-                            onChange={e => handleUpdateCreativeSection(sec.id, 'startSerial', e.target.value)} 
-                            className="h-7 text-xs font-bold text-center" 
-                          />
+                          <div className="h-7 px-2 bg-slate-100 rounded border border-slate-300 flex items-center justify-center font-bold text-xs text-indigo-700">
+                            {toBengaliNumber(sec.fromQ || (secIdx + 1))} (ক্রমান্বয়ে)
+                          </div>
                         </div>
                       </div>
 

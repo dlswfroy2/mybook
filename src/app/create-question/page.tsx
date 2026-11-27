@@ -560,10 +560,58 @@ function CreateQuestionContent() {
     }
   };
 
-  // Save current questions to the central Question Bank
+  // Save current questions to the central Question Bank (handles live edits from contentEditable!)
   const handleSaveToQuestionBank = () => {
-    const list = activeSet === 'A' ? questions : questionsB;
-    if (!list || list.length === 0) {
+    let itemsToSave: Array<{
+      classId: string;
+      subject: string;
+      chapter: string;
+      type: 'mcq' | 'creative' | 'short';
+      content: string;
+      source?: string;
+    }> = [];
+
+    // 1. First priority: Check if live contentEditable has edited text
+    let liveText = '';
+    if (contentEditableRef.current) {
+      liveText = contentEditableRef.current.innerText || contentEditableRef.current.textContent || '';
+    }
+
+    if (liveText && liveText.trim().length > 30) {
+      // Clean header
+      const cleanedText = liveText
+        .replace(/^[^\n]*\b(টিউটোরিয়ালস|বিদ্যালয়|মাদ্রাসা|স্কুল|পরীক্ষা|শ্রেণি|বিষয়|সময়|পূর্ণমান)[^\n]*\n+/gi, '')
+        .trim();
+      const defaultT = (questions[0]?.type || 'creative') as 'creative' | 'short' | 'mcq';
+      const parsed = parseGeneratedQuestions(cleanedText, defaultT);
+      if (parsed && parsed.length > 0) {
+        itemsToSave = parsed.map(p => ({
+          classId: String(meta.classId || '10'),
+          subject: meta.subject || 'সাধারণ',
+          chapter: meta.chapter || '১ম অধ্যায়',
+          type: p.type,
+          content: p.content,
+          source: 'live-editor'
+        }));
+      }
+    }
+
+    // 2. Second priority: Fallback to structured questions array
+    if (itemsToSave.length === 0) {
+      const list = activeSet === 'A' ? questions : questionsB;
+      if (list && list.length > 0) {
+        itemsToSave = list.map(q => ({
+          classId: String(meta.classId || '10'),
+          subject: meta.subject || 'সাধারণ',
+          chapter: meta.chapter || '১ম অধ্যায়',
+          type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
+          content: q.content,
+          source: 'create-question'
+        }));
+      }
+    }
+
+    if (itemsToSave.length === 0) {
       toast({
         variant: 'destructive',
         title: 'কোনো প্রশ্ন নেই',
@@ -571,15 +619,6 @@ function CreateQuestionContent() {
       });
       return;
     }
-
-    const itemsToSave = list.map(q => ({
-      classId: String(meta.classId || '10'),
-      subject: meta.subject || 'সাধারণ',
-      chapter: meta.chapter || '১ম অধ্যায়',
-      type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
-      content: q.content,
-      source: 'create-question'
-    }));
 
     const result = addQuestionsToBank(itemsToSave);
     toast({
@@ -1294,14 +1333,25 @@ function CreateQuestionContent() {
                     <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
                       📄 লাইভ প্রিন্ট-স্টাইল লেআউট
                     </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleGoToPrint}
-                      className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
-                    >
-                      ওয়ার্ড ভিউ ↗
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveToQuestionBank}
+                        className="text-xs font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 h-7 px-2.5 gap-1 shrink-0"
+                        title="এই লাইভ লেআউট থেকে সরাসরি প্রশ্ন ব্যাংকে সেভ করুন"
+                      >
+                        <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> প্রশ্ন ব্যাংকে সেভ
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleGoToPrint}
+                        className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
+                      >
+                        ওয়ার্ড ভিউ ↗
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent 
                     ref={paperContainerRef}
