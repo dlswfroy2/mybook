@@ -91,68 +91,99 @@ async function syncToCentralCloudDoc(db: Firestore, questionsList: BankQuestion[
 }
 
 /**
- * Fetch all questions from the Central Server (Firebase Firestore cloud database),
+ * Fetch all questions from the Central Server (/api/question-bank & Firebase Firestore),
  * and bi-directionally sync with local cache so questions from ALL devices appear!
  */
 export async function fetchBankQuestionsFromFirestore(providedDb?: Firestore | null): Promise<BankQuestion[]> {
   const localList = getBankQuestions();
-  const db = getQuestionBankDb(providedDb);
-  if (!db) return localList;
+  let serverList: BankQuestion[] = [];
 
-  try {
-    const docRef = doc(db, 'questions', CENTRAL_DOC_ID);
-    const snap = await getDoc(docRef);
-
-    let cloudQuestions: BankQuestion[] = [];
-    if (snap.exists()) {
-      const data = snap.data();
-      if (Array.isArray(data?.questions)) {
-        cloudQuestions = data.questions.map((q: any) => ({
-          ...q,
-          syncedToCloud: true
-        }));
-      }
-    }
-
-    // Merge cloud and local questions by unique ID
-    const mergedMap = new Map<string, BankQuestion>();
-    
-    // 1. Add cloud items first
-    for (const q of cloudQuestions) {
-      if (q && q.id && q.content) {
-        mergedMap.set(q.id, q);
-      }
-    }
-
-    // 2. Add local items not yet in cloud
-    let hasNewLocal = false;
-    for (const lq of localList) {
-      if (lq && lq.id && lq.content) {
-        if (!mergedMap.has(lq.id)) {
-          mergedMap.set(lq.id, { ...lq, syncedToCloud: true });
-          hasNewLocal = true;
+  // Step 1: Fetch from Central Server API (/api/question-bank)
+  // This guarantees 100% connectivity between PC and Mobile on the local network without quota limits!
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/question-bank', { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.questions)) {
+          serverList = data.questions;
         }
       }
+    } catch (apiErr) {
+      console.warn('[QuestionBank] /api/question-bank fetch warning:', apiErr);
     }
-
-    const unifiedList = Array.from(mergedMap.values());
-    saveLocalBankQuestions(unifiedList);
-
-    // If local had items that weren't in cloud yet, or cloud was empty: upload all unified questions to cloud
-    if (hasNewLocal || (cloudQuestions.length === 0 && unifiedList.length > 0)) {
-      await syncToCentralCloudDoc(db, unifiedList);
-    }
-
-    return unifiedList;
-  } catch (err) {
-    console.warn('Central server sync failed, falling back to local storage cache:', err);
-    return localList;
   }
+
+  // Step 2: Merge serverList with localList
+  const mergedMap = new Map<string, BankQuestion>();
+  for (const sq of serverList) {
+    if (sq && sq.id && sq.content) {
+      mergedMap.set(sq.id, { ...sq, syncedToCloud: true });
+    }
+  }
+
+  let hasPendingLocalUpload = false;
+  for (const lq of localList) {
+    if (lq && lq.id && lq.content) {
+      if (!mergedMap.has(lq.id)) {
+        mergedMap.set(lq.id, { ...lq, syncedToCloud: true });
+        hasPendingLocalUpload = true;
+      }
+    }
+  }
+
+  const unifiedList = Array.from(mergedMap.values());
+  saveLocalBankQuestions(unifiedList);
+
+  // If local had items not yet on the central server (e.g. 140 questions from PC), POST them to /api/question-bank!
+  if (typeof window !== 'undefined' && (hasPendingLocalUpload || (serverList.length === 0 && unifiedList.length > 0))) {
+    try {
+      await fetch('/api/question-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: unifiedList })
+      });
+      console.log(`[QuestionBank] Successfully synced ${unifiedList.length} questions to /api/question-bank!`);
+    } catch (e) {
+      console.warn('Failed to upload unified list to /api/question-bank:', e);
+    }
+  }
+
+  // Step 3: Also sync to Firebase Firestore if db is available
+  const db = getQuestionBankDb(providedDb);
+  if (db) {
+    try {
+      const docRef = doc(db, 'questions', CENTRAL_DOC_ID);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data?.questions)) {
+          let updatedFromFirestore = false;
+          for (const fq of data.questions) {
+            if (fq && fq.id && !mergedMap.has(fq.id)) {
+              mergedMap.set(fq.id, { ...fq, syncedToCloud: true });
+              updatedFromFirestore = true;
+            }
+          }
+          if (updatedFromFirestore) {
+            const finalUnified = Array.from(mergedMap.values());
+            saveLocalBankQuestions(finalUnified);
+            return finalUnified;
+          }
+        }
+      }
+      syncToCentralCloudDoc(db, unifiedList);
+    } catch (e) {
+      console.warn('[QuestionBank] Firestore background sync notice:', e);
+    }
+  }
+
+  return unifiedList;
 }
 
 /**
  * Save new questions to Question Bank with auto-incremented serial number (ক্রমিক নং).
- * Automatically writes to local cache AND syncs to central cloud Firestore!
+ * Automatically writes to local cache AND syncs to central cloud server & API!
  */
 export function addQuestionsToBank(
   newItems: Array<{
@@ -214,6 +245,15 @@ export function addQuestionsToBank(
 
   saveLocalBankQuestions(existing);
 
+  // Sync to Central Server API (/api/question-bank)
+  if (typeof window !== 'undefined' && savedItems.length > 0) {
+    fetch('/api/question-bank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questions: existing })
+    }).catch(e => console.warn('POST /api/question-bank error:', e));
+  }
+
   // Sync whole list to Central Cloud Firestore document
   const db = getQuestionBankDb(providedDb);
   if (db && savedItems.length > 0) {
@@ -233,6 +273,13 @@ export function deleteQuestionFromBank(id: string, providedDb?: Firestore | null
   if (filtered.length === existing.length) return false;
   
   saveLocalBankQuestions(filtered);
+
+  // Delete from Central Server API
+  if (typeof window !== 'undefined') {
+    fetch(`/api/question-bank?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }).catch(e => console.warn('DELETE /api/question-bank error:', e));
+  }
 
   // Sync update to Central Cloud Server
   const db = getQuestionBankDb(providedDb);
@@ -260,6 +307,14 @@ export function clearQuestionsFromBank(filters?: { classId?: string; subject?: s
     return true;
   });
   saveLocalBankQuestions(remaining);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/question-bank', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questions: remaining })
+    }).catch(e => console.warn('POST /api/question-bank clear error:', e));
+  }
 
   const db = getQuestionBankDb();
   if (db) {
