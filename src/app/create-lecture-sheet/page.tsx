@@ -1975,6 +1975,9 @@ function CreateLectureSheetContent() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveFileName, setSaveFileName] = useState('');
   const [saveTarget, setSaveTarget] = useState<'both' | 'pdf' | 'db'>('both');
+  const [saveClassId, setSaveClassId] = useState<string>('');
+  const [saveSubject, setSaveSubject] = useState<string>('');
+  const [saveTopic, setSaveTopic] = useState<string>('');
 
   const handleGenerateAiSheet = async () => {
     if (!aiClassId || !aiSubject || !aiChapter.trim()) {
@@ -2567,6 +2570,7 @@ function CreateLectureSheetContent() {
             if (docData.pageStyles[0]?.fontSize) { setGlobalFontSize(docData.pageStyles[0].fontSize); setFontSizeDraft(String(docData.pageStyles[0].fontSize)); }
             if (docData.pageStyles[0]?.lineHeight) { setGlobalLineHeight(docData.pageStyles[0].lineHeight); setLineHeightDraft(String(docData.pageStyles[0].lineHeight)); }
           }
+          let finalManual: Record<number, string> = {};
           if (docData.hasPageDocs) {
             // Pages stored in sub-collection lecture-sheets/{id}/pages/{pageIdx}
             try {
@@ -2577,7 +2581,7 @@ function CreateLectureSheetContent() {
                 const pageIdx = Number(pd.id);
                 cleanedManual[pageIdx] = stripDirtyHtml(pd.data().html || '');
               });
-              if (Object.keys(cleanedManual).length > 0) setManualPages(cleanedManual);
+              if (Object.keys(cleanedManual).length > 0) finalManual = cleanedManual;
             } catch (pe) {
               console.warn('Could not load page sub-docs:', pe);
             }
@@ -2586,7 +2590,19 @@ function CreateLectureSheetContent() {
             Object.keys(docData.manualPages).forEach(k => {
               cleanedManual[Number(k)] = stripDirtyHtml(docData.manualPages[Number(k)]);
             });
-            setManualPages(cleanedManual);
+            finalManual = cleanedManual;
+          }
+
+          const sortedIndices = Object.keys(finalManual).map(Number).sort((a, b) => a - b);
+          const loadedPages = sortedIndices.map(idx => finalManual[idx]).filter(Boolean);
+          if (loadedPages.length > 0) {
+            setPaginatedPages(loadedPages);
+            setManualPages(finalManual);
+            hasInitiallyPaginatedRef.current = true;
+          } else if (cleanContent) {
+            setTimeout(() => {
+              repaginateDocument({ sourceContent: cleanContent });
+            }, 100);
           }
         }
       } catch (e) {
@@ -3086,16 +3102,34 @@ function CreateLectureSheetContent() {
     }
   }, [user, db, editId, data, printSettings, pageStyles, manualPages, router, toast, isPrintMode]);
 
+  const computeAutoFileName = useCallback((cId: string, subj: string, top: string) => {
+    const cls = CLASSES.find(c => c.id === cId);
+    const parts = [
+      cls ? `${cls.label} শ্রেণি` : (cId ? `${cId} শ্রেণি` : ''),
+      subj || '',
+      top || '',
+      'লেকচার শিট'
+    ].map(s => String(s).trim()).filter(Boolean);
+    return parts.length > 0 ? parts.join(' - ') : 'লেকচার শিট';
+  }, []);
+
   const handleOpenSaveModal = useCallback(() => {
-    const defaultName = `${data.classId ? `${data.classId} শ্রেণি - ` : ''}${data.subject || 'বিষয়'}${data.topic ? ` - ${data.topic}` : ''} - লেকচার শিট`;
-    setSaveFileName(defaultName);
+    const cId = data.classId || '9';
+    const subj = data.subject || '';
+    const top = data.topic || '';
+    setSaveClassId(cId);
+    setSaveSubject(subj);
+    setSaveTopic(top);
+    setSaveFileName(computeAutoFileName(cId, subj, top));
     setSaveModalOpen(true);
-  }, [data.classId, data.subject, data.topic]);
+  }, [data.classId, data.subject, data.topic, computeAutoFileName]);
 
   const handleConfirmSave = useCallback(async () => {
+    const finalFileName = (saveFileName || computeAutoFileName(saveClassId, saveSubject, saveTopic)).trim();
+
     if (saveTarget === 'pdf') {
       const originalTitle = document.title;
-      document.title = saveFileName.trim() || 'লেকচার শিট';
+      document.title = finalFileName || 'লেকচার শিট';
       setSaveModalOpen(false);
       setTimeout(() => {
         window.print();
@@ -3104,11 +3138,19 @@ function CreateLectureSheetContent() {
       return;
     }
 
-    const success = await handleSave(saveFileName);
+    // Update data with new class, subject, topic
+    setData(prev => ({
+      ...prev,
+      classId: saveClassId || prev.classId,
+      subject: saveSubject || prev.subject,
+      topic: saveTopic || prev.topic,
+    }));
+
+    const success = await handleSave(finalFileName);
     if (success) {
       if (saveTarget === 'both') {
         const originalTitle = document.title;
-        document.title = saveFileName.trim() || 'লেকচার শিট';
+        document.title = finalFileName || 'লেকচার শিট';
         setSaveModalOpen(false);
         setTimeout(() => {
           window.print();
@@ -3118,7 +3160,7 @@ function CreateLectureSheetContent() {
         setSaveModalOpen(false);
       }
     }
-  }, [saveTarget, saveFileName, handleSave]);
+  }, [saveTarget, saveFileName, handleSave, saveClassId, saveSubject, saveTopic, computeAutoFileName]);
 
   const handleFileUpload = async () => {
     if (!db || !user || !uploadFile || !data.classId || !data.subject || !data.type) {
@@ -4768,14 +4810,138 @@ function CreateLectureSheetContent() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* ১. শ্রেণি নির্বাচন বাটনসমূহ */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">ফাইলের নাম (File Name)</label>
+              <label className="text-xs font-black text-slate-800 flex items-center justify-between">
+                <span>🎓 শ্রেণি নির্বাচন করুন:</span>
+                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full">স্বয়ংক্রিয় সিঙ্ক</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {CLASSES.map((c) => {
+                  const isSelected = saveClassId === c.id;
+                  return (
+                    <Button
+                      key={c.id}
+                      type="button"
+                      size="sm"
+                      variant={isSelected ? "default" : "outline"}
+                      className={cn(
+                        "h-8 text-xs font-bold px-3 transition-all",
+                        isSelected
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                          : "border-slate-300 text-slate-700 hover:bg-indigo-50"
+                      )}
+                      onClick={() => {
+                        const newClass = c.id;
+                        setSaveClassId(newClass);
+                        const availableSubs = getSubjectsForClass(newClass);
+                        let newSub = saveSubject;
+                        if (!availableSubs.includes(saveSubject)) {
+                          newSub = availableSubs[0] || '';
+                          setSaveSubject(newSub);
+                        }
+                        const chaps = getChaptersForSubject(newClass, newSub);
+                        let newTop = saveTopic;
+                        if (chaps.length > 0 && !chaps.includes(saveTopic)) {
+                          newTop = chaps[0];
+                          setSaveTopic(newTop);
+                        }
+                        setSaveFileName(computeAutoFileName(newClass, newSub, newTop));
+                      }}
+                    >
+                      {c.label} শ্রেণি
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ২. বিষয় ও অধ্যায় / টপিক */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* বিষয় ড্রপডাউন */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-800">
+                  📚 বিষয় নির্বাচন:
+                </label>
+                <Select
+                  value={saveSubject}
+                  onValueChange={(newSub) => {
+                    setSaveSubject(newSub);
+                    const chaps = getChaptersForSubject(saveClassId, newSub);
+                    let newTop = chaps.length > 0 ? chaps[0] : '';
+                    setSaveTopic(newTop);
+                    setSaveFileName(computeAutoFileName(saveClassId, newSub, newTop));
+                  }}
+                >
+                  <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-slate-300">
+                    <SelectValue placeholder="বিষয় বেছে নিন" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    {getSubjectsForClass(saveClassId).map((s) => (
+                      <SelectItem key={s} value={s} className="font-bold text-xs">
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* অধ্যায় / টপিক */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-800">
+                  📖 অধ্যায় / টপিক:
+                </label>
+                {getChaptersForSubject(saveClassId, saveSubject).length > 0 ? (
+                  <Select
+                    value={saveTopic}
+                    onValueChange={(newTop) => {
+                      setSaveTopic(newTop);
+                      setSaveFileName(computeAutoFileName(saveClassId, saveSubject, newTop));
+                    }}
+                  >
+                    <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-slate-300">
+                      <SelectValue placeholder="অধ্যায় বেছে নিন" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-56">
+                      {getChaptersForSubject(saveClassId, saveSubject).map((ch) => (
+                        <SelectItem key={ch} value={ch} className="font-bold text-xs">
+                          {ch}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={saveTopic}
+                    onChange={(e) => {
+                      const newTop = e.target.value;
+                      setSaveTopic(newTop);
+                      setSaveFileName(computeAutoFileName(saveClassId, saveSubject, newTop));
+                    }}
+                    placeholder="অধ্যায় বা টপিকের নাম লিখুন..."
+                    className="h-9 font-bold text-xs bg-slate-50 border-slate-300"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* ৩. স্বয়ংক্রিয় ফাইলের নাম */}
+            <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-indigo-100">
+              <label className="text-xs font-black text-indigo-950 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> ফাইলের নাম (Auto File Name):
+                </span>
+                <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">অটো-সিঙ্ক</span>
+              </label>
               <Input
                 value={saveFileName}
                 onChange={(e) => setSaveFileName(e.target.value)}
                 placeholder="ফাইলের নাম লিখুন"
-                className="font-bold text-sm h-10 border-slate-300 focus:border-indigo-500"
+                className="font-bold text-xs h-9 bg-white border-indigo-300 focus:border-indigo-500"
               />
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                শ্রেণি, বিষয় বা অধ্যায় পরিবর্তনের সাথে সাথে নামটি স্বয়ংক্রিয়ভাবে আপডেট হবে।
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -4888,7 +5054,7 @@ function CreateLectureSheetContent() {
         }
         @media print {
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; width: 100% !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .no-print, [class*="bg-black/"], [class*="backdrop-blur"] { display: none !important; }
+          .no-print, [class*="bg-black/"], [class*="backdrop-blur"], .toaster, [data-radix-toast-viewport], ol[tabindex], [role="region"], [role="status"], [data-state], [class*="toast"], [class*="Toast"] { display: none !important; opacity: 0 !important; visibility: hidden !important; height: 0 !important; width: 0 !important; pointer-events: none !important; }
           .print-view-container { position: absolute !important; top: 0 !important; left: 0 !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; display: block !important; background: white !important; width: 100% !important; }
           .print-main-area { background: white !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; display: block !important; height: auto !important; position: static !important; width: 100% !important; }
           .paper { background: white !important; background-color: #ffffff !important; color: #000000 !important; position: relative !important; margin: 0 !important; box-shadow: none !important; width: 8.27in !important; height: 11.69in !important; page-break-after: always !important; break-after: page !important; break-inside: avoid !important; display: block !important; box-sizing: border-box !important; border: none !important; overflow: hidden !important; }

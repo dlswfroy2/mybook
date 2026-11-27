@@ -2016,6 +2016,7 @@ function CreateQuestionContent() {
             const docId = editId || doc(collection(db, 'questions')).id;
             const dataToSave: any = {
               ...meta,
+              ...(extra?.metaUpdates || {}),
               content: updatedContent,
               manualPages: extra?.manualPages || null,
               pageStyles: styles,
@@ -2026,6 +2027,9 @@ function CreateQuestionContent() {
               updatedAt: serverTimestamp(),
               isMcq: questions.some(q => q.type === 'mcq'),
             };
+            if (extra?.metaUpdates) {
+              setMeta(prev => ({ ...prev, ...extra.metaUpdates }));
+            }
             if (!editId) dataToSave.createdAt = serverTimestamp();
             if (questions && questions.length > 0) {
               dataToSave.questions = questions.map(q => ({

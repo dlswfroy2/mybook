@@ -149,6 +149,8 @@ function MyLibraryContent() {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [merging, setMerging] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -168,10 +170,15 @@ function MyLibraryContent() {
   useEffect(() => { if (!userLoading && !user) router.push('/auth'); }, [user, userLoading, router]);
 
   useEffect(() => {
+    const hl = searchParams.get('highlight') || searchParams.get('id');
     const cid = searchParams.get('classId');
     const sub = searchParams.get('subject');
     const ch = searchParams.get('chapter');
     const cat = searchParams.get('category');
+
+    if (hl) {
+      setHighlightedId(hl);
+    }
 
     if (cid && sub && ch && cat) {
       setSelectedClass(cid);
@@ -179,6 +186,20 @@ function MyLibraryContent() {
       setSelectedChapter(ch);
       setActiveCategory(cat as any);
       setViewMode('content');
+    } else if (cid && sub) {
+      setSelectedClass(cid);
+      setSelectedSubject(sub);
+      if (ch) setSelectedChapter(ch);
+      if (cat) setActiveCategory(cat as any);
+      setViewMode('content');
+    } else if (cid) {
+      setSelectedClass(cid);
+      if (sub) {
+        setSelectedSubject(sub);
+        setViewMode('content');
+      } else {
+        setViewMode('subjects');
+      }
     }
   }, [searchParams]);
 
@@ -195,6 +216,34 @@ function MyLibraryContent() {
     sheets: rawSheets || [],
     pdfSheets: rawPdfSheets || []
   }), [rawQuestions, rawSheets, rawPdfSheets]);
+
+  useEffect(() => {
+    if (!highlightedId) return;
+    const allDocs = [
+      ...(libraryData.questions || []),
+      ...(libraryData.sheets || []),
+      ...(libraryData.pdfSheets || []),
+    ];
+    if (allDocs.length === 0) return;
+    const target = allDocs.find((item: any) => item.id === highlightedId);
+    if (target) {
+      if (target.classId) setSelectedClass(target.classId);
+      if (target.subject) setSelectedSubject(target.subject);
+      setSelectedChapter(null);
+      setActiveCategory('all');
+      setActiveFileType('all');
+      setViewMode('content');
+    }
+  }, [highlightedId, libraryData]);
+
+  useEffect(() => {
+    if (highlightedId && highlightedRowRef.current) {
+      const timer = setTimeout(() => {
+        highlightedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedId]);
 
   const handleOpenPdf = async (url: string) => {
     if (!url) return;
@@ -700,6 +749,23 @@ function MyLibraryContent() {
           <div style={{ width: '1000px', height: '1px' }} />
         </div>
 
+        {highlightedId && (
+          <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-xl flex items-center justify-between text-red-950 font-bold text-xs shadow-md animate-in fade-in duration-300">
+            <span className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-600 animate-ping shrink-0" />
+              <span>📍 সর্বশেষ কার্যক্রম থেকে আপনার কাঙ্ক্ষিত ফাইলটি নিচে <strong className="text-red-700 underline underline-offset-2">লাল বর্ডারে হাইলাইট</strong> করা রয়েছে। এখান থেকে সরাসরি দেখতে, এডিট বা প্রিন্ট করতে পারবেন।</span>
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setHighlightedId(null)}
+              className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-100 font-black px-2.5 shrink-0"
+            >
+              হাইলাইট সরান ✕
+            </Button>
+          </div>
+        )}
+
         <div 
           ref={tableContainerRef}
           onScroll={() => handleScrollSync('table')}
@@ -722,25 +788,43 @@ function MyLibraryContent() {
                 </TableRow>
               ) : combinedItems.map((item: any, idx) => {
                 const isSelected = selectedDocIds.includes(item.id);
+                const isHighlighted = highlightedId && item.id === highlightedId;
                 return (
                   <TableRow 
                     key={item.id} 
+                    ref={isHighlighted ? (el) => { highlightedRowRef.current = el; } : undefined}
                     className={cn(
-                      "h-14 border-b-2 border-black transition-colors hover:bg-slate-50",
+                      "h-14 border-b-2 transition-all",
+                      isHighlighted
+                        ? "bg-red-50/90 border-2 border-red-600 ring-4 ring-red-400 shadow-xl"
+                        : "border-black hover:bg-slate-50",
                       isSelecting && "cursor-pointer",
                       isSelected && "bg-primary/5"
                     )}
                     onClick={() => isSelecting && toggleSelection(item.id)}
                   >
-                    <TableCell className="text-center font-black border-r-2 border-black bg-cyan-400 text-white w-24">
+                    <TableCell className={cn(
+                      "text-center font-black border-r-2 border-black text-white w-24",
+                      isHighlighted ? "bg-red-600" : "bg-cyan-400"
+                    )}>
                       {isSelecting ? (
                         <div className={cn("w-6 h-6 mx-auto rounded-full border-2 flex items-center justify-center border-white", isSelected ? "bg-white text-primary" : "")}>
                           {isSelected && <CheckCircle2 className="w-5 h-5" />}
                         </div>
                       ) : toBengaliNumber(idx + 1).padStart(2, '০')}
                     </TableCell>
-                    <TableCell className="font-bold border-r-2 border-black bg-green-100 px-4 text-xs md:text-sm">
-                      {item.displayTitle}
+                    <TableCell className={cn(
+                      "font-bold border-r-2 border-black px-4 text-xs md:text-sm",
+                      isHighlighted ? "bg-red-100 text-red-950 font-black" : "bg-green-100"
+                    )}>
+                      <div className="flex items-center gap-2">
+                        {isHighlighted && (
+                          <Badge className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] px-2 py-0.5 animate-pulse shadow-xs shrink-0">
+                            👉 এই ফাইলটি
+                          </Badge>
+                        )}
+                        <span>{item.displayTitle}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="font-bold border-r-2 border-black px-4 text-xs">
                       <div className="flex flex-col gap-0.5">

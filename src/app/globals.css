@@ -159,3 +159,22 @@
 .top-scrollbar-track::-webkit-scrollbar-thumb:hover {
   background: #1d4ed8 !important;
 }
+
+@media print {
+  .no-print,
+  .toaster,
+  [data-radix-toast-viewport],
+  ol[tabindex],
+  [role="region"][aria-label*="Notification" i],
+  [role="status"],
+  [data-state="open"][role="alert"],
+  [class*="Toast"],
+  [class*="toast"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    pointer-events: none !important;
+  }
+}

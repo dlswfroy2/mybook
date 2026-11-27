@@ -1558,7 +1558,9 @@ export default function Home() {
       }
       const subLabel = subParts.join(' • ');
 
-      const href = sheet.id ? `/create-lecture-sheet?id=${sheet.id}` : '/my-questions';
+      const href = sheet.id
+        ? `/my-questions?highlight=${sheet.id}&classId=${sheet.classId || ''}&subject=${encodeURIComponent(sheet.subject || '')}`
+        : '/my-questions';
       const updatedMs = getTimestampMs(sheet.updatedAt);
       const createdMs = getTimestampMs(sheet.createdAt);
       const timeMs = Math.max(updatedMs, createdMs);
@@ -1590,7 +1592,9 @@ export default function Home() {
         subParts.push(pdf.chapterName);
       }
       const subLabel = subParts.join(' • ');
-      const href = '/my-questions';
+      const href = pdf.id
+        ? `/my-questions?highlight=${pdf.id}&classId=${pdf.classId || ''}&subject=${encodeURIComponent(pdf.subject || '')}`
+        : '/my-questions';
 
       const uploadedMs = getTimestampMs(pdf.uploadedAt);
       const updatedMs = getTimestampMs(pdf.updatedAt);
@@ -1642,7 +1646,9 @@ export default function Home() {
       }
       const subLabel = subParts.join(' • ');
 
-      const href = q.id ? `/create-question?id=${q.id}&print=true` : '/my-questions';
+      const href = q.id
+        ? `/my-questions?highlight=${q.id}&classId=${q.classId || ''}&subject=${encodeURIComponent(q.subject || '')}`
+        : '/my-questions';
       const updatedMs = getTimestampMs(q.updatedAt);
       const createdMs = getTimestampMs(q.createdAt);
       const timeMs = Math.max(updatedMs, createdMs);

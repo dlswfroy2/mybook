@@ -45,7 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { WordToolbar } from '@/components/WordToolbar';
 import { FloatingSelectionToolbar } from '@/components/FloatingSelectionToolbar';
-import { CLASSES } from '@/lib/constants';
+import { CLASSES, getSubjectsForClass, getChaptersForSubject } from '@/lib/constants';
 import { generatePracticeQuestions } from '@/ai/flows/generate-practice-questions';
 
 function toBengaliNumber(n: number | string | undefined | null): string {
@@ -2276,6 +2276,9 @@ export function QuestionPrintView({
   const [saveFileName, setSaveFileName] = useState('');
   const [saveTarget, setSaveTarget] = useState<'both' | 'pdf' | 'db'>('both');
   const [saveExamCategory, setSaveExamCategory] = useState('');
+  const [saveClassId, setSaveClassId] = useState<string>('');
+  const [saveSubject, setSaveSubject] = useState<string>('');
+  const [saveChapter, setSaveChapter] = useState<string>('');
 
   // Print layout settings & states
   const [paginatedPages, setPaginatedPages] = useState<string[]>([]);
@@ -2728,10 +2731,27 @@ export function QuestionPrintView({
     });
   };
 
+  const computeAutoFileName = useCallback((cId: string, subj: string, chap: string, ex: string) => {
+    const classLabel = getClassLabel(cId);
+    const parts = [
+      classLabel ? `${classLabel} শ্রেণি` : (cId ? `${cId} শ্রেণি` : ''),
+      subj || '',
+      chap || '',
+      ex || ''
+    ].map(s => String(s).trim()).filter(Boolean);
+    return parts.length > 0 ? parts.join(' - ') : (ex || 'প্রশ্নপত্র');
+  }, []);
+
   const handleOpenSaveModal = () => {
-    const defaultName = getDocumentFileName();
-    setSaveFileName(defaultName);
-    setSaveExamCategory(meta.exam || 'বার্ষিক পরীক্ষা');
+    const cId = String(meta.classId || '10');
+    const subj = meta.subject || '';
+    const chap = meta.chapter || '';
+    const ex = meta.exam || 'সাপ্তাহিক পরীক্ষা';
+    setSaveClassId(cId);
+    setSaveSubject(subj);
+    setSaveChapter(chap);
+    setSaveExamCategory(ex);
+    setSaveFileName(computeAutoFileName(cId, subj, chap, ex));
     setSaveModalOpen(true);
   };
 
@@ -2757,7 +2777,7 @@ export function QuestionPrintView({
         fullText = sortedKeys.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
       }
 
-      const finalFileName = (saveFileName || getDocumentFileName()).trim();
+      const finalFileName = (saveFileName || computeAutoFileName(saveClassId, saveSubject, saveChapter, saveExamCategory)).trim();
       const finalPages = Object.keys(capturedManualPages).length > 0 ? capturedManualPages : manualPages;
 
       // 1. If DB or Both
@@ -2767,6 +2787,12 @@ export function QuestionPrintView({
           manualPages: finalPages,
           exam: saveExamCategory || meta.exam,
           isEditorSaved: true,
+          metaUpdates: {
+            classId: saveClassId || meta.classId,
+            subject: saveSubject || meta.subject,
+            chapter: saveChapter || meta.chapter,
+            exam: saveExamCategory || meta.exam,
+          }
         });
       }
 
@@ -2777,10 +2803,7 @@ export function QuestionPrintView({
         if (typeof document !== 'undefined') {
           document.title = finalFileName.replace(/\.pdf$/i, '');
         }
-        toast({
-          title: 'PDF ডাউনলোড প্রস্তুত! 📥',
-          description: `"${finalFileName}.pdf" নামে ফাইলটি সেভ করতে প্রিন্ট ডায়ালগ ওপেন হচ্ছে...`,
-        });
+        // Do NOT trigger toast here so it doesn't get captured by the print dialog
         setTimeout(() => {
           window.print();
         }, 300);
@@ -3382,7 +3405,7 @@ export function QuestionPrintView({
 
       {/* ── Save & PDF Settings Dialog ── */}
       <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
-        <DialogContent className="font-kalpurush max-w-lg bg-white border-2 border-indigo-200 shadow-2xl p-6">
+        <DialogContent className="font-kalpurush max-w-lg bg-white border-2 border-indigo-200 shadow-2xl p-6 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
               <Save className="w-5 h-5 text-indigo-600" /> প্রশ্নপত্র সংরক্ষণ ও PDF তৈরি
@@ -3390,24 +3413,183 @@ export function QuestionPrintView({
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* 1. File Name */}
+            {/* ১. শ্রেণি নির্বাচন বাটনসমূহ */}
             <div className="space-y-1.5">
               <label className="text-xs font-black text-slate-800 flex items-center justify-between">
-                <span>ফাইলের নাম (PDF ও প্রশ্নব্যাংকের নাম)</span>
-                <span className="text-[10px] text-slate-400 font-normal">পরিবর্তনযোগ্য</span>
+                <span>🎓 শ্রেণি নির্বাচন করুন:</span>
+                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full">স্বয়ংক্রিয় সিঙ্ক</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {CLASSES.map((c) => {
+                  const isSelected = saveClassId === c.id;
+                  return (
+                    <Button
+                      key={c.id}
+                      type="button"
+                      size="sm"
+                      variant={isSelected ? "default" : "outline"}
+                      className={cn(
+                        "h-8 text-xs font-bold px-3 transition-all",
+                        isSelected
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                          : "border-slate-300 text-slate-700 hover:bg-indigo-50"
+                      )}
+                      onClick={() => {
+                        const newClass = c.id;
+                        setSaveClassId(newClass);
+                        const availableSubs = getSubjectsForClass(newClass);
+                        let newSub = saveSubject;
+                        if (!availableSubs.includes(saveSubject)) {
+                          newSub = availableSubs[0] || '';
+                          setSaveSubject(newSub);
+                        }
+                        const chaps = getChaptersForSubject(newClass, newSub);
+                        let newChap = saveChapter;
+                        if (chaps.length > 0 && !chaps.includes(saveChapter)) {
+                          newChap = chaps[0];
+                          setSaveChapter(newChap);
+                        }
+                        setSaveFileName(computeAutoFileName(newClass, newSub, newChap, saveExamCategory));
+                      }}
+                    >
+                      {c.label} শ্রেণি
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ২. বিষয় ও অধ্যায় / টপিক */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* বিষয় ড্রপডাউন */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-800">
+                  📚 বিষয় নির্বাচন:
+                </label>
+                <Select
+                  value={saveSubject}
+                  onValueChange={(newSub) => {
+                    setSaveSubject(newSub);
+                    const chaps = getChaptersForSubject(saveClassId, newSub);
+                    let newChap = chaps.length > 0 ? chaps[0] : '';
+                    setSaveChapter(newChap);
+                    setSaveFileName(computeAutoFileName(saveClassId, newSub, newChap, saveExamCategory));
+                  }}
+                >
+                  <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-slate-300">
+                    <SelectValue placeholder="বিষয় বেছে নিন" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    {getSubjectsForClass(saveClassId).map((s) => (
+                      <SelectItem key={s} value={s} className="font-bold text-xs">
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* অধ্যায় নির্বাচন বা ইনপুট */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-800">
+                  📖 অধ্যায় / টপিক:
+                </label>
+                {getChaptersForSubject(saveClassId, saveSubject).length > 0 ? (
+                  <Select
+                    value={saveChapter}
+                    onValueChange={(newChap) => {
+                      setSaveChapter(newChap);
+                      setSaveFileName(computeAutoFileName(saveClassId, saveSubject, newChap, saveExamCategory));
+                    }}
+                  >
+                    <SelectTrigger className="h-9 font-bold text-xs bg-slate-50 border-slate-300">
+                      <SelectValue placeholder="অধ্যায় বেছে নিন" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-56">
+                      {getChaptersForSubject(saveClassId, saveSubject).map((ch) => (
+                        <SelectItem key={ch} value={ch} className="font-bold text-xs">
+                          {ch}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={saveChapter}
+                    onChange={(e) => {
+                      const newChap = e.target.value;
+                      setSaveChapter(newChap);
+                      setSaveFileName(computeAutoFileName(saveClassId, saveSubject, newChap, saveExamCategory));
+                    }}
+                    placeholder="অধ্যায়ের নাম লিখুন..."
+                    className="h-9 font-bold text-xs bg-slate-50 border-slate-300"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* ৩. পরীক্ষার নাম / ধরণ বাটনসমূহ */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-slate-800 flex items-center justify-between">
+                <span>📝 পরীক্ষার নাম / ধরণ:</span>
+              </label>
+              <div className="flex flex-wrap gap-1 mb-1">
+                {['সাপ্তাহিক পরীক্ষা', '১ম সাময়িক', '২য় সাময়িক', 'অর্ধবার্ষিক', 'বার্ষিক পরীক্ষা', 'মডেল টেস্ট'].map((exName) => {
+                  const isExSelected = saveExamCategory === exName;
+                  return (
+                    <Button
+                      key={exName}
+                      type="button"
+                      size="sm"
+                      variant={isExSelected ? "default" : "outline"}
+                      className={cn(
+                        "h-7 text-[11px] font-bold px-2 py-0 transition-all",
+                        isExSelected
+                          ? "bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                          : "border-slate-300 text-slate-700 hover:bg-amber-50"
+                      )}
+                      onClick={() => {
+                        setSaveExamCategory(exName);
+                        setSaveFileName(computeAutoFileName(saveClassId, saveSubject, saveChapter, exName));
+                      }}
+                    >
+                      {exName}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Input
+                value={saveExamCategory}
+                onChange={(e) => {
+                  const newExam = e.target.value;
+                  setSaveExamCategory(newExam);
+                  setSaveFileName(computeAutoFileName(saveClassId, saveSubject, saveChapter, newExam));
+                }}
+                placeholder="যেমন: সাপ্তাহিক পরীক্ষা / বার্ষিক পরীক্ষা"
+                className="h-8 font-bold text-xs border-slate-300"
+              />
+            </div>
+
+            {/* ৪. স্বয়ংক্রিয় ফাইলের নাম */}
+            <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-indigo-100">
+              <label className="text-xs font-black text-indigo-950 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> ফাইলের নাম (Auto File Name):
+                </span>
+                <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">অটো-সিঙ্ক</span>
               </label>
               <Input
                 value={saveFileName}
                 onChange={e => setSaveFileName(e.target.value)}
-                placeholder="যেমন: ১০ম শ্রেণি - পদার্থবিজ্ঞান - গতি - বার্ষিক পরীক্ষা"
-                className="h-9 font-bold text-xs border-indigo-300 focus-visible:ring-indigo-400"
+                placeholder="যেমন: ১০ম শ্রেণি - পদার্থবিজ্ঞান - গতি - সাপ্তাহিক পরীক্ষা"
+                className="h-9 font-bold text-xs bg-white border-indigo-300 focus-visible:ring-indigo-400"
               />
-              <p className="text-[11px] text-slate-500">
-                এই নামটি দিয়ে স্বয়ংক্রিয়ভাবে PDF ফাইলটি সেভ হবে এবং প্রশ্নব্যাংকে সংরক্ষিত থাকবে।
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                শ্রেণি, বিষয়, অধ্যায় বা পরীক্ষা পরিবর্তনের সাথে সাথে নামটি স্বয়ংক্রিয়ভাবে আপডেট হবে।
               </p>
             </div>
 
-            {/* 2. Destination / Format Selection */}
+            {/* ৫. সংরক্ষণের মাধ্যম ও ফরম্যাট নির্ধারণ */}
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-800">
                 সংরক্ষণের মাধ্যম ও ফরম্যাট নির্ধারণ করুন
@@ -3494,17 +3676,6 @@ export function QuestionPrintView({
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* 3. Category / Exam Title */}
-            <div className="space-y-1">
-              <label className="text-xs font-black text-slate-800">পরীক্ষার ধরণ / ক্যাটাগরি</label>
-              <Input
-                value={saveExamCategory}
-                onChange={e => setSaveExamCategory(e.target.value)}
-                placeholder="যেমন: বার্ষিক পরীক্ষা / মডেল টেস্ট / ১ম সাময়িক"
-                className="h-8 font-bold text-xs"
-              />
             </div>
           </div>
 
