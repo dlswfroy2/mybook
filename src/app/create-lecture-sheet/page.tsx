@@ -1971,6 +1971,11 @@ function CreateLectureSheetContent() {
   const [aiCustomTopic, setAiCustomTopic] = useState('');
   const [editorViewMode, setEditorViewMode] = useState<'visual' | 'code'>('visual');
 
+  // Save & PDF Modal States
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveFileName, setSaveFileName] = useState('');
+  const [saveTarget, setSaveTarget] = useState<'both' | 'pdf' | 'db'>('both');
+
   const handleGenerateAiSheet = async () => {
     if (!aiClassId || !aiSubject || !aiChapter.trim()) {
       toast({
@@ -2543,6 +2548,10 @@ function CreateLectureSheetContent() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const docData = docSnap.data();
+          if ((docData.isEditorSaved || docData.manualPages || docData.hasPageDocs) && !searchParams.get('print')) {
+            router.replace(`/create-lecture-sheet?id=${editId}&print=true`);
+            return;
+          }
           const cleanContent = stripDirtyHtml(docData.content || '');
           setData({
             institution: docData.institution || 'টপ গ্রেড টিউটোরিয়ালস',
@@ -2962,8 +2971,8 @@ function CreateLectureSheetContent() {
       .trim();
   };
 
-  const handleSave = useCallback(async () => {
-    if (!user || !db) return;
+  const handleSave = useCallback(async (customFileName?: string): Promise<boolean> => {
+    if (!user || !db) return false;
     setSaving(true);
 
     try {
@@ -3005,6 +3014,8 @@ function CreateLectureSheetContent() {
         updatedAt: serverTimestamp(),
         hasPageDocs: true,
         pageCount: Object.keys(compressedManualPages).length,
+        fileName: customFileName || data.topic || `${data.subject} লেকচার শিট`,
+        isEditorSaved: true,
       };
       mainPayload.userId = user.uid;
       if (!editId) {
@@ -3057,6 +3068,7 @@ function CreateLectureSheetContent() {
       setData(prev => ({ ...prev, content: updatedFullContent }));
       toast({ title: 'সফল!', description: 'শিটটি সংরক্ষিত হয়েছে।' });
       if (!editId) router.replace(`/create-lecture-sheet?id=${docId}`);
+      return true;
 
     } catch (error: any) {
       setSaving(false);
@@ -3070,8 +3082,43 @@ function CreateLectureSheetContent() {
       } else {
         toast({ variant: 'destructive', title: 'সেভ করতে সমস্যা হয়েছে', description: error?.message || 'অজানা ত্রুটি' });
       }
+      return false;
     }
   }, [user, db, editId, data, printSettings, pageStyles, manualPages, router, toast, isPrintMode]);
+
+  const handleOpenSaveModal = useCallback(() => {
+    const defaultName = `${data.classId ? `${data.classId} শ্রেণি - ` : ''}${data.subject || 'বিষয়'}${data.topic ? ` - ${data.topic}` : ''} - লেকচার শিট`;
+    setSaveFileName(defaultName);
+    setSaveModalOpen(true);
+  }, [data.classId, data.subject, data.topic]);
+
+  const handleConfirmSave = useCallback(async () => {
+    if (saveTarget === 'pdf') {
+      const originalTitle = document.title;
+      document.title = saveFileName.trim() || 'লেকচার শিট';
+      setSaveModalOpen(false);
+      setTimeout(() => {
+        window.print();
+        document.title = originalTitle;
+      }, 300);
+      return;
+    }
+
+    const success = await handleSave(saveFileName);
+    if (success) {
+      if (saveTarget === 'both') {
+        const originalTitle = document.title;
+        document.title = saveFileName.trim() || 'লেকচার শিট';
+        setSaveModalOpen(false);
+        setTimeout(() => {
+          window.print();
+          document.title = originalTitle;
+        }, 300);
+      } else {
+        setSaveModalOpen(false);
+      }
+    }
+  }, [saveTarget, saveFileName, handleSave]);
 
   const handleFileUpload = async () => {
     if (!db || !user || !uploadFile || !data.classId || !data.subject || !data.type) {
@@ -3116,7 +3163,7 @@ function CreateLectureSheetContent() {
         if (['s', 'n', 'd', 'l', 'e', 'r', '[', ']', 'x', 'z', 'y', 'b', 'i', 'u', 'c', 'v', 'a'].includes(key)) {
           if (['x', 'c', 'v', 'a', 'z', 'y'].includes(key)) return; 
           e.preventDefault();
-          if (key === 's') handleSave();
+          if (key === 's') handleOpenSaveModal();
           else if (key === 'n') setPaginatedPages(prev => [...prev, ""]);
           else if (key === 'b') handleFormatting('bold');
           else if (key === 'i') handleFormatting('italic');
@@ -4050,8 +4097,18 @@ function CreateLectureSheetContent() {
             </Card>
 
             <div className="space-y-3">
-              <Button onClick={handleSave} disabled={saving || activeCreationMode === 'pdf'} className="w-full gap-2 font-bold h-11"><Save className="w-4 h-4" /> সেভ করুন (Ctrl+S)</Button>
-              <Button onClick={() => { if(!data.content) return; setManualPages({}); const p = new URLSearchParams(window.location.search); p.set('print', 'true'); if(editId) p.set('id', editId); router.push(`${window.location.pathname}?${p.toString()}`); }} variant="outline" className="w-full gap-2 border-primary text-primary font-bold h-11" disabled={activeCreationMode === 'pdf'}><Eye className="w-4 h-4" /> প্রিন্ট প্রিভিউ</Button>
+              <Button
+                onClick={() => {
+                  const p = new URLSearchParams(window.location.search);
+                  p.set('print', 'true');
+                  if (editId) p.set('id', editId);
+                  router.push(`${window.location.pathname}?${p.toString()}`);
+                }}
+                disabled={activeCreationMode === 'pdf'}
+                className="w-full gap-2 font-black h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md text-sm"
+              >
+                <Printer className="w-4 h-4 text-white" /> এডিটর ও প্রিন্ট প্রিভিউতে যান (সেভ ও PDF তৈরি) ↗
+              </Button>
             </div>
           </aside>
 
@@ -4350,8 +4407,8 @@ function CreateLectureSheetContent() {
               <Button variant="outline" size="sm" onClick={() => router.back()} className="h-8 gap-1.5 font-bold border-slate-300 text-slate-700 bg-white">
                 <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
               </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving} className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-3">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ
+              <Button size="sm" onClick={handleOpenSaveModal} disabled={saving} className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-3 shadow-xs">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} সেভ ও PDF
               </Button>
               <Button size="sm" onClick={() => window.print()} className="h-8 gap-1.5 font-bold bg-primary hover:bg-primary/90 text-white px-4">
                 <Printer className="w-3.5 h-3.5" /> প্রিন্ট
@@ -4698,6 +4755,102 @@ function CreateLectureSheetContent() {
           </div>
         </div>
       )}
+      {/* ═══════════════ সেভ ও PDF ডায়ালগ মডাল ═══════════════ */}
+      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
+        <DialogContent className="font-kalpurush max-w-md bg-white border-2 border-indigo-200">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
+              <Save className="h-5 w-5 text-indigo-600" /> লেকচার শিট সেভ ও PDF তৈরি
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              ফাইলটির নাম ও সেভ করার মাধ্যম নির্ধারণ করুন।
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">ফাইলের নাম (File Name)</label>
+              <Input
+                value={saveFileName}
+                onChange={(e) => setSaveFileName(e.target.value)}
+                placeholder="ফাইলের নাম লিখুন"
+                className="font-bold text-sm h-10 border-slate-300 focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">কোথায় ও কিভাবে সেভ করতে চান?</label>
+              <div className="grid grid-cols-1 gap-2">
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all",
+                  saveTarget === 'both' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 hover:border-slate-300"
+                )}>
+                  <input
+                    type="radio"
+                    name="saveTargetLecture"
+                    checked={saveTarget === 'both'}
+                    onChange={() => setSaveTarget('both')}
+                    className="accent-indigo-600 w-4 h-4"
+                  />
+                  <div>
+                    <p className="font-bold text-xs text-slate-900">ডাটাবেজে সেভ + সরাসরি PDF ডাউনলোড</p>
+                    <p className="text-[11px] text-slate-500">পরবর্তীতে এডিট করার জন্য ক্লাউডে থাকবে এবং সাথে সাথে PDF ডাউনলোড হবে।</p>
+                  </div>
+                </label>
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all",
+                  saveTarget === 'pdf' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 hover:border-slate-300"
+                )}>
+                  <input
+                    type="radio"
+                    name="saveTargetLecture"
+                    checked={saveTarget === 'pdf'}
+                    onChange={() => setSaveTarget('pdf')}
+                    className="accent-indigo-600 w-4 h-4"
+                  />
+                  <div>
+                    <p className="font-bold text-xs text-slate-900">শুধুমাত্র সরাসরি PDF ডাউনলোড (সরাসরি প্রিন্ট)</p>
+                    <p className="text-[11px] text-slate-500">কোনো ক্লাউড ডাটাবেজ ছাড়া সরাসরি কম্পিউটারে PDF হিসেবে সংরক্ষণ করুন।</p>
+                  </div>
+                </label>
+
+                <label className={cn(
+                  "flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all",
+                  saveTarget === 'db' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 hover:border-slate-300"
+                )}>
+                  <input
+                    type="radio"
+                    name="saveTargetLecture"
+                    checked={saveTarget === 'db'}
+                    onChange={() => setSaveTarget('db')}
+                    className="accent-indigo-600 w-4 h-4"
+                  />
+                  <div>
+                    <p className="font-bold text-xs text-slate-900">শুধুমাত্র ডাটাবেজে ক্লাউড সেভ</p>
+                    <p className="text-[11px] text-slate-500">আপনার একাউন্টে সেভ থাকবে, যেকোনো সময় আবার ওপেন ও এডিট করতে পারবেন।</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+            <Button variant="ghost" onClick={() => setSaveModalOpen(false)} className="font-bold text-xs">
+              বাতিল
+            </Button>
+            <Button
+              onClick={handleConfirmSave}
+              disabled={saving}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 gap-2"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {saveTarget === 'pdf' ? 'PDF তৈরি করুন' : 'সেভ সম্পন্ন করুন'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <style dangerouslySetInnerHTML={{ __html: `
         .math-frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.85em; margin: 0 2px; }
         .math-num { border-bottom: 0.5pt solid black; padding: 0 1px; }

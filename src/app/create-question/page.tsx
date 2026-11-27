@@ -635,6 +635,13 @@ function CreateQuestionContent() {
             if (data.content) {
               setDocumentContent(data.content);
             }
+            if (data.manualPages) {
+              setMeta(prev => ({ ...prev, manualPages: data.manualPages, pageStyles: data.pageStyles }));
+            }
+            if ((data.isEditorSaved || data.content) && !searchParams.get('print')) {
+              router.replace(`/create-question?id=${editId}&print=true`);
+              return;
+            }
             const reconstructed = (data.questions || []).map((q: any) => {
               const id = Math.random().toString(36).substr(2, 9);
               const commonFields = { id, type: q.type, imageUrl: q.imageUrl || '', section: q.section || '' };
@@ -757,9 +764,9 @@ function CreateQuestionContent() {
   const isEnglish = meta.subject?.toLowerCase().includes('english') || meta.subject?.toLowerCase().includes('ইংরেজি');
 
   const handleGoToPrint = useCallback(() => {
-    if (questions && questions.length > 0) {
+    if (!meta.content && questions && questions.length > 0) {
       syncQuestionsToContent(questions, questionsB);
-    } else if (contentEditableRef.current) {
+    } else if (contentEditableRef.current && !meta.content) {
       ensureQuestionIntegrity(contentEditableRef.current, Boolean(isEnglish));
       const currentHtml = contentEditableRef.current.innerHTML;
       setDocumentContent(currentHtml);
@@ -769,7 +776,7 @@ function CreateQuestionContent() {
     p.set('print', 'true');
     if (editId) p.set('id', editId);
     router.push(`${window.location.pathname}?${p.toString()}`);
-  }, [questions, questionsB, syncQuestionsToContent, isEnglish, editId, router]);
+  }, [questions, questionsB, syncQuestionsToContent, isEnglish, editId, router, meta.content]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = contentEditableRef.current;
@@ -1022,6 +1029,18 @@ function CreateQuestionContent() {
                   <QrCode className="w-4 h-4 text-purple-600" /> প্রশ্নপত্রে QR কোড যুক্ত করুন
                 </Button>
 
+                {/* 5. OCR AI Scan */}
+                <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
+                <Button
+                  type="button"
+                  onClick={() => ocrInputRef.current?.click()}
+                  disabled={isScanning}
+                  variant="outline"
+                  className="w-full font-bold text-xs h-9 border-emerald-200 text-emerald-800 hover:bg-emerald-50 gap-2"
+                >
+                  {isScanning ? <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> : <ScanText className="w-4 h-4 text-emerald-600" />} এআই প্রশ্ন স্ক্যান (OCR)
+                </Button>
+
                 <div className="pt-2 border-t space-y-3">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">প্রতিষ্ঠানের নাম</label>
@@ -1196,58 +1215,6 @@ function CreateQuestionContent() {
                     <Code2 className="w-3.5 h-3.5" /> কোড ভিউ
                   </TabsTrigger>
                 </TabsList>
-
-                {/* Quick Editor Action Toolbar */}
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => setTemplateModalOpen(true)}
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 hover:bg-indigo-50 text-xs px-2 sm:px-3"
-                    title="রেডিমেড প্রশ্নপত্র টেমপ্লেট বেছে নিন"
-                  >
-                    <LayoutTemplate className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden xs:inline">টেমপ্লেট</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setQrModalOpen(true)}
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1 font-bold border-purple-200 text-purple-800 hover:bg-purple-50 text-xs px-2 sm:px-3"
-                    title="প্রশ্নপত্রে QR কোড যুক্ত করুন"
-                  >
-                    <QrCode className="w-3.5 h-3.5 text-purple-600" /> <span className="hidden xs:inline">QR কোড</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleOpenAiAssistant}
-                    size="sm"
-                    className="h-8 gap-1 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs text-xs px-2 sm:px-3"
-                    title="মান ও টপিক অনুযায়ী AI দিয়ে প্রশ্ন তৈরি করুন"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" /> <span>AI সহকারী</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setActiveMainTab('board')}
-                    size="sm"
-                    className="h-8 gap-1 font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-xs text-xs px-2 sm:px-3"
-                    title="বোর্ড, সাল ও বিষয় অনুযায়ী এআই দিয়ে প্রশ্ন তৈরি করুন"
-                  >
-                    <Award className="w-3.5 h-3.5 text-yellow-200" /> <span>বোর্ড প্রশ্ন</span>
-                  </Button>
-                  <input type="file" ref={ocrInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleOCR} />
-                  <Button 
-                    onClick={() => ocrInputRef.current?.click()} 
-                    disabled={isScanning} 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 gap-1 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-bold text-xs px-2 sm:px-3"
-                  >
-                    {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />} <span className="hidden xs:inline">স্ক্যান</span>
-                  </Button>
-                </div>
               </div>
 
               {/* Tab 1: Live Visual Paper Editor */}
@@ -1575,15 +1542,8 @@ function CreateQuestionContent() {
 
             {/* Bottom Actions */}
             <div className="flex items-center gap-4 pt-4 border-t">
-              <Button onClick={handleSaveToDb} disabled={saving} className="gap-2 px-8 font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} সেভ করুন
-              </Button>
-              <Button 
-                onClick={handleGoToPrint} 
-                variant="secondary" 
-                className="gap-2 px-10 shadow-lg font-black bg-indigo-50 border-2 border-indigo-300 text-indigo-900 hover:bg-indigo-100"
-              >
-                <Printer className="w-4 h-4 text-indigo-600" /> প্রিন্ট ও পেজ লেআউট
+              <Button onClick={handleGoToPrint} className="gap-2 px-8 font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-md text-sm">
+                <Printer className="w-4 h-4 text-white" /> এডিটর ও প্রিন্ট প্রিভিউতে যান (সেভ ও PDF তৈরি) ↗
               </Button>
             </div>
           </div>
@@ -2051,13 +2011,17 @@ function CreateQuestionContent() {
           questionsB={questionsB}
           appName={appName}
           softwareConfig={softwareConfig}
-          onSave={async (updatedContent, styles) => {
+          onSave={async (updatedContent, styles, extra) => {
             if (!user || !db) return;
             const docId = editId || doc(collection(db, 'questions')).id;
             const dataToSave: any = {
               ...meta,
               content: updatedContent,
+              manualPages: extra?.manualPages || null,
               pageStyles: styles,
+              fileName: extra?.fileName || null,
+              exam: extra?.exam || meta.exam || 'পরীক্ষা',
+              isEditorSaved: true,
               userId: user.uid,
               updatedAt: serverTimestamp(),
               isMcq: questions.some(q => q.type === 'mcq'),

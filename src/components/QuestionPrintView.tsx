@@ -2243,8 +2243,11 @@ export function QuestionPrintView({
 
   // Convert questions array to HTML string
   const initialContent = useMemo(() => {
-    // 1. If questions array exists, always prioritize building fresh board-standard HTML from questions
-    // This guarantees separate counters for CQ, Short, and MCQ, as well as marks allocation!
+    // 1. If document was previously saved or has custom content, PRIORITIZE meta.content to preserve formatting!
+    if (meta.content && meta.content.trim()) {
+      return meta.content;
+    }
+    // 2. Otherwise build initial board-standard HTML from questions
     if (questions && questions.length > 0) {
       const buildPartsInner = (qList: any[]) => {
         const typeCounters: Record<string, number> = {};
@@ -2263,13 +2266,16 @@ export function QuestionPrintView({
       }
       return parts.join('\n\n');
     }
-    if (meta.content && meta.content.trim()) {
-      return meta.content;
-    }
     return '';
   }, [questions, questionsB, isEnglish, meta.content]);
 
   const [documentContent, setDocumentContent] = useState(initialContent);
+
+  // Save & PDF Export Modal State
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveFileName, setSaveFileName] = useState('');
+  const [saveTarget, setSaveTarget] = useState<'both' | 'pdf' | 'db'>('both');
+  const [saveExamCategory, setSaveExamCategory] = useState('');
 
   // Print layout settings & states
   const [paginatedPages, setPaginatedPages] = useState<string[]>([]);
@@ -2576,10 +2582,25 @@ export function QuestionPrintView({
 
   // Initial pagination
   useEffect(() => {
-    if (!measurementRef.current || hasInitiallyPaginatedRef.current) return;
+    if (hasInitiallyPaginatedRef.current) return;
     hasInitiallyPaginatedRef.current = true;
-    repaginateDocument({ sourceContent: initialContent });
-  }, [repaginateDocument, initialContent]);
+
+    // If meta.manualPages exists (i.e. document was previously saved in editor), load those exact pages directly!
+    if (meta.manualPages && Object.keys(meta.manualPages).length > 0) {
+      const sortedKeys = Object.keys(meta.manualPages).map(Number).sort((a, b) => a - b);
+      const pages = sortedKeys.map(k => meta.manualPages[k]);
+      setPaginatedPages(pages);
+      setManualPages(meta.manualPages);
+      if (meta.pageStyles) {
+        setPageStyles(meta.pageStyles);
+      }
+      return;
+    }
+
+    if (measurementRef.current) {
+      repaginateDocument({ sourceContent: initialContent });
+    }
+  }, [repaginateDocument, initialContent, meta.manualPages, meta.pageStyles]);
 
   // ✅ After every repagination, run ensureQuestionIntegrity on all live content areas
   // so serial numbers and CQ marks are never lost
@@ -2707,15 +2728,24 @@ export function QuestionPrintView({
     });
   };
 
-  const handleSaveDocument = async () => {
+  const handleOpenSaveModal = () => {
+    const defaultName = getDocumentFileName();
+    setSaveFileName(defaultName);
+    setSaveExamCategory(meta.exam || 'বার্ষিক পরীক্ষা');
+    setSaveModalOpen(true);
+  };
+
+  const handleConfirmSave = async () => {
     setSaving(true);
     try {
       const contentAreas = typeof document !== 'undefined' ? document.querySelectorAll('.content-area') : null;
       let fullText = '';
+      const capturedManualPages: Record<number, string> = {};
       if (contentAreas && contentAreas.length > 0) {
         const liveTexts: string[] = [];
-        contentAreas.forEach(ca => {
+        contentAreas.forEach((ca, idx) => {
           const html = ca.innerHTML.trim();
+          capturedManualPages[idx] = html;
           if (html) liveTexts.push(html);
         });
         if (liveTexts.length > 0) {
@@ -2726,8 +2756,40 @@ export function QuestionPrintView({
         const sortedKeys = Object.keys(manualPages).map(Number).sort((a, b) => a - b);
         fullText = sortedKeys.map(k => manualPages[k] || '').filter(Boolean).join('\n\n');
       }
-      await onSave(fullText, pageStyles);
-      toast({ title: 'সফল!', description: 'প্রশ্নপত্র সফলভাবে সেভ করা হয়েছে।' });
+
+      const finalFileName = (saveFileName || getDocumentFileName()).trim();
+      const finalPages = Object.keys(capturedManualPages).length > 0 ? capturedManualPages : manualPages;
+
+      // 1. If DB or Both
+      if (saveTarget === 'db' || saveTarget === 'both') {
+        await onSave(fullText, pageStyles, {
+          fileName: finalFileName,
+          manualPages: finalPages,
+          exam: saveExamCategory || meta.exam,
+          isEditorSaved: true,
+        });
+      }
+
+      setSaveModalOpen(false);
+
+      // 2. If PDF or Both
+      if (saveTarget === 'pdf' || saveTarget === 'both') {
+        if (typeof document !== 'undefined') {
+          document.title = finalFileName.replace(/\.pdf$/i, '');
+        }
+        toast({
+          title: 'PDF ডাউনলোড প্রস্তুত! 📥',
+          description: `"${finalFileName}.pdf" নামে ফাইলটি সেভ করতে প্রিন্ট ডায়ালগ ওপেন হচ্ছে...`,
+        });
+        setTimeout(() => {
+          window.print();
+        }, 300);
+      } else {
+        toast({
+          title: 'সফলভাবে সংরক্ষিত! 💾',
+          description: 'প্রশ্নপত্রটি আপনার প্রশ্নব্যাংকে অক্ষুণ্ণ ফরম্যাটে সংরক্ষিত হয়েছে।',
+        });
+      }
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'ত্রুটি', description: err.message || 'সেভ করা সম্ভব হয়নি।' });
     } finally {
@@ -2950,8 +3012,8 @@ export function QuestionPrintView({
           <Button variant="outline" size="sm" onClick={onBack} className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white px-2 sm:px-3 shrink-0" title="ফিরে যান">
             <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
           </Button>
-          <Button size="sm" onClick={handleSaveDocument} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ করুন">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ</span>
+          <Button size="sm" onClick={handleOpenSaveModal} disabled={saving} className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 shrink-0" title="সেভ ও PDF তৈরি করুন">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ ও PDF</span>
           </Button>
           <Button size="sm" onClick={handlePrint} className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2 sm:px-4 shrink-0" title="প্রিন্ট করুন">
             <Printer className="w-3.5 h-3.5" /> <span className="hidden xs:inline">প্রিন্ট</span>
@@ -3313,6 +3375,151 @@ export function QuestionPrintView({
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs"
             >
               {aiGenerating ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> তৈরি হচ্ছে...</> : 'প্রশ্ন তৈরি করুন'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Save & PDF Settings Dialog ── */}
+      <Dialog open={saveModalOpen} onOpenChange={setSaveModalOpen}>
+        <DialogContent className="font-kalpurush max-w-lg bg-white border-2 border-indigo-200 shadow-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black flex items-center gap-2 text-indigo-950">
+              <Save className="w-5 h-5 text-indigo-600" /> প্রশ্নপত্র সংরক্ষণ ও PDF তৈরি
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* 1. File Name */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-slate-800 flex items-center justify-between">
+                <span>ফাইলের নাম (PDF ও প্রশ্নব্যাংকের নাম)</span>
+                <span className="text-[10px] text-slate-400 font-normal">পরিবর্তনযোগ্য</span>
+              </label>
+              <Input
+                value={saveFileName}
+                onChange={e => setSaveFileName(e.target.value)}
+                placeholder="যেমন: ১০ম শ্রেণি - পদার্থবিজ্ঞান - গতি - বার্ষিক পরীক্ষা"
+                className="h-9 font-bold text-xs border-indigo-300 focus-visible:ring-indigo-400"
+              />
+              <p className="text-[11px] text-slate-500">
+                এই নামটি দিয়ে স্বয়ংক্রিয়ভাবে PDF ফাইলটি সেভ হবে এবং প্রশ্নব্যাংকে সংরক্ষিত থাকবে।
+              </p>
+            </div>
+
+            {/* 2. Destination / Format Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-800">
+                সংরক্ষণের মাধ্যম ও ফরম্যাট নির্ধারণ করুন
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {/* Option A: Both (Recommended) */}
+                <div
+                  onClick={() => setSaveTarget('both')}
+                  className={cn(
+                    "cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
+                    saveTarget === 'both'
+                      ? "border-indigo-600 bg-indigo-50/60 shadow-xs"
+                      : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-4 h-4 rounded-full mt-0.5 border-2 flex items-center justify-center shrink-0",
+                    saveTarget === 'both' ? "border-indigo-600 bg-indigo-600" : "border-slate-400"
+                  )}>
+                    {saveTarget === 'both' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-900">
+                        🚀 সরাসরি PDF ডাউনলোড + প্রশ্নব্যাংকে সংরক্ষণ
+                      </span>
+                      <span className="text-[10px] bg-indigo-600 text-white font-black px-1.5 py-0.2 rounded-full">প্রস্তাবিত</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      প্রশ্নব্যাংকে নিখুঁত ফরম্যাটে ক্লাউডে সেভ হবে এবং সাথে সাথে কম্পিউটারে PDF ডাউনলোড করার ডায়ালগ আসবে।
+                    </p>
+                  </div>
+                </div>
+
+                {/* Option B: PDF only */}
+                <div
+                  onClick={() => setSaveTarget('pdf')}
+                  className={cn(
+                    "cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
+                    saveTarget === 'pdf'
+                      ? "border-emerald-600 bg-emerald-50/60 shadow-xs"
+                      : "border-slate-200 hover:border-emerald-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-4 h-4 rounded-full mt-0.5 border-2 flex items-center justify-center shrink-0",
+                    saveTarget === 'pdf' ? "border-emerald-600 bg-emerald-600" : "border-slate-400"
+                  )}>
+                    {saveTarget === 'pdf' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-slate-900">
+                      📄 শুধুমাত্র PDF ফাইল ডাউনলোড করুন
+                    </span>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      ক্লাউডে সেভ না করে সরাসরি আপনার কম্পিউটারে A4 সাইজের প্রিন্ট-রেডি PDF ফাইল ডাউনলোড হবে।
+                    </p>
+                  </div>
+                </div>
+
+                {/* Option C: DB only */}
+                <div
+                  onClick={() => setSaveTarget('db')}
+                  className={cn(
+                    "cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
+                    saveTarget === 'db'
+                      ? "border-amber-600 bg-amber-50/60 shadow-xs"
+                      : "border-slate-200 hover:border-amber-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-4 h-4 rounded-full mt-0.5 border-2 flex items-center justify-center shrink-0",
+                    saveTarget === 'db' ? "border-amber-600 bg-amber-600" : "border-slate-400"
+                  )}>
+                    {saveTarget === 'db' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-slate-900">
+                      ☁️ শুধুমাত্র প্রশ্নব্যাংক ডাটাবেজে সংরক্ষণ করুন
+                    </span>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      পরবর্তীতে যে কোনো সময় এডিট, প্রিন্ট বা দেখার জন্য বর্তমান সব স্টাইল ও পেজ সহ অক্ষুণ্ণ থাকবে।
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Category / Exam Title */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-800">পরীক্ষার ধরণ / ক্যাটাগরি</label>
+              <Input
+                value={saveExamCategory}
+                onChange={e => setSaveExamCategory(e.target.value)}
+                placeholder="যেমন: বার্ষিক পরীক্ষা / মডেল টেস্ট / ১ম সাময়িক"
+                className="h-8 font-bold text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 border-t pt-3">
+            <Button variant="outline" size="sm" onClick={() => setSaveModalOpen(false)}>
+              বাতিল
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleConfirmSave}
+              disabled={saving}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 gap-1.5"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {saveTarget === 'pdf' ? 'PDF তৈরি করুন' : 'নিশ্চিত করুন ও সেভ করুন'}
             </Button>
           </DialogFooter>
         </DialogContent>
