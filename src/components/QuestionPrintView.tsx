@@ -2908,7 +2908,7 @@ export function QuestionPrintView({
       const res = addQuestionsToBank(itemsToSave);
       toast({
         title: 'প্রশ্ন ব্যাংকে সংরক্ষিত! 📥',
-        description: `মোট ${toBengaliNumber(res.addedCount)}টি প্রশ্ন আপনার প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
+        description: `মোট ${toBengaliNumber(res.addedCount)}টি প্রশ্ন কেন্দ্রীয় ক্লাউড সার্ভার ও প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
       });
     } catch (err: any) {
       toast({

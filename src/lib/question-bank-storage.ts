@@ -1,5 +1,8 @@
 'use client';
 
+import { getFirestore, doc, setDoc, deleteDoc, getDocs, collection, writeBatch, Firestore } from 'firebase/firestore';
+import { getFirebaseApp } from '@/firebase/config';
+
 export interface BankQuestion {
   id: string;
   classId: string; // e.g. "10", "9", "8", etc.
@@ -12,6 +15,7 @@ export interface BankQuestion {
   createdAt: string; // ISO
   source?: string; // 'create-question' | 'lecture-sheet' | 'manual' | 'ai'
   marks?: number; // e.g. 10 for CQ, 1 for MCQ, 2 for Short
+  syncedToCloud?: boolean;
 }
 
 const STORAGE_KEY = 'topgrade_question_bank_v1';
@@ -22,7 +26,22 @@ export function normalizeText(str?: string): string {
 }
 
 /**
- * Retrieve all questions stored in the local Question Bank.
+ * Safely get Firestore database instance.
+ */
+export function getQuestionBankDb(providedDb?: Firestore | null): Firestore | null {
+  if (providedDb) return providedDb;
+  if (typeof window === 'undefined') return null;
+  try {
+    const app = getFirebaseApp();
+    return getFirestore(app);
+  } catch (err) {
+    console.warn('Could not initialize Firestore for Question Bank:', err);
+    return null;
+  }
+}
+
+/**
+ * Retrieve all questions stored in the local Question Bank (Fast Offline Cache).
  */
 export function getBankQuestions(): BankQuestion[] {
   if (typeof window === 'undefined') return [];
@@ -38,13 +57,89 @@ export function getBankQuestions(): BankQuestion[] {
 }
 
 /**
+ * Save questions into localStorage cache.
+ */
+function saveLocalBankQuestions(list: BankQuestion[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch (err) {
+    console.error('Failed to write question bank to localStorage', err);
+  }
+}
+
+/**
+ * Fetch all questions from the Central Server (Firebase Firestore cloud database),
+ * and bi-directionally sync with local cache so questions from ALL devices appear!
+ */
+export async function fetchBankQuestionsFromFirestore(providedDb?: Firestore | null): Promise<BankQuestion[]> {
+  const localList = getBankQuestions();
+  const db = getQuestionBankDb(providedDb);
+  if (!db) return localList;
+
+  try {
+    const snap = await getDocs(collection(db, 'questionBank'));
+    const cloudQuestions: BankQuestion[] = [];
+    snap.forEach(d => {
+      const data = d.data() as BankQuestion;
+      if (data && data.content) {
+        cloudQuestions.push({
+          ...data,
+          id: data.id || d.id,
+          syncedToCloud: true
+        });
+      }
+    });
+
+    // Merge cloud and local questions by ID
+    const mergedMap = new Map<string, BankQuestion>();
+    
+    // 1. Add cloud items first
+    for (const q of cloudQuestions) {
+      mergedMap.set(q.id, q);
+    }
+
+    // 2. Add local items not yet in cloud, and upload them to the central server
+    const pendingUploads: BankQuestion[] = [];
+    for (const lq of localList) {
+      if (!mergedMap.has(lq.id)) {
+        mergedMap.set(lq.id, lq);
+        pendingUploads.push(lq);
+      }
+    }
+
+    const unifiedList = Array.from(mergedMap.values());
+    saveLocalBankQuestions(unifiedList);
+
+    // Asynchronously push any pending local items to central Firestore cloud
+    if (pendingUploads.length > 0) {
+      (async () => {
+        try {
+          const batch = writeBatch(db);
+          let count = 0;
+          for (const item of pendingUploads) {
+            const ref = doc(db, 'questionBank', item.id);
+            batch.set(ref, { ...item, syncedToCloud: true }, { merge: true });
+            count++;
+            if (count >= 400) break; // Firestore batch limit 500
+          }
+          await batch.commit();
+        } catch (e) {
+          console.warn('Background sync of local questions to central server failed:', e);
+        }
+      })();
+    }
+
+    return unifiedList;
+  } catch (err) {
+    console.warn('Central server fetch failed, falling back to local storage cache:', err);
+    return localList;
+  }
+}
+
+/**
  * Save new questions to Question Bank with auto-incremented serial number (ক্রমিক নং).
- *
- * Rules:
- * - Serials are maintained independently for each: (classId + subject + chapter + type)
- * - Numbering always starts from 1 (১) for each chapter & type combination.
- * - If 10 MCQs already exist for (Class 10 + Math + Chapter 2), adding more will start from 11.
- * - CQ and Short for that same chapter maintain their own separate 1-based serials.
+ * Automatically writes to local cache AND syncs to central cloud Firestore!
  */
 export function addQuestionsToBank(
   newItems: Array<{
@@ -56,7 +151,8 @@ export function addQuestionsToBank(
     options?: string[];
     source?: string;
     marks?: number;
-  }>
+  }>,
+  providedDb?: Firestore | null
 ): { addedCount: number; savedItems: BankQuestion[] } {
   if (typeof window === 'undefined') return { addedCount: 0, savedItems: [] };
   
@@ -96,39 +192,59 @@ export function addQuestionsToBank(
       createdAt: new Date().toISOString(),
       source: item.source || 'ai',
       marks: item.marks || (cleanType === 'creative' ? 10 : cleanType === 'short' ? 2 : 1),
+      syncedToCloud: false
     };
 
     existing.push(newQuestion);
     savedItems.push(newQuestion);
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-  } catch (err) {
-    console.error('Failed to write question bank to localStorage', err);
+  saveLocalBankQuestions(existing);
+
+  // Sync to Central Cloud Firestore server
+  const db = getQuestionBankDb(providedDb);
+  if (db && savedItems.length > 0) {
+    (async () => {
+      try {
+        const batch = writeBatch(db);
+        for (const item of savedItems) {
+          const docRef = doc(db, 'questionBank', item.id);
+          batch.set(docRef, { ...item, syncedToCloud: true });
+        }
+        await batch.commit();
+      } catch (cloudErr) {
+        console.error('Failed to save questions to central Firestore server:', cloudErr);
+      }
+    })();
   }
 
   return { addedCount: savedItems.length, savedItems };
 }
 
 /**
- * Delete a question by its unique ID.
+ * Delete a question by its unique ID from both local cache and central server.
  */
-export function deleteQuestionFromBank(id: string): boolean {
+export function deleteQuestionFromBank(id: string, providedDb?: Firestore | null): boolean {
   if (typeof window === 'undefined') return false;
   const existing = getBankQuestions();
   const filtered = existing.filter(q => q.id !== id);
   if (filtered.length === existing.length) return false;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-    return true;
-  } catch {
-    return false;
+  
+  saveLocalBankQuestions(filtered);
+
+  // Delete from Central Cloud Server
+  const db = getQuestionBankDb(providedDb);
+  if (db) {
+    deleteDoc(doc(db, 'questionBank', id)).catch(err => {
+      console.error('Failed to delete question from central Firestore server:', err);
+    });
   }
+
+  return true;
 }
 
 /**
- * Clear questions matching specific filter criteria, or all if none provided.
+ * Clear questions matching specific filter criteria from local and central server.
  */
 export function clearQuestionsFromBank(filters?: { classId?: string; subject?: string; chapter?: string }): void {
   if (typeof window === 'undefined') return;
@@ -143,5 +259,5 @@ export function clearQuestionsFromBank(filters?: { classId?: string; subject?: s
     if (filters.chapter && normalizeText(q.chapter) === normalizeText(filters.chapter)) return false;
     return true;
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+  saveLocalBankQuestions(remaining);
 }

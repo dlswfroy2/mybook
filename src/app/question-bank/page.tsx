@@ -23,7 +23,9 @@ import {
   Columns,
   Type,
   SlidersHorizontal,
-  Split
+  Split,
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +39,7 @@ import {
   getBankQuestions, 
   addQuestionsToBank, 
   deleteQuestionFromBank, 
+  fetchBankQuestionsFromFirestore,
   normalizeText 
 } from '@/lib/question-bank-storage';
 import { CHAPTERS_DATA } from '@/lib/subject-chapters';
@@ -416,12 +419,27 @@ export default function QuestionBankPage() {
   const [newSubject, setNewSubject] = useState('গণিত');
   const [newChapter, setNewChapter] = useState('১ম অধ্যায়: বাস্তব সংখ্যা');
   const [newContent, setNewContent] = useState('');
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
-  // Load questions from storage
-  const reloadQuestions = useCallback(() => {
+  // Load questions from storage & sync with central cloud Firestore
+  const reloadQuestions = useCallback(async () => {
+    // 1. Instant load from local cache
     const list = getBankQuestions();
     setQuestions(list);
-  }, []);
+
+    // 2. Fetch and bi-directionally sync with Central Server (Firestore)
+    if (db) {
+      setIsSyncingCloud(true);
+      try {
+        const unified = await fetchBankQuestionsFromFirestore(db);
+        setQuestions(unified);
+      } catch (err) {
+        console.warn('Central server sync error:', err);
+      } finally {
+        setIsSyncingCloud(false);
+      }
+    }
+  }, [db]);
 
   useEffect(() => {
     reloadQuestions();
@@ -557,7 +575,7 @@ export default function QuestionBankPage() {
   // Delete handler
   const handleDeleteQuestion = (id: string) => {
     if (confirm('আপনি কি এই প্রশ্নটি প্রশ্নব্যাংক থেকে মুছে ফেলতে চান?')) {
-      deleteQuestionFromBank(id);
+      deleteQuestionFromBank(id, db);
       setSelectedIds(prev => {
         const next = new Set(prev);
         next.delete(id);
@@ -771,7 +789,7 @@ export default function QuestionBankPage() {
       type: newType,
       content: newContent.trim(),
       source: 'manual'
-    }]);
+    }], db);
 
     reloadQuestions();
     setNewContent('');
@@ -1195,6 +1213,17 @@ export default function QuestionBankPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reloadQuestions()}
+              disabled={isSyncingCloud}
+              className="font-bold text-xs text-emerald-800 bg-emerald-50 border-emerald-300 hover:bg-emerald-100 h-8 gap-1.5 shadow-2xs"
+              title="কেন্দ্রীয় ক্লাউড সার্ভারের সাথে রিয়েলটাইম সিঙ্ক করুন"
+            >
+              <Cloud className={cn("w-3.5 h-3.5 text-emerald-600", isSyncingCloud && "animate-spin")} />
+              <span>{isSyncingCloud ? 'সার্ভার সিঙ্ক হচ্ছে...' : 'সার্ভার সিঙ্ক'}</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"

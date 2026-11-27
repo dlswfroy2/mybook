@@ -221,5 +221,10 @@ service cloud.firestore {
       allow update: if isAuthed() && (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isAuthed() && (resource.data.userId == request.auth.uid || isAdmin());
     }
+
+    // ── কেন্দ্রীয় প্রশ্ন ব্যাংক (Question Bank - Central Server Cloud Storage) ──
+    match /questionBank/{id} {
+      allow read, write: if true;
+    }
   }
 }
