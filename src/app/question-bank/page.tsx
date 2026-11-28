@@ -158,12 +158,14 @@ function formatContentWithBoardMarks(
     .replace(/&nbsp;/g, ' ');
   let cleaned = stripHtml(content).replace(/^[\u09E6-\u09EF0-9]+[\u09F7.)]/g, '').trim();
 
-  // If this is a Short Question, strip all trailing/embedded marks like [২], [2], (২), etc.
+  // Strip ALL embedded bracket marks [২], [2] etc. ALWAYS to prevent double marks in display
+  cleaned = cleaned.replace(/\[\s*[০-৯0-9]+\s*\]/g, '').trim();
+
+  // For short questions, also strip trailing digit marks
   if (options?.isShortQuestion) {
     cleaned = cleaned
-      .replace(/\[\s*[০-৯0-9]+\s*\]/g, '')
       .replace(/\(\s*[০-৯0-9]+\s*\)/g, '')
-      .replace(/(?:(।|\.)\s*|\s+)[১-৯1-9][০-৯0-9]?\s*$/gm, '$1')
+      .replace(/([।.])\s*[১-৯1-9][০-৯0-9]?\s*$/gm, '$1')
       .trim();
   }
 
@@ -186,12 +188,11 @@ function formatContentWithBoardMarks(
   const rawLines = mergedParts.filter(Boolean);
   
   const rendered = rawLines.map(line => {
-    // If Short Question, render clean text without any trailing marks
-    if (options?.isShortQuestion) {
+    // Short Question: render clean text
       const strippedLine = line
         .replace(/\[\s*[০-৯0-9]+\s*\]/g, '')
         .replace(/\(\s*[০-৯0-9]+\s*\)/g, '')
-        .replace(/(?:(।|\.)\s*|\s+)[১-৯1-9][০-৯0-9]?\s*$/, '$1')
+        .replace(/([।.])\s*[১-৯1-9][০-৯0-9]?\s*$/, '$1')
         .replace(/\s+/g, ' ')
         .trim();
       return `<div class="leading-relaxed text-justify my-0.5 math-rendered">${formatMathToHtml(strippedLine)}</div>`;
