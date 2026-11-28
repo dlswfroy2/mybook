@@ -3,6 +3,7 @@ import './globals.css';
 import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Footer } from '@/components/layout/Footer';
+import { PrintAwareMain } from '@/components/layout/PrintAwareMain';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { AuthProvider } from '@/context/AuthContext';
@@ -58,9 +59,9 @@ export default function RootLayout({
             <SchoolInfoProvider>
               <AcademicYearProvider>
                 <Navbar />
-                <main className="flex-1 pt-16 sm:pt-20 pb-6 container mx-auto px-1 sm:px-4 max-w-7xl">
+                <PrintAwareMain>
                   {children}
-                </main>
+                </PrintAwareMain>
                 <Footer />
                 <BottomNav />
                 <GlobalAiAssistant />

@@ -41,6 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Safety fallback timeout to prevent infinite auth hanging on cold/stalled network
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500); // Reduced from 3500ms to 1500ms for faster page load
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (!auth || !db) return;
 

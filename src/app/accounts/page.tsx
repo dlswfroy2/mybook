@@ -16,7 +16,16 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Trash2, Smartphone, Search, AlertCircle, TrendingUp, Banknote, CreditCard, Wallet, PieChart as PieChartIcon, LayoutDashboard, Loader2, PlusCircle, MinusCircle, Landmark, Coins, FileText, Hash, ChevronRight, ChevronLeft, BookOpen, LayoutGrid, ListChecks, Printer, Phone, MessageCircle, MessageSquareDashed, Calendar, FileSpreadsheet, FileBarChart, FilePen, BarChart3, Receipt, Settings2, ShieldCheck, UserCheck, Save, Sparkles, Gift, Clock, Table as TableIcon } from 'lucide-react';
+import { Trash2, Smartphone, Search, AlertCircle, TrendingUp, Banknote, CreditCard, Wallet, PieChart as PieChartIcon, LayoutDashboard, Loader2, PlusCircle, MinusCircle, Landmark, Coins, FileText, Hash, ChevronRight, ChevronLeft, BookOpen, LayoutGrid, ListChecks, Printer, Phone, MessageCircle, MessageSquareDashed, Calendar, FileSpreadsheet, FileBarChart, FilePen, BarChart3, Receipt, Settings2, ShieldCheck, UserCheck, Save, Sparkles, Gift, Clock, Table as TableIcon, GraduationCap } from 'lucide-react';
+import { PhoneBookTab } from '@/components/accounts/PhoneBookTab';
+import { 
+  PrepBatchDashboardTab, 
+  PrepBatchFeeSetupTab, 
+  PrepBatchCollectionTab, 
+  PrepBatchDefaultersTab, 
+  PrepBatchReportTab, 
+  type PrepBatchCollectionRecord 
+} from '@/components/accounts/PrepBatchComponents';
 import { format, isToday, isSameMonth, startOfMonth, endOfMonth, isBefore } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -1691,6 +1700,10 @@ export default function AccountsPage() {
   const [potentialPrintParams, setPotentialPrintParams] = useState<{ cls: string } | null>(null);
   const [annualReportPrintData, setAnnualReportPrintData] = useState<any[]>([]);
   
+  // Branch mode: 'academic' (default) vs 'prep_batch' (প্রস্তুতি ব্যাচ)
+  const [accountBranch, setAccountBranch] = useState<'academic' | 'prep_batch'>('academic');
+  const [prepCollections, setPrepCollections] = useState<PrepBatchCollectionRecord[]>([]);
+
   // States for individual collection printing
   const [printingCollection, setPrintingCollection] = useState<FeeCollection | null>(null);
   const [printingStudent, setPrintingStudent] = useState<Student | null>(null);
@@ -1702,6 +1715,32 @@ export default function AccountsPage() {
     }
     setIsLoadingStudents(false); 
   }); return unsubscribe; }, [db, user?.uid, selectedYear]);
+
+  // Real-time listener for preparation batch collections
+  const fetchPrepCollections = useCallback(() => {
+    if (!db || !user?.uid) return;
+    const qPrep = query(collection(db, 'prepBatchCollections'), where('academicYear', '==', selectedYear));
+    const unsub = onSnapshot(qPrep, (snap) => {
+      const records: PrepBatchCollectionRecord[] = snap.docs.map((d) => {
+        const data = d.data();
+        let pDate = new Date();
+        if (data.paymentDate?.toDate) pDate = data.paymentDate.toDate();
+        else if (data.paymentDate) pDate = new Date(data.paymentDate);
+        return {
+          id: d.id,
+          ...data,
+          paymentDate: pDate
+        } as PrepBatchCollectionRecord;
+      });
+      // Sort newest first
+      records.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+      setPrepCollections(records);
+    }, (error) => {
+      console.warn('Prep batch collections fetch notice:', error);
+    });
+    return unsub;
+  }, [db, user?.uid, selectedYear]);
+
   useEffect(() => { 
     setIsClient(true); 
     if (!db || !user?.uid) return;
@@ -1717,13 +1756,28 @@ export default function AccountsPage() {
         setIsLoading(false);
     });
     const unsubStudents = fetchStudents(); 
+    const unsubPrep = fetchPrepCollections();
     return () => {
         unsubTx();
         unsubStudents?.();
+        unsubPrep?.();
     }; 
-  }, [db, user?.uid, selectedYear, fetchStudents]);
+  }, [db, user?.uid, selectedYear, fetchStudents, fetchPrepCollections]);
   
   const sidebarItems = useMemo(() => { 
+      // If Preparation Batch branch is selected
+      if (accountBranch === 'prep_batch') {
+        return [
+          { id: 'prep-dashboard', label: 'প্রস্তুতি ড্যাশবোর্ড', icon: LayoutDashboard, color: 'text-purple-600 bg-purple-50' },
+          { id: 'prep-fee-setup', label: 'প্রস্তুতি ফি সেটআপ', icon: Settings2, color: 'text-indigo-600 bg-indigo-50' },
+          { id: 'prep-collection', label: 'কিস্তি / ফি আদায়', icon: Banknote, color: 'text-emerald-600 bg-emerald-50' },
+          { id: 'prep-defaulters', label: 'প্রস্তুতি বকেয়া তালিকা', icon: AlertCircle, color: 'text-rose-600 bg-rose-50' },
+          { id: 'prep-report', label: 'প্রস্তুতি আদায় রিপোর্ট', icon: ListChecks, color: 'text-violet-600 bg-violet-50' },
+          { id: 'phone-book', label: 'ফোন বুক', icon: Smartphone, color: 'text-sky-600 bg-sky-50' },
+        ];
+      }
+
+      // Academic branch
       const items = [{ id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard, color: 'text-indigo-600 bg-indigo-50' }]; 
       if (hasPermission('manage:fee-setup')) items.push({ id: 'fee-setup', label: 'ফি সেটআপ', icon: Settings2, color: 'text-blue-600 bg-blue-50' }); 
       if (hasPermission('collect:fees')) { items.push({ id: 'fee-collection', label: 'বেতন আদায়', icon: Banknote, color: 'text-emerald-600 bg-emerald-50' }); items.push({ id: 'defaulters', label: 'বকেয়া তালিকা', icon: AlertCircle, color: 'text-rose-600 bg-rose-50' }); } 
@@ -1732,8 +1786,11 @@ export default function AccountsPage() {
       if (hasPermission('view:cashbook-ledger')) { items.push({ id: 'cashbook', label: 'ক্যাশবুক', icon: BookOpen, color: 'text-blue-600 bg-blue-50' }); items.push({ id: 'ledger', label: 'খতিয়ান (লেজার)', icon: LayoutGrid, color: 'text-amber-600 bg-amber-50' }); } 
       if (hasPermission('view:accounts-monthly-report')) items.push({ id: 'monthly-report', label: 'মাসিক রিপোর্ট', icon: FileBarChart, color: 'text-emerald-600 bg-emerald-50' }); 
       if (hasPermission('manage:transactions')) items.push({ id: 'new-transaction', label: 'আয়/ব্যয় এন্ট্রি', icon: PlusCircle, color: 'text-primary bg-primary/10' }); 
+      
+      // Phone book
+      items.push({ id: 'phone-book', label: 'ফোন বুক', icon: Smartphone, color: 'text-sky-600 bg-sky-50' });
       return items; 
-  }, [hasPermission]);
+  }, [accountBranch, hasPermission]);
   
   const handlePrintPotentialReport = (cls: string) => {
     setPotentialPrintParams({ cls });
@@ -1778,9 +1835,166 @@ export default function AccountsPage() {
       
       <main className={cn("flex-1 p-1 sm:p-4 md:p-6 lg:p-10 gap-4 sm:gap-8 pb-[250px]", (activePrintReport || activeSection === 'print' || !!printingCollection) && "no-print")}>
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-4 sm:gap-8">
-            <aside className="w-full md:w-60 shrink-0 space-y-1 no-print bg-white md:bg-transparent p-1.5 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20"><h2 className="text-2xl font-black mb-6 px-4 hidden md:block text-slate-900 tracking-tight">হিসাব শাখা</h2><div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 sm:gap-1.5 scrollbar-none">{sidebarItems.map(item => (<button key={item.id} onClick={() => setActiveSection(item.id)} className={cn("flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2 text-xs sm:text-sm", activeSection === item.id ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30")}> <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}> <item.icon className="h-4 w-4" /> </div> <span className="text-xs sm:text-sm font-black">{item.label}</span> {activeSection === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}</button>))}</div></aside>
+            <aside className="w-full md:w-64 shrink-0 space-y-3 no-print bg-white md:bg-transparent p-2 sm:p-3 md:p-0 border-b md:border-0 sticky top-14 sm:top-20 md:top-28 self-start z-20">
+              <div className="hidden md:flex items-center justify-between px-2 mb-1">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">হিসাব শাখা</h2>
+                <Badge variant="outline" className="font-bold text-[10px] bg-white text-slate-600 border-slate-300">
+                  {toBengaliNumber(selectedYear)}
+                </Badge>
+              </div>
+
+              {/* Branch Toggle: Academic vs Prep Batch */}
+              <div className="bg-slate-200/80 p-1 rounded-2xl flex items-center gap-1 shadow-inner border border-slate-300/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountBranch('academic');
+                    setActiveSection('dashboard');
+                  }}
+                  className={cn(
+                    "flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm",
+                    accountBranch === 'academic'
+                      ? "bg-white text-primary shadow-md border-b-2 border-primary"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                  )}
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>একাডেমিক</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountBranch('prep_batch');
+                    setActiveSection('prep-dashboard');
+                  }}
+                  className={cn(
+                    "flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm",
+                    accountBranch === 'prep_batch'
+                      ? "bg-purple-700 text-white shadow-md border-b-2 border-purple-900"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>প্রস্তুতি ব্যাচ</span>
+                </button>
+              </div>
+
+              {/* Navigation Items */}
+              <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1 sm:gap-1.5 scrollbar-none">
+                {sidebarItems.map(item => (
+                  <button 
+                    key={item.id} 
+                    onClick={() => setActiveSection(item.id)} 
+                    className={cn(
+                      "flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl transition-all duration-300 font-black whitespace-nowrap min-w-fit border-2 text-xs sm:text-sm", 
+                      activeSection === item.id 
+                        ? "bg-white border-primary border-b-4 shadow-xl text-primary scale-105 -translate-y-0.5" 
+                        : "bg-slate-50/50 border-slate-200 border-b-2 text-muted-foreground hover:bg-white hover:border-primary/30"
+                    )}
+                  > 
+                    <div className={cn("p-1.5 rounded-lg shrink-0", activeSection === item.id ? item.color : "bg-muted")}> 
+                      <item.icon className="h-4 w-4" /> 
+                    </div> 
+                    <span className="text-xs sm:text-sm font-black">{item.label}</span> 
+                    {activeSection === item.id && <ChevronRight className="ml-auto h-4 w-4 hidden md:block" />}
+                  </button>
+                ))}
+              </div>
+            </aside>
+
             <div className="flex-1 min-w-0 bg-white md:rounded-[32px] shadow-2xl md:border-[1px] border-slate-200/50 overflow-hidden min-h-[700px] flex flex-col transition-all duration-500 animate-in fade-in slide-in-from-right-4">
-              <div className="p-2 sm:p-6 lg:p-8 flex-1">{isLoadingStudents && allStudents.length === 0 ? <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div> : (<><div className="mb-6 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 no-print"><div><h2 className="text-2xl font-black text-slate-800">{sidebarItems.find(i => i.id === activeSection)?.label}</h2><p className="text-xs font-bold text-muted-foreground mt-1">শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}</p></div><Link href="/fee-due-report"><Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 shadow-md"><CreditCard className="h-4 w-4 mr-1.5" /> কেন্দ্রীয় ফি বকেয়া ও আদায় রিপোর্ট</Button></Link></div>{activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}{activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}{activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}{activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}{activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} onPrintReceipt={handleReceiptPrint} />}{activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}{activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}{activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}{activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}{activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}{activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}{activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}</>)}</div>
+              <div className="p-2 sm:p-6 lg:p-8 flex-1">
+                {isLoadingStudents && allStudents.length === 0 ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-64 w-full" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-6 border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 no-print">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn(
+                            "text-xs font-black px-2.5 py-0.5 shadow-sm",
+                            accountBranch === 'academic' ? "bg-primary text-white" : "bg-purple-700 text-white"
+                          )}>
+                            {accountBranch === 'academic' ? 'একাডেমিক শাখা' : 'প্রস্তুতি ব্যাচ শাখা'}
+                          </Badge>
+                          <h2 className="text-2xl font-black text-slate-800">
+                            {sidebarItems.find(i => i.id === activeSection)?.label || 'হিসাব ড্যাশবোর্ড'}
+                          </h2>
+                        </div>
+                        <p className="text-xs font-bold text-muted-foreground mt-1">
+                          শিক্ষাবর্ষ: {toBengaliNumber(selectedYear)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href="/fee-due-report">
+                          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 shadow-md">
+                            <CreditCard className="h-4 w-4 mr-1.5" /> কেন্দ্রীয় ফি বকেয়া ও আদায় রিপোর্ট
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* ACADEMIC BRANCH TABS */}
+                    {activeSection === 'dashboard' && <AccountsDashboardTab transactions={transactions} isLoading={isLoading} onActionClick={(t) => { setPendingEntryType(t); setActiveSection('new-transaction'); }} />}
+                    {activeSection === 'fee-setup' && <FeeSetupTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintFeeSetup} />}
+                    {activeSection === 'fee-collection' && <FeeCollectionTab studentsForYear={allStudents.filter(s => s.academicYear === selectedYear)} isLoading={isLoadingStudents} onFeeCollected={fetchTransactions} />}
+                    {activeSection === 'defaulters' && <DefaultersTab allStudents={allStudents} selectedYear={selectedYear} />}
+                    {activeSection === 'collection-report' && <CollectionReportTab allStudents={allStudents} onDeleteSuccess={fetchTransactions} onPrintReceipt={handleReceiptPrint} />}
+                    {activeSection === 'income-comparison' && <IncomeComparisonTab allStudents={allStudents} selectedYear={selectedYear} onPrintPotentialReport={handlePrintPotentialReport} />}
+                    {activeSection === 'classwise-annual-report' && <ClasswiseAnnualReportTab allStudents={allStudents} selectedYear={selectedYear} onPrint={handlePrintAnnualReport} />}
+                    {activeSection === 'expense-report' && <ExpenseReportTab transactions={transactions} isLoading={isLoading} onDeleteSuccess={fetchTransactions} />}
+                    {activeSection === 'cashbook' && <CashbookTab transactions={transactions} isLoading={isLoading} refetch={fetchTransactions} />}
+                    {activeSection === 'ledger' && <LedgerTab transactions={transactions} isLoading={isLoading} />}
+                    {activeSection === 'monthly-report' && <MonthlyReportTab transactions={transactions} selectedYear={selectedYear} />}
+                    {activeSection === 'new-transaction' && <NewTransactionTab onTransactionAdded={fetchTransactions} initialType={pendingEntryType} />}
+
+                    {/* PHONE BOOK TAB (Available from both branches) */}
+                    {activeSection === 'phone-book' && (
+                      <PhoneBookTab allStudents={allStudents} selectedYear={selectedYear} />
+                    )}
+
+                    {/* PREPARATION BATCH TABS */}
+                    {activeSection === 'prep-dashboard' && (
+                      <PrepBatchDashboardTab
+                        allStudents={allStudents}
+                        prepCollections={prepCollections}
+                        selectedYear={selectedYear}
+                        onNavigate={(sec) => setActiveSection(sec)}
+                      />
+                    )}
+                    {activeSection === 'prep-fee-setup' && (
+                      <PrepBatchFeeSetupTab
+                        allStudents={allStudents}
+                        selectedYear={selectedYear}
+                      />
+                    )}
+                    {activeSection === 'prep-collection' && (
+                      <PrepBatchCollectionTab
+                        allStudents={allStudents}
+                        prepCollections={prepCollections}
+                        selectedYear={selectedYear}
+                        onRefresh={fetchTransactions}
+                      />
+                    )}
+                    {activeSection === 'prep-defaulters' && (
+                      <PrepBatchDefaultersTab
+                        allStudents={allStudents}
+                        prepCollections={prepCollections}
+                        selectedYear={selectedYear}
+                      />
+                    )}
+                    {activeSection === 'prep-report' && (
+                      <PrepBatchReportTab
+                        prepCollections={prepCollections}
+                        selectedYear={selectedYear}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
         </div>
       </main>

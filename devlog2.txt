@@ -98,3 +98,108 @@ Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
  ○ Compiling /question-bank ...
  ✓ Compiled /question-bank in 955ms (2180 modules)
  GET /question-bank 200 in 1964ms
+ GET /question-bank 200 in 91ms
+ ○ Compiling /api/question-bank ...
+ ✓ Compiled /api/question-bank in 3s (2914 modules)
+ GET /api/question-bank 200 in 3305ms
+ POST /api/question-bank 200 in 2547ms
+ ○ Compiling /create-lecture-sheet ...
+ ✓ Compiled /create-lecture-sheet in 3.2s (2946 modules)
+ GET /create-lecture-sheet 200 in 3587ms
+ GET /create-question 200 in 131ms
+ GET /create-question?print=true 200 in 105ms
+ GET /create-question?print=true 200 in 1296ms
+ GET /create-question 200 in 145ms
+ GET /create-question? 200 in 255ms
+ GET /create-question?print=true 200 in 57ms
+ GET /create-question 200 in 61ms
+ ○ Compiling /omr-sheet ...
+ ✓ Compiled /omr-sheet in 1950ms (2964 modules)
+ GET /omr-sheet?count=25 200 in 2337ms
+ GET /create-question?print=true 200 in 186ms
+ GET /create-question 200 in 56ms
+ POST /create-question 200 in 4197ms
+ ○ Compiling /api/question-bank ...
+ ✓ Compiled /api/question-bank in 1006ms (2238 modules)
+ POST /api/question-bank 200 in 1277ms
+ GET /question-bank 200 in 256ms
+ GET /api/question-bank 200 in 49ms
+ POST /api/question-bank 200 in 86ms
+ GET /create-question 200 in 95ms
+ POST /create-question 200 in 3623ms
+ POST /api/question-bank 200 in 143ms
+ GET /question-bank 200 in 62ms
+ GET /api/question-bank 200 in 39ms
+ POST /api/question-bank 200 in 46ms
+ ✓ Compiled in 2.7s (3040 modules)
+ GET /question-bank 200 in 405ms
+ ✓ Compiled in 2.3s (3040 modules)
+ GET /question-bank 200 in 357ms
+ ✓ Compiled in 2.2s (3040 modules)
+ GET /question-bank 200 in 256ms
+ ✓ Compiled in 4.3s (3040 modules)
+ GET /question-bank 200 in 259ms
+ GET /create-question 200 in 1134ms
+ GET /create-question?print=true 200 in 92ms
+ GET /create-question 200 in 67ms
+ GET /question-bank 200 in 61ms
+ ○ Compiling /api/question-bank ...
+ ✓ Compiled /api/question-bank in 1765ms (2238 modules)
+ GET /api/question-bank 200 in 2037ms
+ GET /api/question-bank 200 in 49ms
+ POST /api/question-bank 200 in 59ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_s5cxe4e 200 in 61ms
+ GET /api/question-bank 200 in 75ms
+ POST /api/question-bank 200 in 50ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_s5cxe4e 200 in 54ms
+ GET /api/question-bank 200 in 68ms
+ POST /api/question-bank 200 in 46ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_fy06zr8 200 in 59ms
+ GET /api/question-bank 200 in 68ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_fy06zr8 200 in 54ms
+ GET /api/question-bank 200 in 74ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_pvlp7ib 200 in 58ms
+ GET /api/question-bank 200 in 69ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_pvlp7ib 200 in 52ms
+ GET /api/question-bank 200 in 66ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_l7uywls 200 in 68ms
+ GET /api/question-bank 200 in 85ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_l7uywls 200 in 81ms
+ GET /api/question-bank 200 in 89ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_vz244i1 200 in 55ms
+ GET /api/question-bank 200 in 70ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_vz244i1 200 in 53ms
+ GET /api/question-bank 200 in 66ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_1o9x7r2 200 in 68ms
+ GET /api/question-bank 200 in 78ms
+ DELETE /api/question-bank?id=qb_mwyk2gzp_1o9x7r2 200 in 80ms
+ GET /api/question-bank 200 in 66ms
+ GET /create-question 200 in 234ms
+ POST /create-question 200 in 4564ms
+ POST /api/question-bank 200 in 45ms
+ GET /question-bank 200 in 249ms
+ GET /api/question-bank 200 in 89ms
+ POST /api/question-bank 200 in 53ms
+ ○ Compiling /api/question-bank ...
+ ✓ Compiled /api/question-bank in 3.4s (3040 modules)
+ ✓ Compiled in 1ms (2238 modules)
+ GET /api/question-bank 200 in 2434ms
+ GET /question-bank 200 in 1807ms
+ ✓ Compiled in 2s (3059 modules)
+ GET /question-bank 200 in 255ms
+ GET /api/question-bank 200 in 52ms
+ POST /api/question-bank 200 in 51ms
+ ✓ Compiled in 1976ms (3059 modules)
+ GET /question-bank 200 in 249ms
+ GET /api/question-bank 200 in 49ms
+ POST /api/question-bank 200 in 40ms
+ ✓ Compiled in 1745ms (3059 modules)
+ GET /question-bank 200 in 478ms
+ GET /api/question-bank 200 in 53ms
+ ✓ Compiled in 1891ms (3059 modules)
+ GET /question-bank 200 in 267ms
+ GET /api/question-bank 200 in 53ms
+ GET /question-bank 200 in 912ms
+ GET /question-bank 200 in 90ms
+ GET /question-bank 200 in 218ms
+ GET /api/question-bank 200 in 42ms

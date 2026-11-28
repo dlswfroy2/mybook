@@ -37,6 +37,11 @@ export type Student = {
   guardianMobile?: string;
   studentMobile?: string;
   fatherNid?: string;
+  // Preparation batch fields
+  prepBatchFee?: number;
+  prepBatchName?: string;
+  prepBatchEnrolled?: boolean;
+  prepBatchPaid?: number;
   motherNid?: string;
   gender?: string;
   religion?: string;

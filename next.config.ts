@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+    // Optimize package imports to reduce bundle size
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'date-fns'],
   },
   /* config options here */
   typescript: {
