@@ -850,7 +850,7 @@ export default function QuestionBankPage() {
     const singleTypeInstruction = isOnlyMcq ? mcqInstruction : isOnlyCreative ? creativeInstruction : shortInstruction;
 
     const activeFont = FONT_FAMILY_CONFIG[printFontFamily]?.font || FONT_FAMILY_CONFIG.kalpurush.font;
-    const activeSize = FONT_SIZE_CONFIG[printFontSize] || FONT_SIZE_CONFIG.base;
+    const activeSize = FONT_SIZE_CONFIG[printFontSize] || FONT_SIZE_CONFIG['13'];
     const activeLeading = LINE_SPACING_CONFIG[printLineSpacing]?.line || activeSize.line;
 
     return (
