@@ -188,7 +188,8 @@ function formatContentWithBoardMarks(
   const rawLines = mergedParts.filter(Boolean);
   
   const rendered = rawLines.map(line => {
-    // Short Question: render clean text
+    // Short Question: render clean text without any trailing marks
+    if (options?.isShortQuestion) {
       const strippedLine = line
         .replace(/\[\s*[০-৯0-9]+\s*\]/g, '')
         .replace(/\(\s*[০-৯0-9]+\s*\)/g, '')
