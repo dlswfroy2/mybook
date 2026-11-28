@@ -1333,7 +1333,7 @@ function CreateQuestionContent() {
                   </CardHeader>
                   <CardContent 
                     ref={paperContainerRef}
-                    className="p-1 sm:p-4 md:p-8 flex justify-center w-full max-w-full overflow-hidden box-border"
+                    className="px-2.5 py-3 sm:p-6 md:p-8 flex justify-center w-full max-w-full overflow-hidden box-border"
                   >
                     {/* Visual A4 Paper Preview - 100% responsive on mobile, standard A4 on desktop */}
                     <div className="w-full min-w-0 max-w-full sm:max-w-[8.27in] bg-white rounded-xl shadow-md border-2 border-slate-300 p-2.5 sm:p-8 md:p-12 font-kalpurush min-h-[11in] text-slate-900 leading-relaxed text-sm transition-all overflow-hidden break-words box-border">

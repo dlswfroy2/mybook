@@ -2976,10 +2976,10 @@ export function QuestionPrintView({
 
       {/* ── Top Header Toolbar ── */}
       <header className="no-print bg-white border-b shrink-0 shadow-sm z-50 select-none">
-        {/* Tier 1 / Main Row: Always fits perfectly */}
-        <div className="h-11 md:h-12 flex items-center justify-between px-2 sm:px-4">
-          {/* Left: Sidebar toggle + Back to Editor + Library */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Tier 1 / Main Row: Always fits perfectly on both mobile and desktop */}
+        <div className="h-11 md:h-12 flex items-center justify-between px-2.5 sm:px-4 gap-1 sm:gap-2">
+          {/* Left: Sidebar toggle + Back to Editor + Bank Actions */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -2996,26 +2996,26 @@ export function QuestionPrintView({
               className="h-8 gap-1 font-bold border-indigo-200 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs" 
               title="মেইন এডিটরে ফিরে যান"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> <span className="inline">মেইন এডিটর</span>
+              <ArrowLeft className="w-3.5 h-3.5" /> <span><span className="hidden sm:inline">মেইন </span>এডিটর</span>
             </Button>
-            <Link href="/my-questions">
+            <Link href="/my-questions" className="hidden sm:inline-flex">
               <Button 
                 variant="outline" 
                 size="sm" 
                 className="h-8 gap-1 font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 px-2 sm:px-2.5 shrink-0 text-xs" 
                 title="আমার লাইব্রেরিতে যান"
               >
-                <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">লাইব্রেরি</span>
+                <Library className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">লাইব্রেরি</span>
               </Button>
             </Link>
-            <Link href="/question-bank">
+            <Link href="/question-bank" className="hidden sm:inline-flex">
               <Button 
                 variant="outline" 
                 size="sm" 
                 className="h-8 gap-1 font-bold border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50 px-2 sm:px-2.5 shrink-0 text-xs" 
                 title="প্রশ্ন ব্যাংকে যান"
               >
-                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংক</span>
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">প্রশ্ন ব্যাংক</span>
               </Button>
             </Link>
             <Button 
@@ -3025,7 +3025,7 @@ export function QuestionPrintView({
               className="h-8 gap-1 font-bold border-indigo-300 text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs shadow-2xs" 
               title="বর্তমান এডিটর থেকে সরাসরি সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
             >
-              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংকে সেভ</span>
+              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden md:inline">প্রশ্ন ব্যাংকে সেভ</span>
             </Button>
           </div>
 
@@ -3127,20 +3127,20 @@ export function QuestionPrintView({
           </div>
 
           {/* Right: Save & Print (ALWAYS 100% visible on both mobile and desktop!) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
             <Button 
               size="sm" 
               onClick={handleOpenSaveModal} 
               disabled={saving} 
-              className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
+              className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3.5 shrink-0 text-xs shadow-xs" 
               title="সেভ ও PDF তৈরি করুন"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span>সেভ ও PDF</span>
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span className="hidden xs:inline">সেভ ও PDF</span><span className="xs:hidden">সেভ</span>
             </Button>
             <Button 
               size="sm" 
               onClick={handlePrint} 
-              className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
+              className="h-8 gap-1 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2 sm:px-3.5 shrink-0 text-xs shadow-xs" 
               title="প্রিন্ট করুন"
             >
               <Printer className="w-3.5 h-3.5" /> <span>প্রিন্ট</span>
@@ -3149,7 +3149,7 @@ export function QuestionPrintView({
         </div>
 
         {/* Tier 2 / Mobile-only Formatting & Zoom Bar: 100% visible, perfectly sized */}
-        <div className="flex md:hidden items-center justify-between px-2 py-1 bg-slate-50 border-t border-slate-200 text-xs gap-1">
+        <div className="flex md:hidden items-center justify-between px-2.5 sm:px-4 py-1 bg-slate-50 border-t border-slate-200 text-xs gap-1">
           {/* Mobile Font Size +/- */}
           <div className="flex items-center bg-white rounded-md p-0.5 border border-slate-300 gap-0.5 shrink-0">
             <button
@@ -3355,7 +3355,7 @@ export function QuestionPrintView({
 
         {/* ── Main Canvas Area with Dynamic Pages ── */}
         <div className="print-canvas-col flex-1 flex flex-col overflow-hidden relative w-full">
-          <main className="print-main-area flex-1 overflow-x-auto overflow-y-auto bg-slate-200 py-3 sm:py-6 px-1 sm:px-4 flex flex-col items-center gap-4 sm:gap-8 relative overscroll-contain" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
+          <main className="print-main-area flex-1 overflow-x-auto overflow-y-auto bg-slate-200 py-3 sm:py-6 px-3 sm:px-6 md:px-8 flex flex-col items-center gap-4 sm:gap-8 relative overscroll-contain" style={{ zoom: effectiveZoom !== 100 ? `${effectiveZoom}%` : undefined }}>
             {showRuler && (
               <div className="no-print sticky top-0 z-40 bg-slate-200/95 backdrop-blur-xs pb-3 pt-1 flex justify-center w-full shadow-xs overflow-x-auto no-scrollbar">
                 <WordRuler
