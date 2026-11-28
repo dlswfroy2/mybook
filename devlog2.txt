@@ -1,0 +1,100 @@
+﻿   ▲ Next.js 15.5.9
+   - Local:        http://localhost:9005
+   - Network:      http://192.168.1.101:9005
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 3.5s
+ ○ Compiling /question-bank ...
+node :  ⨯ ./src/app/question-bank/page.tsx
+At line:1 char:188
++ ... ch\mybook"; node node_modules/next/dist/bin/next dev -p 9005 2>&1 | O ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( ⨯ ./src/app/question-bank/page.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Error:   [31mx[0m Expected ',', got 'const'
+     ,-[[36;1;4mC:\Users\dhono\.gemini\antigravity\scratch\mybook\src\app\question-bank\page.tsx[0m:202:1]
+ [2m199[0m |     }
+ [2m200[0m | 
+ [2m201[0m |     // Check if line is an MCQ options line with multiple options like "(ক) ... (খ) ..."
+ [2m202[0m |     const isMcqOptionsLine = /\([খ-ঘb-d]\)|\b[খ-ঘb-d]\./i.test(line);
+     : [35;1m    ^^^^^[0m
+ [2m203[0m | 
+ [2m204[0m |     // Check if line is a sub-question: e.g. "ক. ... [২]" or "(ক) ... [৪]" or "ক. ...। ২"
+ [2m205[0m |     const subMatch = line.match(/^([ক-ঘa-d]\.|\([ক-ঘa-d]\))\s*(.*)$/i);
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/question-bank/page.tsx
+ ⨯ ./src/app/question-bank/page.tsx
+Error:   [31mx[0m Expected ',', got 'const'
+     ,-[[36;1;4mC:\Users\dhono\.gemini\antigravity\scratch\mybook\src\app\question-bank\page.tsx[0m:202:1]
+ [2m199[0m |     }
+ [2m200[0m | 
+ [2m201[0m |     // Check if line is an MCQ options line with multiple options like "(ক) ... (খ) ..."
+ [2m202[0m |     const isMcqOptionsLine = /\([খ-ঘb-d]\)|\b[খ-ঘb-d]\./i.test(line);
+     : [35;1m    ^^^^^[0m
+ [2m203[0m | 
+ [2m204[0m |     // Check if line is a sub-question: e.g. "ক. ... [২]" or "(ক) ... [৪]" or "ক. ...। ২"
+ [2m205[0m |     const subMatch = line.match(/^([ক-ঘa-d]\.|\([ক-ঘa-d]\))\s*(.*)$/i);
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/question-bank/page.tsx
+ ⨯ ./src/app/question-bank/page.tsx
+Error:   [31mx[0m Expected ',', got 'const'
+     ,-[[36;1;4mC:\Users\dhono\.gemini\antigravity\scratch\mybook\src\app\question-bank\page.tsx[0m:202:1]
+ [2m199[0m |     }
+ [2m200[0m | 
+ [2m201[0m |     // Check if line is an MCQ options line with multiple options like "(ক) ... (খ) ..."
+ [2m202[0m |     const isMcqOptionsLine = /\([খ-ঘb-d]\)|\b[খ-ঘb-d]\./i.test(line);
+     : [35;1m    ^^^^^[0m
+ [2m203[0m | 
+ [2m204[0m |     // Check if line is a sub-question: e.g. "ক. ... [২]" or "(ক) ... [৪]" or "ক. ...। ২"
+ [2m205[0m |     const subMatch = line.match(/^([ক-ঘa-d]\.|\([ক-ঘa-d]\))\s*(.*)$/i);
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/question-bank/page.tsx
+ GET /question-bank 500 in 21016ms
+ ✓ Compiled /_error in 2.9s (2925 modules)
+ GET /question-bank 200 in 1376ms
+ ○ Compiling /create-question ...
+ ✓ Compiled /create-question in 2.3s (2992 modules)
+ GET /create-question 200 in 3238ms
+[Error: Failed to find Server Action "40cf2166888607ef95d3fde4bab1998515dddcc1f0". This request might be from an older 
+or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+ POST /create-question 404 in 452ms
+ GET /create-question 200 in 549ms
+[Error: Failed to find Server Action "40cf2166888607ef95d3fde4bab1998515dddcc1f0". This request might be from an older 
+or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+ POST /create-question 404 in 313ms
+[Error: Failed to find Server Action "40cf2166888607ef95d3fde4bab1998515dddcc1f0". This request might be from an older 
+or newer deployment.
+Read more: https://nextjs.org/docs/messages/failed-to-find-server-action]
+ POST /create-question 404 in 359ms
+ ✓ Compiled in 2.3s (2957 modules)
+ GET /create-question 200 in 347ms
+ ✓ Compiled in 1649ms (2957 modules)
+ GET /create-question 200 in 304ms
+ ✓ Compiled in 1790ms (2957 modules)
+ GET /create-question 200 in 249ms
+ GET /create-question 200 in 1056ms
+ GET /create-question?print=true 200 in 89ms
+ ○ Compiling /question-bank ...
+ ✓ Compiled /question-bank in 955ms (2180 modules)
+ GET /question-bank 200 in 1964ms
