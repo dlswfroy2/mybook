@@ -226,5 +226,19 @@ service cloud.firestore {
     match /questionBank/{id} {
       allow read, write: if true;
     }
+
+    // Preparation Batch - fee collections
+    match /prepBatchCollections/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if hasPermission('collect:fees') || isAdmin();
+      allow delete: if isAdmin() || hasPermission('special:delete-transaction');
+    }
+
+    // Preparation Batch - fee setup
+    match /prepBatchFees/{id} {
+      allow read: if isAuthed();
+      allow write: if hasPermission('collect:fees') || isAdmin();
+    }
   }
 }

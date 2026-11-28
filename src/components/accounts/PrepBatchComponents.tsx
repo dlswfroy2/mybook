@@ -141,7 +141,7 @@ export function PrepBatchDashboardTab({
           </div>
           <h2 className="text-2xl sm:text-3xl font-black">প্রস্তুতি ব্যাচ ড্যাশবোর্ড</h2>
           <p className="text-xs sm:text-sm text-indigo-100 font-bold mt-1">
-            এককালীন প্রস্তুতি ফি নির্ধারণ, কিস্তিতে/ভেঙ্গে আদায় এবং পূর্ণাঙ্গ আলাদা হিসাব।
+            এককালীন প্রস্তুতি ফি নির্ধারণ, ভেঙ্গে ভেঙ্গে আদায় এবং পূর্ণাঙ্গ আলাদা হিসাব।
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -156,7 +156,7 @@ export function PrepBatchDashboardTab({
             className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-9 shadow-md"
           >
             <Banknote className="h-4 w-4 mr-1.5" />
-            কিস্তি আদায় করুন
+            ফি আদায় করুন
           </Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export function PrepBatchDashboardTab({
       <Card className="border shadow-lg rounded-2xl overflow-hidden bg-white">
         <CardHeader className="bg-slate-50/80 border-b pb-3 flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-lg font-black text-slate-800">সর্বশেষ কিস্তি আদায়ের তালিকা</CardTitle>
+            <CardTitle className="text-lg font-black text-slate-800">সর্বশেষ ফি আদায়ের তালিকা</CardTitle>
             <CardDescription className="text-xs font-bold text-slate-500">
               সম্প্রতি সংগৃহীত প্রস্তুতি ফি কিস্তিসমূহের বিবরণ
             </CardDescription>
@@ -797,7 +797,7 @@ export function PrepBatchCollectionTab({
                           )}
                         >
                           <Banknote className="h-3.5 w-3.5 mr-1" />
-                          কিস্তি আদায়
+                          ফি আদায়
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -815,7 +815,7 @@ export function PrepBatchCollectionTab({
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
               <Banknote className="h-5 w-5 text-emerald-600" />
-              <span>প্রস্তুতি ব্যাচ কিস্তি / ফি আদায়</span>
+              <span>প্রস্তুতি ব্যাচ ফি আদায়</span>
             </DialogTitle>
             <DialogDescription className="text-xs font-bold text-slate-500">
               পুরো ফি একবারে অথবা আংশিক/কিস্তিতে ভেঙ্গে আদায় করতে পারেন।

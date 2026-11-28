@@ -1770,7 +1770,7 @@ export default function AccountsPage() {
         return [
           { id: 'prep-dashboard', label: 'প্রস্তুতি ড্যাশবোর্ড', icon: LayoutDashboard, color: 'text-purple-600 bg-purple-50' },
           { id: 'prep-fee-setup', label: 'প্রস্তুতি ফি সেটআপ', icon: Settings2, color: 'text-indigo-600 bg-indigo-50' },
-          { id: 'prep-collection', label: 'কিস্তি / ফি আদায়', icon: Banknote, color: 'text-emerald-600 bg-emerald-50' },
+          { id: 'prep-collection', label: 'ফি আদায়', icon: Banknote, color: 'text-emerald-600 bg-emerald-50' },
           { id: 'prep-defaulters', label: 'প্রস্তুতি বকেয়া তালিকা', icon: AlertCircle, color: 'text-rose-600 bg-rose-50' },
           { id: 'prep-report', label: 'প্রস্তুতি আদায় রিপোর্ট', icon: ListChecks, color: 'text-violet-600 bg-violet-50' },
           { id: 'phone-book', label: 'ফোন বুক', icon: Smartphone, color: 'text-sky-600 bg-sky-50' },
