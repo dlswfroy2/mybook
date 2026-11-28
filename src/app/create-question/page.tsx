@@ -993,40 +993,66 @@ function CreateQuestionContent() {
               <p className="text-[11px] sm:text-xs text-slate-500 font-bold mt-0.5">বোর্ড পরীক্ষার মানসম্পন্ন প্রশ্নপত্র তৈরি, এআই সহায়তা ও পূর্ণাঙ্গ ওয়ার্ড লেআউট</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Button variant="ghost" onClick={() => router.back()} className="gap-1.5 font-bold h-9 text-xs">
-              <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">ফিরে যান</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleSaveToQuestionBank} 
-              className="gap-1.5 font-bold border-indigo-400 text-indigo-800 hover:bg-indigo-50 h-9 text-xs"
-              title="বর্তমান প্রশ্নগুলো সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
-            >
-              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> প্রশ্ন ব্যাংকে সেভ
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => router.push('/question-bank')} 
-              className="gap-1.5 font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-9 text-xs"
-            >
-              📚 প্রশ্ন ব্যাংক
-            </Button>
-            <Button 
-              variant="default" 
-              onClick={handleGoToPrint} 
-              className="gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md h-9 text-xs"
-            >
-              <Printer className="w-3.5 h-3.5" /> প্রিন্ট ও পেজ লেআউট
-            </Button>
-            {editId && (
-              <Button variant="outline" onClick={() => router.push(`/online-exam?id=${editId}`)} className="gap-1.5 font-bold border-emerald-500 text-emerald-700 hover:bg-emerald-50 h-9 text-xs">
-                <GraduationCap className="w-3.5 h-3.5" /> অনলাইন পরীক্ষা
+          {/* Header Action Buttons: 1 line on desktop, exactly 2 equal balanced lines on smaller screens */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-1.5 sm:gap-2 w-full lg:w-auto shrink-0">
+            {/* Line 1: 3 equal buttons on small screens, flows inline on desktop */}
+            <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => router.back()} 
+                className="gap-1 font-bold h-8.5 text-xs px-2 sm:px-3 justify-center text-slate-700 hover:bg-slate-100"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> <span>ফিরে যান</span>
               </Button>
-            )}
-            <Button variant="outline" onClick={() => router.push(editId ? `/omr-sheet?id=${editId}` : `/omr-sheet?count=${questions.length || 25}`)} className="gap-1.5 font-bold border-purple-500 text-purple-700 hover:bg-purple-50 h-9 text-xs">
-              <CheckCircle2 className="w-3.5 h-3.5" /> OMR শিট
-            </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleSaveToQuestionBank} 
+                className="gap-1 font-bold border-indigo-300 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 h-8.5 text-xs px-2 sm:px-3 justify-center shadow-2xs"
+                title="বর্তমান প্রশ্নগুলো সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
+              >
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> <span className="truncate">প্রশ্ন ব্যাংকে সেভ</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push('/question-bank')} 
+                className="gap-1 font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 h-8.5 text-xs px-2 sm:px-3 justify-center shadow-2xs"
+              >
+                📚 <span className="truncate">প্রশ্ন ব্যাংক</span>
+              </Button>
+            </div>
+
+            {/* Line 2: Equal buttons on small screens, flows inline on desktop */}
+            <div className="grid grid-cols-2 sm:flex items-center gap-1.5 sm:gap-2">
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={handleGoToPrint} 
+                className="gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs h-8.5 text-xs px-3 justify-center"
+              >
+                <Printer className="w-3.5 h-3.5" /> <span>প্রিন্ট ও পেজ লেআউট</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push(editId ? `/omr-sheet?id=${editId}` : `/omr-sheet?count=${questions.length || 25}`)} 
+                className="gap-1 font-bold border-purple-400 text-purple-700 hover:bg-purple-50 h-8.5 text-xs px-2.5 sm:px-3 justify-center shadow-2xs"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" /> <span>OMR শিট</span>
+              </Button>
+              {editId && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push(`/online-exam?id=${editId}`)} 
+                  className="gap-1 font-bold border-emerald-500 text-emerald-700 hover:bg-emerald-50 h-8.5 text-xs px-2.5 sm:px-3 justify-center shadow-2xs col-span-2 sm:col-span-1"
+                >
+                  <GraduationCap className="w-3.5 h-3.5 text-emerald-600" /> <span>অনলাইন পরীক্ষা</span>
+                </Button>
+              )}
+            </div>
           </div>
         </header>
 

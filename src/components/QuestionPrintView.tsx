@@ -3018,13 +3018,19 @@ export function QuestionPrintView({
                 <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংক</span>
               </Button>
             </Link>
-            <h3 className="font-bold text-sm hidden lg:inline text-slate-800 truncate max-w-xs xl:max-w-md ml-1">
-              প্রিন্ট প্রিভিউ - {meta.institution || appName}
-            </h3>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={handleSaveToQuestionBankFromWord} 
+              className="h-8 gap-1 font-bold border-indigo-300 text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs shadow-2xs" 
+              title="বর্তমান এডিটর থেকে সরাসরি সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
+            >
+              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংকে সেভ</span>
+            </Button>
           </div>
 
-          {/* Desktop Middle Tools (Font, Zoom, Ruler, AI, Page Count) */}
-          <div className="hidden md:flex items-center gap-1.5 sm:gap-2">
+          {/* Desktop Middle Tools (Font, Zoom, Ruler, Page Count) */}
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 shrink min-w-0">
             {/* Font Size +/- */}
             <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 gap-0.5 shrink-0" title="ফন্ট সাইজ পরিবর্তন করুন">
               <button
@@ -3114,38 +3120,19 @@ export function QuestionPrintView({
               <span>রুলার</span>
             </Button>
 
-            {/* AI Assistant */}
-            <Button
-              size="sm"
-              onClick={() => setAiModalOpen(true)}
-              className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 shadow-xs shrink-0 text-xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-              <span>AI সহকারী</span>
-            </Button>
-
             {/* Page Count */}
             <div className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 shrink-0">
-              মোট পাতা: {toBengaliNumber(paginatedPages.length)}
+              পাতা: {toBengaliNumber(paginatedPages.length)}
             </div>
           </div>
 
           {/* Right: Save & Print (ALWAYS 100% visible on both mobile and desktop!) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleSaveToQuestionBankFromWord} 
-              className="h-8 gap-1.5 font-bold border-indigo-300 text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 px-2 sm:px-2.5 shrink-0 text-xs shadow-xs" 
-              title="বর্তমান এডিটর থেকে সরাসরি সেন্ট্রাল প্রশ্ন ব্যাংকে সেভ করুন"
-            >
-              <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> <span className="hidden sm:inline">প্রশ্ন ব্যাংকে সেভ</span><span className="sm:hidden">ব্যাংকে সেভ</span>
-            </Button>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
             <Button 
               size="sm" 
               onClick={handleOpenSaveModal} 
               disabled={saving} 
-              className="h-8 gap-1 font-bold bg-green-600 hover:bg-green-700 text-white px-2.5 sm:px-3 shrink-0 text-xs shadow-xs" 
+              className="h-8 gap-1.5 font-bold bg-green-600 hover:bg-green-700 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
               title="সেভ ও PDF তৈরি করুন"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} <span>সেভ ও PDF</span>
@@ -3153,7 +3140,7 @@ export function QuestionPrintView({
             <Button 
               size="sm" 
               onClick={handlePrint} 
-              className="h-8 gap-1 font-bold bg-primary hover:bg-primary/90 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
+              className="h-8 gap-1.5 font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 sm:px-3.5 shrink-0 text-xs shadow-xs" 
               title="প্রিন্ট করুন"
             >
               <Printer className="w-3.5 h-3.5" /> <span>প্রিন্ট</span>
