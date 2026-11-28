@@ -167,8 +167,23 @@ function formatContentWithBoardMarks(
       .trim();
   }
 
-  // Merge lines where math $ expression may be split across lines (prevents broken fractions)
-  const rawLines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  // Pre-process: merge orphan number-only lines (broken fraction remnants from old data)
+  // e.g. content line "ক. x +" then next line "1" then "x" → join to "ক. x + 1 x"
+  const rawParts = cleaned.split(/\r?\n/).map(l => l.trim());
+  const mergedParts: string[] = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i];
+    if (!part) continue;
+    // If this line is ONLY digits/numbers (orphan fraction line), join with previous
+    const isOrphan = /^[০-৯\d]+$/.test(part) || (/^[০-৯\d\s+\-*/=.]+$/.test(part) && part.trim().length <= 5);
+    const isSubQ = /^[ক-ঘa-d][.)।]/.test(part);
+    if (isOrphan && !isSubQ && mergedParts.length > 0) {
+      mergedParts[mergedParts.length - 1] += ' ' + part;
+    } else {
+      mergedParts.push(part);
+    }
+  }
+  const rawLines = mergedParts.filter(Boolean);
   
   const rendered = rawLines.map(line => {
     // If Short Question, render clean text without any trailing marks

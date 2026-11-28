@@ -1297,15 +1297,6 @@ function CreateQuestionContent() {
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={handleSaveToQuestionBank}
-                        className="text-xs font-bold text-indigo-700 border-indigo-300 hover:bg-indigo-50 h-7 px-2.5 gap-1 shrink-0"
-                        title="এই লাইভ লেআউট থেকে সরাসরি প্রশ্ন ব্যাংকে সেভ করুন"
-                      >
-                        <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" /> প্রশ্ন ব্যাংকে সেভ
-                      </Button>
-                      <Button
-                        size="sm"
                         variant="ghost"
                         onClick={handleGoToPrint}
                         className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 h-7 px-2 shrink-0"
