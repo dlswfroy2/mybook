@@ -239,7 +239,21 @@ export function addQuestionsToBank(
       syncedToCloud: true
     };
 
-    existing.push(newQuestion);
+    // Dedup: skip if same type+subject+chapter+class and first 60 chars of content match
+    const contentKey = normalizeText(cleanContent).substring(0, 60);
+    const isDuplicate = existing.some(q =>
+      String(q.classId).trim() === cleanClass &&
+      normalizeText(q.subject) === normalizeText(cleanSubj) &&
+      normalizeText(q.chapter) === normalizeText(cleanChap) &&
+      q.type === cleanType &&
+      normalizeText(q.content).substring(0, 60) === contentKey
+    );
+    if (isDuplicate) {
+      console.log('[QuestionBank] Skipping duplicate question:', cleanContent.substring(0, 40));
+      continue;
+    }
+
+        existing.push(newQuestion);
     savedItems.push(newQuestion);
   }
 

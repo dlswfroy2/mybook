@@ -560,58 +560,11 @@ function CreateQuestionContent() {
     }
   };
 
-  // Save current questions to the central Question Bank (handles live edits from contentEditable!)
+  // Save current questions to the central Question Bank
+  // ALWAYS uses structured questions array — never parses DOM/innerText → prevents math breakage & double-save
   const handleSaveToQuestionBank = () => {
-    let itemsToSave: Array<{
-      classId: string;
-      subject: string;
-      chapter: string;
-      type: 'mcq' | 'creative' | 'short';
-      content: string;
-      source?: string;
-    }> = [];
-
-    // 1. First priority: Check if live contentEditable has edited text
-    let liveText = '';
-    if (contentEditableRef.current) {
-      liveText = contentEditableRef.current.innerText || contentEditableRef.current.textContent || '';
-    }
-
-    if (liveText && liveText.trim().length > 30) {
-      // Clean header
-      const cleanedText = liveText
-        .replace(/^[^\n]*\b(টিউটোরিয়ালস|বিদ্যালয়|মাদ্রাসা|স্কুল|পরীক্ষা|শ্রেণি|বিষয়|সময়|পূর্ণমান)[^\n]*\n+/gi, '')
-        .trim();
-      const defaultT = (questions[0]?.type || 'creative') as 'creative' | 'short' | 'mcq';
-      const parsed = parseGeneratedQuestions(cleanedText, defaultT);
-      if (parsed && parsed.length > 0) {
-        itemsToSave = parsed.map(p => ({
-          classId: String(meta.classId || '10'),
-          subject: meta.subject || 'সাধারণ',
-          chapter: meta.chapter || '১ম অধ্যায়',
-          type: p.type,
-          content: p.content,
-          source: 'live-editor'
-        }));
-      }
-    }
-
-    // 2. Second priority: Fallback to structured questions array
-    if (itemsToSave.length === 0) {
-      const list = activeSet === 'A' ? questions : questionsB;
-      if (list && list.length > 0) {
-        itemsToSave = list.map(q => ({
-          classId: String(meta.classId || '10'),
-          subject: meta.subject || 'সাধারণ',
-          chapter: meta.chapter || '১ম অধ্যায়',
-          type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
-          content: q.content,
-          source: 'create-question'
-        }));
-      }
-    }
-
-    if (itemsToSave.length === 0) {
+    const list = activeSet === 'A' ? questions : questionsB;
+    if (!list || list.length === 0) {
       toast({
         variant: 'destructive',
         title: 'কোনো প্রশ্ন নেই',
@@ -619,15 +572,23 @@ function CreateQuestionContent() {
       });
       return;
     }
-
+    const itemsToSave = list.map(q => ({
+      classId: String(meta.classId || '10'),
+      subject: meta.subject || 'সাধারণ',
+      chapter: meta.chapter || '১ম অধ্যায়',
+      type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative'),
+      content: q.content,
+      options: q.options || [],
+      source: 'create-question'
+    }));
     const result = addQuestionsToBank(itemsToSave, db);
     toast({
       title: 'প্রশ্ন ব্যাংকে সংরক্ষিত! 📥',
-      description: `মোট ${toBengaliNumber(result.addedCount)}টি প্রশ্ন কেন্দ্রীয় ক্লাউড সার্ভার ও প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
+      description: `মোট ${toBengaliNumber(result.addedCount)}টি প্রশ্ন সফলভাবে সংরক্ষিত হয়েছে।`
     });
   };
 
-  const getClassLabel = useCallback((cid?: string | number) => {
+    const getClassLabel = useCallback((cid?: string | number) => {
     if (!cid) return '';
     const s = String(cid).trim();
     const found = CLASSES.find(c => c.id === s || c.label === s || c.value === s || s.includes(c.label));

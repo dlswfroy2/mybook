@@ -2851,73 +2851,42 @@ export function QuestionPrintView({
     }
   };
 
-  // Direct save from Word-like editor into Question Bank (captures live edited DOM)
+  // Direct save from Word-like editor into Question Bank
+  // ALWAYS uses structured questions prop — never parses DOM .content-area → prevents math breakage & double-save
   const handleSaveToQuestionBankFromWord = () => {
     try {
-      const contentAreas = typeof document !== 'undefined' ? document.querySelectorAll('.content-area') : null;
-      let textToParse = '';
-      if (contentAreas && contentAreas.length > 0) {
-        const liveTexts: string[] = [];
-        contentAreas.forEach(ca => {
-          const t = (ca as HTMLElement).innerText || (ca as HTMLElement).textContent || '';
-          if (t.trim()) liveTexts.push(t.trim());
-        });
-        textToParse = liveTexts.join('\n\n');
-      }
-
-      let itemsToSave: any[] = [];
-      if (textToParse && textToParse.length > 20) {
-        // Strip institutional header
-        const cleaned = textToParse
-          .replace(/^[^\n]*\b(টিউটোরিয়ালস|বিদ্যালয়|মাদ্রাসা|স্কুল|পরীক্ষা|শ্রেণি|বিষয়|সময়|পূর্ণমান)[^\n]*\n+/gi, '')
-          .trim();
-        const defaultT = (questions[0]?.type || 'creative') as 'creative' | 'short' | 'mcq';
-        const parsed = parseGeneratedQuestions(cleaned, defaultT);
-        if (parsed && parsed.length > 0) {
-          itemsToSave = parsed.map(p => ({
-            classId: String(saveClassId || meta.classId || '10'),
-            subject: saveSubject || meta.subject || 'সাধারণ',
-            chapter: saveChapter || meta.chapter || '১ম অধ্যায়',
-            type: p.type,
-            content: p.content,
-            source: 'word-editor'
-          }));
-        }
-      }
-
-      if (itemsToSave.length === 0 && questions && questions.length > 0) {
-        itemsToSave = questions.map(q => ({
-          classId: String(saveClassId || meta.classId || '10'),
-          subject: saveSubject || meta.subject || 'সাধারণ',
-          chapter: saveChapter || meta.chapter || '১ম অধ্যায়',
-          type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative') as 'mcq' | 'creative' | 'short',
-          content: q.content,
-          source: 'word-editor'
-        }));
-      }
-
-      if (itemsToSave.length === 0) {
+      if (!questions || questions.length === 0) {
         toast({
           variant: 'destructive',
-          title: 'কোনো প্রশ্ন পাওয়া যায়নি',
-          description: 'প্রশ্ন ব্যাংকে সংরক্ষণ করার জন্য উপযুক্ত প্রশ্ন টেক্সট প্রয়োজন।'
+          title: 'কোনো প্রশ্ন পাওয়া যায়নি',
+          description: 'প্রশ্ন ব্যাংকে সংরক্ষণ করার জন্য উপযুক্ত প্রশ্ন টেক্সট প্রয়োজন।'
         });
         return;
       }
 
+      const itemsToSave = questions.map(q => ({
+        classId: String(saveClassId || meta.classId || '10'),
+        subject: saveSubject || meta.subject || 'সাধারণ',
+        chapter: saveChapter || meta.chapter || '১ম অধ্যায়',
+        type: (q.type === 'mcq' ? 'mcq' : q.type === 'short' ? 'short' : 'creative'),
+        content: q.content,
+        options: q.options || [],
+        source: 'word-editor'
+      }));
+
       const res = addQuestionsToBank(itemsToSave);
       toast({
         title: 'প্রশ্ন ব্যাংকে সংরক্ষিত! 📥',
-        description: `মোট ${toBengaliNumber(res.addedCount)}টি প্রশ্ন কেন্দ্রীয় ক্লাউড সার্ভার ও প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
+        description: `মোট ${toBengaliNumber(res.addedCount)}টি প্রশ্ন কেন্দ্রীয় ক্লাউড সার্ভার ও প্রশ্ন ব্যাংকে সফলভাবে সংরক্ষিত হয়েছে।`
       });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         variant: 'destructive',
-        title: 'সংরক্ষণ ব্যর্থ হয়েছে',
-        description: err.message || 'প্রশ্ন ব্যাংকে সেভ করা যায়নি।'
+        title: 'সংরক্ষণ ব্যর্থ হয়েছে',
+        description: err.message || 'প্রশ্ন ব্যাংকে সেভ করা যায়নি।'
       });
     }
-  };
+  };;
 
   const getDocumentFileName = useCallback(() => {
     const classLabel = getClassLabel(meta.classId);

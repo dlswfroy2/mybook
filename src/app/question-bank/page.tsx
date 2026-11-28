@@ -146,7 +146,18 @@ function formatContentWithBoardMarks(
 ): string {
   if (!content) return '';
   // Strip any duplicate leading serial number like "১। " or "১. " or "1. " from start
-  let cleaned = content.replace(/^[০-৯0-9]+[।.)]\s*/, '').trim();
+    // Strip any HTML tags that might have been saved from DOM (old data cleanup)
+  let cleaned = content
+    .replace(/<brs*/?>/gi, '\n')
+    .replace(/<div[^>]*>/gi, '\n')
+    .replace(/</div>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/^[০-৯0-9]+[।.)]s*/, '')
+    .trim();
 
   // If this is a Short Question, strip all trailing/embedded marks like [২], [2], (২), etc.
   if (options?.isShortQuestion) {
@@ -157,7 +168,14 @@ function formatContentWithBoardMarks(
       .trim();
   }
 
-  const rawLines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  // Merge lines that are continuations of math $ expressions (prevent broken fractions/sqrt)
+  // e.g. if a line ends mid-$...$, merge with next line
+  const mergedContent = cleaned
+    // First join lines where previous line ended inside a $ math block (odd number of $)
+    .replace(/([^\n]*\$[^\$\n]+)\n([^\n]*\$)/g, '$1 $2')
+    // Also join lines that are clearly fraction/sqrt continuations (number alone on a line)
+    .replace(/\n([০-৯0-9]+)\n/g, ' $1 ');
+  const rawLines = mergedContent.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   
   const rendered = rawLines.map(line => {
     // If Short Question, render clean text without any trailing marks
