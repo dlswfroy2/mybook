@@ -720,7 +720,7 @@ export default function QuestionBankPage() {
       const letter = letters[prev.length] || `বিভাগ ${toBengaliNumber(nextIndex)}`;
       const lastSec = prev[prev.length - 1];
       const cqTotal = selectedCreatives.length || 1;
-      const fromQ = lastSec ? Math.min(cqTotal, lastSec.toQ + 1) : 1;
+      const fromQ = (lastSec && lastSec.toQ > 0) ? Math.min(cqTotal, lastSec.toQ + 1) : 1;
       const toQ = Math.min(cqTotal, fromQ + 2);
       const startSerial = toBengaliNumber(fromQ);
 
@@ -1005,12 +1005,28 @@ export default function QuestionBankPage() {
             </div>
 
             {/* When single section (e.g. only MCQ test or only CQ test), display instruction centered across full page width */}
-            {isSingleTypeExam && singleTypeInstruction && (
+            {isSingleTypeExam && singleTypeInstruction && !creativeSections.some(s => s.fromQ === 0 && s.toQ === 0 && s.instruction) && (
               <div className="text-xs font-bold text-slate-900 mt-1">
                 [{singleTypeInstruction}]
               </div>
             )}
           </div>
+
+          {/* Master Section Banners (যেসব বিভাগের পরিসীমা ০-০ দেওয়া হয়েছে, সেগুলো সব প্রশ্নের উপরে হেডারের নিচে মূল শিরোনাম হিসেবে বসবে) */}
+          {includeCreative && creativeSections.filter(sec => sec.fromQ === 0 && sec.toQ === 0).map((sec, secIdx) => (
+            <div key={`master-banner-${sec.id || secIdx}`} className="master-banner text-center my-2 pb-1.5 border-b border-black select-none [column-span:all] w-full">
+              {sec.title && (
+                <div className="inline-block font-black text-sm sm:text-base text-black border-b border-black pb-0.5 uppercase tracking-wide">
+                  {sec.title}
+                </div>
+              )}
+              {sec.instruction && (
+                <div className="text-xs sm:text-[13px] font-bold italic text-slate-900 mt-0.5">
+                  [{sec.instruction}]
+                </div>
+              )}
+            </div>
+          ))}
 
           {/* Question Flow (1 or 2 columns based on columnLayout) */}
           <div className={cn(
@@ -1020,14 +1036,15 @@ export default function QuestionBankPage() {
               : "columns-1 print:columns-1"
           )}>
             {/* Section 1: Creative Questions (CQ) - Supports multiple sections (ক, খ, গ, ঘ বিভাগ) */}
-            {includeCreative && selectedCreatives.length > 0 && creativeSections.map((sec, secIdx) => {
+            {includeCreative && selectedCreatives.length > 0 && creativeSections.filter(sec => !(sec.fromQ === 0 && sec.toQ === 0)).map((sec, secIdx) => {
               const startIdx = Math.max(0, (sec.fromQ || 1) - 1);
               const endIdx = Math.min(selectedCreatives.length, sec.toQ || selectedCreatives.length);
               const secQuestions = selectedCreatives.slice(startIdx, endIdx);
 
               if (secQuestions.length === 0) return null;
 
-              const showHeader = !isSingleTypeExam || creativeSections.length > 1;
+              const activeSections = creativeSections.filter(s => !(s.fromQ === 0 && s.toQ === 0));
+              const showHeader = !isSingleTypeExam || activeSections.length > 1 || creativeSections.some(s => s.fromQ === 0 && s.toQ === 0);
 
               return (
                 <div key={sec.id || secIdx} className="section-block mb-2">
@@ -1202,6 +1219,13 @@ export default function QuestionBankPage() {
               margin-top: 4px !important;
               margin-bottom: 4px !important;
               padding: 0 !important;
+            }
+            .master-banner {
+              break-inside: avoid !important;
+              break-after: avoid !important;
+              page-break-after: avoid !important;
+              margin-top: 4px !important;
+              margin-bottom: 6px !important;
             }
             .question-item {
               break-inside: avoid !important;
@@ -1925,15 +1949,23 @@ export default function QuestionBankPage() {
                           <div className="flex items-center gap-1">
                             <Input 
                               type="number" 
-                              value={sec.fromQ} 
-                              onChange={e => handleUpdateCreativeSection(sec.id, 'fromQ', parseInt(e.target.value, 10) || 1)} 
+                              min={0}
+                              value={sec.fromQ ?? 0} 
+                              onChange={e => {
+                                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                                handleUpdateCreativeSection(sec.id, 'fromQ', isNaN(val) ? 0 : Math.max(0, val));
+                              }} 
                               className="h-7 text-xs font-bold text-center px-1" 
                             />
                             <span className="text-slate-400 font-bold">-</span>
                             <Input 
                               type="number" 
-                              value={sec.toQ} 
-                              onChange={e => handleUpdateCreativeSection(sec.id, 'toQ', parseInt(e.target.value, 10) || 1)} 
+                              min={0}
+                              value={sec.toQ ?? 0} 
+                              onChange={e => {
+                                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                                handleUpdateCreativeSection(sec.id, 'toQ', isNaN(val) ? 0 : Math.max(0, val));
+                              }} 
                               className="h-7 text-xs font-bold text-center px-1" 
                             />
                           </div>
@@ -1941,10 +1973,19 @@ export default function QuestionBankPage() {
                         <div className="space-y-1">
                           <label className="font-bold text-slate-700 text-[11px]">শুরুর ক্রমিক</label>
                           <div className="h-7 px-2 bg-slate-100 rounded border border-slate-300 flex items-center justify-center font-bold text-xs text-indigo-700">
-                            {toBengaliNumber(sec.fromQ || (secIdx + 1))} (ক্রমান্বয়ে)
+                            {sec.fromQ === 0 && sec.toQ === 0
+                              ? 'প্রযোজ্য নয় (মূল শিরোনাম)'
+                              : `${toBengaliNumber(sec.fromQ || (secIdx + 1))} (ক্রমান্বয়ে)`
+                            }
                           </div>
                         </div>
                       </div>
+
+                      {sec.fromQ === 0 && sec.toQ === 0 && (
+                        <p className="text-[10.5px] text-amber-800 font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                          ★ পরিসীমা 0-0: এটি কোনো নির্দিষ্ট প্রশ্নের আওতাভুক্ত নয়; সরাসরি সব প্রশ্নের উপরে প্রশ্নপত্রের মূল শিরোনাম ও সাধারণ নির্দেশনা হিসেবে বসবে।
+                        </p>
+                      )}
 
                       <div className="space-y-1">
                         <label className="font-bold text-slate-700 text-[11px]">উত্তর দেওয়ার নির্দেশনা</label>
