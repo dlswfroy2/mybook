@@ -588,7 +588,7 @@ function CreateQuestionContent() {
     });
   };
 
-    const getClassLabel = useCallback((cid?: string | number) => {
+  const getClassLabel = useCallback((cid?: string | number) => {
     if (!cid) return '';
     const s = String(cid).trim();
     const found = CLASSES.find(c => c.id === s || c.label === s || c.value === s || s.includes(c.label));
